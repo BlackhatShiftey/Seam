@@ -210,19 +210,19 @@ runtime = SeamRuntime(
 Current status:
 
 - SQLite vector adapter is fully active
-- Pgvector adapter is scaffolded for production integration
+- Pgvector adapter is active for production-style integration
 - both adapters use the same MIRL record ids as join keys
+- `validate-stack` can smoke-test the configured embedding provider and pgvector adapter
 
 ## 8. What still needs to be completed
 
 The current integration is functional, but still v1:
 
-- add a Postgres/pgvector adapter
 - add external vector DB adapters
-- add model-specific pack scoring
-- add embedding benchmark comparisons between models
+- add embedding benchmark comparisons between cloud and local models
 - add reranking model hooks
 - add a stronger local embedding backend than the hash fallback
+- formalize teacher-model to local-model data export for fine-tuning
 
 ## 9. Rule of thumb
 

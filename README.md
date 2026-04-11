@@ -28,6 +28,22 @@ python seam.py --db seam.db search "translator natural language" --budget 3
 python seam.py --db seam.db export-symbols
 ```
 
+## Live stack validation
+
+Validate the currently configured embedding + pgvector path:
+
+```powershell
+python seam.py --db seam_validate.db validate-stack
+```
+
+Run a local pgvector database with Docker:
+
+```powershell
+docker run -d --name seam-pgvector -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=seam -p 54329:5432 pgvector/pgvector:pg17
+$env:SEAM_PGVECTOR_DSN="postgresql://postgres:postgres@localhost:54329/seam"
+python seam.py --db seam_validate.db validate-stack
+```
+
 ## Model configuration
 
 Default:
@@ -40,6 +56,12 @@ Environment-driven OpenAI-compatible embeddings:
 $env:SEAM_EMBEDDING_PROVIDER="openai"
 $env:SEAM_EMBEDDING_MODEL="text-embedding-3-small"
 $env:OPENAI_API_KEY="..."
+```
+
+Optional pgvector DSN:
+
+```powershell
+$env:SEAM_PGVECTOR_DSN="postgresql://postgres:postgres@localhost:54329/seam"
 ```
 
 Then:

@@ -6,11 +6,13 @@ from pathlib import Path
 
 from .mirl import IRBatch
 from .runtime import SeamRuntime
+from .validation import validate_runtime_stack
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SEAM v1 memory compiler/runtime")
     parser.add_argument("--db", default="seam.db", help="SQLite database path")
+    parser.add_argument("--pgvector-dsn", default=None, help="Optional pgvector DSN; falls back to SEAM_PGVECTOR_DSN")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     ingest_parser = subparsers.add_parser("ingest", help="Store raw text from a file or stdin")
@@ -68,13 +70,17 @@ def build_parser() -> argparse.ArgumentParser:
     export_symbols_parser.add_argument("--output")
 
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
+    subparsers.add_parser("validate-stack", help="Validate embedding and pgvector runtime wiring")
     return parser
 
 
 def run_cli(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
-    runtime = SeamRuntime(args.db)
+    if args.command == "validate-stack":
+        print(json.dumps(validate_runtime_stack(args.db, pgvector_dsn=args.pgvector_dsn), indent=2))
+        return
+    runtime = SeamRuntime(args.db, pgvector_dsn=args.pgvector_dsn)
 
     if args.command == "ingest":
         text = Path(args.source).read_text(encoding="utf-8") if args.source != "-" else input()

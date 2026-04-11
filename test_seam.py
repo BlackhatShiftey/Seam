@@ -6,7 +6,9 @@ from uuid import uuid4
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime.models import OpenAICompatibleEmbeddingModel, default_embedding_model
 from seam_runtime.pack import score_pack, unpack_exact_pack
+from seam_runtime.runtime import resolve_pgvector_dsn
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
+from seam_runtime.validation import runtime_configuration_snapshot
 from seam_runtime.verify import verify_ir
 
 
@@ -182,6 +184,37 @@ claim c1:
         self.assertEqual(exact_score["reversibility"], 1.0)
         self.assertGreaterEqual(context_score["traceability"], 0.66)
         self.assertGreater(context_score["overall"], 0.0)
+
+    def test_resolve_pgvector_dsn_from_env(self) -> None:
+        previous = os.environ.get("SEAM_PGVECTOR_DSN")
+        try:
+            os.environ["SEAM_PGVECTOR_DSN"] = "postgresql://postgres:postgres@localhost:54329/seam"
+            self.assertEqual(resolve_pgvector_dsn(), "postgresql://postgres:postgres@localhost:54329/seam")
+            self.assertEqual(resolve_pgvector_dsn("postgresql://override"), "postgresql://override")
+        finally:
+            if previous is None:
+                os.environ.pop("SEAM_PGVECTOR_DSN", None)
+            else:
+                os.environ["SEAM_PGVECTOR_DSN"] = previous
+
+    def test_runtime_configuration_snapshot_reports_missing_cloud_key(self) -> None:
+        keys = ["SEAM_EMBEDDING_PROVIDER", "SEAM_EMBEDDING_MODEL", "SEAM_EMBEDDING_API_KEY_ENV", "ALT_OPENAI_KEY"]
+        snapshot = {key: os.environ.get(key) for key in keys}
+        try:
+            os.environ["SEAM_EMBEDDING_PROVIDER"] = "openai-compatible"
+            os.environ["SEAM_EMBEDDING_MODEL"] = "text-embedding-3-small"
+            os.environ["SEAM_EMBEDDING_API_KEY_ENV"] = "ALT_OPENAI_KEY"
+            os.environ.pop("ALT_OPENAI_KEY", None)
+            config = runtime_configuration_snapshot(pgvector_dsn="postgresql://postgres:postgres@localhost:54329/seam")
+        finally:
+            for key, value in snapshot.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.assertFalse(config["embedding"]["configured"])
+        self.assertTrue(config["pgvector"]["dsn_present"])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from .dsl import compile_dsl
@@ -28,10 +29,11 @@ class SeamRuntime:
     ) -> None:
         self.store = SQLiteStore(store_path)
         self.embedding_model = embedding_model or default_embedding_model()
+        resolved_pgvector_dsn = resolve_pgvector_dsn(pgvector_dsn)
         if vector_adapter is not None:
             self.vector_adapter = vector_adapter
-        elif pgvector_dsn:
-            self.vector_adapter = PgVectorAdapter(pgvector_dsn, self.embedding_model)
+        elif resolved_pgvector_dsn:
+            self.vector_adapter = PgVectorAdapter(resolved_pgvector_dsn, self.embedding_model)
         else:
             self.vector_adapter = SQLiteVectorAdapter(str(store_path), self.embedding_model)
 
@@ -128,3 +130,13 @@ class SeamRuntime:
         batch = self.store.load_ir(ids=record_ids) if record_ids else self.store.load_ir()
         self.vector_adapter.index_records(batch.records)
         return {"indexed_ids": [record.id for record in batch.records], "model": self.embedding_model.name, "adapter": getattr(self.vector_adapter, "name", "unknown")}
+
+
+def resolve_pgvector_dsn(pgvector_dsn: str | None = None) -> str | None:
+    if pgvector_dsn:
+        return pgvector_dsn
+    value = os.environ.get("SEAM_PGVECTOR_DSN")
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
