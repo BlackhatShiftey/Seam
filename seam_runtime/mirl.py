@@ -1,0 +1,341 @@
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Iterable
+
+
+SCHEMA_VERSION = "mirl/0.1"
+VALID_SCOPES = {"global", "org", "project", "user", "thread", "ephemeral"}
+PACK_MODES = {"exact", "context", "narrative"}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+class RecordKind(str, Enum):
+    RAW = "RAW"
+    SPAN = "SPAN"
+    ENT = "ENT"
+    CLM = "CLM"
+    EVT = "EVT"
+    REL = "REL"
+    STA = "STA"
+    SYM = "SYM"
+    PACK = "PACK"
+    FLOW = "FLOW"
+    PROV = "PROV"
+    META = "META"
+
+
+class Status(str, Enum):
+    ASSERTED = "asserted"
+    OBSERVED = "observed"
+    INFERRED = "inferred"
+    HYPOTHETICAL = "hypothetical"
+    CONTRADICTED = "contradicted"
+    SUPERSEDED = "superseded"
+    DEPRECATED = "deprecated"
+    DELETED_SOFT = "deleted_soft"
+
+
+@dataclass
+class MIRLRecord:
+    id: str
+    kind: RecordKind
+    ns: str = "local.default"
+    scope: str = "project"
+    ver: str = SCHEMA_VERSION
+    created_at: str = field(default_factory=utc_now)
+    updated_at: str = field(default_factory=utc_now)
+    conf: float = 1.0
+    status: Status = Status.ASSERTED
+    t0: str | None = None
+    t1: str | None = None
+    prov: list[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    ext: dict[str, Any] = field(default_factory=dict)
+    attrs: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "kind": self.kind.value,
+            "ns": self.ns,
+            "scope": self.scope,
+            "ver": self.ver,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "conf": round(float(self.conf), 6),
+            "status": self.status.value,
+            "t0": self.t0,
+            "t1": self.t1,
+            "prov": list(self.prov),
+            "evidence": list(self.evidence),
+            "ext": self.ext,
+            "attrs": self.attrs,
+        }
+
+    def payload_dict(self) -> dict[str, Any]:
+        data = self.to_dict()
+        data.pop("id")
+        data.pop("kind")
+        return data
+
+    def to_text_line(self) -> str:
+        payload = json.dumps(self.payload_dict(), sort_keys=True, separators=(",", ":"))
+        return f"{self.kind.value}|{self.id}|{payload}"
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MIRLRecord":
+        return cls(
+            id=data["id"],
+            kind=RecordKind(data["kind"]),
+            ns=data.get("ns", "local.default"),
+            scope=data.get("scope", "project"),
+            ver=data.get("ver", SCHEMA_VERSION),
+            created_at=data.get("created_at", utc_now()),
+            updated_at=data.get("updated_at", utc_now()),
+            conf=float(data.get("conf", 1.0)),
+            status=Status(data.get("status", Status.ASSERTED.value)),
+            t0=data.get("t0"),
+            t1=data.get("t1"),
+            prov=list(data.get("prov", [])),
+            evidence=list(data.get("evidence", [])),
+            ext=dict(data.get("ext", {})),
+            attrs=dict(data.get("attrs", {})),
+        )
+
+    @classmethod
+    def from_text_line(cls, line: str) -> "MIRLRecord":
+        kind, record_id, payload = line.split("|", 2)
+        data = json.loads(payload)
+        data["id"] = record_id
+        data["kind"] = kind
+        return cls.from_dict(data)
+
+
+@dataclass
+class IRBatch:
+    records: list[MIRLRecord]
+
+    def to_text(self) -> str:
+        return "\n".join(record.to_text_line() for record in sorted(self.records, key=lambda item: item.id))
+
+    def to_json(self) -> list[dict[str, Any]]:
+        return [record.to_dict() for record in sorted(self.records, key=lambda item: item.id)]
+
+    def by_id(self) -> dict[str, MIRLRecord]:
+        return {record.id: record for record in self.records}
+
+    def kind(self, kind: RecordKind) -> list[MIRLRecord]:
+        return [record for record in self.records if record.kind == kind]
+
+    @classmethod
+    def from_text(cls, text: str) -> "IRBatch":
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        return cls([MIRLRecord.from_text_line(line) for line in lines])
+
+    @classmethod
+    def from_json(cls, payload: list[dict[str, Any]]) -> "IRBatch":
+        return cls([MIRLRecord.from_dict(item) for item in payload])
+
+
+@dataclass
+class VerifyIssue:
+    level: str
+    code: str
+    message: str
+    record_id: str | None = None
+
+
+@dataclass
+class VerifyReport:
+    issues: list[VerifyIssue] = field(default_factory=list)
+
+    @property
+    def valid(self) -> bool:
+        return not any(issue.level == "error" for issue in self.issues)
+
+    def add(self, level: str, code: str, message: str, record_id: str | None = None) -> None:
+        self.issues.append(VerifyIssue(level=level, code=code, message=message, record_id=record_id))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "valid": self.valid,
+            "issues": [
+                {
+                    "level": issue.level,
+                    "code": issue.code,
+                    "message": issue.message,
+                    "record_id": issue.record_id,
+                }
+                for issue in self.issues
+            ],
+        }
+
+
+@dataclass
+class PersistReport:
+    stored_ids: list[str]
+    store_path: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"stored_ids": self.stored_ids, "store_path": self.store_path}
+
+
+@dataclass
+class Pack:
+    pack_id: str
+    mode: str
+    lens: str
+    refs: list[str]
+    payload: dict[str, Any]
+    budget: int
+    reversible: bool
+    token_cost: int
+    profile: str = "default"
+    created_at: str = field(default_factory=utc_now)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "pack_id": self.pack_id,
+            "mode": self.mode,
+            "lens": self.lens,
+            "refs": self.refs,
+            "payload": self.payload,
+            "budget": self.budget,
+            "reversible": self.reversible,
+            "token_cost": self.token_cost,
+            "profile": self.profile,
+            "created_at": self.created_at,
+        }
+
+    def to_record(self, ns: str = "local.default", scope: str = "project") -> MIRLRecord:
+        return MIRLRecord(
+            id=self.pack_id,
+            kind=RecordKind.PACK,
+            ns=ns,
+            scope=scope,
+            status=Status.OBSERVED,
+            attrs={
+                "mode": self.mode,
+                "lens": self.lens,
+                "refs": self.refs,
+                "payload": self.payload,
+                "budget": self.budget,
+                "reversible": self.reversible,
+                "token_cost": self.token_cost,
+                "profile": self.profile,
+            },
+        )
+
+    @classmethod
+    def from_record(cls, record: MIRLRecord) -> "Pack":
+        attrs = record.attrs
+        return cls(
+            pack_id=record.id,
+            mode=attrs["mode"],
+            lens=attrs.get("lens", "general"),
+            refs=list(attrs.get("refs", [])),
+            payload=dict(attrs.get("payload", {})),
+            budget=int(attrs.get("budget", 0)),
+            reversible=bool(attrs.get("reversible", False)),
+            token_cost=int(attrs.get("token_cost", 0)),
+            profile=str(attrs.get("profile", "default")),
+            created_at=record.created_at,
+        )
+
+
+@dataclass
+class SearchCandidate:
+    record: MIRLRecord
+    score: float
+    reasons: list[str] = field(default_factory=list)
+    evidence: list[MIRLRecord] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "record": self.record.to_dict(),
+            "score": round(self.score, 6),
+            "reasons": self.reasons,
+            "evidence": [item.to_dict() for item in self.evidence],
+        }
+
+
+@dataclass
+class SearchResult:
+    query: str
+    candidates: list[SearchCandidate]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"query": self.query, "candidates": [candidate.to_dict() for candidate in self.candidates]}
+
+
+@dataclass
+class TraceGraph:
+    root_id: str
+    nodes: list[MIRLRecord]
+    edges: list[dict[str, str]]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "root_id": self.root_id,
+            "nodes": [node.to_dict() for node in self.nodes],
+            "edges": self.edges,
+        }
+
+
+@dataclass
+class ReconcileReport:
+    added_records: list[MIRLRecord]
+    actions: list[dict[str, Any]]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "added_records": [record.to_dict() for record in self.added_records],
+            "actions": self.actions,
+        }
+
+
+@dataclass
+class Artifact:
+    target: str
+    body: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"target": self.target, "body": self.body, "metadata": self.metadata}
+
+
+def token_count(text: str) -> int:
+    return len([token for token in text.replace("\n", " ").split(" ") if token])
+
+
+def cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float:
+    if not left or not right:
+        return 0.0
+    numerator = sum(left[token] * right.get(token, 0.0) for token in left)
+    left_norm = math.sqrt(sum(value * value for value in left.values()))
+    right_norm = math.sqrt(sum(value * value for value in right.values()))
+    if not left_norm or not right_norm:
+        return 0.0
+    return numerator / (left_norm * right_norm)
+
+
+def iter_textual_fields(record: MIRLRecord) -> Iterable[str]:
+    for key, value in record.attrs.items():
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    yield item
+        elif isinstance(value, dict):
+            for subvalue in value.values():
+                if isinstance(subvalue, str):
+                    yield subvalue
