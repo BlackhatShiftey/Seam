@@ -1,9 +1,11 @@
+import os
 import unittest
 from pathlib import Path
 from uuid import uuid4
 
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
-from seam_runtime.pack import unpack_exact_pack
+from seam_runtime.models import OpenAICompatibleEmbeddingModel, default_embedding_model
+from seam_runtime.pack import score_pack, unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
 from seam_runtime.verify import verify_ir
 
@@ -129,6 +131,57 @@ claim c1:
         batch = compile_nl("Build durable AI memory for databases.")
         parsed = load_ir_lines(batch.to_text())
         self.assertEqual(len(parsed), len(batch.records))
+
+    def test_default_embedding_model_from_env(self) -> None:
+        keys = [
+            "SEAM_EMBEDDING_PROVIDER",
+            "SEAM_EMBEDDING_MODEL",
+            "SEAM_EMBEDDING_BASE_URL",
+            "SEAM_EMBEDDING_API_KEY_ENV",
+            "SEAM_EMBEDDING_TIMEOUT_S",
+            "SEAM_EMBEDDING_DIMENSIONS",
+        ]
+        snapshot = {key: os.environ.get(key) for key in keys}
+        try:
+            os.environ["SEAM_EMBEDDING_PROVIDER"] = "openai-compatible"
+            os.environ["SEAM_EMBEDDING_MODEL"] = "text-embedding-3-small"
+            os.environ["SEAM_EMBEDDING_BASE_URL"] = "https://example.test/v1/embeddings"
+            os.environ["SEAM_EMBEDDING_API_KEY_ENV"] = "ALT_OPENAI_KEY"
+            os.environ["SEAM_EMBEDDING_TIMEOUT_S"] = "12.5"
+            os.environ["SEAM_EMBEDDING_DIMENSIONS"] = "256"
+            model = default_embedding_model()
+        finally:
+            for key, value in snapshot.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.assertIsInstance(model, OpenAICompatibleEmbeddingModel)
+        self.assertEqual(model.model, "text-embedding-3-small")
+        self.assertEqual(model.base_url, "https://example.test/v1/embeddings")
+        self.assertEqual(model.api_key_env, "ALT_OPENAI_KEY")
+        self.assertEqual(model.timeout_s, 12.5)
+        self.assertEqual(model.dimensions, 256)
+
+    def test_retrieval_benchmark_uses_gold_fixtures(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        benchmark = runtime.run_retrieval_benchmark()
+        self.assertGreaterEqual(benchmark["summary"]["fixture_count"], 3)
+        self.assertIn("hybrid", benchmark["summary"]["tracks"])
+        self.assertTrue(benchmark["summary"]["success_checks"]["exact_packs_reversible"])
+        categories = {fixture["category"] for fixture in benchmark["fixtures"]}
+        self.assertIn("relation", categories)
+
+    def test_pack_scoring_preserves_traceability_metrics(self) -> None:
+        batch = compile_nl("We need a translator back into natural language for AI memory.")
+        exact = pack_ir(batch, mode="exact")
+        context = pack_ir(batch, mode="context")
+        exact_score = score_pack(exact, batch.records)
+        context_score = score_pack(context, batch.records)
+        self.assertEqual(exact_score["reversibility"], 1.0)
+        self.assertGreaterEqual(context_score["traceability"], 0.66)
+        self.assertGreater(context_score["overall"], 0.0)
 
 
 if __name__ == "__main__":

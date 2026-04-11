@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -43,6 +43,9 @@ class PgVectorAdapter:
     table_name: str = "seam_vector_index"
     name: str = "pgvector"
 
+    def __post_init__(self) -> None:
+        self.table_name = _validate_identifier(self.table_name)
+
     def _connect(self):
         try:
             import psycopg
@@ -59,11 +62,14 @@ class PgVectorAdapter:
                     create table if not exists {self.table_name} (
                         record_id text primary key,
                         model_name text not null,
+                        dimension integer not null,
                         source_text text not null,
-                        vector_json jsonb not null
+                        embedding vector not null,
+                        updated_at text not null
                     )
                     """
                 )
+                cursor.execute(f"create index if not exists {self.table_name}_model_name_idx on {self.table_name} (model_name)")
             connection.commit()
 
     def index_records(self, records: list[MIRLRecord]) -> None:
@@ -73,32 +79,50 @@ class PgVectorAdapter:
                 for record in records:
                     if record.kind not in INDEXABLE_KINDS:
                         continue
-                    source_text = " ".join(part for part in record.attrs.values() if isinstance(part, str))
+                    source_text = SQLiteVectorIndex.render_record_text(record)
                     vector = self.model.embed(source_text)
                     cursor.execute(
                         f"""
-                        insert into {self.table_name} (record_id, model_name, source_text, vector_json)
-                        values (%s, %s, %s, %s)
+                        insert into {self.table_name} (record_id, model_name, dimension, source_text, embedding, updated_at)
+                        values (%s, %s, %s, %s, %s::vector, %s)
                         on conflict (record_id) do update
                         set model_name = excluded.model_name,
+                            dimension = excluded.dimension,
                             source_text = excluded.source_text,
-                            vector_json = excluded.vector_json
+                            embedding = excluded.embedding,
+                            updated_at = excluded.updated_at
                         """,
-                        (record.id, self.model.name, source_text, json.dumps(vector)),
+                        (record.id, self.model.name, len(vector), source_text, _vector_literal(vector), record.updated_at),
                     )
             connection.commit()
 
     def search(self, query: str, limit: int = 10) -> dict[str, float]:
         self.ensure_schema()
         query_vector = self.model.embed(query)
-        scores: dict[str, float] = {}
         with self._connect() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(f"select record_id, vector_json from {self.table_name} where model_name = %s", (self.model.name,))
+                cursor.execute(
+                    f"""
+                    select record_id, 1 - (embedding <=> %s::vector) as score
+                    from {self.table_name}
+                    where model_name = %s and dimension = %s
+                    order by embedding <=> %s::vector
+                    limit %s
+                    """,
+                    (_vector_literal(query_vector), self.model.name, len(query_vector), _vector_literal(query_vector), limit),
+                )
                 rows = cursor.fetchall()
-        for record_id, vector_json in rows:
-            vector = json.loads(vector_json) if isinstance(vector_json, str) else vector_json
-            score = sum(a * b for a, b in zip(query_vector, vector, strict=False))
-            if score > 0:
-                scores[record_id] = score
-        return dict(sorted(scores.items(), key=lambda item: item[1], reverse=True)[:limit])
+        return {record_id: float(score) for record_id, score in rows if score is not None and float(score) > 0}
+
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_identifier(name: str) -> str:
+    if not _IDENTIFIER_RE.fullmatch(name):
+        raise ValueError(f"Unsafe SQL identifier: {name}")
+    return name
+
+
+def _vector_literal(vector: list[float]) -> str:
+    return "[" + ",".join(f"{float(value):.8f}" for value in vector) + "]"

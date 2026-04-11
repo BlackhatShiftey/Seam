@@ -6,7 +6,7 @@ import math
 import os
 import urllib.request
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class EmbeddingModel(Protocol):
@@ -15,6 +15,16 @@ class EmbeddingModel(Protocol):
 
     def embed(self, text: str) -> list[float]:
         ...
+
+
+@dataclass(frozen=True)
+class EmbeddingSettings:
+    provider: str = "hash"
+    model: str = "text-embedding-3-small"
+    base_url: str = "https://api.openai.com/v1/embeddings"
+    api_key_env: str = "OPENAI_API_KEY"
+    timeout_s: float = 30.0
+    dimensions: int | None = None
 
 
 @dataclass
@@ -37,10 +47,14 @@ class OpenAICompatibleEmbeddingModel:
     model: str
     api_key_env: str = "OPENAI_API_KEY"
     base_url: str = "https://api.openai.com/v1/embeddings"
+    timeout_s: float = 30.0
+    dimensions: int | None = None
     name: str = ""
     dimension: int = 1536
 
     def __post_init__(self) -> None:
+        if self.dimensions is not None:
+            self.dimension = self.dimensions
         if not self.name:
             self.name = f"openai-compatible:{self.model}"
 
@@ -48,28 +62,53 @@ class OpenAICompatibleEmbeddingModel:
         api_key = os.environ.get(self.api_key_env)
         if not api_key:
             raise RuntimeError(f"Missing API key in {self.api_key_env}")
-        body = json.dumps({"model": self.model, "input": text}).encode("utf-8")
+        body_payload: dict[str, Any] = {"model": self.model, "input": text}
+        if self.dimensions is not None:
+            body_payload["dimensions"] = self.dimensions
+        body = json.dumps(body_payload).encode("utf-8")
         request = urllib.request.Request(
             self.base_url,
             data=body,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
             payload = json.loads(response.read().decode("utf-8"))
-        vector = payload["data"][0]["embedding"]
+        vector = [float(value) for value in payload["data"][0]["embedding"]]
         self.dimension = len(vector)
-        return vector
+        return _normalize(vector)
+
+
+def embedding_settings_from_env() -> EmbeddingSettings:
+    provider = os.environ.get("SEAM_EMBEDDING_PROVIDER", "hash").strip().lower() or "hash"
+    model = os.environ.get("SEAM_EMBEDDING_MODEL", "text-embedding-3-small")
+    base_url = os.environ.get("SEAM_EMBEDDING_BASE_URL", "https://api.openai.com/v1/embeddings")
+    api_key_env = os.environ.get("SEAM_EMBEDDING_API_KEY_ENV", "OPENAI_API_KEY")
+    timeout_s = float(os.environ.get("SEAM_EMBEDDING_TIMEOUT_S", "30"))
+    dimensions = _coerce_positive_int(os.environ.get("SEAM_EMBEDDING_DIMENSIONS"))
+    return EmbeddingSettings(
+        provider=provider,
+        model=model,
+        base_url=base_url,
+        api_key_env=api_key_env,
+        timeout_s=timeout_s,
+        dimensions=dimensions,
+    )
 
 
 def default_embedding_model() -> EmbeddingModel:
-    provider = os.environ.get("SEAM_EMBEDDING_PROVIDER", "hash").lower()
-    if provider == "openai":
-        model_name = os.environ.get("SEAM_EMBEDDING_MODEL", "text-embedding-3-small")
-        base_url = os.environ.get("SEAM_EMBEDDING_BASE_URL", "https://api.openai.com/v1/embeddings")
-        api_key_env = os.environ.get("SEAM_EMBEDDING_API_KEY_ENV", "OPENAI_API_KEY")
-        return OpenAICompatibleEmbeddingModel(model=model_name, base_url=base_url, api_key_env=api_key_env)
-    return HashEmbeddingModel()
+    settings = embedding_settings_from_env()
+    if settings.provider in {"hash", "local", "deterministic"}:
+        return HashEmbeddingModel()
+    if settings.provider in {"openai", "openai-compatible"}:
+        return OpenAICompatibleEmbeddingModel(
+            model=settings.model,
+            base_url=settings.base_url,
+            api_key_env=settings.api_key_env,
+            timeout_s=settings.timeout_s,
+            dimensions=settings.dimensions,
+        )
+    raise ValueError(f"Unsupported embedding provider: {settings.provider}")
 
 
 def cosine(left: list[float], right: list[float]) -> float:
@@ -92,3 +131,12 @@ def _normalize(vector: list[float]) -> list[float]:
 
 def _tokens(text: str) -> list[str]:
     return [part for part in text.lower().replace("\n", " ").split(" ") if part]
+
+
+def _coerce_positive_int(value: str | None) -> int | None:
+    if value is None or not value.strip():
+        return None
+    parsed = int(value)
+    if parsed <= 0:
+        raise ValueError("Embedding dimensions must be a positive integer")
+    return parsed
