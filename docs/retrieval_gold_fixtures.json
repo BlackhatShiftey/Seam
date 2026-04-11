@@ -1,0 +1,32 @@
+[
+  {
+    "name": "goal_constraint_fact",
+    "category": "fact",
+    "format": "dsl",
+    "query": "goal durable_memory preserve_meaning",
+    "expected_ids": ["clm:goal", "clm:constraint", "sta:design"],
+    "budget": 5,
+    "pack_budget": 96,
+    "source": "raw raw:1:\n  source \"fixture://goal\"\n  text \"We need durable memory without losing meaning.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 46\nclaim clm:goal:\n  subject ent:project:seam\n  predicate goal\n  object durable_memory\n  evidence span:1\nclaim clm:constraint:\n  subject ent:project:seam\n  predicate constraint\n  object preserve_meaning\n  evidence span:1\nstate sta:design:\n  target ent:project:seam\n  field goal durable_memory\n  field constraint preserve_meaning\n  evidence span:1\n"
+  },
+  {
+    "name": "translator_workflow_intent",
+    "category": "workflow_intent",
+    "format": "dsl",
+    "query": "translator nl_ir_pack_roundtrip",
+    "expected_ids": ["clm:translator", "sta:translator"],
+    "budget": 5,
+    "pack_budget": 96,
+    "source": "raw raw:1:\n  source \"fixture://translator\"\n  text \"We need a translator back into natural language for memory workflows.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 66\nclaim clm:translator:\n  subject ent:project:seam\n  predicate translator\n  object nl_ir_pack_roundtrip\n  evidence span:1\nstate sta:translator:\n  target ent:project:seam\n  field translator nl_ir_pack_roundtrip\n  evidence span:1\n"
+  },
+  {
+    "name": "relation_trace_graph",
+    "category": "relation",
+    "format": "dsl",
+    "query": "depends_on expands_symbols_before_rank pack:context:translator",
+    "expected_ids": ["rel:trace", "rel:search", "clm:translator"],
+    "budget": 5,
+    "pack_budget": 96,
+    "source": "raw raw:1:\n  source \"fixture://relation\"\n  text \"Search should expand shorthand before ranking and keep traceable packs.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 71\nclaim clm:translator:\n  subject ent:project:seam\n  predicate translator\n  object nl_ir_pack_roundtrip\n  evidence span:1\nrel rel:trace:\n  src pack:context:translator\n  predicate depends_on\n  dst clm:translator\n  evidence span:1\nrel rel:search:\n  src flow:search:1\n  predicate expands_symbols_before_rank\n  dst pack:context:translator\n  evidence span:1\n"
+  }
+]
