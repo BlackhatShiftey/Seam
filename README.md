@@ -129,6 +129,7 @@ SQLite tables:
 
 ## Important docs
 
+- [docs/ENGINEERING_LOG.md](docs/ENGINEERING_LOG.md)
 - [docs/BENCHMARK_SOP.md](docs/BENCHMARK_SOP.md)
 - [docs/MIRL_V1.md](docs/MIRL_V1.md)
 - [docs/RETRIEVAL_EVAL_V1.md](docs/RETRIEVAL_EVAL_V1.md)
