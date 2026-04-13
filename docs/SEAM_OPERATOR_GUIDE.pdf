@@ -1,0 +1,794 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+2 0 obj
+<< /Length 1925 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+(# SEAM Operator Guide) Tj
+T*
+() Tj
+T*
+(This is the practical runbook for interacting with SEAM, running tests, and validating the) Tj
+T*
+(live stack.) Tj
+T*
+() Tj
+T*
+(## 1. What SEAM uses) Tj
+T*
+() Tj
+T*
+(- SQLite for canonical truth, provenance, packs, and metadata) Tj
+T*
+(- SQLite `vector_index` by default for local vector search) Tj
+T*
+(- Optional Postgres + pgvector for a real external vector database) Tj
+T*
+(- Configurable embedding model:) Tj
+T*
+(  - default local deterministic hash model) Tj
+T*
+(  - optional OpenAI-compatible cloud embedding provider) Tj
+T*
+() Tj
+T*
+(## 2. Where the databases live) Tj
+T*
+() Tj
+T*
+(- SQLite truth database: whatever you pass to `--db`) Tj
+T*
+(  - examples: `seam.db`, `seam_validate.db`, `seam_live.db`, `seam_demo.db`) Tj
+T*
+(- SQLite vector index:) Tj
+T*
+(  - stored inside that same SQLite file unless pgvector is enabled) Tj
+T*
+(- pgvector database:) Tj
+T*
+(  - separate Postgres container) Tj
+T*
+(  - local validated DSN: `postgresql://postgres:postgres@localhost:54329/seam`) Tj
+T*
+(  - container name used so far: `seam-pgvector`) Tj
+T*
+() Tj
+T*
+(## 3. Environment setup) Tj
+T*
+() Tj
+T*
+(### Local deterministic baseline) Tj
+T*
+() Tj
+T*
+(No API key required.) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam_validate.db validate-stack) Tj
+T*
+(python seam.py --db seam_validate.db stats) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Live cloud + pgvector path) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+($env:OPENAI_API_KEY="your-real-openai-api-key") Tj
+T*
+($env:SEAM_EMBEDDING_PROVIDER="openai-compatible") Tj
+T*
+($env:SEAM_EMBEDDING_MODEL="text-embedding-3-small") Tj
+T*
+($env:SEAM_PGVECTOR_DSN="postgresql://postgres:postgres@localhost:54329/seam") Tj
+T*
+() Tj
+T*
+(python seam.py --db seam_validate.db validate-stack) Tj
+T*
+(python seam.py --db seam_validate.db stats) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Start the local pgvector database) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Length 1115 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+() Tj
+T*
+(```powershell) Tj
+T*
+(docker run -d --name seam-pgvector -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres) Tj
+T*
+(-e POSTGRES_DB=seam -p 54329:5432 pgvector/pgvector:pg17) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(If it already exists:) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(docker start seam-pgvector) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(## 4. CLI surface) Tj
+T*
+() Tj
+T*
+(Top-level help:) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --help) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(Available commands:) Tj
+T*
+() Tj
+T*
+(```text) Tj
+T*
+(ingest) Tj
+T*
+(compile-nl) Tj
+T*
+(compile-dsl) Tj
+T*
+(verify) Tj
+T*
+(persist) Tj
+T*
+(search) Tj
+T*
+(pack) Tj
+T*
+(decompile) Tj
+T*
+(trace) Tj
+T*
+(reconcile) Tj
+T*
+(transpile) Tj
+T*
+(reindex) Tj
+T*
+(promote-symbols) Tj
+T*
+(export-symbols) Tj
+T*
+(stats) Tj
+T*
+(validate-stack) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(## 5. How to interact with SEAM) Tj
+T*
+() Tj
+T*
+(### Compile natural language into MIRL) Tj
+T*
+() Tj
+T*
+(Compile only:) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db compile-nl "We need a translator back into natural language for) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 1478 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+(memory workflows.") Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(Compile and persist:) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db compile-nl "We need a translator back into natural language for) Tj
+T*
+(memory workflows." --persist) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Compile DSL into MIRL) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db compile-dsl docs\\example.dsl --persist) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Verify MIRL from a file) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db verify docs\\example.mirl) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Persist MIRL from a file) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db persist docs\\example.mirl) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Search persisted memory) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db search "translator natural language" --budget 3) Tj
+T*
+(python seam.py --db seam.db search "thread memory mode" --scope thread --budget 5) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Build packs) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db pack clm:2,sta:ent:project:seam --mode context --lens general) Tj
+T*
+(--budget 128) Tj
+T*
+(python seam.py --db seam.db pack clm:2,sta:ent:project:seam --mode exact --lens general) Tj
+T*
+(--budget 128) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Decompile records) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db decompile clm:2,sta:ent:project:seam) Tj
+T*
+(```) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 1490 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+() Tj
+T*
+(### Trace provenance) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db trace clm:2) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Reconcile contradictions or duplicates) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db reconcile) Tj
+T*
+(python seam.py --db seam.db reconcile --record-ids clm:truth:v1,clm:truth:v2) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Transpile workflows) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db transpile flow:search:1) Tj
+T*
+(python seam.py --db seam.db transpile flow:search:1 --target python) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Reindex vectors) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db reindex) Tj
+T*
+(python seam.py --db seam.db reindex --record-ids clm:2,sta:ent:project:seam) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Promote machine-only symbols) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db promote-symbols --min-frequency 1) Tj
+T*
+(python seam.py --db seam.db promote-symbols --record-ids clm:2,sta:ent:project:seam --min-) Tj
+T*
+(frequency 1) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Export the symbol nursery) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam.db export-symbols) Tj
+T*
+(python seam.py --db seam.db export-symbols --namespace local.default --output) Tj
+T*
+(docs\\symbols.md) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Run benchmark summary) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam_validate.db stats) Tj
+T*
+(```) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 1535 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+() Tj
+T*
+(### Validate the embedding + pgvector stack) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam_validate.db validate-stack) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(## 6. Testing SEAM) Tj
+T*
+() Tj
+T*
+(### Run the full unit suite) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python -m unittest -v) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Run one specific test) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python -m unittest test_seam.SeamTests.test_retrieval_benchmark_uses_gold_fixtures -v) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Run a strict warning-sensitive test) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python -Werror::ResourceWarning -m unittest) Tj
+T*
+(test_seam.SeamTests.test_symbol_export_and_query_expansion) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(### Recommended operator test loop) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python -m unittest -v) Tj
+T*
+(python seam.py --db seam_validate.db validate-stack) Tj
+T*
+(python seam.py --db seam_validate.db stats) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(Use the local baseline when you are changing core logic and want deterministic behavior.) Tj
+T*
+() Tj
+T*
+(Use the cloud path when you want a stronger teacher-quality embedding baseline.) Tj
+T*
+() Tj
+T*
+(## 7. Worked example) Tj
+T*
+() Tj
+T*
+(This is a real example flow you can run from a clean shell.) Tj
+T*
+() Tj
+T*
+(### Step 1: compile and persist one sentence) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam_demo.db compile-nl "We need a translator back into natural language) Tj
+T*
+( for memory workflows." --persist) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 1463 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+(```) Tj
+T*
+() Tj
+T*
+(What happened:) Tj
+T*
+() Tj
+T*
+(- SEAM emitted `RAW`, `SPAN`, `PROV`, `ENT`, `CLM`, and `STA` records) Tj
+T*
+(- the important retrieval records included:) Tj
+T*
+(  - `clm:2` with predicate `translator`) Tj
+T*
+(  - `sta:ent:project:seam` with the translator field) Tj
+T*
+() Tj
+T*
+(### Step 2: search it) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python seam.py --db seam_demo.db search "translator natural language" --budget 3) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(Expected behavior:) Tj
+T*
+() Tj
+T*
+(- top result should include `clm:2`) Tj
+T*
+(- the search result should show reasons such as lexical, semantic, graph, and temporal) Tj
+T*
+(contributions) Tj
+T*
+(- the evidence chain should include `span:1`) Tj
+T*
+() Tj
+T*
+(### Step 3: run one benchmark test) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+(python -m unittest test_seam.SeamTests.test_retrieval_benchmark_uses_gold_fixtures -v) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(Expected behavior:) Tj
+T*
+() Tj
+T*
+(- the test should pass) Tj
+T*
+(- it confirms the hardened fixture benchmark is loading and checking the current success) Tj
+T*
+(gates) Tj
+T*
+() Tj
+T*
+(## 8. How to connect your own model) Tj
+T*
+() Tj
+T*
+(SEAM expects an embedding model with:) Tj
+T*
+() Tj
+T*
+(```python) Tj
+T*
+(name: str) Tj
+T*
+(dimension: int) Tj
+T*
+(embed\(text: str\) -> list[float]) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(Minimal example:) Tj
+T*
+() Tj
+T*
+(```python) Tj
+T*
+(from seam import SeamRuntime) Tj
+T*
+() Tj
+ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Length 1642 >>
+stream
+BT
+/F1 10 Tf
+50 742 Td
+14 TL
+() Tj
+T*
+(class MyEmbeddingModel:) Tj
+T*
+(    name = "my-local-model") Tj
+T*
+(    dimension = 768) Tj
+T*
+() Tj
+T*
+(    def embed\(self, text: str\) -> list[float]:) Tj
+T*
+(        raise NotImplementedError\("Replace with your model call"\)) Tj
+T*
+() Tj
+T*
+() Tj
+T*
+(runtime = SeamRuntime\("seam.db", embedding_model=MyEmbeddingModel\(\)\)) Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(For a shell-based OpenAI-compatible path, use:) Tj
+T*
+() Tj
+T*
+(```powershell) Tj
+T*
+($env:OPENAI_API_KEY="your-real-openai-api-key") Tj
+T*
+($env:SEAM_EMBEDDING_PROVIDER="openai-compatible") Tj
+T*
+($env:SEAM_EMBEDDING_MODEL="text-embedding-3-small") Tj
+T*
+(```) Tj
+T*
+() Tj
+T*
+(## 9. What to do when something fails) Tj
+T*
+() Tj
+T*
+(- `validate-stack` says API key missing:) Tj
+T*
+(  - set `OPENAI_API_KEY` in the same shell session) Tj
+T*
+(- `validate-stack` says pgvector DSN missing:) Tj
+T*
+(  - set `SEAM_PGVECTOR_DSN`) Tj
+T*
+(- `validate-stack` reports `HTTP 429`:) Tj
+T*
+(  - provider wiring is working, but quota/rate/billing needs attention) Tj
+T*
+(- `stats` regresses:) Tj
+T*
+(  - inspect the fixture-level `expected_ids`, `rejected_ids`, and `rejection_rate`) Tj
+T*
+(- search finds the right thing but also stale junk:) Tj
+T*
+(  - add or strengthen a benchmark fixture instead of relying on memory) Tj
+T*
+() Tj
+T*
+(## 10. Files worth knowing) Tj
+T*
+() Tj
+T*
+(- `README.md`) Tj
+T*
+(- `docs/BENCHMARK_SOP.md`) Tj
+T*
+(- `docs/RETRIEVAL_EVAL_V1.md`) Tj
+T*
+(- `docs/SOP_MODEL_INTEGRATION.md`) Tj
+T*
+(- `docs/PGVECTOR_LOCAL.md`) Tj
+T*
+(- `docs/ENGINEERING_LOG.md`) Tj
+T*
+(- `docs/retrieval_gold_fixtures.json`) Tj
+T*
+(- `test_seam.py`) Tj
+ET
+endstream
+endobj
+15 0 obj
+<< /Type /Page /Parent 16 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 14 0 R >>
+endobj
+16 0 obj
+<< /Type /Pages /Kids [ 3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R ] /Count 7 >>
+endobj
+17 0 obj
+<< /Type /Catalog /Pages 16 0 R >>
+endobj
+xref
+0 18
+0000000000 65535 f 
+0000000015 00000 n 
+0000000083 00000 n 
+0000002060 00000 n 
+0000002187 00000 n 
+0000003354 00000 n 
+0000003481 00000 n 
+0000005011 00000 n 
+0000005138 00000 n 
+0000006680 00000 n 
+0000006807 00000 n 
+0000008395 00000 n 
+0000008524 00000 n 
+0000010040 00000 n 
+0000010169 00000 n 
+0000011864 00000 n 
+0000011993 00000 n 
+0000012092 00000 n 
+trailer
+<< /Size 18 /Root 17 0 R >>
+startxref
+12143
+%%EOF

@@ -131,6 +131,7 @@ SQLite tables:
 
 - [docs/ENGINEERING_LOG.md](docs/ENGINEERING_LOG.md)
 - [docs/BENCHMARK_SOP.md](docs/BENCHMARK_SOP.md)
+- [docs/SEAM_OPERATOR_GUIDE.md](docs/SEAM_OPERATOR_GUIDE.md)
 - [docs/MIRL_V1.md](docs/MIRL_V1.md)
 - [docs/RETRIEVAL_EVAL_V1.md](docs/RETRIEVAL_EVAL_V1.md)
 - [docs/SOP_MODEL_INTEGRATION.md](docs/SOP_MODEL_INTEGRATION.md)
