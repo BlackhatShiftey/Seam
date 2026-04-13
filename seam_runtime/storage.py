@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, TraceGraph
@@ -18,92 +19,94 @@ class SQLiteStore:
         return connection
 
     def _init_schema(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                create table if not exists raw_docs (
-                    id text primary key,
-                    ns text not null,
-                    scope text not null,
-                    source_ref text,
-                    content text not null,
-                    created_at text not null
-                );
-                create table if not exists raw_spans (
-                    id text primary key,
-                    raw_id text not null,
-                    start integer not null,
-                    end integer not null,
-                    span_text text,
-                    created_at text not null
-                );
-                create table if not exists ir_records (
-                    id text primary key,
-                    kind text not null,
-                    ns text not null,
-                    scope text not null,
-                    status text not null,
-                    conf real not null,
-                    t0 text,
-                    t1 text,
-                    created_at text not null,
-                    updated_at text not null,
-                    payload_json text not null
-                );
-                create table if not exists ir_edges (
-                    id integer primary key autoincrement,
-                    src_id text not null,
-                    edge_type text not null,
-                    dst_id text not null
-                );
-                create table if not exists symbol_table (
-                    id text primary key,
-                    ns text not null,
-                    symbol text not null,
-                    expansion text not null,
-                    payload_json text not null
-                );
-                create table if not exists pack_store (
-                    id text primary key,
-                    mode text not null,
-                    lens text not null,
-                    refs_json text not null,
-                    payload_json text not null,
-                    created_at text not null
-                );
-                create table if not exists prov_log (
-                    id text primary key,
-                    entity text,
-                    activity text,
-                    agent text,
-                    payload_json text not null
-                );
-                create table if not exists vector_index (
-                    record_id text not null,
-                    model_name text not null,
-                    dimension integer not null,
-                    source_text text not null,
-                    vector_json text not null,
-                    updated_at text not null,
-                    primary key (record_id, model_name)
-                );
-                """
-            )
+        with closing(self._connect()) as connection:
+            with connection:
+                connection.executescript(
+                    """
+                    create table if not exists raw_docs (
+                        id text primary key,
+                        ns text not null,
+                        scope text not null,
+                        source_ref text,
+                        content text not null,
+                        created_at text not null
+                    );
+                    create table if not exists raw_spans (
+                        id text primary key,
+                        raw_id text not null,
+                        start integer not null,
+                        end integer not null,
+                        span_text text,
+                        created_at text not null
+                    );
+                    create table if not exists ir_records (
+                        id text primary key,
+                        kind text not null,
+                        ns text not null,
+                        scope text not null,
+                        status text not null,
+                        conf real not null,
+                        t0 text,
+                        t1 text,
+                        created_at text not null,
+                        updated_at text not null,
+                        payload_json text not null
+                    );
+                    create table if not exists ir_edges (
+                        id integer primary key autoincrement,
+                        src_id text not null,
+                        edge_type text not null,
+                        dst_id text not null
+                    );
+                    create table if not exists symbol_table (
+                        id text primary key,
+                        ns text not null,
+                        symbol text not null,
+                        expansion text not null,
+                        payload_json text not null
+                    );
+                    create table if not exists pack_store (
+                        id text primary key,
+                        mode text not null,
+                        lens text not null,
+                        refs_json text not null,
+                        payload_json text not null,
+                        created_at text not null
+                    );
+                    create table if not exists prov_log (
+                        id text primary key,
+                        entity text,
+                        activity text,
+                        agent text,
+                        payload_json text not null
+                    );
+                    create table if not exists vector_index (
+                        record_id text not null,
+                        model_name text not null,
+                        dimension integer not null,
+                        source_text text not null,
+                        vector_json text not null,
+                        updated_at text not null,
+                        primary key (record_id, model_name)
+                    );
+                    """
+                )
 
     def persist_ir(self, batch: IRBatch) -> PersistReport:
-        with self._connect() as connection:
-            for record in batch.records:
-                payload = json.dumps(record.to_dict(), sort_keys=True, separators=(",", ":"))
-                connection.execute(
-                    """
-                    insert or replace into ir_records
-                    (id, kind, ns, scope, status, conf, t0, t1, created_at, updated_at, payload_json)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (record.id, record.kind.value, record.ns, record.scope, record.status.value, record.conf, record.t0, record.t1, record.created_at, record.updated_at, payload),
-                )
-                self._persist_specialized(connection, record)
-                self._persist_edges(connection, record)
+        with closing(self._connect()) as connection:
+            with connection:
+                for record in batch.records:
+                    payload = json.dumps(record.to_dict(), sort_keys=True, separators=(",", ":"))
+                    connection.execute(
+                        """
+                        insert or replace into ir_records
+                        (id, kind, ns, scope, status, conf, t0, t1, created_at, updated_at, payload_json)
+                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (record.id, record.kind.value, record.ns, record.scope, record.status.value, record.conf, record.t0, record.t1, record.created_at, record.updated_at, payload),
+                    )
+                    self._persist_specialized(connection, record)
+                    self._persist_edges(connection, record)
         return PersistReport(stored_ids=[record.id for record in batch.records], store_path=self.path)
 
     def _persist_specialized(self, connection: sqlite3.Connection, record: MIRLRecord) -> None:
@@ -163,12 +166,12 @@ class SQLiteStore:
         if scope:
             query += " and scope = ?"
             params.append(scope)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(query, params).fetchall()
         return IRBatch([MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows])
 
     def read_pack(self, pack_id: str) -> Pack:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute("select * from pack_store where id = ?", (pack_id,)).fetchone()
         if row is None:
             raise KeyError(pack_id)

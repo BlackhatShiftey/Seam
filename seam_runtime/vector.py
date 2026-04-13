@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from typing import Iterable
 
 from .mirl import MIRLRecord, RecordKind, iter_textual_fields
@@ -22,42 +23,44 @@ class SQLiteVectorIndex:
         return connection
 
     def ensure_schema(self) -> None:
-        with self._connect() as connection:
-            connection.execute(
-                """
-                create table if not exists vector_index (
-                    record_id text not null,
-                    model_name text not null,
-                    dimension integer not null,
-                    source_text text not null,
-                    vector_json text not null,
-                    updated_at text not null,
-                    primary key (record_id, model_name)
+        with closing(self._connect()) as connection:
+            with connection:
+                connection.execute(
+                    """
+                    create table if not exists vector_index (
+                        record_id text not null,
+                        model_name text not null,
+                        dimension integer not null,
+                        source_text text not null,
+                        vector_json text not null,
+                        updated_at text not null,
+                        primary key (record_id, model_name)
+                    )
+                    """
                 )
-                """
-            )
 
     def index_records(self, records: Iterable[MIRLRecord]) -> None:
         self.ensure_schema()
-        with self._connect() as connection:
-            for record in records:
-                if record.kind not in INDEXABLE_KINDS:
-                    continue
-                source_text = self.render_record_text(record)
-                vector = self.model.embed(source_text)
-                connection.execute(
-                    """
-                    insert or replace into vector_index (record_id, model_name, dimension, source_text, vector_json, updated_at)
-                    values (?, ?, ?, ?, ?, ?)
-                    """,
-                    (record.id, self.model.name, len(vector), source_text, json.dumps(vector), record.updated_at),
-                )
+        with closing(self._connect()) as connection:
+            with connection:
+                for record in records:
+                    if record.kind not in INDEXABLE_KINDS:
+                        continue
+                    source_text = self.render_record_text(record)
+                    vector = self.model.embed(source_text)
+                    connection.execute(
+                        """
+                        insert or replace into vector_index (record_id, model_name, dimension, source_text, vector_json, updated_at)
+                        values (?, ?, ?, ?, ?, ?)
+                        """,
+                        (record.id, self.model.name, len(vector), source_text, json.dumps(vector), record.updated_at),
+                    )
 
     def search(self, query: str, limit: int = 10) -> dict[str, float]:
         self.ensure_schema()
         query_vector = self.model.embed(query)
         scores: dict[str, float] = {}
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute("select record_id, vector_json from vector_index where model_name = ?", (self.model.name,)).fetchall()
         for row in rows:
             score = cosine(query_vector, json.loads(row["vector_json"]))
