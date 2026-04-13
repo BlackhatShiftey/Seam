@@ -163,6 +163,8 @@ def _block_to_record(block: ParsedBlock, ns: str, scope: str, created_at: str) -
         updated_at=created_at,
         conf=conf,
         status=status,
+        t0=str(block.fields.get("t0")) if block.fields.get("t0") is not None else None,
+        t1=str(block.fields.get("t1")) if block.fields.get("t1") is not None else None,
         prov=prov,
         evidence=evidence,
         attrs=attrs,

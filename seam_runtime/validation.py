@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import os
+import urllib.error
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Any
@@ -62,19 +63,40 @@ def _embedding_smoke_check() -> dict[str, Any]:
             "model": settings.model,
         }
     runtime = SeamRuntime("validation_cloud_smoke.db")
-    vector = runtime.embedding_model.embed("SEAM validation embedding smoke test")
     try:
-        Path("validation_cloud_smoke.db").unlink(missing_ok=True)
-    except OSError:
-        pass
-    return {
-        "name": "embedding_provider",
-        "status": "ok",
-        "message": "Live cloud embedding smoke test passed.",
-        "provider": settings.provider,
-        "model": settings.model,
-        "dimension": len(vector),
-    }
+        vector = runtime.embedding_model.embed("SEAM validation embedding smoke test")
+        return {
+            "name": "embedding_provider",
+            "status": "ok",
+            "message": "Live cloud embedding smoke test passed.",
+            "provider": settings.provider,
+            "model": settings.model,
+            "dimension": len(vector),
+        }
+    except urllib.error.HTTPError as exc:
+        return {
+            "name": "embedding_provider",
+            "status": "blocked",
+            "message": f"Cloud embedding smoke test failed with HTTP {exc.code}.",
+            "provider": settings.provider,
+            "model": settings.model,
+            "http_status": exc.code,
+            "reason": getattr(exc, "reason", None),
+        }
+    except urllib.error.URLError as exc:
+        return {
+            "name": "embedding_provider",
+            "status": "blocked",
+            "message": "Cloud embedding smoke test could not reach the endpoint.",
+            "provider": settings.provider,
+            "model": settings.model,
+            "reason": str(exc.reason),
+        }
+    finally:
+        try:
+            Path("validation_cloud_smoke.db").unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _pgvector_smoke_check(store_path: str | Path, pgvector_dsn: str | None = None) -> dict[str, Any]:

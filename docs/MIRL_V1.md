@@ -35,6 +35,8 @@ MIRL is the canonical memory IR inside SEAM.
 - `ext`
 - `attrs`
 
+The hardened retrieval benchmark now explicitly tests the behavior of `t0`, `t1`, `scope`, `status`, `prov`, and `evidence`, because those are the fields that distinguish real memory from loose text similarity.
+
 ## Status Enum
 
 - `asserted`
@@ -73,3 +75,8 @@ KIND|record_id|<canonical_json_payload_without_id_and_kind>
 - natural-language summary
 - explicitly lossy
 - never treated as durable truth
+
+The benchmark treats exact/context pack behavior as a contract:
+
+- exact packs must remain reversible
+- context packs must keep `refs`, `prov`, and `evidence` traceable

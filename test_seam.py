@@ -1,6 +1,8 @@
 import os
 import unittest
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
@@ -169,11 +171,31 @@ claim c1:
     def test_retrieval_benchmark_uses_gold_fixtures(self) -> None:
         runtime = SeamRuntime(self.db_path)
         benchmark = runtime.run_retrieval_benchmark()
-        self.assertGreaterEqual(benchmark["summary"]["fixture_count"], 3)
+        self.assertGreaterEqual(benchmark["summary"]["fixture_count"], 7)
         self.assertIn("hybrid", benchmark["summary"]["tracks"])
         self.assertTrue(benchmark["summary"]["success_checks"]["exact_packs_reversible"])
+        self.assertIn("expected_over_rejected_on_temporal_scope_contradiction", benchmark["summary"]["success_checks"])
         categories = {fixture["category"] for fixture in benchmark["fixtures"]}
         self.assertIn("relation", categories)
+        self.assertIn("temporal", categories)
+        self.assertIn("contradiction", categories)
+        self.assertIn("scope", categories)
+        self.assertIn("namespace", categories)
+
+    def test_compile_dsl_preserves_temporal_fields(self) -> None:
+        batch = compile_dsl(
+            """
+claim runtime_now:
+  subject ent:project:seam
+  predicate runtime
+  object graph_memory_runtime
+  t0 "2026-01-01T00:00:00+00:00"
+  t1 "2026-12-31T23:59:59+00:00"
+"""
+        )
+        record = next(item for item in batch.records if item.id == "runtime_now")
+        self.assertEqual(record.t0, "2026-01-01T00:00:00+00:00")
+        self.assertEqual(record.t1, "2026-12-31T23:59:59+00:00")
 
     def test_pack_scoring_preserves_traceability_metrics(self) -> None:
         batch = compile_nl("We need a translator back into natural language for AI memory.")
@@ -215,6 +237,30 @@ claim c1:
 
         self.assertFalse(config["embedding"]["configured"])
         self.assertTrue(config["pgvector"]["dsn_present"])
+
+    def test_validate_stack_reports_http_429_without_crashing(self) -> None:
+        keys = ["SEAM_EMBEDDING_PROVIDER", "SEAM_EMBEDDING_MODEL", "SEAM_EMBEDDING_API_KEY_ENV", "ALT_OPENAI_KEY"]
+        snapshot = {key: os.environ.get(key) for key in keys}
+        try:
+            os.environ["SEAM_EMBEDDING_PROVIDER"] = "openai-compatible"
+            os.environ["SEAM_EMBEDDING_MODEL"] = "text-embedding-3-small"
+            os.environ["SEAM_EMBEDDING_API_KEY_ENV"] = "ALT_OPENAI_KEY"
+            os.environ["ALT_OPENAI_KEY"] = "test-key"
+            with patch("seam_runtime.validation.SeamRuntime") as runtime_cls:
+                runtime_cls.return_value.embedding_model.embed.side_effect = urllib.error.HTTPError("https://api.openai.com/v1/embeddings", 429, "Too Many Requests", hdrs=None, fp=None)
+                report = runtime_configuration_snapshot()
+                self.assertTrue(report["embedding"]["configured"])
+                validation = __import__("seam_runtime.validation", fromlist=["validate_runtime_stack"]).validate_runtime_stack(self.db_path)
+        finally:
+            for key, value in snapshot.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        embedding_check = next(check for check in validation["checks"] if check["name"] == "embedding_provider")
+        self.assertEqual(embedding_check["status"], "blocked")
+        self.assertEqual(embedding_check["http_status"], 429)
 
 
 if __name__ == "__main__":

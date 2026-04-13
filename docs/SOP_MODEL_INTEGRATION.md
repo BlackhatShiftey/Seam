@@ -9,10 +9,11 @@ This SOP explains how models connect to SEAM for:
 
 ## 1. Current architecture
 
-SEAM uses two storage layers together:
+SEAM uses one canonical storage layer and one optional vector acceleration layer:
 
 - **SQLite** is the source of truth for MIRL, provenance, packs, and metadata
-- **vector_index** inside SQLite is the default semantic index for embeddings
+- **SQLite `vector_index`** is the default semantic index when you do not provide pgvector
+- **pgvector/Postgres** is an optional external semantic index when you provide `SEAM_PGVECTOR_DSN`
 
 The runtime flow is:
 
@@ -30,8 +31,10 @@ The runtime flow is:
 
 The model integration layer lives in:
 
-- [seam_runtime/models.py](C:/Users/iwana/OneDrive/Documents/Codex/seam_runtime/models.py:1)
-- [seam_runtime/vector.py](C:/Users/iwana/OneDrive/Documents/Codex/seam_runtime/vector.py:1)
+- `seam_runtime/models.py`
+- `seam_runtime/runtime.py`
+- `seam_runtime/vector.py`
+- `seam_runtime/vector_adapters.py`
 
 SEAM currently supports:
 
@@ -44,6 +47,18 @@ SEAM currently supports:
   - uses an OpenAI-compatible embeddings endpoint
   - requires an API key
   - intended for real semantic quality
+
+Use the local fallback when:
+
+- you want deterministic tests
+- you are working offline
+- you are changing MIRL or retrieval logic and do not want cloud noise
+
+Use cloud embeddings when:
+
+- you want a teacher-quality retrieval baseline
+- you are validating the live stack
+- you want to compare future local OSS models against a stronger reference
 
 ## 3. Standard model contract
 
@@ -78,15 +93,25 @@ runtime = SeamRuntime("seam.db")
 
 This uses `HashEmbeddingModel`.
 
-### Option B: OpenAI-compatible endpoint
+### Option B: OpenAI-compatible endpoint from the shell
 
-Set your API key:
+Set the environment in the same shell where you run SEAM:
 
 ```powershell
 $env:OPENAI_API_KEY="your-key"
+$env:SEAM_EMBEDDING_PROVIDER="openai-compatible"
+$env:SEAM_EMBEDDING_MODEL="text-embedding-3-small"
+$env:SEAM_PGVECTOR_DSN="postgresql://postgres:postgres@localhost:54329/seam"
 ```
 
-Instantiate the runtime with a model:
+Then validate:
+
+```powershell
+python seam.py --db seam_validate.db validate-stack
+python seam.py --db seam_validate.db stats
+```
+
+Or instantiate the runtime directly:
 
 ```python
 from seam import SeamRuntime
@@ -114,6 +139,8 @@ Then:
 ```python
 runtime = SeamRuntime("seam.db", embedding_model=MyEmbeddingModel())
 ```
+
+If you want the runtime to use your model without wiring it manually each time, add your provider to `default_embedding_model()` and the env parser in `seam_runtime/models.py`.
 
 ## 5. Operational workflow
 
@@ -150,7 +177,12 @@ The hybrid score combines:
 
 ## 6. Database wiring blueprint
 
-SEAM now uses SQLite as the coordination database.
+SEAM uses SQLite as the coordination database and optional Postgres/pgvector for external vector search.
+
+Database locations:
+
+- SQLite truth store: whichever `--db` file you pass, such as `seam.db`, `seam_validate.db`, or `seam_live.db`
+- pgvector store: the Postgres database named `seam` behind `SEAM_PGVECTOR_DSN`
 
 Primary tables:
 
@@ -192,7 +224,7 @@ Recommended future adapter order:
 
 SEAM now has a `PgVectorAdapter` scaffold in:
 
-- [seam_runtime/vector_adapters.py](C:/Users/iwana/OneDrive/Documents/Codex/seam_runtime/vector_adapters.py:1)
+- `seam_runtime/vector_adapters.py`
 
 Runtime example:
 
@@ -213,6 +245,7 @@ Current status:
 - Pgvector adapter is active for production-style integration
 - both adapters use the same MIRL record ids as join keys
 - `validate-stack` can smoke-test the configured embedding provider and pgvector adapter
+- the validated local pgvector setup is `postgresql://postgres:postgres@localhost:54329/seam`
 
 ## 8. What still needs to be completed
 
@@ -223,6 +256,7 @@ The current integration is functional, but still v1:
 - add reranking model hooks
 - add a stronger local embedding backend than the hash fallback
 - formalize teacher-model to local-model data export for fine-tuning
+- add first-class local OSS embedding model adapters under the same contract
 
 ## 9. Rule of thumb
 

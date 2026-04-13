@@ -5,8 +5,10 @@
     "format": "dsl",
     "query": "goal durable_memory preserve_meaning",
     "expected_ids": ["clm:goal", "clm:constraint", "sta:design"],
+    "rejected_ids": [],
     "budget": 5,
     "pack_budget": 96,
+    "notes": "Basic factual retrieval should beat raw overlap and recover both explicit claims plus the compressed state.",
     "source": "raw raw:1:\n  source \"fixture://goal\"\n  text \"We need durable memory without losing meaning.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 46\nclaim clm:goal:\n  subject ent:project:seam\n  predicate goal\n  object durable_memory\n  evidence span:1\nclaim clm:constraint:\n  subject ent:project:seam\n  predicate constraint\n  object preserve_meaning\n  evidence span:1\nstate sta:design:\n  target ent:project:seam\n  field goal durable_memory\n  field constraint preserve_meaning\n  evidence span:1\n"
   },
   {
@@ -15,8 +17,10 @@
     "format": "dsl",
     "query": "translator nl_ir_pack_roundtrip",
     "expected_ids": ["clm:translator", "sta:translator"],
+    "rejected_ids": [],
     "budget": 5,
     "pack_budget": 96,
+    "notes": "Workflow-style normalized query should recover the translator claim and state.",
     "source": "raw raw:1:\n  source \"fixture://translator\"\n  text \"We need a translator back into natural language for memory workflows.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 66\nclaim clm:translator:\n  subject ent:project:seam\n  predicate translator\n  object nl_ir_pack_roundtrip\n  evidence span:1\nstate sta:translator:\n  target ent:project:seam\n  field translator nl_ir_pack_roundtrip\n  evidence span:1\n"
   },
   {
@@ -25,8 +29,59 @@
     "format": "dsl",
     "query": "depends_on expands_symbols_before_rank pack:context:translator",
     "expected_ids": ["rel:trace", "rel:search", "clm:translator"],
+    "rejected_ids": [],
     "budget": 5,
     "pack_budget": 96,
+    "notes": "Relation-heavy query should recover both graph edges plus the connected translator claim, while pack scoring still preserves traceable evidence and refs.",
     "source": "raw raw:1:\n  source \"fixture://relation\"\n  text \"Search should expand shorthand before ranking and keep traceable packs.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 71\nclaim clm:translator:\n  subject ent:project:seam\n  predicate translator\n  object nl_ir_pack_roundtrip\n  evidence span:1\nrel rel:trace:\n  src pack:context:translator\n  predicate depends_on\n  dst clm:translator\n  evidence span:1\nrel rel:search:\n  src flow:search:1\n  predicate expands_symbols_before_rank\n  dst pack:context:translator\n  evidence span:1\n"
+  },
+  {
+    "name": "temporal_current_runtime",
+    "category": "temporal",
+    "format": "dsl",
+    "query": "current retrieval runtime 2026 graph_memory_runtime",
+    "expected_ids": ["clm:runtime:v2", "sta:runtime:2026"],
+    "rejected_ids": ["clm:runtime:v1"],
+    "budget": 5,
+    "pack_budget": 96,
+    "notes": "The current runtime should outrank the superseded runtime and keep the stale answer out of top-1.",
+    "source": "raw raw:1:\n  source \"fixture://temporal\"\n  text \"In 2024 retrieval used chunk cache. In 2026 retrieval uses graph memory runtime.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 80\nclaim clm:runtime:v1:\n  subject ent:project:seam\n  predicate runtime\n  object chunk_cache\n  status superseded\n  t0 \"2024-01-01T00:00:00+00:00\"\n  evidence span:1\nclaim clm:runtime:v2:\n  subject ent:project:seam\n  predicate runtime\n  object graph_memory_runtime\n  t0 \"2026-01-01T00:00:00+00:00\"\n  evidence span:1\nstate sta:runtime:2026:\n  target ent:project:seam\n  t0 \"2026-01-01T00:00:00+00:00\"\n  field runtime graph_memory_runtime\n  evidence span:1\nrel rel:supersedes:\n  src clm:runtime:v2\n  predicate supersedes\n  dst clm:runtime:v1\n"
+  },
+  {
+    "name": "contradiction_resolution",
+    "category": "contradiction",
+    "format": "dsl",
+    "query": "memory provenance not raw_chunks_only mirl_with_provenance",
+    "expected_ids": ["clm:truth:v2", "rel:contradicts", "sta:truth"],
+    "rejected_ids": ["clm:truth:v1"],
+    "budget": 5,
+    "pack_budget": 96,
+    "notes": "The asserted provenance-aware claim should outrank the contradicted raw-only claim.",
+    "source": "raw raw:1:\n  source \"fixture://contradiction\"\n  text \"Raw chunks only are not enough. Memory needs MIRL with provenance.\"\nspan span:1:\n  raw raw:1\n  start 0\n  end 66\nclaim clm:truth:v1:\n  subject ent:project:seam\n  predicate memory_truth\n  object raw_chunks_only\n  status contradicted\n  evidence span:1\nclaim clm:truth:v2:\n  subject ent:project:seam\n  predicate memory_truth\n  object mirl_with_provenance\n  evidence span:1\nstate sta:truth:\n  target ent:project:seam\n  field memory_truth mirl_with_provenance\n  evidence span:1\nrel rel:contradicts:\n  src clm:truth:v2\n  predicate contradicts\n  dst clm:truth:v1\n"
+  },
+  {
+    "name": "scope_thread_priority",
+    "category": "scope",
+    "format": "dsl",
+    "query": "active thread goal thread_memory_mode",
+    "scope": "thread",
+    "expected_ids": ["clm:thread:goal", "sta:thread"],
+    "rejected_ids": ["clm:project:goal"],
+    "budget": 5,
+    "pack_budget": 96,
+    "notes": "Thread-scoped retrieval should prefer the thread memory over the project default.",
+    "source": "raw raw:1:\n  source \"fixture://scope\"\n  scope project\n  text \"Project memory defaults to long_horizon_mode, but this thread uses thread_memory_mode.\"\nspan span:1:\n  raw raw:1\n  scope project\n  start 0\n  end 83\nclaim clm:project:goal:\n  scope project\n  subject ent:project:seam\n  predicate goal\n  object long_horizon_mode\n  evidence span:1\nclaim clm:thread:goal:\n  scope thread\n  subject ent:project:seam\n  predicate goal\n  object thread_memory_mode\n  evidence span:1\nstate sta:thread:\n  scope thread\n  target ent:project:seam\n  field goal thread_memory_mode\n  evidence span:1\n"
+  },
+  {
+    "name": "namespace_symbol_inheritance",
+    "category": "namespace",
+    "format": "dsl",
+    "query": "mem xlat durable_memory translator",
+    "expected_ids": ["clm:ns:goal", "clm:ns:translator", "sta:ns"],
+    "rejected_ids": [],
+    "budget": 5,
+    "pack_budget": 96,
+    "notes": "Parent-namespace symbols should expand in a child namespace and retrieve the underlying memory records.",
+    "source": "entity project \"SEAM\" as ent:project:seam\nsymbol sym:mem:\n  namespace org\n  symbol mem\n  expansion memory\nsymbol sym:xlat:\n  namespace org\n  symbol xlat\n  expansion translator\nclaim clm:ns:goal:\n  namespace org.app.user.thread\n  subject ent:project:seam\n  predicate goal\n  object durable_memory\nclaim clm:ns:translator:\n  namespace org.app.user.thread\n  subject ent:project:seam\n  predicate translator\n  object nl_ir_pack_roundtrip\nstate sta:ns:\n  namespace org.app.user.thread\n  target ent:project:seam\n  field memory durable_memory\n  field translator nl_ir_pack_roundtrip\n"
   }
 ]
