@@ -386,6 +386,26 @@ python seam.py --db seam.db export-symbols
 
 ---
 
+## Security Rules — Never Expose Secrets
+
+These rules apply to every commit, PR, and code change without exception:
+
+1. **Never commit credentials.** API keys, passwords, tokens, private keys, and personal account details must never appear in any committed file — not in source code, not in comments, not in documentation, not in test fixtures.
+
+2. **Use environment variables for secrets.** Reference secrets by environment variable name only (e.g., `OPENAI_API_KEY`). Never hardcode a value.
+
+3. **No real values in examples.** Documentation and examples must use placeholders like `sk-...`, `your-api-key`, or `<YOUR_KEY_HERE>` — never a real key, even a revoked one.
+
+4. **No personal account details.** Usernames, email addresses, personal access tokens, OAuth credentials, or account IDs tied to a real person must not appear in committed files.
+
+5. **`.env` files are always ignored.** The `.gitignore` blocks `.env`, `.env.*`, `*.key`, `*.pem`, `credentials.json`, and related files. Do not override or work around these rules.
+
+6. **Audit before committing.** Before creating any commit, scan the diff for the patterns above. If anything looks like a real credential, remove it and use a placeholder instead.
+
+7. **No exceptions for "temporary" or "test" credentials.** A secret is a secret regardless of its intended lifetime or scope.
+
+---
+
 ## Important Rules for AI Assistants
 
 1. **Read `SEAM_SPEC_V0.1.md` before modifying any IR data types.** It is the authoritative specification and defines field semantics, encoding rules, and invariants that must be preserved.

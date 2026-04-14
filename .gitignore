@@ -7,3 +7,17 @@ __pycache__/
 conversations/
 *.conversation
 *.jsonl
+
+# Secrets and credentials — NEVER commit these
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+credentials.json
+service_account.json
+config.local.*
+*.secret
