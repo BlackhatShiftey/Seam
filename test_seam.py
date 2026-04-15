@@ -1,8 +1,14 @@
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from uuid import uuid4
 
+from experimental.hybrid_orchestrator import ChromaSemanticAdapter, HybridOrchestrator, QueryIntent
+from experimental.hybrid_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
+from seam_runtime.cli import run_cli
+from seam_runtime.models import cosine
 from seam_runtime.pack import unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
 from seam_runtime.verify import verify_ir
@@ -130,6 +136,158 @@ claim c1:
         parsed = load_ir_lines(batch.to_text())
         self.assertEqual(len(parsed), len(batch.records))
 
+    def test_retrieval_orchestrator_builds_mixed_plan(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        orchestrator = HybridOrchestrator(runtime)
+        plan = orchestrator.plan("kind:CLM translator natural language", scope="thread", budget=3)
+        self.assertEqual(plan.intent, QueryIntent.HYBRID)
+        self.assertEqual(plan.filters.kinds, ["CLM"])
+        self.assertEqual([leg.name for leg in plan.legs], ["sql", "vector"])
+        self.assertEqual(plan.normalized_query, "translator natural language")
+
+    def test_retrieval_orchestrator_merges_sql_and_vector_legs(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
+        runtime.persist_ir(batch)
+        orchestrator = HybridOrchestrator(runtime)
+        result = orchestrator.search("kind:CLM translator natural language", budget=3, include_trace=True)
+        self.assertTrue(result.candidates)
+        translator = next((candidate for candidate in result.candidates if candidate.record.id == "clm:2"), None)
+        self.assertIsNotNone(translator)
+        self.assertIn("sql", translator.sources)
+        self.assertIsNotNone(result.trace)
+        self.assertIn("sql", result.trace["legs"])
+        self.assertIn("vector", result.trace["legs"])
+
+    def test_cli_plan_outputs_mixed_intent(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["--db", str(self.db_path), "plan", "kind:CLM translator natural language", "--budget", "3", "--format", "json"])
+        payload = stream.getvalue()
+        self.assertIn('"intent": "hybrid"', payload)
+        self.assertIn('"name": "sql"', payload)
+        self.assertIn('"name": "vector"', payload)
+
+    def test_cli_compare_outputs_basic_and_retrieval(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["--db", str(self.db_path), "compare", "translator natural language", "--budget", "3", "--format", "json"])
+        payload = stream.getvalue()
+        self.assertIn('"search"', payload)
+        self.assertIn('"retrieve"', payload)
+
+    def test_cli_retrieve_pretty_output(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["--db", str(self.db_path), "retrieve", "kind:CLM translator natural language", "--budget", "3"])
+        payload = stream.getvalue()
+        self.assertIn("Intent: hybrid", payload)
+        self.assertIn("Candidates:", payload)
+        self.assertIn("clm:2", payload)
+
+    def test_chroma_semantic_adapter_searches_via_fake_client(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
+        runtime.persist_ir(batch)
+        adapter = ChromaSemanticAdapter(runtime.store, runtime.embedding_model, client=FakeChromaClient())
+        plan = build_plan("translator natural language", budget=3)
+        hits = adapter.search(plan, limit=3)
+        self.assertTrue(hits)
+        self.assertEqual(hits[0].record.id, "clm:2")
+        self.assertEqual(hits[0].leg, "chroma")
+
+    def test_retrieval_orchestrator_syncs_persistent_indexes(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
+        runtime.persist_ir(batch)
+        orchestrator = HybridOrchestrator(
+            runtime,
+            semantic_adapter=ChromaSemanticAdapter(runtime.store, runtime.embedding_model, client=FakeChromaClient()),
+            semantic_backend="chroma",
+        )
+        report = orchestrator.sync_persistent_indexes()
+        self.assertEqual(report["backend"], "chroma")
+        self.assertGreaterEqual(report["chroma_indexed"], 1)
+        self.assertIn("clm:2", report["sqlite_indexed"])
+
+    def test_context_pipeline_returns_context_pack(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
+        runtime.persist_ir(batch)
+        orchestrator = HybridOrchestrator(runtime)
+        rag = orchestrator.rag("translator natural language", budget=3, pack_budget=10, include_trace=True)
+        self.assertIn("clm:2", rag.candidate_ids)
+        self.assertEqual(rag.pack["mode"], "context")
+        self.assertTrue(rag.pack["payload"]["entries"])
+        self.assertIsNotNone(rag.trace)
+
+    def test_cli_rag_search_json_contains_pack(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["--db", str(self.db_path), "context", "translator natural language", "--budget", "3", "--format", "json"])
+        payload = stream.getvalue()
+        self.assertIn('"pack"', payload)
+        self.assertIn('"candidate_ids"', payload)
+
+    def test_cli_compile_nl_rag_sync_persists_and_syncs(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli([
+                "--db",
+                str(self.db_path),
+                "compile-nl",
+                "We need a translator back into natural language for memory workflows.",
+                "--index",
+            ])
+        runtime = SeamRuntime(self.db_path)
+        records = runtime.store.load_ir().records
+        self.assertTrue(records)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FakeChromaCollection:
+    def __init__(self) -> None:
+        self.entries: dict[str, dict[str, object]] = {}
+
+    def upsert(self, ids, embeddings, documents, metadatas) -> None:
+        for record_id, embedding, document, metadata in zip(ids, embeddings, documents, metadatas, strict=False):
+            self.entries[record_id] = {
+                "embedding": embedding,
+                "document": document,
+                "metadata": metadata,
+            }
+
+    def query(self, query_embeddings, n_results, include):
+        query_embedding = query_embeddings[0]
+        scored = []
+        for record_id, payload in self.entries.items():
+            similarity = cosine(query_embedding, payload["embedding"])
+            distance = max(0.0, 1.0 - similarity)
+            scored.append((record_id, distance, payload))
+        scored.sort(key=lambda item: item[1])
+        top = scored[:n_results]
+        return {
+            "ids": [[item[0] for item in top]],
+            "distances": [[item[1] for item in top]],
+            "documents": [[item[2]["document"] for item in top]],
+            "metadatas": [[item[2]["metadata"] for item in top]],
+        }
+
+
+class FakeChromaClient:
+    def __init__(self) -> None:
+        self.collection = FakeChromaCollection()
+
+    def get_or_create_collection(self, name, metadata=None):
+        return self.collection

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, TraceGraph
@@ -18,7 +19,7 @@ class SQLiteStore:
         return connection
 
     def _init_schema(self) -> None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.executescript(
                 """
                 create table if not exists raw_docs (
@@ -89,9 +90,10 @@ class SQLiteStore:
                 );
                 """
             )
+            connection.commit()
 
     def persist_ir(self, batch: IRBatch) -> PersistReport:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             for record in batch.records:
                 payload = json.dumps(record.to_dict(), sort_keys=True, separators=(",", ":"))
                 connection.execute(
@@ -104,6 +106,7 @@ class SQLiteStore:
                 )
                 self._persist_specialized(connection, record)
                 self._persist_edges(connection, record)
+            connection.commit()
         return PersistReport(stored_ids=[record.id for record in batch.records], store_path=self.path)
 
     def _persist_specialized(self, connection: sqlite3.Connection, record: MIRLRecord) -> None:
@@ -163,12 +166,12 @@ class SQLiteStore:
         if scope:
             query += " and scope = ?"
             params.append(scope)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(query, params).fetchall()
         return IRBatch([MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows])
 
     def read_pack(self, pack_id: str) -> Pack:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute("select * from pack_store where id = ?", (pack_id,)).fetchone()
         if row is None:
             raise KeyError(pack_id)
