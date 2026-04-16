@@ -1,0 +1,30 @@
+﻿[
+  {
+    "name": "translator_anchor_early",
+    "query": "predicate:translator_for object:natural_language",
+    "expected_ids": ["anchor_early"],
+    "required_prompt_snippets": ["translator_for", "natural_language"],
+    "required_summary_snippets": ["translator_for", "natural_language"],
+    "filler_count": 18,
+    "target_position": "early",
+    "target": {
+      "id": "anchor_early",
+      "predicate": "translator_for",
+      "object": "natural_language"
+    }
+  },
+  {
+    "name": "projection_anchor_late",
+    "query": "predicate:projection_index object:tokenizer_projection",
+    "expected_ids": ["anchor_late"],
+    "required_prompt_snippets": ["projection_index", "tokenizer_projection"],
+    "required_summary_snippets": ["projection_index", "tokenizer_projection"],
+    "filler_count": 18,
+    "target_position": "late",
+    "target": {
+      "id": "anchor_late",
+      "predicate": "projection_index",
+      "object": "tokenizer_projection"
+    }
+  }
+]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -33,7 +34,7 @@ class SQLiteIRAdapter:
         query_text = plan.normalized_query or plan.query
         query_tokens = _unique_tokens(_tokens(query_text))
         query_sql, params = _build_structured_sql(plan, query_tokens, limit)
-        with self.store._connect() as connection:
+        with closing(self.store._connect()) as connection:
             rows = connection.execute(query_sql, params).fetchall()
         hits: list[LegHit] = []
         for row in rows:

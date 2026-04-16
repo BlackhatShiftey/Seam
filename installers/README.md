@@ -1,4 +1,4 @@
-# SEAM Installers
+﻿# SEAM Installers
 
 This folder is the direct "download and run" install surface for SEAM.
 
@@ -49,3 +49,26 @@ Default persistent database paths:
 
 - Windows: `%LOCALAPPDATA%\SEAM\state\seam.db`
 - Linux: `~/.local/share/seam/state/seam.db`
+
+## Prove-It Flow After Install
+
+Health check:
+
+```text
+seam doctor
+```
+
+Full benchmark glassbox run:
+
+```text
+seam benchmark run all --persist --output seam-benchmark-report.json
+seam benchmark show latest
+seam benchmark verify seam-benchmark-report.json
+```
+
+Exact machine-language demo:
+
+```text
+seam demo lossless /path/to/document.txt /path/to/document.seamlx --min-savings 0.75
+seam demo lossless /path/to/document.seamlx /path/to/rebuilt.txt --rebuild
+```

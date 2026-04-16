@@ -1,6 +1,7 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from seam_runtime.cli import run_cli
 from seam_runtime.dsl import compile_dsl
@@ -29,8 +30,7 @@ def decompile_ir(records, mode: str = "expanded") -> str:
     states = [record for record in batch.records if record.kind.value == "STA"]
     claims = [record for record in batch.records if record.kind.value == "CLM"]
     if states:
-        fields = states[0].attrs.get("fields", {})
-        summary = "; ".join(f"{key}={value}" for key, value in fields.items())
+        summary = "; ".join(f"{key}={value}" for key, value in states[0].attrs.get("fields", {}).items())
     elif claims:
         summary = "; ".join(f"{record.attrs.get('subject')} {record.attrs.get('predicate')} {record.attrs.get('object')}" for record in claims)
     else:
@@ -79,7 +79,17 @@ def main() -> None:
 
 
 def benchmark_main() -> None:
-    run_cli(["lossless-benchmark", *sys.argv[1:]])
+    argv = sys.argv[1:]
+    if argv and argv[0] not in {"run", "show", "verify", "-h", "--help"} and Path(argv[0]).exists():
+        run_cli(["lossless-benchmark", *argv])
+        return
+    if not argv:
+        run_cli(["benchmark", "run"])
+        return
+    if argv[0] in {"run", "show", "verify"}:
+        run_cli(["benchmark", *argv])
+        return
+    run_cli(["benchmark", "run", *argv])
 
 
 if __name__ == "__main__":

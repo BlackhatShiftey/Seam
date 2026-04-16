@@ -1,11 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
+from uuid import uuid4
 
-from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, TraceGraph
+from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, TraceGraph, utc_now
 
 
 class SQLiteStore:
@@ -90,10 +92,65 @@ class SQLiteStore:
                     updated_at text not null,
                     primary key (record_id, model_name)
                 );
+                create table if not exists machine_artifacts (
+                    artifact_id text primary key,
+                    source_type text not null,
+                    source_id text not null,
+                    codec text,
+                    transform_chain text,
+                    tokenizer text,
+                    sha256_raw text,
+                    sha256_machine text,
+                    bytes_raw integer,
+                    bytes_machine integer,
+                    tokens_raw integer,
+                    tokens_machine integer,
+                    token_savings_ratio real,
+                    roundtrip_ok integer not null,
+                    metadata_json text not null,
+                    artifact_json text not null,
+                    machine_text text,
+                    created_at text not null
+                );
+                create table if not exists benchmark_runs (
+                    run_id text primary key,
+                    requested_suite text,
+                    executed_suites text not null,
+                    status text not null,
+                    bundle_hash text,
+                    manifest_json text not null,
+                    summary_json text not null,
+                    report_json text not null,
+                    created_at text not null
+                );
+                create table if not exists benchmark_cases (
+                    run_id text not null,
+                    case_id text not null,
+                    family text not null,
+                    status text not null,
+                    case_hash text,
+                    metrics_json text not null,
+                    trace_json text not null,
+                    case_json text not null,
+                    primary key (run_id, case_id)
+                );
+                create table if not exists projection_index (
+                    projection_id text primary key,
+                    record_id text not null,
+                    projection_kind text not null,
+                    projection_text text not null,
+                    tokenizer text,
+                    token_count integer,
+                    metadata_json text not null,
+                    updated_at text not null
+                );
                 create index if not exists idx_ir_records_kind on ir_records (kind);
                 create index if not exists idx_ir_records_ns_scope on ir_records (ns, scope);
                 create index if not exists idx_ir_edges_src on ir_edges (src_id);
                 create index if not exists idx_ir_edges_dst on ir_edges (dst_id);
+                create index if not exists idx_machine_artifacts_source on machine_artifacts (source_type, source_id);
+                create index if not exists idx_benchmark_cases_family on benchmark_cases (family);
+                create unique index if not exists idx_projection_record_kind on projection_index (record_id, projection_kind);
                 """
             )
             connection.commit()
@@ -208,3 +265,205 @@ class SQLiteStore:
                     seen.add(dst)
                     queue.append(dst)
         return TraceGraph(root_id=root_id, nodes=[records[node_id] for node_id in seen], edges=edges)
+
+    def write_machine_artifact(
+        self,
+        source_type: str,
+        source_id: str,
+        artifact: dict[str, object],
+        roundtrip_ok: bool,
+        metadata: dict[str, object] | None = None,
+    ) -> str:
+        artifact_id = f"mx:{uuid4().hex[:12]}"
+        machine_text = str(artifact.get("machine_text", "") or "")
+        machine_bytes = machine_text.encode("utf-8") if machine_text else b""
+        with closing(self._connect()) as connection:
+            connection.execute(
+                """
+                insert or replace into machine_artifacts
+                (artifact_id, source_type, source_id, codec, transform_chain, tokenizer, sha256_raw, sha256_machine,
+                 bytes_raw, bytes_machine, tokens_raw, tokens_machine, token_savings_ratio, roundtrip_ok,
+                 metadata_json, artifact_json, machine_text, created_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact_id,
+                    source_type,
+                    source_id,
+                    artifact.get("codec"),
+                    artifact.get("transform"),
+                    artifact.get("token_estimator"),
+                    artifact.get("sha256"),
+                    hashlib.sha256(machine_bytes).hexdigest() if machine_bytes else None,
+                    artifact.get("original_bytes"),
+                    artifact.get("machine_bytes"),
+                    artifact.get("original_tokens"),
+                    artifact.get("machine_tokens"),
+                    artifact.get("token_savings_ratio"),
+                    1 if roundtrip_ok else 0,
+                    json.dumps(metadata or {}, sort_keys=True, separators=(",", ":")),
+                    json.dumps(artifact, sort_keys=True, separators=(",", ":")),
+                    machine_text or None,
+                    utc_now(),
+                ),
+            )
+            connection.commit()
+        return artifact_id
+
+    def read_machine_artifact(self, artifact_id: str) -> dict[str, object]:
+        with closing(self._connect()) as connection:
+            row = connection.execute("select * from machine_artifacts where artifact_id = ?", (artifact_id,)).fetchone()
+        if row is None:
+            raise KeyError(artifact_id)
+        artifact = json.loads(row["artifact_json"])
+        return {
+            "artifact_id": row["artifact_id"],
+            "source_type": row["source_type"],
+            "source_id": row["source_id"],
+            "codec": row["codec"],
+            "transform_chain": row["transform_chain"],
+            "tokenizer": row["tokenizer"],
+            "sha256_raw": row["sha256_raw"],
+            "sha256_machine": row["sha256_machine"],
+            "bytes_raw": row["bytes_raw"],
+            "bytes_machine": row["bytes_machine"],
+            "tokens_raw": row["tokens_raw"],
+            "tokens_machine": row["tokens_machine"],
+            "token_savings_ratio": row["token_savings_ratio"],
+            "roundtrip_ok": bool(row["roundtrip_ok"]),
+            "metadata": json.loads(row["metadata_json"]),
+            "artifact": artifact,
+            "machine_text": row["machine_text"],
+            "created_at": row["created_at"],
+        }
+
+    def write_projection(
+        self,
+        record_id: str,
+        projection_kind: str,
+        projection_text: str,
+        tokenizer: str | None = None,
+        token_count: int | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> str:
+        projection_id = f"px:{uuid4().hex[:12]}"
+        with closing(self._connect()) as connection:
+            connection.execute("delete from projection_index where record_id = ? and projection_kind = ?", (record_id, projection_kind))
+            connection.execute(
+                """
+                insert into projection_index
+                (projection_id, record_id, projection_kind, projection_text, tokenizer, token_count, metadata_json, updated_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    projection_id,
+                    record_id,
+                    projection_kind,
+                    projection_text,
+                    tokenizer,
+                    token_count,
+                    json.dumps(metadata or {}, sort_keys=True, separators=(",", ":")),
+                    utc_now(),
+                ),
+            )
+            connection.commit()
+        return projection_id
+
+    def read_projections(self, record_id: str | None = None, projection_kind: str | None = None) -> list[dict[str, object]]:
+        query = "select * from projection_index where 1=1"
+        params: list[object] = []
+        if record_id is not None:
+            query += " and record_id = ?"
+            params.append(record_id)
+        if projection_kind is not None:
+            query += " and projection_kind = ?"
+            params.append(projection_kind)
+        query += " order by updated_at desc"
+        with closing(self._connect()) as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [
+            {
+                "projection_id": row["projection_id"],
+                "record_id": row["record_id"],
+                "projection_kind": row["projection_kind"],
+                "projection_text": row["projection_text"],
+                "tokenizer": row["tokenizer"],
+                "token_count": row["token_count"],
+                "metadata": json.loads(row["metadata_json"]),
+                "updated_at": row["updated_at"],
+            }
+            for row in rows
+        ]
+
+    def write_benchmark_run(self, report: dict[str, object]) -> str:
+        manifest = dict(report.get("manifest", {}))
+        summary = dict(report.get("summary", {}))
+        run_id = str(manifest.get("run_id") or f"bench:{uuid4().hex[:12]}")
+        executed_suites = list(manifest.get("executed_suites", []))
+        with closing(self._connect()) as connection:
+            connection.execute(
+                """
+                insert or replace into benchmark_runs
+                (run_id, requested_suite, executed_suites, status, bundle_hash, manifest_json, summary_json, report_json, created_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    manifest.get("requested_suite"),
+                    json.dumps(executed_suites),
+                    summary.get("status", "FAIL"),
+                    report.get("bundle_hash"),
+                    json.dumps(manifest, sort_keys=True, separators=(",", ":")),
+                    json.dumps(summary, sort_keys=True, separators=(",", ":")),
+                    json.dumps(report, sort_keys=True, separators=(",", ":")),
+                    manifest.get("created_at") or utc_now(),
+                ),
+            )
+            connection.execute("delete from benchmark_cases where run_id = ?", (run_id,))
+            for family_name, family in dict(report.get("families", {})).items():
+                for case in family.get("cases", []):
+                    connection.execute(
+                        """
+                        insert into benchmark_cases
+                        (run_id, case_id, family, status, case_hash, metrics_json, trace_json, case_json)
+                        values (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            run_id,
+                            f"{family_name}:{case.get('case_id')}",
+                            family_name,
+                            case.get("status"),
+                            case.get("case_hash"),
+                            json.dumps(case.get("metrics", {}), sort_keys=True, separators=(",", ":")),
+                            json.dumps(case.get("trace", {}), sort_keys=True, separators=(",", ":")),
+                            json.dumps(case, sort_keys=True, separators=(",", ":")),
+                        ),
+                    )
+            connection.commit()
+        return run_id
+
+    def read_benchmark_run(self, run_id: str) -> dict[str, object]:
+        with closing(self._connect()) as connection:
+            row = connection.execute("select report_json from benchmark_runs where run_id = ?", (run_id,)).fetchone()
+        if row is None:
+            return {}
+        return json.loads(row["report_json"])
+
+    def list_benchmark_runs(self, limit: int = 10) -> list[dict[str, object]]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "select run_id, requested_suite, executed_suites, status, bundle_hash, created_at from benchmark_runs order by created_at desc limit ?",
+                (limit,),
+            ).fetchall()
+        return [
+            {
+                "run_id": row["run_id"],
+                "requested_suite": row["requested_suite"],
+                "executed_suites": json.loads(row["executed_suites"]),
+                "status": row["status"],
+                "bundle_hash": row["bundle_hash"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+

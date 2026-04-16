@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from contextlib import redirect_stdout
@@ -499,6 +500,106 @@ claim c2:
             for path in (source_path, compressed_path, rebuilt_path, log_path):
                 if path.exists():
                     path.unlink()
+
+    def test_runtime_benchmark_suite_persists_and_verifies_bundle(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        bundle_path = Path(f"benchmark_bundle_{uuid4().hex}.json")
+        try:
+            report = runtime.run_benchmark_suite(suite="all", persist=True, bundle_path=bundle_path)
+            self.assertEqual(report["summary"]["status"], "PASS")
+            self.assertEqual(report["summary"]["family_count"], 6)
+            self.assertTrue(bundle_path.exists())
+
+            runs = runtime.list_benchmark_runs(limit=1)
+            self.assertTrue(runs)
+            self.assertEqual(runs[0]["run_id"], report["manifest"]["run_id"])
+
+            loaded = runtime.read_benchmark_run(report["manifest"]["run_id"])
+            self.assertEqual(loaded["bundle_hash"], report["bundle_hash"])
+
+            verification = runtime.verify_benchmark_bundle(bundle_path)
+            self.assertEqual(verification["status"], "PASS")
+            self.assertTrue(verification["bundle_hash_ok"])
+        finally:
+            if bundle_path.exists():
+                bundle_path.unlink()
+
+    def test_runtime_benchmark_verifier_flags_tampered_bundle(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        bundle_path = Path(f"benchmark_bundle_{uuid4().hex}.json")
+        tampered_path = Path(f"benchmark_bundle_tampered_{uuid4().hex}.json")
+        try:
+            runtime.run_benchmark_suite(suite="lossless", bundle_path=bundle_path)
+            payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+            payload["families"]["lossless"]["cases"][0]["metrics"]["roundtrip_match"] = False
+            tampered_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+            verification = runtime.verify_benchmark_bundle(tampered_path)
+            self.assertEqual(verification["status"], "FAIL")
+            self.assertFalse(verification["bundle_hash_ok"])
+            self.assertTrue(any(not item["ok"] for item in verification["case_checks"]))
+        finally:
+            for target in (bundle_path, tampered_path):
+                if target.exists():
+                    target.unlink()
+
+    def test_storage_machine_artifact_and_projection_roundtrip(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        artifact = compress_text_lossless("SEAM preserves exact context while compressing token usage for lossless recovery.\n" * 10)
+        artifact_id = runtime.store.write_machine_artifact(
+            source_type="test.machine",
+            source_id="machine-roundtrip",
+            artifact=artifact.to_dict(include_machine_text=True),
+            roundtrip_ok=True,
+            metadata={"suite": "unit"},
+        )
+        loaded_artifact = runtime.store.read_machine_artifact(artifact_id)
+        self.assertTrue(loaded_artifact["roundtrip_ok"])
+        self.assertEqual(loaded_artifact["metadata"], {"suite": "unit"})
+        self.assertTrue(str(loaded_artifact["machine_text"]).startswith("SEAM-LX/1"))
+
+        projection_id = runtime.store.write_projection(
+            record_id="clm:test",
+            projection_kind="prompt",
+            projection_text="SEAM retrieved context\n[1] clm:test [CLM] translator_for natural_language",
+            tokenizer="char4_approx",
+            token_count=17,
+            metadata={"suite": "unit"},
+        )
+        projections = runtime.store.read_projections(record_id="clm:test", projection_kind="prompt")
+        self.assertEqual(len(projections), 1)
+        self.assertEqual(projections[0]["projection_id"], projection_id)
+        self.assertEqual(projections[0]["metadata"], {"suite": "unit"})
+
+    def test_cli_benchmark_show_latest_reads_persisted_run(self) -> None:
+        bundle_path = Path(f"benchmark_cli_bundle_{uuid4().hex}.json")
+        try:
+            run_stream = StringIO()
+            with redirect_stdout(run_stream):
+                run_cli([
+                    "--db",
+                    str(self.db_path),
+                    "benchmark",
+                    "run",
+                    "lossless",
+                    "--persist",
+                    "--output",
+                    str(bundle_path),
+                    "--format",
+                    "json",
+                ])
+            payload = run_stream.getvalue()
+            self.assertIn('"requested_suite": "lossless"', payload)
+
+            show_stream = StringIO()
+            with redirect_stdout(show_stream):
+                run_cli(["--db", str(self.db_path), "benchmark", "show", "latest", "--format", "json"])
+            show_payload = show_stream.getvalue()
+            self.assertIn('"requested_suite": "lossless"', show_payload)
+            self.assertIn('"bundle_hash"', show_payload)
+        finally:
+            if bundle_path.exists():
+                bundle_path.unlink()
 
     def test_cli_compile_nl_rag_sync_persists_and_syncs(self) -> None:
         stream = StringIO()

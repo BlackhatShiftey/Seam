@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import hashlib
@@ -8,6 +8,7 @@ from importlib.util import find_spec
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
+from .benchmarks import BENCHMARK_SUITES, render_benchmark_pretty, render_benchmark_verification_pretty
 from .context_views import CONTEXT_VIEWS, build_context_payload, render_context_pretty
 from .dashboard import run_dashboard
 from .installer import default_runtime_db_path
@@ -69,6 +70,25 @@ def build_parser() -> argparse.ArgumentParser:
     demo_lossless_parser.add_argument("--show-machine", action="store_true")
     demo_lossless_parser.add_argument("--log-output")
     demo_lossless_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    
+    benchmark_parser = subparsers.add_parser("benchmark", help="Run or inspect SEAM glassbox benchmark suites")
+    benchmark_subparsers = benchmark_parser.add_subparsers(dest="benchmark_command", required=True)
+    benchmark_run_parser = benchmark_subparsers.add_parser("run", help="Run benchmark suites")
+    benchmark_run_parser.add_argument("suite", nargs="?", choices=["all", *BENCHMARK_SUITES], default="all")
+    benchmark_run_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+    benchmark_run_parser.add_argument("--min-savings", type=float, default=0.30)
+    benchmark_run_parser.add_argument("--persist", action="store_true")
+    benchmark_run_parser.add_argument("--output")
+    benchmark_run_parser.add_argument("--include-machine-text", action="store_true")
+    benchmark_run_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_show_parser = benchmark_subparsers.add_parser("show", help="Show a persisted benchmark run")
+    benchmark_show_parser.add_argument("run_id", nargs="?", default="latest")
+    benchmark_show_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_verify_parser = benchmark_subparsers.add_parser("verify", help="Verify a benchmark bundle hash and case hashes")
+    benchmark_verify_parser.add_argument("bundle")
+    benchmark_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     compile_nl_parser = subparsers.add_parser("compile-nl", help="Compile natural language into MIRL")
     compile_nl_parser.add_argument("text")
@@ -384,7 +404,45 @@ def run_cli(argv: list[str] | None = None) -> None:
             return
         print(_render_doctor_report(payload))
         return
-    if args.command == "stats":
+    if args.command == "benchmark":
+        if args.benchmark_command == "run":
+            payload = runtime.run_benchmark_suite(
+                suite=args.suite,
+                tokenizer=args.tokenizer,
+                min_token_savings=args.min_savings,
+                persist=args.persist,
+                include_machine_text=args.include_machine_text,
+                bundle_path=args.output,
+            )
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_benchmark_pretty(payload))
+            return
+        if args.benchmark_command == "show":
+            if args.run_id == "latest":
+                runs = runtime.list_benchmark_runs(limit=1)
+                if not runs:
+                    raise SystemExit("No benchmark runs have been persisted yet.")
+                run_id = str(runs[0]["run_id"])
+            else:
+                run_id = args.run_id
+            payload = runtime.read_benchmark_run(run_id)
+            if not payload:
+                raise SystemExit(f"Benchmark run not found: {run_id}")
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_benchmark_pretty(payload))
+            return
+        if args.benchmark_command == "verify":
+            payload = runtime.verify_benchmark_bundle(args.bundle)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_benchmark_verification_pretty(payload))
+            return
+
         print(json.dumps(runtime.run_retrieval_benchmark(), indent=2))
 
 
@@ -611,3 +669,8 @@ def _record_signal(record: dict[str, object]) -> str:
     if "target" in attrs:
         return f"target={attrs.get('target')}"
     return ""
+
+
+
+
+

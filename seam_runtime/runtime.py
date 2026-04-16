@@ -1,21 +1,22 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
 
+from .benchmarks import run_benchmark_suite, verify_benchmark_bundle
 from .dsl import compile_dsl
 from .evals import run_retrieval_benchmark
 from .mirl import Artifact, IRBatch, Pack, PersistReport, ReconcileReport, SearchResult, TraceGraph, VerifyReport
-from .nl import compile_nl, suggest_symbols
+from .models import EmbeddingModel, default_embedding_model
+from .nl import compile_nl
 from .pack import pack_record, pack_records
 from .reconcile import reconcile_ir
 from .retrieval import search_batch
 from .storage import SQLiteStore
 from .symbols import export_symbol_markdown, propose_symbols
 from .transpile import transpile_python
-from .verify import verify_ir
-from .models import EmbeddingModel, default_embedding_model
 from .vector_adapters import PgVectorAdapter, SQLiteVectorAdapter, VectorAdapter
+from .verify import verify_ir
 
 
 class SeamRuntime:
@@ -124,7 +125,39 @@ class SeamRuntime:
     def run_retrieval_benchmark(self) -> dict[str, object]:
         return run_retrieval_benchmark(embedding_model=self.embedding_model)
 
+    def run_benchmark_suite(
+        self,
+        suite: str = "all",
+        tokenizer: str = "auto",
+        min_token_savings: float = 0.30,
+        persist: bool = False,
+        include_machine_text: bool = False,
+        bundle_path: str | Path | None = None,
+    ) -> dict[str, object]:
+        return run_benchmark_suite(
+            self,
+            suite=suite,
+            tokenizer=tokenizer,
+            min_token_savings=min_token_savings,
+            persist=persist,
+            include_machine_text=include_machine_text,
+            bundle_path=bundle_path,
+        )
+
+    def verify_benchmark_bundle(self, bundle: str | Path | dict[str, object]) -> dict[str, object]:
+        return verify_benchmark_bundle(bundle)
+
+    def read_benchmark_run(self, run_id: str) -> dict[str, object]:
+        return self.store.read_benchmark_run(run_id)
+
+    def list_benchmark_runs(self, limit: int = 10) -> list[dict[str, object]]:
+        return self.store.list_benchmark_runs(limit=limit)
+
     def reindex_vectors(self, record_ids: list[str] | None = None) -> dict[str, object]:
         batch = self.store.load_ir(ids=record_ids) if record_ids else self.store.load_ir()
         self.vector_adapter.index_records(batch.records)
-        return {"indexed_ids": [record.id for record in batch.records], "model": self.embedding_model.name, "adapter": getattr(self.vector_adapter, "name", "unknown")}
+        return {
+            "indexed_ids": [record.id for record in batch.records],
+            "model": self.embedding_model.name,
+            "adapter": getattr(self.vector_adapter, "name", "unknown"),
+        }

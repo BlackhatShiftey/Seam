@@ -1,0 +1,18 @@
+﻿[
+  {
+    "name": "translator_context_task",
+    "query": "predicate:translator_for object:natural_language",
+    "expected_ids": ["c1"],
+    "required_prompt_snippets": ["translator_for", "natural_language"],
+    "required_summary_snippets": ["translator_for", "natural_language"],
+    "dsl": "entity project \"SEAM\" as p1\nclaim c1:\n  subject p1\n  predicate translator_for\n  object natural_language\nclaim c2:\n  subject p1\n  predicate memory_runtime\n  object durable_context\nclaim c3:\n  subject p1\n  predicate exact_rebuild\n  object source_state\n"
+  },
+  {
+    "name": "projection_context_task",
+    "query": "predicate:projection_index object:tokenizer_projection",
+    "expected_ids": ["c2"],
+    "required_prompt_snippets": ["projection_index", "tokenizer_projection"],
+    "required_summary_snippets": ["projection_index", "tokenizer_projection"],
+    "dsl": "entity project \"SEAM\" as p1\nclaim c1:\n  subject p1\n  predicate persistent_memory\n  object sqlite_truth\nclaim c2:\n  subject p1\n  predicate projection_index\n  object tokenizer_projection\nclaim c3:\n  subject p1\n  predicate benchmark_engine\n  object glassbox_traces\n"
+  }
+]
