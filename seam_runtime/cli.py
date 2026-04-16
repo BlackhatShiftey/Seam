@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from experimental.hybrid_orchestrator import HybridOrchestrator
+from experimental.retrieval_orchestrator import RetrievalOrchestrator
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -242,8 +242,8 @@ def _add_rag_sync_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
 
 
-def _build_retrieval_orchestrator(runtime: SeamRuntime, args: argparse.Namespace) -> HybridOrchestrator:
-    return HybridOrchestrator(
+def _build_retrieval_orchestrator(runtime: SeamRuntime, args: argparse.Namespace) -> RetrievalOrchestrator:
+    return RetrievalOrchestrator(
         runtime,
         semantic_backend=getattr(args, "vector_backend", "seam"),
         chroma_path=getattr(args, "vector_path", ".seam_chroma"),

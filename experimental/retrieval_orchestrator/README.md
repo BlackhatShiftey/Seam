@@ -1,4 +1,4 @@
-# Retrieval Orchestrator Scaffold
+# Retrieval Orchestrator (Experimental)
 
 This package is an experimental SEAM extension for retrieval orchestration.
 
@@ -16,8 +16,12 @@ Current implementation:
 - `adapters.py` runs a structured SQLite leg and a semantic vector leg against the live SEAM runtime
 - `adapters.py` also includes an optional `ChromaSemanticAdapter` for a Chroma-backed semantic leg
 - `merger.py` normalizes and reranks merged candidates
-- `orchestrator.py` exposes `HybridOrchestrator.plan()` and `HybridOrchestrator.search()`
+- `orchestrator.py` exposes `RetrievalOrchestrator.plan()` and `RetrievalOrchestrator.search()`
 - `orchestrator.py` also exposes persistent index syncing plus `rag()` context-pack retrieval
+
+Compatibility:
+- the legacy import path `experimental.hybrid_orchestrator` still resolves
+- the legacy class names `HybridOrchestrator`, `HybridSearchResult`, and `HybridCandidate` remain as aliases
 
 Suggested next wiring steps:
 1. Upgrade the SQL leg from in-memory ranking to richer SQLite/Postgres predicates.

@@ -1,27 +1,22 @@
-"""Legacy compatibility layer for the previous experimental package name."""
-
-from experimental.retrieval_orchestrator import (
-    ChromaSemanticAdapter,
-    HybridCandidate,
-    HybridOrchestrator,
-    HybridSearchResult,
+from .adapters import ChromaSemanticAdapter, SeamVectorSearchAdapter, SQLiteIRAdapter
+from .orchestrator import RetrievalOrchestrator
+from .types import (
     QueryFilters,
     QueryIntent,
     RAGResult,
     RetrievalCandidate,
     RetrievalLeg,
-    RetrievalOrchestrator,
     RetrievalPlan,
     RetrievalSearchResult,
-    SeamVectorSearchAdapter,
-    SQLiteIRAdapter,
 )
+
+HybridOrchestrator = RetrievalOrchestrator
+HybridCandidate = RetrievalCandidate
+HybridSearchResult = RetrievalSearchResult
 
 __all__ = [
     "ChromaSemanticAdapter",
-    "HybridCandidate",
     "HybridOrchestrator",
-    "HybridSearchResult",
     "QueryFilters",
     "QueryIntent",
     "RAGResult",
@@ -32,4 +27,6 @@ __all__ = [
     "RetrievalSearchResult",
     "SeamVectorSearchAdapter",
     "SQLiteIRAdapter",
+    "HybridCandidate",
+    "HybridSearchResult",
 ]
