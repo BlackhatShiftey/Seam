@@ -27,6 +27,8 @@ except ImportError as exc:  # pragma: no cover - user-facing guard
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
 
+from .context_views import CONTEXT_VIEWS, build_context_payload
+from .lossless import LOSSLESS_CODECS, LOSSLESS_TRANSFORMS, TOKENIZER_CHOICES, benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
 from .mirl import IRBatch
 from .models import HashEmbeddingModel
 from .runtime import SeamRuntime
@@ -88,6 +90,9 @@ class DashboardApp:
             chroma_collection=vector_collection,
         )
         self.events: deque[DashboardEvent] = deque(maxlen=10)
+        self.active_tab = "runtime"
+        self.last_benchmark_payload: dict[str, Any] | None = None
+        self.last_machine_text: str | None = None
         self.last_command = "help"
         self.result_title = "Welcome"
         self.result_body = (
@@ -96,6 +101,7 @@ class DashboardApp:
             "  compile We need durable memory for AI systems\n"
             "  retrieve translator natural language\n"
             "  context translator natural language\n"
+            "  benchmark tools/lossless_demo_input.txt --min-savings 0.75\n"
             "  stats\n"
             "  quit"
         )
@@ -111,6 +117,9 @@ class DashboardApp:
 
         quit_parser = subparsers.add_parser("quit", add_help=False, aliases=["exit"])
         quit_parser.add_argument("rest", nargs="*")
+
+        tab_parser = subparsers.add_parser("tab", add_help=False)
+        tab_parser.add_argument("view", choices=["runtime", "benchmark"])
 
         compile_parser = subparsers.add_parser("compile", add_help=False, aliases=["compile-nl"])
         compile_parser.add_argument("text", nargs="+")
@@ -134,6 +143,7 @@ class DashboardApp:
                 command_parser.add_argument("--pack-budget", type=int, default=512)
                 command_parser.add_argument("--lens", default="rag")
                 command_parser.add_argument("--mode", choices=["context", "narrative", "exact"], default="context")
+                command_parser.add_argument("--view", choices=CONTEXT_VIEWS, default="pack")
             else:
                 command_parser.add_argument("--trace", action="store_true")
 
@@ -144,6 +154,25 @@ class DashboardApp:
 
         trace_parser = subparsers.add_parser("trace", add_help=False)
         trace_parser.add_argument("obj_id")
+
+        benchmark_parser = subparsers.add_parser("benchmark", add_help=False)
+        benchmark_parser.add_argument("source")
+        benchmark_parser.add_argument("--codec", choices=["auto", *LOSSLESS_CODECS], default="auto")
+        benchmark_parser.add_argument("--transform", choices=["auto", *LOSSLESS_TRANSFORMS], default="auto")
+        benchmark_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+        benchmark_parser.add_argument("--min-savings", type=float, default=0.30)
+        benchmark_parser.add_argument("--show-machine", action="store_true")
+
+        compress_parser = subparsers.add_parser("compress-doc", add_help=False, aliases=["lossless-compress"])
+        compress_parser.add_argument("source")
+        compress_parser.add_argument("--codec", choices=["auto", *LOSSLESS_CODECS], default="auto")
+        compress_parser.add_argument("--transform", choices=["auto", *LOSSLESS_TRANSFORMS], default="auto")
+        compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+
+        decompress_parser = subparsers.add_parser("decompress-doc", add_help=False, aliases=["lossless-decompress"])
+        decompress_parser.add_argument("source")
+
+        subparsers.add_parser("decompress-last", add_help=False)
 
         stats_parser = subparsers.add_parser("stats", add_help=False)
         stats_parser.add_argument("rest", nargs="*")
@@ -191,6 +220,12 @@ class DashboardApp:
             self.result_title = "Dashboard Help"
             self.result_body = self._help_text()
             self._log("help", "Displayed interactive command help.")
+            return False
+        if args.command == "tab":
+            self.active_tab = args.view
+            self.result_title = "Dashboard Tab"
+            self.result_body = f"Switched to the {args.view} tab."
+            self._log("system", f"Switched dashboard tab to {args.view}.")
             return False
 
         try:
@@ -240,14 +275,17 @@ class DashboardApp:
                 return False
 
             if args.command == "context":
-                result = self.orchestrator.rag(
-                    " ".join(args.query),
-                    scope=args.scope,
-                    budget=args.budget,
-                    pack_budget=args.pack_budget,
-                    lens=args.lens,
-                    mode=args.mode,
-                ).to_dict()
+                result = build_context_payload(
+                    self.orchestrator.rag(
+                        " ".join(args.query),
+                        scope=args.scope,
+                        budget=args.budget,
+                        pack_budget=args.pack_budget,
+                        lens=args.lens,
+                        mode=args.mode,
+                    ).to_dict(),
+                    view=args.view,
+                )
                 self._succeed("Context", result, "Built generation context from retrieved records.")
                 return False
 
@@ -263,6 +301,47 @@ class DashboardApp:
             if args.command == "trace":
                 result = self.runtime.trace(args.obj_id).to_dict()
                 self._succeed("Trace", result, f"Traced provenance for {args.obj_id}.")
+                return False
+
+            if args.command == "benchmark":
+                benchmark_result = benchmark_text_lossless(
+                    self._read_text_source(args.source),
+                    codec=args.codec,
+                    transform=args.transform,
+                    min_token_savings=args.min_savings,
+                    tokenizer=args.tokenizer,
+                )
+                result = benchmark_result.to_dict(include_machine_text=args.show_machine)
+                self.last_benchmark_payload = result
+                self.last_machine_text = benchmark_result.artifact.machine_text
+                self.active_tab = "benchmark"
+                self._succeed("Benchmark", result, "Ran iterative lossless benchmark search.")
+                return False
+
+            if args.command in {"compress-doc", "lossless-compress"}:
+                artifact = compress_text_lossless(
+                    self._read_text_source(args.source),
+                    codec=args.codec,
+                    transform=args.transform,
+                    tokenizer=args.tokenizer,
+                ).to_dict(include_machine_text=True)
+                self.last_machine_text = str(artifact.get("machine_text", ""))
+                self.active_tab = "benchmark"
+                self._succeed("Compress Doc", artifact, "Built lossless machine text.")
+                return False
+
+            if args.command in {"decompress-doc", "lossless-decompress"}:
+                text = decompress_text_lossless(self._read_text_source(args.source))
+                self.active_tab = "benchmark"
+                self._succeed("Decompress Doc", text, "Restored source document from machine text.")
+                return False
+
+            if args.command == "decompress-last":
+                if not self.last_machine_text:
+                    raise ValueError("No in-memory machine text is available yet. Run benchmark or compress-doc first.")
+                text = decompress_text_lossless(self.last_machine_text)
+                self.active_tab = "benchmark"
+                self._succeed("Decompress Last", text, "Restored the latest machine text from the benchmark tab.")
                 return False
 
             if args.command == "stats":
@@ -309,10 +388,14 @@ class DashboardApp:
     def _build_header(self, metrics: DashboardMetrics) -> Panel:
         title = Text("SEAM Console", style="bold cyan")
         subtitle = Text(
-            f"runtime-connected terminal dashboard | db={metrics.db_path} | records={metrics.total_records}",
+            f"runtime-connected terminal dashboard | db={metrics.db_path} | records={metrics.total_records} | tab={self.active_tab}",
             style="white",
         )
-        return Panel(Group(title, subtitle), border_style="bright_blue", box=box.ROUNDED)
+        tabs = Text()
+        tabs.append("Runtime", style="bold black on bright_white" if self.active_tab == "runtime" else "white")
+        tabs.append("  ")
+        tabs.append("Benchmark", style="bold black on bright_white" if self.active_tab == "benchmark" else "white")
+        return Panel(Group(title, subtitle, tabs), border_style="bright_blue", box=box.ROUNDED)
 
     def _build_runtime_panels(self, metrics: DashboardMetrics):
         runtime_table = Table.grid(expand=True)
@@ -348,10 +431,15 @@ class DashboardApp:
         panels.add_column(ratio=1)
         panels.add_column(ratio=1)
         panels.add_column(ratio=1)
+        third_panel = (
+            Panel(self._build_benchmark_summary_table(), title="[cyan]Benchmark[/cyan]", border_style="bright_blue", box=box.ROUNDED)
+            if self.active_tab == "benchmark"
+            else Panel(kinds_table, title="[cyan]Top Kinds[/cyan]", border_style="bright_blue", box=box.ROUNDED)
+        )
         panels.add_row(
             Panel(runtime_table, title="[cyan]Runtime[/cyan]", border_style="bright_blue", box=box.ROUNDED),
             Panel(storage_table, title="[cyan]Storage[/cyan]", border_style="bright_blue", box=box.ROUNDED),
-            Panel(kinds_table, title="[cyan]Top Kinds[/cyan]", border_style="bright_blue", box=box.ROUNDED),
+            third_panel,
         )
         return panels
 
@@ -359,12 +447,20 @@ class DashboardApp:
         body = Table.grid(expand=True)
         body.add_column(ratio=3)
         body.add_column(ratio=2)
-        body.add_row(
-            Panel(self._build_result_body(), title=f"[cyan]{escape(self.result_title)}[/cyan]", border_style="bright_blue", box=box.ROUNDED),
+        side_group = (
             Group(
+                Panel(self._build_benchmark_log_table(), title="[cyan]Benchmark Log[/cyan]", border_style="bright_blue", box=box.ROUNDED),
+                Panel(self._build_command_help(), title="[cyan]Commands[/cyan]", border_style="bright_blue", box=box.ROUNDED),
+            )
+            if self.active_tab == "benchmark"
+            else Group(
                 Panel(self._build_log_table(), title="[cyan]Runtime Log[/cyan]", border_style="bright_blue", box=box.ROUNDED),
                 Panel(self._build_command_help(), title="[cyan]Commands[/cyan]", border_style="bright_blue", box=box.ROUNDED),
-            ),
+            )
+        )
+        body.add_row(
+            Panel(self._build_result_body(), title=f"[cyan]{escape(self.result_title)}[/cyan]", border_style="bright_blue", box=box.ROUNDED),
+            side_group,
         )
         footer = Panel(
             Text(f"Last command: {self.last_command}", style="green"),
@@ -405,12 +501,17 @@ class DashboardApp:
 
     def _build_command_help(self):
         help_lines = [
+            "tab runtime|benchmark",
             "compile <text>",
             "compile-dsl <file>",
             "search <query>",
             "plan <query>",
             "retrieve <query>",
             "context <query>",
+            "benchmark <file> [--tokenizer auto|char4_approx|cl100k_base|o200k_base]",
+            "compress-doc <file> [--tokenizer auto|char4_approx|cl100k_base|o200k_base]",
+            "decompress-doc <file>",
+            "decompress-last",
             "index",
             "trace <record-id>",
             "stats",
@@ -438,7 +539,53 @@ class DashboardApp:
     def _format_payload(self, payload: object) -> str:
         if isinstance(payload, IRBatch):
             return payload.to_text()
+        if isinstance(payload, str):
+            return payload
+        if isinstance(payload, dict) and "artifact" in payload and "roundtrip_match" in payload:
+            from .lossless import render_lossless_benchmark_pretty
+
+            return render_lossless_benchmark_pretty(payload)
         return json.dumps(payload, indent=2, sort_keys=True)
+
+    def _build_benchmark_summary_table(self):
+        table = Table.grid(expand=True)
+        table.add_column(ratio=1)
+        table.add_column(justify="right")
+        payload = self.last_benchmark_payload
+        if not payload:
+            table.add_row("Status", "No benchmark yet")
+            table.add_row("Run", "benchmark <file>")
+            return table
+        artifact = payload.get("artifact", {})
+        table.add_row("Status", "PASS" if payload.get("passed") else "FAIL")
+        table.add_row("Roundtrip", "PASS" if payload.get("roundtrip_match") else "FAIL")
+        table.add_row("Transform", str(artifact.get("transform")))
+        table.add_row("Codec", str(artifact.get("codec")))
+        table.add_row("Tokenizer", str(artifact.get("token_estimator")))
+        table.add_row("Savings", f"{float(artifact.get('token_savings_ratio', 0.0)):.1%}")
+        table.add_row("Gain", f"{float(artifact.get('intelligence_per_token_gain', 0.0)):.2f}x")
+        table.add_row("Flags", str(len(payload.get("flags", []))))
+        return table
+
+    def _build_benchmark_log_table(self):
+        table = Table.grid(expand=True)
+        table.add_column(width=6, style="dim")
+        table.add_column(width=14)
+        table.add_column(ratio=1)
+        payload = self.last_benchmark_payload or {}
+        attempts = payload.get("search_log", [])
+        if not attempts:
+            table.add_row("-", "benchmark", "Run a benchmark to populate the search log.")
+            return table
+        for attempt in attempts[-8:]:
+            flags = f" flags={','.join(attempt.get('flags', []))}" if attempt.get("flags") else ""
+            detail = (
+                f"{attempt.get('transform')}/{attempt.get('codec')} "
+                f"savings={float(attempt.get('token_savings_ratio', 0.0)):.1%} "
+                f"tokens={attempt.get('machine_tokens')}{flags}"
+            )
+            table.add_row(str(attempt.get("iteration")), str(attempt.get("status")), detail)
+        return table
 
     def _collect_metrics(self) -> DashboardMetrics:
         db_path = Path(self.runtime.store.path)
@@ -491,12 +638,17 @@ class DashboardApp:
     def _help_text(self) -> str:
         return (
             "SEAM dashboard commands\n\n"
+            "tab runtime|benchmark\n"
             "compile <text>\n"
             "compile-dsl <file>\n"
             "search <query> [--budget N]\n"
             "plan <query> [--budget N]\n"
             "retrieve <query> [--budget N] [--trace]\n"
-            "context <query> [--budget N] [--pack-budget N]\n"
+            "context <query> [--budget N] [--pack-budget N] [--view pack|prompt|evidence|summary|records]\n"
+            "benchmark <file> [--min-savings N] [--tokenizer auto|char4_approx|cl100k_base|o200k_base]\n"
+            "compress-doc <file> [--tokenizer auto|char4_approx|cl100k_base|o200k_base]\n"
+            "decompress-doc <file>\n"
+            "decompress-last\n"
             "index [--scope S] [--namespace NS]\n"
             "trace <record-id>\n"
             "stats\n"
@@ -507,6 +659,12 @@ class DashboardApp:
     def _split_ids(text: str) -> list[str] | None:
         parts = [part.strip() for part in text.split(",") if part.strip()]
         return parts or None
+
+    @staticmethod
+    def _read_text_source(source: str) -> str:
+        if source == "-":
+            return sys.stdin.read()
+        return Path(source).read_bytes().decode("utf-8")
 
     @staticmethod
     def _directory_size(path: Path) -> int:

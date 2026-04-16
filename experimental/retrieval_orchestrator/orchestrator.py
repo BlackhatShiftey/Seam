@@ -105,6 +105,8 @@ class RetrievalOrchestrator:
             query=query,
             backend=self.semantic_backend,
             candidate_ids=[record.id for record in records],
+            candidates=[candidate.to_dict() for candidate in search_result.candidates],
+            records=[record.to_dict() for record in records],
             pack=pack.to_dict(),
             trace=trace,
         )

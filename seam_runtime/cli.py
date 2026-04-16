@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import sys
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
+from .context_views import CONTEXT_VIEWS, build_context_payload, render_context_pretty
 from .dashboard import run_dashboard
+from .lossless import (
+    LOSSLESS_CODECS,
+    LOSSLESS_TRANSFORMS,
+    TOKENIZER_CHOICES,
+    benchmark_text_lossless,
+    compress_text_lossless,
+    decompress_text_lossless,
+    render_lossless_benchmark_pretty,
+)
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -17,6 +29,44 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest_parser = subparsers.add_parser("ingest", help="Store raw text from a file or stdin")
     ingest_parser.add_argument("source")
+
+    lossless_compress_parser = subparsers.add_parser("lossless-compress", aliases=["compress-doc"], help="Losslessly compress a document into SEAM machine text")
+    lossless_compress_parser.add_argument("source")
+    lossless_compress_parser.add_argument("--codec", choices=["auto", *LOSSLESS_CODECS], default="auto")
+    lossless_compress_parser.add_argument("--transform", choices=["auto", *LOSSLESS_TRANSFORMS], default="auto")
+    lossless_compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+    lossless_compress_parser.add_argument("--output")
+    lossless_compress_parser.add_argument("--format", choices=["machine", "json"], default="machine")
+
+    lossless_decompress_parser = subparsers.add_parser("lossless-decompress", aliases=["decompress-doc"], help="Restore a SEAM lossless document back to exact text")
+    lossless_decompress_parser.add_argument("source")
+    lossless_decompress_parser.add_argument("--output")
+
+    lossless_benchmark_parser = subparsers.add_parser("lossless-benchmark", aliases=["benchmark-doc"], help="Benchmark lossless document compression and roundtrip recovery")
+    lossless_benchmark_parser.add_argument("source")
+    lossless_benchmark_parser.add_argument("--codec", choices=["auto", *LOSSLESS_CODECS], default="auto")
+    lossless_benchmark_parser.add_argument("--transform", choices=["auto", *LOSSLESS_TRANSFORMS], default="auto")
+    lossless_benchmark_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+    lossless_benchmark_parser.add_argument("--min-savings", type=float, default=0.30)
+    lossless_benchmark_parser.add_argument("--compressed-output")
+    lossless_benchmark_parser.add_argument("--roundtrip-output")
+    lossless_benchmark_parser.add_argument("--log-output")
+    lossless_benchmark_parser.add_argument("--show-machine", action="store_true")
+    lossless_benchmark_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    demo_parser = subparsers.add_parser("demo", help="Run operator-facing SEAM demos")
+    demo_subparsers = demo_parser.add_subparsers(dest="demo_command", required=True)
+    demo_lossless_parser = demo_subparsers.add_parser("lossless", help="Compress or rebuild a lossless SEAM-LX document demo")
+    demo_lossless_parser.add_argument("source")
+    demo_lossless_parser.add_argument("output")
+    demo_lossless_parser.add_argument("--rebuild", action="store_true", help="Treat the source as machine text and rebuild the original document")
+    demo_lossless_parser.add_argument("--codec", choices=["auto", *LOSSLESS_CODECS], default="auto")
+    demo_lossless_parser.add_argument("--transform", choices=["auto", *LOSSLESS_TRANSFORMS], default="auto")
+    demo_lossless_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+    demo_lossless_parser.add_argument("--min-savings", type=float, default=0.30)
+    demo_lossless_parser.add_argument("--show-machine", action="store_true")
+    demo_lossless_parser.add_argument("--log-output")
+    demo_lossless_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     compile_nl_parser = subparsers.add_parser("compile-nl", help="Compile natural language into MIRL")
     compile_nl_parser.add_argument("text")
@@ -69,6 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--pack-budget", type=int, default=512)
     context_parser.add_argument("--lens", default="rag")
     context_parser.add_argument("--mode", choices=["context", "narrative", "exact"], default="context")
+    context_parser.add_argument("--view", choices=CONTEXT_VIEWS, default="pack")
     context_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     context_parser.add_argument("--trace", action="store_true")
     context_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
@@ -121,10 +172,92 @@ def build_parser() -> argparse.ArgumentParser:
 def run_cli(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command in {"lossless-compress", "compress-doc"}:
+        text = _read_text_source(args.source)
+        artifact = compress_text_lossless(text, codec=args.codec, transform=args.transform, tokenizer=args.tokenizer)
+        if args.output:
+            _write_text_output(args.output, artifact.machine_text)
+        if args.format == "json":
+            print(json.dumps(artifact.to_dict(include_machine_text=True), indent=2))
+            return
+        print(artifact.machine_text)
+        return
+    if args.command in {"lossless-decompress", "decompress-doc"}:
+        machine_text = _read_text_source(args.source)
+        text = decompress_text_lossless(machine_text)
+        if args.output:
+            _write_text_output(args.output, text)
+            print(args.output)
+            return
+        print(text)
+        return
+    if args.command in {"lossless-benchmark", "benchmark-doc"}:
+        text = _read_text_source(args.source)
+        result = benchmark_text_lossless(
+            text,
+            codec=args.codec,
+            transform=args.transform,
+            min_token_savings=args.min_savings,
+            tokenizer=args.tokenizer,
+        )
+        if args.compressed_output:
+            _write_text_output(args.compressed_output, result.artifact.machine_text)
+        if args.roundtrip_output:
+            _write_text_output(args.roundtrip_output, result.roundtrip_text)
+        payload = result.to_dict(include_machine_text=args.show_machine)
+        if args.log_output:
+            _write_text_output(args.log_output, json.dumps(payload, indent=2))
+        if args.format == "json":
+            print(json.dumps(payload, indent=2))
+            return
+        print(render_lossless_benchmark_pretty(payload))
+        return
+    if args.command == "demo" and args.demo_command == "lossless":
+        if args.rebuild:
+            rebuilt_text = decompress_text_lossless(_read_text_source(args.source))
+            _write_text_output(args.output, rebuilt_text)
+            payload = {
+                "mode": "rebuild",
+                "source": args.source,
+                "output": args.output,
+                "status": "PASS",
+                "sha256": hashlib.sha256(rebuilt_text.encode("utf-8")).hexdigest(),
+                "output_bytes": len(rebuilt_text.encode("utf-8")),
+                "integrity": "verified against embedded SEAM-LX/1 hash",
+            }
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(_render_lossless_demo_result(payload))
+            return
+
+        text = _read_text_source(args.source)
+        result = benchmark_text_lossless(
+            text,
+            codec=args.codec,
+            transform=args.transform,
+            min_token_savings=args.min_savings,
+            tokenizer=args.tokenizer,
+        )
+        _write_text_output(args.output, result.artifact.machine_text)
+        payload = result.to_dict(include_machine_text=args.show_machine)
+        payload["mode"] = "compress"
+        payload["source"] = args.source
+        payload["output"] = args.output
+        if args.log_output:
+            payload["log_output"] = args.log_output
+            _write_text_output(args.log_output, json.dumps(payload, indent=2))
+        if args.format == "json":
+            print(json.dumps(payload, indent=2))
+            return
+        print(_render_lossless_demo_result(payload))
+        return
+
     runtime = SeamRuntime(args.db)
 
     if args.command == "ingest":
-        text = Path(args.source).read_text(encoding="utf-8") if args.source != "-" else input()
+        text = _read_text_source(args.source)
         print(runtime.compile_nl(text, source_ref=args.source).to_text())
         return
     if args.command == "compile-nl":
@@ -187,16 +320,19 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command in {"context", "rag-search"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        payload = orchestrator.rag(
-            args.query,
-            scope=args.scope,
-            budget=args.budget,
-            pack_budget=args.pack_budget,
-            lens=args.lens,
-            mode=args.mode,
-            include_trace=args.trace,
-        ).to_dict()
-        _print_retrieval_output(payload, output_format=args.format, renderer=_render_rag_pretty)
+        payload = build_context_payload(
+            orchestrator.rag(
+                args.query,
+                scope=args.scope,
+                budget=args.budget,
+                pack_budget=args.pack_budget,
+                lens=args.lens,
+                mode=args.mode,
+                include_trace=args.trace,
+            ).to_dict(),
+            view=args.view,
+        )
+        _print_retrieval_output(payload, output_format=args.format, renderer=render_context_pretty)
         return
     if args.command == "dashboard":
         run_dashboard(
@@ -242,6 +378,43 @@ def run_cli(argv: list[str] | None = None) -> None:
 
 def _split_ids(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def _read_text_source(source: str) -> str:
+    if source == "-":
+        return sys.stdin.read()
+    return Path(source).read_bytes().decode("utf-8")
+
+
+def _write_text_output(target: str, text: str) -> None:
+    if target == "-":
+        print(text)
+        return
+    Path(target).write_bytes(text.encode("utf-8"))
+
+
+def _render_lossless_demo_result(payload: dict[str, object]) -> str:
+    if payload.get("mode") == "rebuild":
+        return "\n".join(
+            [
+                "Demo: REBUILD PASS",
+                f"Source machine text: {payload.get('source')}",
+                f"Rebuilt output: {payload.get('output')}",
+                f"Rebuilt bytes: {payload.get('output_bytes')}",
+                f"SHA256: {payload.get('sha256')}",
+                f"Integrity: {payload.get('integrity')}",
+            ]
+        )
+
+    lines = [
+        f"Demo: {'PASS' if payload.get('passed') else 'FAIL'}",
+        f"Source document: {payload.get('source')}",
+        f"Compressed output: {payload.get('output')}",
+    ]
+    if payload.get("log_output"):
+        lines.append(f"Log output: {payload.get('log_output')}")
+    lines.extend(["", render_lossless_benchmark_pretty(payload)])
+    return "\n".join(lines)
 
 
 def _add_retrieval_common_args(parser: argparse.ArgumentParser, include_backend: bool = True) -> None:
@@ -347,30 +520,13 @@ def _render_rag_sync_pretty(payload: dict[str, object]) -> str:
     )
 
 
-def _render_rag_pretty(payload: dict[str, object]) -> str:
-    pack = payload.get("pack", {})
-    lines = [
-        f"Backend: {payload.get('backend')}",
-        f"Query: {payload.get('query')}",
-        f"Candidate ids: {', '.join(payload.get('candidate_ids', [])) or '(none)'}",
-        f"Pack id: {pack.get('pack_id')}",
-        "Context entries:",
-    ]
-    entries = pack.get("payload", {}).get("entries", [])
-    if not entries:
-        lines.append("(none)")
-    for index, entry in enumerate(entries, start=1):
-        lines.append(f"{index}. {entry.get('id')} [{entry.get('kind')}]")
-    if payload.get("trace"):
-        lines.append("Trace: included")
-    return "\n".join(lines)
-
-
 def _render_ids(payload: dict[str, object]) -> str:
     if "search" in payload and "retrieve" in payload:
         search_ids = " ".join(candidate["record"]["id"] for candidate in payload["search"].get("candidates", []))
         retrieval_ids = " ".join(candidate["record"]["id"] for candidate in payload["retrieve"].get("candidates", []))
         return f"search: {search_ids}\nretrieve: {retrieval_ids}".strip()
+    if "records" in payload:
+        return "\n".join(payload.get("candidate_ids", []))
     if "candidates" in payload:
         return "\n".join(candidate["record"]["id"] for candidate in payload.get("candidates", []))
     if "candidate_ids" in payload:

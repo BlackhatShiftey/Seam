@@ -15,7 +15,7 @@ Use it to track:
 - current work state and step number
 - handoff policy
 
-Last updated: 2026-04-15
+Last updated: 2026-04-16
 
 ## How To Use This File
 
@@ -40,7 +40,7 @@ Why this is split from `PROJECT_STATUS.md`:
 
 ### Current phase
 
-- phase: retrieval/runtime strengthening, dashboard integration, and repo cleanup
+- phase: retrieval/runtime strengthening, dashboard integration, packaging, and operator-demo productization
 
 ### Current step
 
@@ -50,13 +50,17 @@ Why this is split from `PROJECT_STATUS.md`:
 - step 4 was repo hygiene and durable project memory
 - step 5 is runtime-connected dashboard integration and stabilization
 - step 6 was strengthening the structured SQLite retrieval leg
-- next implementation step is richer context output for generation and operator workflows
+- step 7 was richer context output for generation and operator workflows
+- step 8 is lossless document compression benchmarking and demo support
+- step 9 is iterative lossless optimization logging and benchmark dashboard integration
+- step 10 is packaging, installed entrypoints, and one-command lossless demo flows
+- next implementation step is deciding the long-term home of retrieval and how lossless machine text should relate to MIRL/runtime workflows
 
 ### Immediate objective
 
 - keep the repo clean
 - preserve stable project memory in-repo
-- move next into better SQL filtering/ranking
+- continue promoting retrieval/context into a more polished runtime surface
 
 ## Assistant Memory Rule
 
@@ -139,7 +143,21 @@ Current retrieval stack includes:
 - merged ranking
 - optional trace output
 - context pack generation for downstream generation
+- richer context views for prompt, evidence, summary, and exact-record workflows
 - optional Chroma-backed vector retrieval
+
+Current lossless compression surface includes:
+
+- `SEAM-LX/1` machine-text envelope
+- exact document compression/decompression
+- SHA-256 integrity verification
+- benchmark reporting for token savings and exact roundtrip recovery
+- iterative search across known reversible transforms/codecs until no better candidate remains
+- fluctuation/regression logging for debugging and future rule design
+- dashboard benchmark tab with in-memory roundtrip via `decompress-last`
+- packaged terminal commands via editable install
+- tokenizer-aware benchmark reporting with `tiktoken` fallback behavior
+- one-command demo flow via `seam demo lossless` and exact rebuild via `--rebuild`
 
 ### Persistence model
 
@@ -161,6 +179,7 @@ Derived stores:
 - CLI language should describe what the command does, not internal experimental stage names.
 - SQLite remains the canonical source of truth.
 - Chroma is optional and should support persistence/retrieval, not replace the canonical record store.
+- machine-compressed views may be used as derived retrieval/operator artifacts, but they do not replace canonical SQLite records.
 - Experimental retrieval work can evolve, but should not break the stable core runtime unnecessarily.
 - Compatibility aliases are acceptable when they reduce churn during terminology cleanup.
 
@@ -259,11 +278,61 @@ Derived stores:
 - added table indexes to support the stronger structured path
 - added regression tests to prove irrelevant kind-only matches are excluded and exact structured matches work without free-text terms
 
+#### Richer context output
+
+- added reusable context view formatting for `pack`, `prompt`, `evidence`, `summary`, and `records`
+- kept pack generation as the canonical retrieval/context path while exposing richer operator-facing views on top
+- extended the RAG result shape to include ranked candidates and exact record payloads so downstream renderers do not have to reconstruct retrieval state
+- wired the new context views into both the CLI and the runtime-connected dashboard
+- added regression coverage for prompt view, evidence/citation JSON, and exact-record output
+
+#### Lossless machine-language benchmark
+
+- added a dedicated `SEAM-LX/1` lossless machine-text format separate from MIRL compilation
+- implemented reversible document compression using standard-library codecs with automatic best-codec selection
+- added exact decompression with SHA-256 integrity checking so any mismatch fails loudly
+- added benchmark reporting for token savings, byte savings, and intelligence-per-token gain using a deterministic prompt-token estimator
+- added CLI commands for `lossless-compress`, `lossless-decompress`, and `lossless-benchmark`
+- added a demo input file and regression coverage for exact roundtrips and high-savings benchmark passes
+
+#### Iterative benchmark loop and dashboard benchmark tab
+
+- upgraded the lossless benchmark from a one-shot codec pick into an iterative search over known reversible transforms and codecs
+- added per-attempt search logging with regression/fluctuation flags so compression changes can be debugged and used to guide future rule additions
+- wired benchmark, compression, decompression, and in-memory `decompress-last` flows into the terminal dashboard
+- added a dedicated benchmark tab in the dashboard with benchmark summary and search-log panels
+
 #### Documentation and cleanup
 
 - removed temporary handoff files from the repo
 - removed generated NotebookLM export artifacts from the repo
 - checked for conversation/share links in the repo and found none
+
+### 2026-04-16
+
+#### Packaging and terminal entrypoints
+
+- added `pyproject.toml` so the repo can be installed editable
+- exposed `seam` as the main console script and `seam-benchmark` as a focused benchmark shortcut
+- aligned dependency metadata so the packaged operator surface installs `rich`, `chromadb`, and `tiktoken`
+
+#### One-command lossless demo
+
+- added `seam demo lossless <source> <output>` as the main operator-facing prove-it workflow
+- added `seam demo lossless <machine> <output> --rebuild` for exact reconstruction from machine text
+- kept the lower-level `lossless-compress`, `lossless-decompress`, and `lossless-benchmark` commands intact underneath the demo flow
+
+#### Tokenizer-aware benchmark reporting
+
+- upgraded the lossless benchmark to support tokenizer selection
+- added `tiktoken`-backed counting with graceful fallback to `char4_approx`
+- threaded tokenizer selection into the CLI and dashboard benchmark surface
+
+#### Verification and coverage
+
+- added regression tests for the new demo compression/rebuild workflow
+- added regression coverage for explicit tokenizer selection in the lossless benchmark
+- fixed byte-preserving file I/O for the lossless demo path so Windows newline translation does not corrupt rebuild verification
 
 ## Repo Maintenance Notes
 
@@ -307,9 +376,12 @@ Avoid:
 
 ### Highest-priority runtime debt
 
-1. Context output formats are not rich enough yet.
-2. Retrieval still needs a long-term home decision between `experimental/` and `seam_runtime`.
-3. Remaining doc language should be aligned around current command vocabulary.
+1. Retrieval still needs a long-term home decision between `experimental/` and `seam_runtime`.
+2. We still need to decide how the lossless machine-language path should integrate with MIRL, packs, and downstream reasoning workflows.
+3. We need a canonical machine-projection storage strategy before pushing SEAM-compressed views deeper into derived retrieval systems like Chroma.
+4. The iterative lossless optimizer currently searches a small rule set; stronger reversible rules and corpus-driven tuning are the next leverage point.
+5. Remaining doc language should be aligned around current command vocabulary.
+6. The dashboard/operator surface still needs productization beyond early utility.
 
 ### Lower-priority but useful work
 
@@ -321,13 +393,15 @@ Avoid:
 
 ### Immediate next step
 
-Add richer `context` output modes so the system can emit prompt text, evidence/citations, summary views, and exact record payloads from the same retrieval result.
+Decide whether retrieval should move into `seam_runtime`, then add a canonical machine-projection layer plus retrieval evaluation so SEAM-compressed derived views can be compared safely against the current semantic-text path before changing Chroma behavior.
 
 ### Candidate follow-ups after that
 
 1. Decide whether retrieval should move into `seam_runtime`.
-2. Continue terminology/documentation cleanup across the remaining docs.
-3. Keep improving and productizing the runtime-connected dashboard surface.
+2. Add canonical machine-projection storage for exact SEAM-compressed artifacts.
+3. Run retrieval evals for human-readable vs machine-projected vs hybrid semantic indexing.
+4. Continue terminology/documentation cleanup across the remaining docs.
+5. Keep improving and productizing the runtime-connected dashboard surface.
 
 ## Update Template
 

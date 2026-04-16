@@ -150,6 +150,8 @@ class RAGResult:
     query: str
     backend: str
     candidate_ids: list[str]
+    candidates: list[dict[str, Any]]
+    records: list[dict[str, Any]]
     pack: dict[str, Any]
     trace: dict[str, Any] | None = None
 
@@ -158,6 +160,8 @@ class RAGResult:
             "query": self.query,
             "backend": self.backend,
             "candidate_ids": list(self.candidate_ids),
+            "candidates": list(self.candidates),
+            "records": list(self.records),
             "pack": self.pack,
             "trace": self.trace,
         }

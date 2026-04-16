@@ -13,7 +13,7 @@ and milestone history, also read:
 
 - `REPO_LEDGER.md`
 
-Last updated: 2026-04-15
+Last updated: 2026-04-16
 
 ## Current State
 
@@ -28,8 +28,15 @@ SEAM is a working memory-first compiler/runtime with:
 - a cleaned-up CLI with retrieval-oriented terminology
 - a runtime-connected terminal dashboard
 - a stronger SQLite retrieval leg with SQL-side filtering and ranking
+- richer `context` output views for prompt, evidence, summary, and exact-record workflows
+- a lossless document machine-language benchmark with exact roundtrip verification
+- an iterative lossless benchmark loop with fluctuation logging and a benchmark dashboard tab
+- packaged terminal entrypoints for `seam` and `seam-benchmark`
+- a one-command `seam demo lossless` flow for compressing and rebuilding exact machine text
+- tokenizer-aware benchmark reporting with `tiktoken` support and fallback to `char4_approx`
+- byte-faithful lossless file I/O so rebuilt demo files survive Windows newline handling
 
-The CLI is usable now, but not "finished" in the sense of product polish. Core flows work. The biggest remaining runtime gaps are richer context output and deciding where retrieval should live long-term.
+The CLI is usable now, but not "finished" in the sense of product polish. Core flows work. The biggest remaining runtime gaps are deciding where retrieval should live long-term, aligning docs around the current vocabulary, and continuing to productize the operator surface.
 
 ## What Is Done
 
@@ -48,6 +55,11 @@ The CLI is usable now, but not "finished" in the sense of product polish. Core f
 - the SQLite retrieval leg now pushes field filters, lexical gating, and ordering into SQL instead of relying on a weak in-memory pass
 - merged ranking exists
 - context/RAG pack generation exists
+- `context` can now emit pack output plus prompt-ready, evidence/citation, summary, and exact-record views from the same retrieval result
+- a separate `SEAM-LX/1` lossless machine-language path now exists for exact document compression, decompression, and benchmark demos
+- the lossless benchmark now searches known reversible transforms/codecs until no better candidate remains, logs compression fluctuations, and is visible in the dashboard benchmark tab
+- `seam demo lossless <source> <output>` now writes a benchmark-backed machine-text demo artifact, and `--rebuild` restores the exact original document
+- editable install now exposes `seam` and `seam-benchmark` as terminal commands
 - Chroma support exists as an optional vector backend
 
 ### CLI language cleanup
@@ -89,6 +101,7 @@ This means new code should use the retrieval-oriented package name, while older 
 - local virtual environment support is documented
 - `chromadb` is installed and verified
 - `rich` was added for the terminal preview prototype
+- `tiktoken` is now part of the packaged/operator dependency set for tokenizer-backed benchmark counts
 
 ### Terminal dashboard and prototype work
 
@@ -114,15 +127,13 @@ We still need to decide whether the retrieval orchestrator should:
 
 If promoted, `index` and `context` should become clearly first-class runtime features.
 
-### 2. Richer context output
+### 2. Retrieval projection decisions
 
-`context` currently returns a pack-oriented result.
-We likely want additional output modes such as:
+We still need to decide how far to push machine-efficient projections into derived retrieval layers:
 
-- plain prompt text
-- citation/evidence mode
-- summarized record mode
-- exact record mode
+- whether Chroma should gain a SEAM-compressed projection or metadata sidecar
+- whether embeddings should stay on human-readable renderings, machine-text renderings, or a dual representation
+- how to evaluate retrieval quality before changing the current semantic-text default
 
 ### 3. Documentation alignment
 
@@ -138,18 +149,19 @@ The repo should consistently describe the system using:
 
 ### 4. Productization of the terminal surface
 
-The runtime-connected terminal dashboard now exists, but it is still an early operator surface rather than a fully polished product UI.
-If we want it to become real product surface area, we need to decide whether to build:
+The runtime-connected terminal dashboard and packaged CLI entrypoints now exist, but the operator surface is still early rather than fully polished.
+If we want it to become a stronger product surface, we need to decide whether to build:
 
 - a true TUI
 - a browser shell
 - a startup/dashboard mode for the CLI
+- a first-run setup experience that configures the local agent/runtime automatically
 
 ## Immediate Next Step
 
 Best next implementation task:
 
-Add richer `context` output modes so SEAM can emit prompt-ready text, evidence/citation views, summaries, and exact-record payloads depending on the operator need.
+Decide whether retrieval should remain under `experimental/` or move into `seam_runtime`, then add a canonical machine-projection storage layer and retrieval evaluation so SEAM-compressed representations can be compared safely against the current semantic-text path.
 
 ## Working Rule
 

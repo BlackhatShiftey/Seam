@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seam-runtime"
+version = "0.1.0"
+description = "SEAM memory runtime and glassbox operator tooling for AI agents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "chromadb==1.5.7",
+  "rich==13.9.4",
+  "tiktoken>=0.8.0",
+]
+
+[project.scripts]
+seam = "seam:main"
+seam-benchmark = "seam:benchmark_main"
+
+[tool.setuptools]
+py-modules = ["seam"]
+
+[tool.setuptools.packages.find]
+include = ["experimental*", "seam_runtime*"]

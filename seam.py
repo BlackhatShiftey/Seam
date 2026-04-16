@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import sys
+
 from seam_runtime.cli import run_cli
 from seam_runtime.dsl import compile_dsl
+from seam_runtime.lossless import LosslessArtifact, LosslessBenchmarkResult, benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
 from seam_runtime.mirl import IRBatch, MIRLRecord, Pack
 from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel
 from seam_runtime.nl import compile_nl
@@ -53,8 +56,30 @@ def unpack_pack(pack: Pack | str):
     raise TypeError("unpack_pack now expects a Pack instance")
 
 
+def lossless_compress(text: str, codec: str = "auto", transform: str = "auto", tokenizer: str = "auto") -> LosslessArtifact:
+    return compress_text_lossless(text, codec=codec, transform=transform, tokenizer=tokenizer)
+
+
+def lossless_decompress(machine_text: str) -> str:
+    return decompress_text_lossless(machine_text)
+
+
+def lossless_benchmark(
+    text: str,
+    codec: str = "auto",
+    transform: str = "auto",
+    min_token_savings: float = 0.30,
+    tokenizer: str = "auto",
+) -> LosslessBenchmarkResult:
+    return benchmark_text_lossless(text, codec=codec, transform=transform, min_token_savings=min_token_savings, tokenizer=tokenizer)
+
+
 def main() -> None:
     run_cli()
+
+
+def benchmark_main() -> None:
+    run_cli(["lossless-benchmark", *sys.argv[1:]])
 
 
 if __name__ == "__main__":
