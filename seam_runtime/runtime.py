@@ -122,7 +122,7 @@ class SeamRuntime:
         return markdown
 
     def run_retrieval_benchmark(self) -> dict[str, object]:
-        return run_retrieval_benchmark(self.store.load_ir())
+        return run_retrieval_benchmark(embedding_model=self.embedding_model)
 
     def reindex_vectors(self, record_ids: list[str] | None = None) -> dict[str, object]:
         batch = self.store.load_ir(ids=record_ids) if record_ids else self.store.load_ir()
