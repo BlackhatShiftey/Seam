@@ -29,7 +29,7 @@ Design stance:
 
 - SQLite is the canonical source of truth
 - vectors and Chroma are derived retrieval layers, not canonical storage
-- the dashboard is a glassbox, not the primary interface
+- the dashboard is a glassbox operator surface, not the primary interface
 - the highest-value use case is an AI agent running on a device with SEAM embedded underneath it
 - stored and retrieved data should trend toward machine-efficient representations when SEAM can do so without violating exactness or canonical storage guarantees
 
@@ -81,12 +81,71 @@ Notes:
 - if `rich` is not installed, dashboard-specific tests skip automatically
 - the lossless codec and benchmark do not require `rich`, `chromadb`, or `tiktoken`
 
-## Install The Terminal Commands
+## Installer Flow
 
-If you want `seam` and `seam-benchmark` as real terminal commands:
+If you want the "download installer, run installer, type `seam`" path, use the installer entrypoint for your platform.
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
+```
+
+Linux:
+
+```bash
+sh ./installers/install_seam_linux.sh
+```
+
+What the installer does:
+
+- creates a dedicated SEAM runtime under your home directory instead of relying on a repo-local venv
+- installs SEAM into that dedicated runtime
+- creates global `seam` and `seam-benchmark` shims
+- configures a persistent default database in the SEAM install state directory
+- updates a user PATH location or shell profile as needed
+- runs `seam doctor`
+
+The installer path is the intended operator path. It is designed so a person or an agent can bootstrap SEAM once, then use `seam` as the machine-first local runtime command without thinking about a repo-local virtual environment.
+
+After the installer finishes, open a new terminal and type:
+
+```text
+seam doctor
+seam --help
+```
+
+Default persistence paths:
+
+- Windows: `%LOCALAPPDATA%\SEAM\state\seam.db`
+- Linux: `~/.local/share/seam/state/seam.db`
+
+## Repo-Local Development Install
+
+If you want `seam` and `seam-benchmark` as real terminal commands just for the current checkout:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e .
+```
+
+Fastest repo-local development path:
+
+```powershell
+.\scripts\bootstrap_seam.ps1
+```
+
+That script will:
+
+- create `.venv` if needed
+- install SEAM in editable mode
+- install global `seam` and `seam-benchmark` shims into a user PATH location
+- verify `seam.exe` and `seam-benchmark.exe`
+- run `seam doctor`
+
+To drop into a shell where you can type `seam` directly:
+
+```powershell
+. .\scripts\enter_seam.ps1
 ```
 
 That installs the packaged CLI plus:
@@ -108,6 +167,14 @@ Or activate the venv first and use:
 seam --help
 seam-benchmark tools/lossless_demo_input.txt --min-savings 0.75
 ```
+
+Smoke-test the install:
+
+```powershell
+seam doctor
+```
+
+After `bootstrap_seam.ps1`, new PowerShell windows should also be able to run `seam` directly without activating the repo venv first. The repo-local helper is mainly for development; the installer flow above is the intended operator path.
 
 ## Optional Extras
 
@@ -134,19 +201,21 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 ### 1. Compile and Persist Memory
 
+If you installed SEAM through the platform installer, `seam` already points at the persistent default database in the SEAM state directory. You only need `--db` when you want to override that default for an experiment or test.
+
 ```powershell
-seam --db seam.db compile-nl "We need durable memory for AI systems." --persist
-seam --db seam.db index
-seam --db seam.db search "durable memory" --budget 5
+seam compile-nl "We need durable memory for AI systems." --persist
+seam index
+seam search "durable memory" --budget 5
 ```
 
 ### 2. Retrieve Agent Context
 
 ```powershell
-seam --db seam.db retrieve "translator natural language" --budget 5 --trace
-seam --db seam.db context "translator natural language" --view prompt
-seam --db seam.db context "translator natural language" --view evidence --format json
-seam --db seam.db context "translator natural language" --view records
+seam retrieve "translator natural language" --budget 5 --trace
+seam context "translator natural language" --view prompt
+seam context "translator natural language" --view evidence --format json
+seam context "translator natural language" --view records
 ```
 
 ### 3. Launch the Glassbox Dashboard
@@ -154,14 +223,14 @@ seam --db seam.db context "translator natural language" --view records
 Requires `rich`:
 
 ```powershell
-seam --db seam.db dashboard
+seam dashboard
 ```
 
 Useful non-interactive snapshots:
 
 ```powershell
-seam --db seam.db dashboard --snapshot --no-clear
-seam --db seam.db dashboard --run "tab benchmark" --run "benchmark tools/lossless_demo_input.txt --min-savings 0.75" --run "decompress-last" --no-clear
+seam dashboard --snapshot --no-clear
+seam dashboard --run "tab benchmark" --run "benchmark tools/lossless_demo_input.txt --min-savings 0.75" --run "decompress-last" --no-clear
 ```
 
 ## Lossless Machine-Language Demo
@@ -230,6 +299,7 @@ The CLI is primarily for interacting with stored data, investigating the runtime
 ### Inspection and Debugging
 
 - `dashboard`: launch the runtime-connected terminal dashboard
+- `doctor`: check install health and run a lightweight compile/lossless smoke test
 - `demo lossless`: one-command operator demo for compressing and rebuilding exact machine text
 - `trace`: inspect provenance for an object id
 - `pack`: build a pack from persisted record ids

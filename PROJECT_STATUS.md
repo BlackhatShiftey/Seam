@@ -35,6 +35,13 @@ SEAM is a working memory-first compiler/runtime with:
 - a one-command `seam demo lossless` flow for compressing and rebuilding exact machine text
 - tokenizer-aware benchmark reporting with `tiktoken` support and fallback to `char4_approx`
 - byte-faithful lossless file I/O so rebuilt demo files survive Windows newline handling
+- repo-local bootstrap and shell-entry scripts now exist so operators can install SEAM and reach a working `seam` command faster
+- `seam doctor` now provides a lightweight install-health and smoke-test path
+- bootstrap now also installs user-level command shims so new shells can run `seam` without repo venv activation
+- platform-specific installer entrypoints now exist for Windows and Linux, with a dedicated home-directory SEAM runtime and persistent default database
+- `installers/README.md` now documents the direct platform install commands next to the installers themselves
+- the repo-owned READMEs now use the current machine-first, glassbox, retrieval/context terminology
+- the Windows installer path has been verified end to end with real `seam` command launch, persistence, lossless demo, and dashboard smoke checks
 
 The CLI is usable now, but not "finished" in the sense of product polish. Core flows work. The biggest remaining runtime gaps are deciding where retrieval should live long-term, aligning docs around the current vocabulary, and continuing to productize the operator surface.
 
@@ -135,17 +142,15 @@ We still need to decide how far to push machine-efficient projections into deriv
 - whether embeddings should stay on human-readable renderings, machine-text renderings, or a dual representation
 - how to evaluate retrieval quality before changing the current semantic-text default
 
-### 3. Documentation alignment
+### 3. Retrieval evaluation and integration
 
-Some documentation still uses older wording.
-The repo should consistently describe the system using:
+The next architecture question is no longer basic naming cleanup.
+It is how aggressively SEAM should push machine-efficient projections into derived retrieval layers while preserving:
 
-- compile
-- search
-- retrieval
-- index
-- context
-- export
+- canonical SQLite truth
+- exact traceability
+- semantic retrieval quality
+- tokenizer-measured savings that we can actually prove
 
 ### 4. Productization of the terminal surface
 
@@ -157,11 +162,18 @@ If we want it to become a stronger product surface, we need to decide whether to
 - a startup/dashboard mode for the CLI
 - a first-run setup experience that configures the local agent/runtime automatically
 
+### 5. Cross-platform verification depth
+
+The installer path now exists for Windows and Linux, but our verification depth is uneven:
+
+- Windows has been run and verified end to end
+- Linux installer support is implemented, but still needs a real-machine validation pass
+
 ## Immediate Next Step
 
 Best next implementation task:
 
-Decide whether retrieval should remain under `experimental/` or move into `seam_runtime`, then add a canonical machine-projection storage layer and retrieval evaluation so SEAM-compressed representations can be compared safely against the current semantic-text path.
+Add a canonical machine-projection storage layer plus tokenizer-backed retrieval evaluation, then compare machine-efficient derived views against the current semantic-text retrieval path before deciding how far SEAM compression should flow into retrieval and vector integration.
 
 ## Working Rule
 

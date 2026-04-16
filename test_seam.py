@@ -11,6 +11,7 @@ from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import run_dashboard
+from seam_runtime.installer import default_runtime_db_path, render_posix_shim, render_windows_cmd_shim
 from seam_runtime.lossless import benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
 from seam_runtime.models import OpenAICompatibleEmbeddingModel, cosine, default_embedding_model
 from seam_runtime.pack import score_pack, unpack_exact_pack
@@ -514,6 +515,52 @@ claim c2:
         runtime = SeamRuntime(self.db_path)
         records = runtime.store.load_ir().records
         self.assertTrue(records)
+
+    def test_cli_doctor_reports_pass(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["doctor"])
+        payload = stream.getvalue()
+        self.assertIn("SEAM doctor: PASS", payload)
+        self.assertIn("Compile smoke: PASS", payload)
+
+    def test_cli_doctor_json_reports_dependency_status(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["doctor", "--format", "json"])
+        payload = stream.getvalue()
+        self.assertIn('"status": "PASS"', payload)
+        self.assertIn('"dependencies"', payload)
+
+    def test_installer_windows_shim_sets_persistent_db(self) -> None:
+        shim = render_windows_cmd_shim(
+            Path(r"C:\SEAM\runtime\Scripts\seam.exe"),
+            Path(r"C:\Repos\Seam"),
+            r'powershell -ExecutionPolicy Bypass -File "C:\Repos\Seam\installers\install_seam_windows.ps1"',
+            Path(r"C:\Users\iwana\AppData\Local\SEAM\state\seam.db"),
+        )
+        self.assertIn("SEAM_DB_PATH", shim)
+        self.assertIn(r"C:\Users\iwana\AppData\Local\SEAM\state\seam.db", shim)
+
+    def test_installer_posix_shim_sets_persistent_db(self) -> None:
+        shim = render_posix_shim(
+            Path("/home/iwana/.local/share/seam/runtime/bin/seam"),
+            Path("/repos/seam"),
+            '"/repos/seam/installers/install_seam_linux.sh"',
+            Path("/home/iwana/.local/share/seam/state/seam.db"),
+        )
+        self.assertIn('export SEAM_DB_PATH="/home/iwana/.local/share/seam/state/seam.db"', shim)
+
+    def test_default_runtime_db_path_prefers_env(self) -> None:
+        original = os.environ.get("SEAM_DB_PATH")
+        try:
+            os.environ["SEAM_DB_PATH"] = "custom-seam.db"
+            self.assertEqual(default_runtime_db_path(), "custom-seam.db")
+        finally:
+            if original is None:
+                os.environ.pop("SEAM_DB_PATH", None)
+            else:
+                os.environ["SEAM_DB_PATH"] = original
 
     def test_dashboard_snapshot_renders_runtime_metrics(self) -> None:
         if Console is None:

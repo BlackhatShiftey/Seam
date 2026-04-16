@@ -1,21 +1,21 @@
 # SEAM Branding Concepts
 
-These are first-pass SVG concepts for the `seam` CLI/tool identity.
+These are first-pass SVG concepts for the `seam` glassbox operator surface around the machine-first SEAM runtime.
 
 Recommended direction:
 - `seam-mark-retro.svg`
-- Reason: it combines a memorable seam silhouette with a phosphor-terminal feel, which fits the CLI identity better than a generic modern tech mark.
+- Reason: it combines a memorable seam silhouette with a phosphor-terminal feel, which fits the glassbox CLI/dashboard identity better than a generic modern tech mark.
 
 Concepts:
 - `seam-mark-retro.svg`
   - A retro terminal badge with a phosphor seam cut and memory-grid details.
-  - Feels nostalgic, ownable, and more visually sticky for a CLI product.
+  - Feels nostalgic, ownable, and more visually sticky for a glassbox runtime shell.
 - `seam-mark-join.svg`
   - Two interlocking halves meeting at a center seam.
   - Feels like stitching, composition, and system integration.
 - `seam-mark-stack.svg`
   - A layered memory stack with a highlighted seam line.
-  - Feels more infrastructural and storage-oriented.
+  - Feels more infrastructural, persistence-oriented, and machine-first.
 - `seam-mark-terminal.svg`
   - A terminal-inspired prompt mark fused with a seam cut.
   - Best if the identity should feel strongly CLI-native.
@@ -25,7 +25,7 @@ Shared visual rules:
 - strong silhouette
 - works in monochrome
 - works at small terminal/icon sizes
-- should feel good with glow, scanline, or hover-reactive effects in a GUI shell
+- should feel good with glow, scanline, or hover-reactive effects in a terminal dashboard or future GUI shell
 
 Palette used in these drafts:
 - deep ink: `#0f172a`
@@ -39,7 +39,7 @@ Suggested next step:
 1. Pick the strongest concept.
 2. Refine line weight, corner radius, and color behavior.
 3. Export a final app icon, terminal badge, and social/repo mark from the chosen direction.
-4. Carry the same motion language into the GUI shell with subtle glow and scanline interaction.
+4. Carry the same motion language into the glassbox dashboard and any future GUI shell with subtle glow and scanline interaction.
 
 Runnable previews:
 - Browser preview:
@@ -50,8 +50,8 @@ Runnable previews:
   - `.\.venv\Scripts\python branding\seam_terminal_preview.py`
 
 Runtime-connected dashboard:
-- `.\.venv\Scripts\python seam.py --db seam.db dashboard`
-- `.\.venv\Scripts\python seam.py --db seam.db dashboard --snapshot --no-clear`
+- `seam dashboard`
+- `seam dashboard --snapshot --no-clear`
 
 Current packaged assets:
 - browser mock:

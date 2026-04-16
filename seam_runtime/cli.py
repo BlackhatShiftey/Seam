@@ -4,11 +4,13 @@ import argparse
 import hashlib
 import json
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
 from .context_views import CONTEXT_VIEWS, build_context_payload, render_context_pretty
 from .dashboard import run_dashboard
+from .installer import default_runtime_db_path
 from .lossless import (
     LOSSLESS_CODECS,
     LOSSLESS_TRANSFORMS,
@@ -24,7 +26,7 @@ from .runtime import SeamRuntime
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SEAM v1 memory compiler/runtime")
-    parser.add_argument("--db", default="seam.db", help="SQLite database path")
+    parser.add_argument("--db", default=default_runtime_db_path(), help="SQLite database path")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     ingest_parser = subparsers.add_parser("ingest", help="Store raw text from a file or stdin")
@@ -164,6 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     export_symbols_parser = subparsers.add_parser("export-symbols", help="Export symbol nursery markdown for audit/safety")
     export_symbols_parser.add_argument("--namespace")
     export_symbols_parser.add_argument("--output")
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check SEAM install health and run a lightweight smoke test")
+    doctor_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
@@ -372,6 +377,13 @@ def run_cli(argv: list[str] | None = None) -> None:
     if args.command == "export-symbols":
         print(runtime.export_symbols(namespace=args.namespace, output_path=args.output))
         return
+    if args.command == "doctor":
+        payload = _build_doctor_report()
+        if args.format == "json":
+            print(json.dumps(payload, indent=2))
+            return
+        print(_render_doctor_report(payload))
+        return
     if args.command == "stats":
         print(json.dumps(runtime.run_retrieval_benchmark(), indent=2))
 
@@ -415,6 +427,60 @@ def _render_lossless_demo_result(payload: dict[str, object]) -> str:
         lines.append(f"Log output: {payload.get('log_output')}")
     lines.extend(["", render_lossless_benchmark_pretty(payload)])
     return "\n".join(lines)
+
+
+def _build_doctor_report() -> dict[str, object]:
+    runtime = SeamRuntime(":memory:")
+    batch = runtime.compile_nl("SEAM doctor smoke test for durable local memory.")
+    smoke_ok = bool(batch.records)
+    lossless_result = benchmark_text_lossless(
+        "\n".join(["SEAM preserves exact context while compressing token usage for lossless recovery."] * 12),
+        min_token_savings=0.30,
+    )
+    return {
+        "status": "PASS" if smoke_ok and lossless_result.roundtrip_match else "FAIL",
+        "python": sys.version.split()[0],
+        "db_mode": "in-memory",
+        "default_db_path": default_runtime_db_path(),
+        "smoke_compile": {
+            "status": "PASS" if smoke_ok else "FAIL",
+            "record_count": len(batch.records),
+        },
+        "lossless": {
+            "status": "PASS" if lossless_result.roundtrip_match else "FAIL",
+            "token_estimator": lossless_result.artifact.token_estimator,
+            "token_savings_ratio": round(lossless_result.artifact.token_savings_ratio, 6),
+        },
+        "dependencies": {
+            "rich": find_spec("rich") is not None,
+            "chromadb": find_spec("chromadb") is not None,
+            "tiktoken": find_spec("tiktoken") is not None,
+        },
+    }
+
+
+def _render_doctor_report(payload: dict[str, object]) -> str:
+    dependency_lines = [
+        f"- {name}: {'installed' if installed else 'missing'}"
+        for name, installed in payload.get("dependencies", {}).items()
+    ]
+    return "\n".join(
+        [
+            f"SEAM doctor: {payload.get('status')}",
+            f"Python: {payload.get('python')}",
+            f"DB mode: {payload.get('db_mode')}",
+            f"Default DB: {payload.get('default_db_path')}",
+            f"Compile smoke: {payload.get('smoke_compile', {}).get('status')} ({payload.get('smoke_compile', {}).get('record_count')} records)",
+            (
+                "Lossless smoke: "
+                f"{payload.get('lossless', {}).get('status')} "
+                f"({payload.get('lossless', {}).get('token_savings_ratio')} savings, "
+                f"estimator={payload.get('lossless', {}).get('token_estimator')})"
+            ),
+            "Dependencies:",
+            *dependency_lines,
+        ]
+    )
 
 
 def _add_retrieval_common_args(parser: argparse.ArgumentParser, include_backend: bool = True) -> None:

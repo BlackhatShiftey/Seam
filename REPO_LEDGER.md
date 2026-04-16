@@ -334,6 +334,25 @@ Derived stores:
 - added regression coverage for explicit tokenizer selection in the lossless benchmark
 - fixed byte-preserving file I/O for the lossless demo path so Windows newline translation does not corrupt rebuild verification
 
+#### Launch UX and operator bootstrap
+
+- added `scripts/bootstrap_seam.ps1` to create `.venv`, install SEAM in editable mode, verify entrypoints, and run a smoke check
+- added `scripts/enter_seam.ps1` as a repo-local shell helper so operators can activate the venv and immediately type `seam`
+- added `scripts/install_global_seam_command.ps1` so SEAM can install user-level command shims into a PATH location outside the repo venv
+- added `seam doctor` as a lightweight install-health and smoke-test command
+- updated README so the shortest path to a working `seam` command is explicit, including no-activation usage in new shells
+
+#### Cross-platform installer and persistence setup
+
+- added dedicated installer entrypoints under `installers/` for Windows and Linux
+- installer now creates a dedicated SEAM runtime under the user home directory instead of relying on the repo-local development venv
+- installer-generated shims set `SEAM_DB_PATH` automatically so `seam` defaults to a durable persistent database
+- default installer persistence path is `%LOCALAPPDATA%\SEAM\state\seam.db` on Windows and `~/.local/share/seam/state/seam.db` on Linux
+- added `installers/README.md` so the direct platform install commands live beside the installer entrypoints
+- updated the repo-owned READMEs to use the current machine-first, glassbox, retrieval/context terminology
+- verified the Windows installer flow end to end: installed `seam`, ran `seam doctor`, persisted data into the default runtime database, ran the lossless demo flow, and launched dashboard snapshots from the installed command
+- Linux installer support is implemented in the same installer core, but still needs a real Linux validation pass before we can claim field verification
+
 ## Repo Maintenance Notes
 
 ### Files we should generally avoid committing

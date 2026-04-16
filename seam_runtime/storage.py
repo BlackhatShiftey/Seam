@@ -11,6 +11,8 @@ from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, TraceGra
 class SQLiteStore:
     def __init__(self, path: str | Path = "seam.db") -> None:
         self.path = str(path)
+        if self.path != ":memory:":
+            Path(self.path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
