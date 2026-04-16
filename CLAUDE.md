@@ -1,51 +1,97 @@
-# CLAUDE.md — SEAM Codebase Guide
+# CLAUDE.md — SEAM Continuity Guide
 
-This file provides a comprehensive orientation for AI assistants (and developers) working in this repository. Read it fully before making any changes.
+This file is the Claude-facing resume guide for the SEAM repo.
+It is **not** the canonical project ledger — durable memory lives in `PROJECT_STATUS.md` and `REPO_LEDGER.md`.
 
 ---
 
-## Project Overview
+## Read Order on Resume
 
-**SEAM** is a memory-first compiler/runtime for AI systems. It defines a canonical memory representation called **MIRL** (Memory Intermediate Representation Language) and provides tooling to compile, persist, search, compress, verify, and transpile that memory.
+1. `PROJECT_STATUS.md` — short current snapshot, what is done, what still needs work, immediate next step
+2. `REPO_LEDGER.md` — full engineering history, architecture decisions, active branch, milestone log
+3. `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` — if the task touches benchmarking, machine language, or evaluation policy
+4. `benchmarks/README.md` — operator-facing benchmark commands
+5. `experimental/retrieval_orchestrator/README.md` — if the task touches retrieval planning or orchestration
 
-Three core concepts:
-- **SEAM** — the platform: runtime, CLI, SDK, adapters
-- **MIRL** — the canonical memory IR stored inside SEAM
-- **PACK** — a derived, prompt-time compressed view of MIRL records
+---
+
+## Project Identity
+
+- **SEAM** — machine-first memory compiler/runtime and operator glassbox for AI agents
+- **MIRL** — canonical memory IR (Memory Intermediate Representation Language)
+- **PACK** — derived prompt-time or context-time compressed view of MIRL
+- **SEAM-LX/1** — exact machine-text envelope for lossless document compression and token-efficiency benchmarks
+
+---
+
+## Active Branch
+
+`feature/hybrid-orchestrator-v2`
+
+Handoff branch: `handoff/archive`
 
 ---
 
 ## Repository Layout
 
 ```
-/home/user/Seam/
+/
 ├── seam.py                          # Public API facade + CLI entry point
 ├── test_seam.py                     # Full test suite (unittest)
-├── SEAM_SPEC_V0.1.md                # Authoritative specification (1193 lines — read before changing IR)
+├── pyproject.toml                   # Build config; console scripts: seam, seam-benchmark
+├── requirements.txt                 # chromadb, rich, tiktoken
+├── SEAM_SPEC_V0.1.md                # Authoritative MIRL specification
+├── PROJECT_STATUS.md                # Short current-state tracker (read first)
+├── REPO_LEDGER.md                   # Long-form engineering memory (read second)
+├── CLAUDE.md                        # This file
+├── GEMINI.md                        # Gemini-facing resume guide
+├── ANTIGRAVITY.md                   # Antigravity-facing resume guide
 ├── seam_runtime/                    # Core implementation package
 │   ├── __init__.py                  # Exported public types
-│   ├── cli.py                       # 14-subcommand argparse CLI
+│   ├── benchmarks.py                # Six-family glassbox benchmark engine
+│   ├── cli.py                       # Full CLI (30+ subcommands + aliases)
+│   ├── context_views.py             # Context view rendering (pack/prompt/evidence/summary/records)
+│   ├── dashboard.py                 # Runtime-connected terminal dashboard
 │   ├── dsl.py                       # DSL compiler (structured text → MIRL)
-│   ├── evals.py                     # Retrieval benchmark harness
-│   ├── mirl.py                      # MIRL data types (RecordKind, MIRLRecord, IRBatch, Pack, …)
+│   ├── evals.py                     # Retrieval benchmark harness (gold fixtures)
+│   ├── installer.py                 # Install path management, default DB path
+│   ├── lossless.py                  # SEAM-LX/1 lossless compression/decompression engine
+│   ├── mirl.py                      # MIRL data types (RecordKind, MIRLRecord, IRBatch, Pack…)
 │   ├── models.py                    # Embedding model abstractions + env-driven factory
 │   ├── nl.py                        # NL compiler (free text → MIRL)
 │   ├── pack.py                      # Pack generation, unpacking, and scoring
 │   ├── reconcile.py                 # Claim duplicate/contradiction resolution
 │   ├── retrieval.py                 # Hybrid search (lexical + vector + graph + temporal)
-│   ├── runtime.py                   # SeamRuntime orchestrator (main integration point)
-│   ├── storage.py                   # SQLiteStore (8-table schema)
+│   ├── runtime.py                   # SeamRuntime orchestrator
+│   ├── storage.py                   # SQLiteStore (12-table schema)
 │   ├── symbols.py                   # Symbol proposal, maps, and markdown export
 │   ├── transpile.py                 # MIRL → Python code generation
 │   ├── vector.py                    # SQLiteVectorIndex
 │   ├── vector_adapters.py           # Pluggable vector backends (SQLite, pgvector)
 │   └── verify.py                    # Schema and reversibility validation
+├── experimental/
+│   ├── retrieval_orchestrator/      # Canonical retrieval planning package
+│   │   ├── orchestrator.py          # RetrievalOrchestrator: plan/search/rag/sync
+│   │   ├── planner.py               # Query classification + filter extraction
+│   │   ├── adapters.py              # SQLiteIRAdapter, SeamVectorSearchAdapter, ChromaSemanticAdapter
+│   │   ├── merger.py                # Hit normalization + reranking
+│   │   └── types.py                 # RetrievalPlan, RetrievalSearchResult, RAGResult
+│   └── hybrid_orchestrator/         # Compatibility alias layer (legacy imports resolve here)
+├── benchmarks/
+│   ├── SEAM_BENCHMARK_BLUEPRINT_V1.md
+│   ├── README.md
+│   └── fixtures/                    # agent_tasks.json, long_context_cases.json, lossless_cases.json
+├── installers/                      # install_seam.py, install_seam_linux.sh, install_seam_windows.ps1
+├── scripts/                         # bootstrap_seam.ps1, enter_seam.ps1, install_global_seam_command.ps1
+├── tools/
+│   └── lossless_demo_input.txt      # Demo input for lossless compression flows
+├── branding/                        # SVG marks, screenshots, design principles, terminal preview
 └── docs/
-    ├── MIRL_V1.md                   # MIRL spec reference
-    ├── RETRIEVAL_EVAL_V1.md         # Evaluation methodology
-    ├── SOP_MODEL_INTEGRATION.md     # How to add/swap embedding models
-    ├── SYMBOL_NURSERY.md            # Symbol allocation rules
-    └── retrieval_gold_fixtures.json # Gold fixtures for benchmark tests
+    ├── MIRL_V1.md
+    ├── RETRIEVAL_EVAL_V1.md
+    ├── SOP_MODEL_INTEGRATION.md
+    ├── SYMBOL_NURSERY.md
+    └── retrieval_gold_fixtures.json
 ```
 
 ---
@@ -54,259 +100,265 @@ Three core concepts:
 
 | Concern | Choice |
 |---|---|
-| Language | Python 3.10+ |
-| Database | SQLite (primary); PostgreSQL + pgvector (optional) |
+| Language | Python 3.11+ |
+| Database | SQLite (canonical); PostgreSQL + pgvector (optional) |
+| Vector semantic backend | SQLite (default); Chroma (optional) |
 | Embeddings | `HashEmbeddingModel` (default, local, deterministic); `OpenAICompatibleEmbeddingModel` (optional) |
+| Tokenizer | `tiktoken` (preferred); `char4_approx` fallback |
+| UI | `rich` (terminal rendering) |
 | Test framework | `unittest` (stdlib) |
-| External deps | None required — optional `psycopg` for pgvector |
-| Build system | None; run directly with `python seam.py` |
-
-There is no `requirements.txt`, `setup.py`, or `pyproject.toml`. All required dependencies are standard library. Keep it that way unless there is a compelling reason to add an external dependency.
+| Build | `pyproject.toml` (setuptools); console scripts `seam` and `seam-benchmark` |
+| External deps | `chromadb`, `rich`, `tiktoken` (all optional at runtime, listed in `requirements.txt`) |
 
 ---
 
-## Architecture: Four Layers
+## Architecture: Five Layers
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│  Orchestration   SeamRuntime (runtime.py) + CLI (cli.py)     │
-├───────────────────────────────────────────────────────────────┤
-│  Compilation     nl.py (NL→MIRL)  │  dsl.py (DSL→MIRL)      │
-├───────────────────────────────────────────────────────────────┤
-│  Data Model      mirl.py — RecordKind, MIRLRecord, IRBatch   │
-│                  pack.py — Pack (compressed prompt views)     │
-├───────────────────────────────────────────────────────────────┤
-│  Processing      verify.py │ reconcile.py │ symbols.py       │
-│                  retrieval.py │ vector.py │ vector_adapters.py│
-│                  storage.py (SQLiteStore, 8 tables)           │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  Orchestration    SeamRuntime (runtime.py) + CLI (cli.py)      │
+│                   RetrievalOrchestrator (experimental/)         │
+│                   Dashboard (dashboard.py)                      │
+├────────────────────────────────────────────────────────────────┤
+│  Compilation      nl.py (NL→MIRL)  │  dsl.py (DSL→MIRL)       │
+│  Compression      lossless.py (SEAM-LX/1)                      │
+├────────────────────────────────────────────────────────────────┤
+│  Data Model       mirl.py — RecordKind, MIRLRecord, IRBatch    │
+│                   pack.py — Pack (compressed prompt views)      │
+│                   context_views.py — operator-facing views      │
+├────────────────────────────────────────────────────────────────┤
+│  Processing       verify.py │ reconcile.py │ symbols.py        │
+│                   retrieval.py │ benchmarks.py │ evals.py       │
+│                   vector.py │ vector_adapters.py                │
+├────────────────────────────────────────────────────────────────┤
+│  Storage          storage.py (SQLiteStore, 12 tables)           │
+│                   models.py (embedding backends)                │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-Data flows in one direction: **compile → verify → persist → index → search/pack**.
+Data flows one direction: **compile → verify → persist → index → search/pack/benchmark**
 
 ---
 
-## Key Data Types (mirl.py)
+## Storage Schema (storage.py) — 12 Tables
 
-### RecordKind (enum)
-```
-RAW  SPAN  ENT  CLM  EVT  REL  STA  SYM  PACK  FLOW  PROV  META
-```
-
-### Status (enum)
-```
-asserted  observed  inferred  hypothetical
-contradicted  superseded  deprecated  deleted_soft
-```
-
-### MIRLRecord (dataclass)
-Core fields: `id`, `kind`, `ns`, `scope`, `ver`, `created_at`, `updated_at`, `conf`, `status`, `t0`, `t1`, `prov`, `evidence`, `ext`, `attrs`
-
-- `id` format: `{kind_lower}:{sequential_integer}` (e.g., `clm:1`, `ent:2`)
-- `ns` format: dot-separated namespace hierarchy (e.g., `org.app.user.thread`)
-- `conf` range: `0.0`–`1.0`
-- `prov` / `evidence`: lists of record IDs linking to PROV and SPAN records
-
-### IRBatch (dataclass)
-Container for `list[MIRLRecord]`. Supports:
-- `to_text()` / `from_text()` — pipe-delimited line format
-- `to_json()` / `from_json()` — full JSON
-
-### Pack (dataclass)
-Compressed prompt view. Three modes:
-- `exact` — fully reversible JSON; `unpack_exact_pack(pack)` returns the original `IRBatch`
-- `context` — symbol-substituted compaction (irreversible but traceable)
-- `narrative` — human-readable summary
-
----
-
-## SeamRuntime API (runtime.py)
-
-`SeamRuntime` is the primary integration point. Instantiate it with a SQLite path:
-
-```python
-from seam import SeamRuntime
-runtime = SeamRuntime("seam.db")
-```
-
-| Method | Purpose |
-|---|---|
-| `compile_nl(text, ...)` | Free text → `IRBatch` |
-| `compile_dsl(text, ...)` | DSL text → `IRBatch` |
-| `verify_ir(batch)` | Returns `VerifyReport` |
-| `persist_ir(batch)` | Validates, normalizes, writes to DB + vector index |
-| `search_ir(query, ...)` | Hybrid search → `SearchResult` |
-| `pack_ir(record_ids, ...)` | Build `Pack` from stored records |
-| `decompile_ir(record_ids, ...)` | Human-readable MIRL summary |
-| `trace(obj_id)` | Provenance graph → `TraceGraph` |
-| `reconcile_ir(record_ids)` | Detect/resolve duplicate or conflicting claims |
-| `transpile_ir(record_ids, target)` | MIRL → Python stub (`Artifact`) |
-| `promote_symbols(min_frequency)` | Propose and persist machine symbols |
-| `export_symbols(namespace, output_path)` | Symbol nursery markdown |
-| `reindex_vectors(record_ids)` | Rebuild vector index |
-| `run_retrieval_benchmark()` | Gold fixture evaluation → `dict` |
-
-`persist_ir()` always validates before writing. If `VerifyReport.valid` is `False`, it raises `ValueError`.
-
----
-
-## Public API (seam.py)
-
-`seam.py` is the thin facade used in tests and user code:
-
-```python
-from seam import (
-    SeamRuntime,
-    compile_nl,      # → IRBatch
-    compile_dsl,     # → IRBatch
-    pack_ir,         # (batch_or_records, lens, budget, mode) → Pack
-    decompile_ir,    # (batch_or_records, mode) → str
-    render_ir,       # (batch_or_records) → str (pipe-delimited text)
-    load_ir_lines,   # (text) → list[MIRLRecord]
-    unpack_pack,     # (Pack) → dict or json
-    verify_ir,       # (batch) → VerifyReport
-)
-```
-
----
-
-## CLI Reference (cli.py)
-
-Entry point: `python seam.py --db <path> <command> [args]`
-
-| Subcommand | What it does |
-|---|---|
-| `ingest <source>` | Store raw text from file or stdin |
-| `compile-nl <text> [--persist]` | NL → MIRL; optionally persists |
-| `compile-dsl <file> [--persist]` | DSL file → MIRL |
-| `verify <file>` | Validate MIRL from text file |
-| `persist <file>` | Persist MIRL from text file |
-| `search <query> [--scope] [--budget]` | Hybrid search |
-| `pack <record_ids> [--lens] [--budget] [--mode]` | Build pack |
-| `decompile <record_ids> [--mode]` | Decompile to text |
-| `trace <obj_id>` | Provenance trace |
-| `reconcile [--record-ids]` | Reconcile claims |
-| `transpile <record_ids> [--target]` | MIRL → Python |
-| `reindex [--record-ids]` | Rebuild vector index |
-| `promote-symbols [--min-frequency]` | Propose/persist symbols |
-| `export-symbols [--namespace] [--output]` | Symbol nursery markdown |
-| `stats` | Run retrieval benchmark |
-
-All commands output JSON or pipe-delimited MIRL text to stdout.
-
----
-
-## Storage Schema (storage.py)
-
-Eight SQLite tables:
+**Canonical truth (never drop or skip):**
 
 | Table | Contents |
 |---|---|
 | `raw_docs` | Original raw text with source_ref |
 | `raw_spans` | Extracted text spans |
 | `ir_records` | All MIRL records (JSON-serialized) |
-| `ir_edges` | Provenance and evidence edges |
+| `prov_log` | Provenance log entries |
+
+**Derived (rebuildable):**
+
+| Table | Contents |
+|---|---|
+| `ir_edges` | Provenance and evidence graph edges |
 | `symbol_table` | Proposed machine-only symbols |
 | `pack_store` | Stored packs |
-| `prov_log` | Provenance log entries |
 | `vector_index` | Embedded vectors (JSON float arrays) |
 
-**Canonical truth:** `raw_docs`, `raw_spans`, `prov_log`, and `ir_records`.  
-**Derived (can be rebuilt):** `pack_store`, `vector_index`, `symbol_table` exports.
+**Machine / benchmark (new):**
+
+| Table | Contents |
+|---|---|
+| `machine_artifacts` | Lossless compression artifacts and projections |
+| `benchmark_runs` | Persisted benchmark suite run records |
+| `benchmark_cases` | Per-case benchmark results |
+| `projection_index` | Machine-projection derived indexes |
 
 ---
 
-## Hybrid Search Scoring (retrieval.py)
+## CLI Reference
 
-`search_batch()` combines four independent signals with fixed weights:
+Entry point: `seam --db <path> <command>` or `python seam.py --db <path> <command>`
 
-| Signal | Weight | Source |
+### Core MIRL commands
+
+| Command | Purpose |
+|---|---|
+| `ingest <source>` | Store raw text from file or stdin |
+| `compile-nl <text> [--persist] [--index]` | NL → MIRL |
+| `compile-dsl <file> [--persist] [--index]` | DSL file → MIRL |
+| `verify <file>` | Validate MIRL |
+| `persist <file> [--index]` | Persist MIRL from text file |
+| `search <query> [--scope] [--budget]` | Basic hybrid search |
+| `pack <ids> [--lens] [--budget] [--mode]` | Build pack |
+| `decompile <ids> [--mode]` | Decompile to text |
+| `trace <obj_id>` | Provenance trace |
+| `reconcile [--record-ids]` | Reconcile claims |
+| `transpile <ids> [--target]` | MIRL → Python |
+| `reindex [--record-ids]` | Rebuild vector index |
+| `promote-symbols [--min-frequency]` | Propose/persist symbols |
+| `export-symbols [--namespace] [--output]` | Symbol nursery markdown |
+| `stats` | Run retrieval benchmark |
+
+### Retrieval orchestrator commands
+
+| Command | Aliases | Purpose |
 |---|---|---|
-| Lexical | 40% | Term overlap with record text fields |
-| Semantic (vector) | 35% | Cosine similarity via embedding model |
-| Graph expansion | 15% | Provenance/evidence link bonus |
-| Temporal | 10% | Recency of record timestamps |
+| `plan <query>` | `hybrid-plan` | Build a retrieval plan |
+| `retrieve <query>` | `hybrid-search` | Run retrieval and rank results |
+| `compare <query>` | `hybrid-compare` | Compare basic search vs. retrieval |
+| `index [--record-ids]` | `rag-sync` | Sync records into vector indexes |
+| `context <query>` | `rag-search` | Retrieve context for generation |
 
-Symbol expansion is applied to the query before ranking. Results include a `reasons` list explaining each score contribution.
+### Lossless compression commands
+
+| Command | Aliases | Purpose |
+|---|---|---|
+| `lossless-compress <source>` | `compress-doc` | Compress document to SEAM-LX/1 machine text |
+| `lossless-decompress <source>` | `decompress-doc` | Restore original document from machine text |
+| `lossless-benchmark <source>` | `benchmark-doc` | Benchmark compression + roundtrip |
+| `demo lossless <src> <out>` | — | Operator demo: compress or `--rebuild` |
+
+### Benchmark commands
+
+| Command | Purpose |
+|---|---|
+| `benchmark run [suite] [--persist] [--output]` | Run benchmark suites (all or named family) |
+| `benchmark show [run_id]` | Show a persisted run (`latest` by default) |
+| `benchmark verify <bundle>` | Verify bundle hash and case hashes |
+
+### Operator commands
+
+| Command | Purpose |
+|---|---|
+| `dashboard [--snapshot] [--run <cmd>]` | Launch runtime-connected terminal dashboard |
+| `doctor` | Install health check + smoke test |
+
+**Benchmark suite families:** `lossless`, `retrieval`, `embedding`, `long_context`, `persistence`, `agent_tasks`
 
 ---
 
-## Embedding Models (models.py)
+## Retrieval Orchestrator (experimental/)
 
-Protocol: `name: str`, `dimension: int`, `embed(text: str) -> list[float]`
+**Canonical package:** `experimental.retrieval_orchestrator`
+**Compat alias:** `experimental.hybrid_orchestrator` (legacy imports still resolve)
 
-**Default (no config needed):** `HashEmbeddingModel` — deterministic 64-dim bag-of-words using SHA256. No external calls, works offline.
+`RetrievalOrchestrator` wraps a `SeamRuntime` and provides:
 
-**OpenAI-compatible:** configured entirely via environment variables:
+| Method | Purpose |
+|---|---|
+| `plan(query, scope, budget)` | Classify query intent + extract filters → `RetrievalPlan` |
+| `search(query, ...)` | Execute SQL + vector legs, merge, rank → `RetrievalSearchResult` |
+| `rag(query, ...)` | Search + pack context → `RAGResult` |
+| `sync_persistent_indexes(...)` | Sync records into SQLite vector index and optional Chroma |
 
-```bash
-SEAM_EMBEDDING_PROVIDER="openai"              # or "openai-compatible"
-SEAM_EMBEDDING_MODEL="text-embedding-3-small"
-SEAM_EMBEDDING_BASE_URL="https://api.openai.com/v1/embeddings"
-SEAM_EMBEDDING_API_KEY_ENV="OPENAI_API_KEY"   # name of the var holding the key
-SEAM_EMBEDDING_TIMEOUT_S="30.0"
-SEAM_EMBEDDING_DIMENSIONS="1536"              # optional
+Two semantic backends:
+- **`seam`** (default) — `SeamVectorSearchAdapter` wrapping the SQLite vector index
+- **`chroma`** — `ChromaSemanticAdapter` using a persistent Chroma collection
+
+The SQL retrieval leg pushes field filters (`kind`, `scope`, `ns`, `predicate`, `subject`, `object`), lexical gating, and ranking into SQL — it is not an in-memory scan.
+
+---
+
+## SEAM-LX/1 Lossless Compression (lossless.py)
+
+Machine-text format for exact document compression and token-efficiency benchmarking.
+
+**Envelope format:**
+```
+SEAM-LX/1
+c=<codec>
+t=<transform>
+h=<sha256>
+p=<base85-encoded-payload>
 ```
 
-Then `OPENAI_API_KEY=sk-...` must be set.
+**Codecs:** `zlib`, `bz2`, `lzma` (auto-selects best)
+**Transforms:** `identity`, `line_table`, `paragraph_table`
+**Token estimator:** `tiktoken` (cl100k_base or o200k_base) with `char4_approx` fallback
 
-`default_embedding_model()` reads these at construction time. To add a new backend, implement the `EmbeddingModel` protocol and wire it into `models.py`.
+Decompression verifies SHA-256 integrity and raises `ValueError` on mismatch — any lossy result fails loudly.
+
+**Public API (seam.py):**
+```python
+from seam import lossless_compress, lossless_decompress, lossless_benchmark
+artifact = lossless_compress("your text")
+original = lossless_decompress(artifact.machine_text)
+result = lossless_benchmark("your text", min_token_savings=0.30)
+```
 
 ---
 
-## Vector Adapters (vector_adapters.py)
+## Context Views (context_views.py)
 
-Two backends implementing the `VectorAdapter` protocol:
+The `context` command and `RetrievalOrchestrator.rag()` support five output views:
 
-- **`SQLiteVectorAdapter`** — default; stores float arrays in `vector_index` table
-- **`PgVectorAdapter`** — PostgreSQL + pgvector; pass `pgvector_dsn` to `SeamRuntime`
+| View | Output |
+|---|---|
+| `pack` | Compressed MIRL pack (default) |
+| `prompt` | Formatted prompt-ready text with citations |
+| `evidence` | Per-record citations with scores and provenance |
+| `summary` | Record count, kind breakdown, highlights |
+| `records` | Raw JSON records |
 
-To use pgvector:
+---
+
+## SeamRuntime API (runtime.py)
+
+```python
+from seam import SeamRuntime
+runtime = SeamRuntime("seam.db")
+```
+
+**Core methods (unchanged):**
+`compile_nl`, `compile_dsl`, `verify_ir`, `normalize_ir`, `persist_ir`, `search_ir`, `pack_ir`, `decompile_ir`, `trace`, `reconcile_ir`, `transpile_ir`, `suggest_symbols`, `promote_symbols`, `export_symbols`, `reindex_vectors`, `run_retrieval_benchmark`
+
+**New benchmark methods:**
+
+| Method | Purpose |
+|---|---|
+| `run_benchmark_suite(suite, tokenizer, persist, ...)` | Run named or all benchmark families |
+| `verify_benchmark_bundle(bundle)` | Verify bundle hash + case hashes |
+| `read_benchmark_run(run_id)` | Load persisted run |
+| `list_benchmark_runs(limit)` | List persisted runs |
+
+---
+
+## Key Data Types (mirl.py)
+
+### RecordKind (12 kinds)
+```
+RAW  SPAN  ENT  CLM  EVT  REL  STA  SYM  PACK  FLOW  PROV  META
+```
+
+### Status (8 values)
+```
+asserted  observed  inferred  hypothetical
+contradicted  superseded  deprecated  deleted_soft
+```
+
+### MIRLRecord
+`id` format: `{kind_lower}:{integer}` — `id` field: `ns`, `scope`, `conf` (0–1), `status`, `t0`, `t1`, `prov`, `evidence`, `ext`, `attrs`
+
+### Pack modes
+- `exact` — fully reversible; `unpack_exact_pack()` reconstructs original `IRBatch`
+- `context` — symbol-compacted (irreversible but traceable ≥ 0.66)
+- `narrative` — human display only
+
+---
+
+## Embedding & Vector Backends
+
+**Embedding models** (models.py) — env-driven:
+```bash
+SEAM_EMBEDDING_PROVIDER="openai"           # or "openai-compatible", default is "hash"
+SEAM_EMBEDDING_MODEL="text-embedding-3-small"
+SEAM_EMBEDDING_BASE_URL="https://api.openai.com/v1/embeddings"
+SEAM_EMBEDDING_API_KEY_ENV="OPENAI_API_KEY"
+SEAM_EMBEDDING_TIMEOUT_S="30.0"
+SEAM_EMBEDDING_DIMENSIONS="1536"
+```
+
+**Vector adapters** — pass at construction:
 ```python
 runtime = SeamRuntime("seam.db", pgvector_dsn="postgresql://user:pass@host/db")
 ```
-
----
-
-## Symbol System (symbols.py)
-
-Symbols are short machine-readable aliases for repeated expansions. They live in the namespace hierarchy and are stored as `SYM` records.
-
-Predefined core symbols: `goal→gl`, `scope→sc`, `principle→pr`, `constraint→cs`, `memory→mem`, and others.
-
-Namespace hierarchy: `org → org.app → org.app.user → org.app.user.thread`  
-Child namespaces can shadow parent symbols.
-
-**Workflow:**
-```bash
-python seam.py --db seam.db persist mirl_records.txt
-python seam.py --db seam.db promote-symbols --min-frequency 2
-python seam.py --db seam.db reindex
-python seam.py --db seam.db pack <ids> --mode context
-python seam.py --db seam.db export-symbols
-```
-
----
-
-## DSL Syntax (dsl.py)
-
-Minimal structured format for authoring MIRL without writing raw JSON:
-
-```
-entity project "SEAM" as p1
-
-claim c1:
-  subject p1
-  predicate supports
-  object ["db", "rag", "ctx"]
-  conf 0.9
-
-state s1:
-  subject p1
-  fields status=active priority=high
-```
-
-Supported block types: `entity`, `claim`, `state`, `pack`
+Or use Chroma via the retrieval orchestrator (`--vector-backend chroma`).
 
 ---
 
@@ -317,129 +369,82 @@ cd /home/user/Seam
 python -m unittest test_seam.py -v
 ```
 
-Tests use a per-test temporary SQLite database (UUID-named, deleted in `tearDown`).
-
-**Test coverage includes:**
-- NL and DSL compilation → MIRL generation
-- Exact pack round-trip reversibility
-- Verifier rejection of invalid MIRL
-- End-to-end persist → search → trace
-- Vector index reindex and recall
-- Symbol promotion and pack compaction
-- Symbol export and query expansion
-- Namespace chain inheritance
-- Decompile output and pack payload structure
-- Text parser round-trip (pipe-delimited format)
-- Embedding model env-variable configuration
-- Retrieval benchmark with gold fixtures
-- Pack scoring metrics (reversibility, traceability)
-
-There is no separate CI configuration. Run tests locally before committing.
+Tests use UUID-named SQLite files, deleted in `tearDown`. No CI is configured — run locally before committing.
 
 ---
 
 ## Code Conventions
 
-- **Python 3.10+** — all files begin with `from __future__ import annotations`
-- **Type annotations** — all functions and methods are fully typed
-- **Naming:** `PascalCase` for classes, `snake_case` for functions/methods/variables, `UPPER_CASE` for module-level constants
-- **Private helpers** — prefixed with `_` (e.g., `_lexical_score`, `_init_schema`)
-- **Dataclasses** — used heavily; frozen where immutability is appropriate
-- **Imports** — standard library first, then local relative imports (`from .module import X`)
-- **Line length** — approximately 100–120 characters; no enforced formatter is configured
-- **Docstrings** — minimal; functions are named to be self-documenting
-- **No external formatters** — no `.black`, `.isort`, `.pylintrc`, or `pyproject.toml` present; maintain style consistency with existing code
-- **No CI** — no `.github/workflows/` or other pipeline configuration exists
+- `from __future__ import annotations` at the top of every module
+- Full type annotations on all functions and methods
+- `PascalCase` classes, `snake_case` functions/variables, `UPPER_CASE` constants
+- Private helpers prefixed `_`
+- Relative imports within `seam_runtime` (`from .module import X`)
+- No enforced formatter — maintain consistency with existing style
+- Minimal docstrings; functions are named to be self-documenting
+- No comments explaining what code does; only comment the non-obvious why
 
 ---
 
-## Development Workflow
+## Stable Architecture Decisions
 
-### Typical ingest → search cycle
+These must not be reversed without explicit discussion:
+
+1. **SQLite is canonical truth.** Chroma, vector indexes, packs, machine projections, and symbol exports are all derived and rebuildable from `ir_records`.
+2. **Compilation modules never write to storage.** `nl.py` and `dsl.py` produce `IRBatch` only; `storage.py` owns all persistence.
+3. **`persist_ir()` always validates first.** Never bypass `verify_ir()`. Fix the records, not the validator.
+4. **Chroma is optional.** It must not become canonical. Use it as a derived semantic layer only.
+5. **No lossy compression.** SEAM-LX/1 must always pass exact SHA-256 roundtrip verification.
+6. **Benchmark claims require auditable bundles.** No wins claimed from screenshots alone — bundle hash + case hashes + fixture hashes required.
+7. **Retrieval orchestrator stays in `experimental/`** until the benchmark engine proves retrieval quality holds under machine-projection changes.
+8. **Search scoring weights are fixed** at lexical 40% / semantic 35% / graph 15% / temporal 10%. Do not adjust without updating `REPO_LEDGER.md` and the spec.
+9. **Namespace format is `dotted.lowercase.string`.** No slashes, uppercase, or spaces.
+10. **Read `SEAM_SPEC_V0.1.md` before modifying any IR data type.** It is the authoritative specification.
+
+---
+
+## Common Workflows
+
+### Ingest → search
 ```bash
-# Compile and persist NL text
-python seam.py --db seam.db compile-nl "Your text." --persist
+seam compile-nl "Your text." --persist --index
+seam promote-symbols --min-frequency 2
+seam context "your query" --view prompt
+```
 
-# Rebuild symbols and vector index
-python seam.py --db seam.db promote-symbols --min-frequency 2
-python seam.py --db seam.db reindex
+### Lossless demo
+```bash
+seam demo lossless tools/lossless_demo_input.txt compressed.seam-lx
+seam demo lossless compressed.seam-lx rebuilt.txt --rebuild
+```
 
-# Search
-python seam.py --db seam.db search "your query" --budget 5
+### Benchmark run
+```bash
+seam benchmark run all --persist --output seam-benchmark-report.json
+seam benchmark show latest
+seam benchmark verify seam-benchmark-report.json
+```
 
-# Export symbol nursery for audit
-python seam.py --db seam.db export-symbols
+### Install health check
+```bash
+seam doctor
 ```
 
 ### Adding a new module
-1. Create `seam_runtime/<module>.py` following the `from __future__ import annotations` convention
-2. Add public types to `seam_runtime/__init__.py` if they form part of the public API
-3. Wire into `SeamRuntime` (`runtime.py`) if the feature needs orchestration
+1. Create `seam_runtime/<module>.py` with `from __future__ import annotations`
+2. Add public types to `seam_runtime/__init__.py` if part of the public API
+3. Wire into `SeamRuntime` (`runtime.py`) if it needs orchestration
 4. Add a CLI subcommand in `cli.py` if user-facing
 5. Add tests in `test_seam.py`
 
-### Adding a new embedding backend
-1. Implement the `EmbeddingModel` protocol in `models.py`
-2. Add recognition logic in `default_embedding_model()` (env-variable driven)
-3. Document the new `SEAM_EMBEDDING_PROVIDER` value in this file and in `docs/SOP_MODEL_INTEGRATION.md`
-4. Add a test case in `test_seam.py`
-
 ---
 
-## Security Rules — Never Expose Secrets
+## Security Rules — Non-Negotiable
 
-These rules apply to every commit, PR, and code change without exception:
-
-1. **Never commit credentials.** API keys, passwords, tokens, private keys, and personal account details must never appear in any committed file — not in source code, not in comments, not in documentation, not in test fixtures.
-
-2. **Use environment variables for secrets.** Reference secrets by environment variable name only (e.g., `OPENAI_API_KEY`). Never hardcode a value.
-
-3. **No real values in examples.** Documentation and examples must use placeholders like `sk-...`, `your-api-key`, or `<YOUR_KEY_HERE>` — never a real key, even a revoked one.
-
-4. **No personal account details.** Usernames, email addresses, personal access tokens, OAuth credentials, or account IDs tied to a real person must not appear in committed files.
-
-5. **`.env` files are always ignored.** The `.gitignore` blocks `.env`, `.env.*`, `*.key`, `*.pem`, `credentials.json`, and related files. Do not override or work around these rules.
-
-6. **Audit before committing.** Before creating any commit, scan the diff for the patterns above. If anything looks like a real credential, remove it and use a placeholder instead.
-
-7. **No exceptions for "temporary" or "test" credentials.** A secret is a secret regardless of its intended lifetime or scope.
-
----
-
-## Important Rules for AI Assistants
-
-1. **Read `SEAM_SPEC_V0.1.md` before modifying any IR data types.** It is the authoritative specification and defines field semantics, encoding rules, and invariants that must be preserved.
-
-2. **Compilation modules (`nl.py`, `dsl.py`) only produce MIRL records.** They must not write to storage directly. Storage is exclusively `storage.py`'s responsibility.
-
-3. **`persist_ir()` always validates first.** Never bypass `verify_ir()` when writing records. If validation fails, fix the records, not the validator.
-
-4. **Pack modes have different reversibility guarantees:**
-   - `exact` — fully reversible; `unpack_exact_pack()` must reconstruct the original `IRBatch` exactly
-   - `context` — irreversible but traceable (traceability ≥ 0.66)
-   - `narrative` — for human display only
-
-5. **Do not add external dependencies** unless strictly necessary. The standard library is intentionally sufficient.
-
-6. **Test data is ephemeral.** Tests create UUID-named SQLite files and delete them in `tearDown`. Do not rely on persistent test state.
-
-7. **All search scoring weights are explicit.** Do not adjust the 40/35/15/10 split in `retrieval.py` without updating this document and the spec.
-
-8. **Symbol IDs must not collide.** When proposing new predefined symbols in `symbols.py`, check against existing entries and follow the ambiguity-scoring logic.
-
-9. **The `ir_records` table is canonical truth.** `pack_store`, `vector_index`, and symbol exports are all derived and can be rebuilt from `ir_records` at any time.
-
-10. **Namespace format is `dotted.lowercase.string`.** Do not use slashes, uppercase, or spaces in namespace identifiers.
-
----
-
-## Key Reference Documents
-
-| Document | Purpose |
-|---|---|
-| `SEAM_SPEC_V0.1.md` | Authoritative IR specification (read before changing data types) |
-| `docs/MIRL_V1.md` | MIRL specification reference |
-| `docs/SOP_MODEL_INTEGRATION.md` | How to add or swap embedding models |
-| `docs/SYMBOL_NURSERY.md` | Symbol allocation rules and namespace mechanics |
-| `docs/RETRIEVAL_EVAL_V1.md` | Retrieval evaluation methodology and success criteria |
-| `docs/retrieval_gold_fixtures.json` | Gold fixtures used by the benchmark harness |
+1. **Never commit credentials.** API keys, passwords, tokens, private keys, and personal account details must never appear in any committed file.
+2. **Use environment variables for secrets.** Reference by name only (e.g., `OPENAI_API_KEY`). Never hardcode values.
+3. **No real values in examples.** Use placeholders: `sk-...`, `your-api-key`, `<YOUR_KEY_HERE>`.
+4. **No personal account details.** No usernames, email addresses, personal tokens, or account IDs in committed files.
+5. **`.env` files are always gitignored.** Do not override or work around this.
+6. **Audit the diff before every commit.** If anything looks like a real credential, remove it.
+7. **No session or conversation links anywhere.** No `claude.ai` URLs, session links, or conversation links in commit messages, PR descriptions, code, comments, or documentation. These expose private session content.

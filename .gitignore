@@ -1,14 +1,17 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 *.db
+.seam_chroma/
+exports/
 
 # Conversation logs
 conversations/
 *.conversation
 *.jsonl
 
-# Secrets and credentials — NEVER commit these
+# Secrets and credentials - NEVER commit these
 .env
 .env.*
 *.pem

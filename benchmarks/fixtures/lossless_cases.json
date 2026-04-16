@@ -1,0 +1,12 @@
+[
+  {
+    "name": "lossless_demo_input",
+    "source_file": "tools/lossless_demo_input.txt",
+    "min_token_savings": 0.75
+  },
+  {
+    "name": "operator_memory_repeat",
+    "text": "SEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\nSEAM preserves exact context while compressing token usage for lossless recovery.\n",
+    "min_token_savings": 0.3
+  }
+]
