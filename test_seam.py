@@ -577,7 +577,6 @@ claim c2:
             if source_path.exists():
                 source_path.unlink()
 
-
 if __name__ == "__main__":
     unittest.main()
 

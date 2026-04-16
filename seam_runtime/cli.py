@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
+from .dashboard import run_dashboard
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -73,6 +74,14 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     context_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     context_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
+
+    dashboard_parser = subparsers.add_parser("dashboard", help="Launch the runtime-connected terminal dashboard")
+    dashboard_parser.add_argument("--snapshot", action="store_true", help="Render one dashboard frame and exit")
+    dashboard_parser.add_argument("--run", dest="dashboard_commands", action="append", default=[], help="Run a dashboard command non-interactively")
+    dashboard_parser.add_argument("--no-clear", action="store_true", help="Do not clear the terminal between renders")
+    dashboard_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
+    dashboard_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
+    dashboard_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
 
     pack_parser = subparsers.add_parser("pack", help="Build a pack from persisted record ids")
     pack_parser.add_argument("record_ids")
@@ -188,6 +197,17 @@ def run_cli(argv: list[str] | None = None) -> None:
             include_trace=args.trace,
         ).to_dict()
         _print_retrieval_output(payload, output_format=args.format, renderer=_render_rag_pretty)
+        return
+    if args.command == "dashboard":
+        run_dashboard(
+            runtime,
+            vector_backend=args.vector_backend,
+            vector_path=args.vector_path,
+            vector_collection=args.vector_collection,
+            snapshot=args.snapshot,
+            commands=args.dashboard_commands,
+            no_clear=args.no_clear,
+        )
         return
     if args.command == "pack":
         print(json.dumps(runtime.pack_ir(record_ids=_split_ids(args.record_ids), lens=args.lens, budget=args.budget, mode=args.mode).to_dict(), indent=2))

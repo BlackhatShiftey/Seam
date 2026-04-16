@@ -49,6 +49,10 @@ Runnable previews:
   - `.\.venv\Scripts\python branding\seam_terminal_preview.py --snapshot`
   - `.\.venv\Scripts\python branding\seam_terminal_preview.py`
 
+Runtime-connected dashboard:
+- `.\.venv\Scripts\python seam.py --db seam.db dashboard`
+- `.\.venv\Scripts\python seam.py --db seam.db dashboard --snapshot --no-clear`
+
 Current packaged assets:
 - browser mock:
   - `branding/seam-retro-preview.html`

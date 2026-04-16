@@ -40,15 +40,17 @@ Why this is split from `PROJECT_STATUS.md`:
 
 ### Current phase
 
-- phase: retrieval/runtime strengthening and repo cleanup
+- phase: retrieval/runtime strengthening, dashboard integration, and repo cleanup
 
 ### Current step
 
 - step 1 was retrieval/CLI terminology cleanup
 - step 2 was Chroma-backed retrieval/context support
 - step 3 was retrieval package rename and compatibility cleanup
-- step 4 is repo hygiene, durable project memory, and preparing for the next runtime improvement
-- next implementation step is stronger structured SQLite retrieval
+- step 4 was repo hygiene and durable project memory
+- step 5 is runtime-connected dashboard integration and stabilization
+- step 6 was strengthening the structured SQLite retrieval leg
+- next implementation step is richer context output for generation and operator workflows
 
 ### Immediate objective
 
@@ -241,6 +243,22 @@ Derived stores:
 - built both browser and terminal preview surfaces
 - treated this as prototype/design work, not shipped runtime product work
 
+#### Runtime-connected dashboard work
+
+- added a real `dashboard` CLI command backed by the live SEAM runtime
+- connected dashboard actions to compile, search, plan, retrieve, context, index, trace, and stats operations
+- added scripted dashboard execution so the terminal surface can be smoke-tested automatically
+- verified that a bad dashboard command path stays contained in the UI instead of crashing the process
+
+#### Structured retrieval upgrade
+
+- moved the SQLite retrieval leg away from a weak in-memory scan
+- pushed explicit filters for `id`, `kind`, `ns`, `scope`, `predicate`, `subject`, and `object` into SQL
+- added SQL-side lexical gating so broad filters do not pull in irrelevant records with zero text match
+- added SQL-side ordering using structured score, lexical score, and record freshness/confidence
+- added table indexes to support the stronger structured path
+- added regression tests to prove irrelevant kind-only matches are excluded and exact structured matches work without free-text terms
+
 #### Documentation and cleanup
 
 - removed temporary handoff files from the repo
@@ -289,14 +307,13 @@ Avoid:
 
 ### Highest-priority runtime debt
 
-1. Structured SQLite retrieval is still too lightweight.
-2. Context output formats are not rich enough yet.
-3. Retrieval still needs a long-term home decision between `experimental/` and `seam_runtime`.
-4. Remaining doc language should be aligned around current command vocabulary.
+1. Context output formats are not rich enough yet.
+2. Retrieval still needs a long-term home decision between `experimental/` and `seam_runtime`.
+3. Remaining doc language should be aligned around current command vocabulary.
 
 ### Lower-priority but useful work
 
-1. Productize the terminal/TUI/dashboard prototype if desired.
+1. Improve and productize the new runtime-connected dashboard surface.
 2. Improve trace output with stronger debugging and explainability.
 3. Add more durable maintenance scripts if repo workflows get heavier.
 
@@ -304,14 +321,13 @@ Avoid:
 
 ### Immediate next step
 
-Strengthen the SQLite retrieval leg so explicit filters and structured queries perform more of the useful ranking work before vector fallback.
+Add richer `context` output modes so the system can emit prompt text, evidence/citations, summary views, and exact record payloads from the same retrieval result.
 
 ### Candidate follow-ups after that
 
-1. Add richer `context` output modes:
-   plain prompt context, evidence/citations, summary view, exact-record view.
-2. Decide whether retrieval should move into `seam_runtime`.
-3. Continue terminology/documentation cleanup across the remaining docs.
+1. Decide whether retrieval should move into `seam_runtime`.
+2. Continue terminology/documentation cleanup across the remaining docs.
+3. Keep improving and productizing the runtime-connected dashboard surface.
 
 ## Update Template
 

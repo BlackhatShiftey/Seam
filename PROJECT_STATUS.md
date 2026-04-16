@@ -26,8 +26,10 @@ SEAM is a working memory-first compiler/runtime with:
 - pack/context generation
 - Chroma-backed vector retrieval as an option
 - a cleaned-up CLI with retrieval-oriented terminology
+- a runtime-connected terminal dashboard
+- a stronger SQLite retrieval leg with SQL-side filtering and ranking
 
-The CLI is usable now, but not "finished" in the sense of product polish. Core flows work. The biggest remaining runtime gap is stronger structured retrieval in the SQL leg.
+The CLI is usable now, but not "finished" in the sense of product polish. Core flows work. The biggest remaining runtime gaps are richer context output and deciding where retrieval should live long-term.
 
 ## What Is Done
 
@@ -43,6 +45,7 @@ The CLI is usable now, but not "finished" in the sense of product polish. Core f
 
 - retrieval planning exists
 - structured + vector retrieval legs exist
+- the SQLite retrieval leg now pushes field filters, lexical gating, and ordering into SQL instead of relying on a weak in-memory pass
 - merged ranking exists
 - context/RAG pack generation exists
 - Chroma support exists as an optional vector backend
@@ -87,10 +90,11 @@ This means new code should use the retrieval-oriented package name, while older 
 - `chromadb` is installed and verified
 - `rich` was added for the terminal preview prototype
 
-### Branding/prototype work
+### Terminal dashboard and prototype work
 
-There is a terminal-style branding prototype in `branding/`.
-It is a design prototype, not yet a shipped runtime surface.
+- `seam.py --db seam.db dashboard` now launches a real runtime-connected terminal dashboard
+- the dashboard supports live interactive use plus scripted `--run` commands for smoke testing
+- the older `branding/` work still exists as design/prototype material
 
 ## What Was Cleaned Up
 
@@ -101,23 +105,7 @@ It is a design prototype, not yet a shipped runtime surface.
 
 ## What Still Needs Work
 
-### 1. Stronger structured retrieval
-
-The current SQL leg is still too lightweight.
-We should push more filtering and ranking into SQLite for:
-
-- `kind`
-- `scope`
-- `namespace`
-- `predicate`
-- `subject`
-- `object`
-- lexical relevance
-
-Goal:
-- make structured queries do more useful work before vector fallback
-
-### 2. Decide where retrieval lives long-term
+### 1. Decide where retrieval lives long-term
 
 We still need to decide whether the retrieval orchestrator should:
 
@@ -126,7 +114,7 @@ We still need to decide whether the retrieval orchestrator should:
 
 If promoted, `index` and `context` should become clearly first-class runtime features.
 
-### 3. Richer context output
+### 2. Richer context output
 
 `context` currently returns a pack-oriented result.
 We likely want additional output modes such as:
@@ -136,7 +124,7 @@ We likely want additional output modes such as:
 - summarized record mode
 - exact record mode
 
-### 4. Documentation alignment
+### 3. Documentation alignment
 
 Some documentation still uses older wording.
 The repo should consistently describe the system using:
@@ -148,9 +136,9 @@ The repo should consistently describe the system using:
 - context
 - export
 
-### 5. Productization of the terminal surface
+### 4. Productization of the terminal surface
 
-The terminal branding/prototype work is visually useful, but it is still separate from the actual CLI/runtime.
+The runtime-connected terminal dashboard now exists, but it is still an early operator surface rather than a fully polished product UI.
 If we want it to become real product surface area, we need to decide whether to build:
 
 - a true TUI
@@ -161,7 +149,7 @@ If we want it to become real product surface area, we need to decide whether to 
 
 Best next implementation task:
 
-Strengthen the SQLite retrieval leg so filtered retrieval is meaningfully better and more explainable before semantic/vector fallback.
+Add richer `context` output modes so SEAM can emit prompt-ready text, evidence/citation views, summaries, and exact-record payloads depending on the operator need.
 
 ## Working Rule
 

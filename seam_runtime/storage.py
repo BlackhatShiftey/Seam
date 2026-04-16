@@ -88,6 +88,10 @@ class SQLiteStore:
                     updated_at text not null,
                     primary key (record_id, model_name)
                 );
+                create index if not exists idx_ir_records_kind on ir_records (kind);
+                create index if not exists idx_ir_records_ns_scope on ir_records (ns, scope);
+                create index if not exists idx_ir_edges_src on ir_edges (src_id);
+                create index if not exists idx_ir_edges_dst on ir_edges (dst_id);
                 """
             )
             connection.commit()

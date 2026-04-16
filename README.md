@@ -33,7 +33,24 @@ python seam.py --db seam.db retrieve "translator natural language" --vector-back
 python seam.py --db seam.db context "translator natural language" --format pretty
 python seam.py --db seam.db context "translator natural language" --vector-backend chroma --vector-path .seam_chroma --format pretty
 python seam.py --db seam.db compare "translator natural language" --budget 3
+python seam.py --db seam.db dashboard --snapshot --no-clear
+python seam.py --db seam.db dashboard
 python seam.py --db seam.db export-symbols
+```
+
+## Terminal dashboard
+
+SEAM also includes a runtime-connected terminal dashboard:
+
+```powershell
+python seam.py --db seam.db dashboard
+```
+
+Useful non-interactive modes:
+
+```powershell
+python seam.py --db seam.db dashboard --snapshot --no-clear
+python seam.py --db seam.db dashboard --run "compile We need durable memory for AI systems." --run "retrieve durable memory --budget 3" --no-clear
 ```
 
 ## Environment setup
