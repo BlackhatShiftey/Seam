@@ -1,4 +1,4 @@
-﻿# SEAM Repo Ledger
+# SEAM Repo Ledger
 
 This file is the long-lived engineering ledger for the repository.
 It exists to preserve useful project memory across conversations and work sessions.
@@ -15,7 +15,7 @@ Use it to track:
 - current work state and step number
 - handoff policy
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## How To Use This File
 
@@ -327,3 +327,23 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - run tests after meaningful runtime changes
 - keep `PROJECT_STATUS.md` and `REPO_LEDGER.md` current whenever the direction changes
 - prefer auditable benchmark bundles over ad hoc claims in chat or commit messages
+## 2026-04-17
+
+### Repo wiring recovery and local setup hardening
+
+- confirmed the intended SEAM repo root is `C:\Users\iwana\OneDrive\Documents\Codex`
+- reattached the local repo at that folder to `origin=https://github.com/BlackhatShiftey/Seam.git`
+- identified the earlier confusion source: git root drift happened after deletion of a different repo, which made the local project appear detached and briefly encouraged inspection from the wrong higher-level root
+- restored the repo-owned `.gitignore` rules after it had been reduced to only `.env`, which caused local SQLite databases and cache folders to appear as untracked noise
+- preserved this incident in the ledger instead of removing it so future sessions can recognize the failure mode quickly
+
+### Local pgvector/bootstrap work now present in the repo tree
+
+- added repo-local pgvector bootstrap files including `compose.yaml`, `docker/initdb/01-vector.sql`, `scripts/pgvector-up.ps1`, `scripts/setup-seam.ps1`, and `.env.example`
+- kept password handling local-only through `.env` and passwordless session DSNs so secrets do not need to appear in chat or shell history
+- verified the local setup path can bring up pgvector-backed Postgres and run the SEAM test suite after configuration
+
+### Working rule going forward
+
+- treat `C:\Users\iwana\OneDrive\Documents\Codex` as the canonical repo root for git operations
+- if repo state looks wrong again, check `git rev-parse --show-toplevel` in this folder before assuming the project or remote is missing
