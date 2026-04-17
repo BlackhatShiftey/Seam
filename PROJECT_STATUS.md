@@ -132,7 +132,7 @@ The runtime-connected terminal dashboard and packaged CLI entrypoints now exist,
 
 Best next implementation task:
 
-Integrate the PgVector-backed production vector index as the default semantic backend (replacing the SQLite scratchpad for larger deployments) and validate the Linux installer path on a real machine.
+`PgVectorAdapter` is implemented and formally verified (54 tests green, including schema DDL, upsert, dedup, search, DSN wiring, and full runtime round-trip). The remaining step is promoting PgVector to the default semantic backend for production deployments (right now it is opt-in via `pgvector_dsn`) and validating the Linux installer path on a real machine.
 
 ## Working Rule
 

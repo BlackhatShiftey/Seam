@@ -52,7 +52,8 @@ When resuming work:
 - step 10 was packaging, installed entrypoints, and one-command lossless demo flows
 - step 11 was the six-family glassbox benchmark engine, benchmark persistence, and cross-agent continuity docs
 - step 12 was validating the SEAM-LX/1 machine retrieval projection hypothesis using neural embeddings (SBERT) and establishing a persistent benchmark tracking system
-- next implementation step is integrating the PgVector-backed production vector index as the default semantic backend and validating the Linux installer path on a real machine
+- step 13 was adding formal test coverage for `PgVectorAdapter` via `FakePgVectorAdapter`, proving schema DDL, upsert, dedup, search, DSN wiring, and full runtime round-trip all work correctly (54 tests green)
+- next implementation step is promoting PgVector to the default semantic backend for production deployments and validating the Linux installer path on a real machine
 
 ### Immediate objective
 
@@ -340,3 +341,8 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - added `SentenceTransformerModel` (SBERT) support to `seam_runtime/models.py` using `sentence-transformers`
 - proved the "lossless retrieval" hypothesis: SEAM-LX/1 machine text preserves 100% retrieval recall when using neural embeddings, effectively closing the cross-domain gap without requiring a parallel natural-text index
 - established the `benchmarks/runs/` JSON registry and [BENCHMARK_LOG.md](file:///c:/Users/iwana/OneDrive/Documents/Codex/benchmarks/BENCHMARK_LOG.md) for long-term tracking
+
+#### PgVector Adapter Formal Verification
+- added `FakePgVectorAdapter` to `test_seam.py` — subclasses `PgVectorAdapter`, overrides `_connect()` with an in-memory cursor and SQL log, no live Postgres required
+- added `PgVectorAdapterTests` covering: schema DDL execution, record indexing, upsert dedup, scored search, DSN-based wiring in `SeamRuntime`, and full compile→persist→search round-trip
+- all 54 tests green; `PgVectorAdapter` is now formally proven, not just manually confirmed

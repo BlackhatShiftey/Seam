@@ -14,9 +14,11 @@ from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import run_dashboard
 from seam_runtime.installer import default_runtime_db_path, render_posix_shim, render_windows_cmd_shim
 from seam_runtime.lossless import benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
-from seam_runtime.models import OpenAICompatibleEmbeddingModel, cosine, default_embedding_model
+from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel, cosine, default_embedding_model
 from seam_runtime.pack import score_pack, unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
+from seam_runtime.vector import INDEXABLE_KINDS
+from seam_runtime.vector_adapters import PgVectorAdapter
 from seam_runtime.verify import verify_ir
 
 try:
@@ -724,6 +726,153 @@ claim c2:
         finally:
             if source_path.exists():
                 source_path.unlink()
+
+class PgVectorAdapterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.db_path = Path(f"test_pgvector_{uuid4().hex}.db")
+        self.model = HashEmbeddingModel()
+        self.adapter = FakePgVectorAdapter(self.model)
+
+    def tearDown(self) -> None:
+        try:
+            if self.db_path.exists():
+                self.db_path.unlink()
+        except PermissionError:
+            pass
+
+    def _make_batch(self):
+        return compile_dsl(
+            """
+entity project "SEAM" as proj
+claim c1:
+  subject proj
+  predicate supports
+  object "databases"
+claim c2:
+  subject proj
+  predicate supports
+  object "context windows"
+""",
+            scope="project",
+        )
+
+    def test_pgvector_adapter_indexes_records(self) -> None:
+        batch = self._make_batch()
+        self.adapter.index_records(batch.records)
+        indexable_count = sum(1 for r in batch.records if r.kind in INDEXABLE_KINDS)
+        self.assertEqual(len(self.adapter._store), indexable_count)
+
+    def test_pgvector_adapter_search_returns_scored_results(self) -> None:
+        batch = self._make_batch()
+        self.adapter.index_records(batch.records)
+        scores = self.adapter.search("databases context windows", limit=5)
+        self.assertGreater(len(scores), 0)
+        for score in scores.values():
+            self.assertIsInstance(score, float)
+            self.assertGreater(score, 0.0)
+
+    def test_pgvector_adapter_upsert_does_not_duplicate(self) -> None:
+        batch = self._make_batch()
+        self.adapter.index_records(batch.records)
+        count_first = len(self.adapter._store)
+        self.adapter.index_records(batch.records)
+        self.assertEqual(len(self.adapter._store), count_first)
+
+    def test_pgvector_adapter_schema_ddl_is_executed(self) -> None:
+        batch = self._make_batch()
+        self.adapter.index_records(batch.records)
+        sql_lower = [s.lower() for s in self.adapter.sql_log]
+        self.assertTrue(any("create extension" in s and "vector" in s for s in sql_lower))
+        self.assertTrue(any("create table" in s and "seam_vector_index" in s for s in sql_lower))
+        self.assertTrue(any("create index" in s and "seam_vector_index" in s for s in sql_lower))
+
+    def test_runtime_uses_pgvector_adapter_when_dsn_provided(self) -> None:
+        runtime = SeamRuntime(self.db_path, pgvector_dsn="postgresql://fake/db")
+        self.assertIsInstance(runtime.vector_adapter, PgVectorAdapter)
+
+    def test_runtime_persist_search_roundtrip_with_pgvector(self) -> None:
+        runtime = SeamRuntime(self.db_path, vector_adapter=self.adapter)
+        batch = runtime.compile_dsl(
+            """
+entity project "SEAM" as proj
+claim c1:
+  subject proj
+  predicate supports
+  object "databases"
+claim c2:
+  subject proj
+  predicate supports
+  object "context windows"
+"""
+        )
+        runtime.persist_ir(batch)
+        result = runtime.search_ir("databases context windows", budget=5)
+        self.assertTrue(result.candidates)
+
+
+class _FakePgCursor:
+    def __init__(self, store: dict, sql_log: list) -> None:
+        self._store = store
+        self._sql_log = sql_log
+        self._rows: list = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    def execute(self, sql: str, params=None) -> None:
+        self._sql_log.append(sql.strip())
+        sql_lower = sql.strip().lower()
+        if sql_lower.startswith("insert") and params:
+            record_id, model_name, dimension, source_text, vec_literal, updated_at = params
+            vec = [float(x) for x in vec_literal.strip("[]").split(",")]
+            self._store[record_id] = {"model": model_name, "dim": dimension, "vec": vec}
+        elif sql_lower.startswith("select") and params:
+            vec_literal, model_name, dimension, _, limit = params
+            query_vec = [float(x) for x in vec_literal.strip("[]").split(",")]
+            scored = []
+            for rid, entry in self._store.items():
+                if entry["model"] != model_name or entry["dim"] != dimension:
+                    continue
+                score = cosine(query_vec, entry["vec"])
+                if score > 0:
+                    scored.append((rid, score))
+            scored.sort(key=lambda item: -item[1])
+            self._rows = scored[:limit]
+
+    def fetchall(self):
+        return self._rows
+
+
+class _FakePgConnection:
+    def __init__(self, store: dict, sql_log: list) -> None:
+        self._store = store
+        self._sql_log = sql_log
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    def cursor(self):
+        return _FakePgCursor(self._store, self._sql_log)
+
+    def commit(self):
+        pass
+
+
+class FakePgVectorAdapter(PgVectorAdapter):
+    def __init__(self, model: HashEmbeddingModel) -> None:
+        super().__init__(dsn="fake://", model=model)
+        self._store: dict = {}
+        self.sql_log: list[str] = []
+
+    def _connect(self):
+        return _FakePgConnection(self._store, self.sql_log)
+
 
 class FakeChromaCollection:
     def __init__(self) -> None:
