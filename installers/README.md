@@ -102,6 +102,48 @@ export SEAM_PGVECTOR_DSN="postgresql://user:password@localhost:5432/seam"
 seam doctor  # should show: PgVector: reachable
 ```
 
+### Setting up Postgres with pgvector (Docker)
+
+A `docker-compose.yaml` is included at the repo root for local development. From the repo root:
+
+```sh
+docker compose up -d
+```
+
+This starts a Postgres 18 instance with the pgvector extension pre-installed, listening on port `5432`. The default credentials are:
+
+| Setting | Default |
+|---|---|
+| Database | `seam` |
+| User | `seam` |
+| Password | `local-test-password` |
+| Port | `5432` |
+
+Set the DSN to match:
+
+```sh
+export SEAM_PGVECTOR_DSN="postgresql://seam:local-test-password@localhost:5432/seam"
+```
+
+To override any default, set the corresponding environment variable before running `docker compose up`:
+
+```sh
+POSTGRES_PASSWORD=mypassword SEAM_PGVECTOR_PORT=5433 docker compose up -d
+```
+
+To persist the DSN across terminal sessions, add the export to your shell profile (`.bashrc`, `.zshrc`, etc.):
+
+```sh
+echo 'export SEAM_PGVECTOR_DSN="postgresql://seam:local-test-password@localhost:5432/seam"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Verify the full setup:
+
+```sh
+seam doctor  # PgVector: reachable
+```
+
 ## Prove-It Flow After Install
 
 Health check:
