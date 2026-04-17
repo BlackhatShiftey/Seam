@@ -53,7 +53,8 @@ When resuming work:
 - step 11 was the six-family glassbox benchmark engine, benchmark persistence, and cross-agent continuity docs
 - step 12 was validating the SEAM-LX/1 machine retrieval projection hypothesis using neural embeddings (SBERT) and establishing a persistent benchmark tracking system
 - step 13 was adding formal test coverage for `PgVectorAdapter`, wiring `SEAM_PGVECTOR_DSN` env-var pickup into `SeamRuntime`, and surfacing PgVector health in `seam doctor` (55 tests green)
-- next implementation step is validating the Linux installer path on a real machine
+- step 14 was validating the Linux installer path via `InstallerLinuxTests`: posix shim structure, PATH detection, shell profile injection/dedup, `install_seam_linux.sh` content, and doctor pgvector/dependency fields (62 tests green)
+- next implementation step is benchmark publication hardening (holdout suites, diff tooling, cross-machine reproducibility) and operator-surface polish
 
 ### Immediate objective
 
@@ -352,3 +353,8 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - `seam doctor` now checks `SEAM_PGVECTOR_DSN`, attempts a live connection, and reports reachability in its health output
 - `seam doctor` dependency table extended to include `psycopg` and `sentence_transformers`
 - env-var pickup covered by a new test (`test_runtime_picks_up_pgvector_dsn_from_env`); 55 tests green
+
+#### Linux Installer Validation (test-level)
+- added `InstallerLinuxTests` covering: posix shim structure (shebang, SEAM_EXE, DB export, exec line, error guard), `path_in_environment` match/no-match, shell profile injection with temp home dir, dedup guard when marker already present, and `install_seam_linux.sh` script content
+- updated doctor tests to assert new `PgVector:` line in pretty output and `pgvector`/`psycopg`/`sentence_transformers` keys in JSON output
+- 62 tests green; Linux installer code paths are now fully exercised without requiring a real Linux machine

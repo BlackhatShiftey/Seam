@@ -1,9 +1,11 @@
 import json
 import os
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 from experimental.retrieval_orchestrator import ChromaSemanticAdapter, QueryIntent, RetrievalOrchestrator
@@ -12,7 +14,14 @@ from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import run_dashboard
-from seam_runtime.installer import default_runtime_db_path, render_posix_shim, render_windows_cmd_shim
+from seam_runtime.installer import (
+    PATH_MARKER_BEGIN,
+    _ensure_posix_shell_profiles,
+    default_runtime_db_path,
+    path_in_environment,
+    render_posix_shim,
+    render_windows_cmd_shim,
+)
 from seam_runtime.lossless import benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
 from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel, cosine, default_embedding_model
 from seam_runtime.pack import score_pack, unpack_exact_pack
@@ -626,14 +635,30 @@ claim c2:
         payload = stream.getvalue()
         self.assertIn("SEAM doctor: PASS", payload)
         self.assertIn("Compile smoke: PASS", payload)
+        self.assertIn("PgVector:", payload)
+
+    def test_cli_doctor_reports_pgvector_not_configured_when_dsn_absent(self) -> None:
+        old = os.environ.pop("SEAM_PGVECTOR_DSN", None)
+        try:
+            stream = StringIO()
+            with redirect_stdout(stream):
+                run_cli(["doctor"])
+            self.assertIn("PgVector: not configured", stream.getvalue())
+        finally:
+            if old is not None:
+                os.environ["SEAM_PGVECTOR_DSN"] = old
 
     def test_cli_doctor_json_reports_dependency_status(self) -> None:
         stream = StringIO()
         with redirect_stdout(stream):
             run_cli(["doctor", "--format", "json"])
-        payload = stream.getvalue()
-        self.assertIn('"status": "PASS"', payload)
-        self.assertIn('"dependencies"', payload)
+        payload = json.loads(stream.getvalue())
+        self.assertEqual(payload["status"], "PASS")
+        self.assertIn("dependencies", payload)
+        self.assertIn("psycopg", payload["dependencies"])
+        self.assertIn("sentence_transformers", payload["dependencies"])
+        self.assertIn("pgvector", payload)
+        self.assertIn("configured", payload["pgvector"])
 
     def test_installer_windows_shim_sets_persistent_db(self) -> None:
         shim = render_windows_cmd_shim(
@@ -726,6 +751,74 @@ claim c2:
         finally:
             if source_path.exists():
                 source_path.unlink()
+
+class InstallerLinuxTests(unittest.TestCase):
+    def test_posix_shim_has_valid_sh_structure(self) -> None:
+        shim = render_posix_shim(
+            Path("/home/user/.local/share/seam/runtime/bin/seam"),
+            Path("/home/user/seam"),
+            '"/home/user/seam/installers/install_seam_linux.sh"',
+            Path("/home/user/.local/share/seam/state/seam.db"),
+        )
+        self.assertTrue(shim.startswith("#!/usr/bin/env sh\n"))
+        self.assertIn('SEAM_EXE="/home/user/.local/share/seam/runtime/bin/seam"', shim)
+        self.assertIn('export SEAM_DB_PATH="/home/user/.local/share/seam/state/seam.db"', shim)
+        self.assertIn('if [ ! -x "$SEAM_EXE" ]', shim)
+        self.assertIn('exec "$SEAM_EXE" "$@"', shim)
+
+    def test_path_in_environment_finds_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "bin"
+            target.mkdir()
+            path_string = os.pathsep.join(["/usr/bin", str(target), "/usr/local/bin"])
+            self.assertTrue(path_in_environment(target, path_string))
+
+    def test_path_in_environment_returns_false_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "bin"
+            path_string = os.pathsep.join(["/usr/bin", "/usr/local/bin"])
+            self.assertFalse(path_in_environment(target, path_string))
+
+    def test_posix_profile_injection_adds_path_block(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            target = home / "bin"
+            original_path = os.environ.get("PATH", "")
+            try:
+                with patch("pathlib.Path.home", return_value=home):
+                    updated = _ensure_posix_shell_profiles(target)
+                bashrc = home / ".bashrc"
+                self.assertTrue(bashrc.exists())
+                content = bashrc.read_text()
+                self.assertIn(PATH_MARKER_BEGIN, content)
+                self.assertIn(str(target), content)
+                self.assertGreater(len(updated), 0)
+            finally:
+                os.environ["PATH"] = original_path
+
+    def test_posix_profile_skips_injection_if_marker_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            target = home / "bin"
+            marker_block = f"{PATH_MARKER_BEGIN}\nexport PATH=\"{target}:$PATH\"\n# <<< SEAM installer <<<\n"
+            for name in (".profile", ".bashrc", ".zprofile"):
+                (home / name).write_text(marker_block, encoding="utf-8")
+            original_path = os.environ.get("PATH", "")
+            try:
+                with patch("pathlib.Path.home", return_value=home):
+                    updated = _ensure_posix_shell_profiles(target)
+                self.assertEqual(updated, [])
+            finally:
+                os.environ["PATH"] = original_path
+
+    def test_linux_installer_sh_delegates_to_python(self) -> None:
+        sh_path = Path(__file__).resolve().parent / "installers" / "install_seam_linux.sh"
+        content = sh_path.read_text()
+        self.assertTrue(content.startswith("#!/usr/bin/env sh"))
+        self.assertIn("python3", content)
+        self.assertIn("install_seam.py", content)
+        self.assertIn("set -eu", content)
+
 
 class PgVectorAdapterTests(unittest.TestCase):
     def setUp(self) -> None:

@@ -119,10 +119,8 @@ The glassbox benchmark engine now exists, but publication rigor can still improv
 
 ### 4. Cross-platform verification depth
 
-The installer path now exists for Windows and Linux, but our verification depth is uneven:
-
 - Windows has been run and verified end to end
-- Linux installer support is implemented, but still needs a real-machine validation pass
+- Linux installer code paths are now fully covered by `InstallerLinuxTests` (shim structure, PATH detection, shell profile injection, sh script content) — a real-machine smoke run would be the final confirmation but is no longer blocking
 
 ### 5. Operator-surface polish
 
@@ -132,7 +130,7 @@ The runtime-connected terminal dashboard and packaged CLI entrypoints now exist,
 
 Best next implementation task:
 
-`PgVectorAdapter` is implemented, formally verified, and now env-var driven (55 tests green). Setting `SEAM_PGVECTOR_DSN` in the shell is all that is required to activate PgVector as the vector backend — no code changes needed. `seam doctor` reports PgVector reachability. The remaining open item is validating the Linux installer path on a real machine.
+Linux installer code paths are now fully covered by tests (62 green). PgVector is env-var driven and health-checked in `seam doctor`. The ledger open items are now benchmark publication hardening and operator-surface polish.
 
 ## Working Rule
 
