@@ -1,4 +1,4 @@
-﻿# SEAM Installers
+# SEAM Installers
 
 This folder is the direct "download and run" install surface for SEAM.
 
@@ -17,12 +17,56 @@ From the repo root:
 powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
 ```
 
-## Linux
+## Linux (including WSL2)
+
+### Prerequisites
+
+Python's `venv` module is not bundled by default on Debian/Ubuntu. Install it first:
+
+```sh
+sudo apt-get install -y python3.12-venv
+```
+
+> If you are on a different Python version, replace `3.12` with your version (check with `python3 --version`).
+
+### Run the installer
 
 From the repo root:
 
-```bash
+```sh
 sh ./installers/install_seam_linux.sh
+```
+
+The installer creates a self-contained SEAM runtime at `~/.local/share/seam/runtime` and adds `seam` to your PATH via your shell profile. **Do not use system `pip` or `pip3` — the installer manages its own venv.**
+
+### Install optional extras
+
+The base install is intentionally lean. Install optional backends after the main install:
+
+```sh
+# PgVector backend (requires a running Postgres with pgvector extension)
+~/.local/share/seam/runtime/bin/pip install -e "/path/to/seam/repo[pgvector]"
+
+# SBERT neural embeddings (downloads ~80MB model on first use)
+~/.local/share/seam/runtime/bin/pip install -e "/path/to/seam/repo[sbert]"
+
+# Both
+~/.local/share/seam/runtime/bin/pip install -e "/path/to/seam/repo[all-extras]"
+```
+
+Replace `/path/to/seam/repo` with the actual repo path. On WSL2 with the repo on the Windows filesystem:
+
+```sh
+~/.local/share/seam/runtime/bin/pip install -e "/mnt/c/Users/<you>/OneDrive/Documents/Codex[all-extras]"
+```
+
+### Open a new terminal after install
+
+The installer updates your shell profile but the change only takes effect in a new terminal session:
+
+```sh
+seam doctor
+seam --help
 ```
 
 ## Shared behavior
@@ -38,17 +82,25 @@ That installer:
 - updates PATH or shell profile state as needed
 - runs `seam doctor`
 
-After install, open a new terminal and run:
-
-```text
-seam doctor
-seam --help
-```
-
 Default persistent database paths:
 
 - Windows: `%LOCALAPPDATA%\SEAM\state\seam.db`
 - Linux: `~/.local/share/seam/state/seam.db`
+
+## Optional backends
+
+| Extra | Package installed | When you need it |
+|---|---|---|
+| `pgvector` | `psycopg[binary]>=3.0` | PgVector as the vector backend (set `SEAM_PGVECTOR_DSN`) |
+| `sbert` | `sentence-transformers>=2.0` | Neural SBERT embeddings |
+| `all-extras` | both | Full production setup |
+
+To activate PgVector after installing the extra, set the DSN in your environment:
+
+```sh
+export SEAM_PGVECTOR_DSN="postgresql://user:password@localhost:5432/seam"
+seam doctor  # should show: PgVector: reachable
+```
 
 ## Prove-It Flow After Install
 
