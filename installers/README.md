@@ -110,6 +110,20 @@ Health check:
 seam doctor
 ```
 
+Terminal dashboard (operator UI):
+
+```text
+seam dashboard
+```
+
+The dashboard is a live terminal UI connected to the SEAM runtime. It shows memory records, search logs, benchmark results, and lets you run compile, search, and context operations interactively. Requires `rich` (installed by default).
+
+To take a one-shot snapshot without launching the interactive UI:
+
+```text
+seam dashboard --snapshot
+```
+
 Full benchmark glassbox run:
 
 ```text
