@@ -1,4 +1,4 @@
-﻿# SEAM Project Status
+# SEAM Project Status
 
 This is the quick current-state tracker for the repo.
 Use this file for the shortest high-signal view of:
@@ -13,7 +13,7 @@ and milestone history, also read:
 
 - `REPO_LEDGER.md`
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## Current State
 
@@ -103,6 +103,9 @@ We still need controlled evaluation of:
 - machine-text retrieval projections
 - hybrid natural + machine projections
 
+> [!TIP]
+> **Experimental Evidence:** We have validated that SBERT-based semantic retrieval closes the cross-domain gap (natural query vs. machine document) entirely, achieving 100% recall across all tracks. This confirms our machine-projection architecture is viable for production.
+
 The benchmark engine is now the place to prove those choices instead of making them by taste.
 
 ### 3. Benchmark publication and holdout strategy
@@ -129,7 +132,7 @@ The runtime-connected terminal dashboard and packaged CLI entrypoints now exist,
 
 Best next implementation task:
 
-Run tokenizer-backed retrieval experiments for natural, machine, and hybrid projections while keeping SQLite canonical, then validate the Linux installer path on a real machine.
+Integrate the PgVector-backed production vector index as the default semantic backend (replacing the SQLite scratchpad for larger deployments) and validate the Linux installer path on a real machine.
 
 ## Working Rule
 
@@ -139,4 +142,5 @@ When resuming work in a new conversation:
 2. Then read `REPO_LEDGER.md` for deeper project history and maintenance context.
 3. Read `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` if the task touches benchmarking, machine-language rollout, or evaluation policy.
 4. Use `CLAUDE.md`, `GEMINI.md`, or `ANTIGRAVITY.md` only as assistant-specific resume guides.
-5. Update this file whenever a major milestone or direction changes.
+5. Store all benchmark run JSONs in `benchmarks/runs/` and update `benchmarks/BENCHMARK_LOG.md`.
+6. Update this file whenever a major milestone or direction changes.

@@ -725,10 +725,6 @@ claim c2:
             if source_path.exists():
                 source_path.unlink()
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class FakeChromaCollection:
     def __init__(self) -> None:
         self.entries: dict[str, dict[str, object]] = {}
@@ -764,3 +760,7 @@ class FakeChromaClient:
 
     def get_or_create_collection(self, name, metadata=None):
         return self.collection
+
+
+if __name__ == "__main__":
+    unittest.main()

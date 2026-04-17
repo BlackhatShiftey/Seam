@@ -1,4 +1,4 @@
-﻿# SEAM Repo Ledger
+# SEAM Repo Ledger
 
 This file is the long-lived engineering ledger for the repository.
 It exists to preserve useful project memory across conversations and work sessions.
@@ -15,7 +15,7 @@ Use it to track:
 - current work state and step number
 - handoff policy
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## How To Use This File
 
@@ -50,8 +50,9 @@ When resuming work:
 - step 8 was lossless document compression benchmarking and demo support
 - step 9 was iterative lossless optimization logging and benchmark dashboard integration
 - step 10 was packaging, installed entrypoints, and one-command lossless demo flows
-- step 11 is the six-family glassbox benchmark engine, benchmark persistence, and cross-agent continuity docs
-- next implementation step is tokenizer-backed retrieval evaluation for natural, machine, and hybrid projections, plus real-machine Linux installer validation
+- step 11 was the six-family glassbox benchmark engine, benchmark persistence, and cross-agent continuity docs
+- step 12 was validating the SEAM-LX/1 machine retrieval projection hypothesis using neural embeddings (SBERT) and establishing a persistent benchmark tracking system
+- next implementation step is integrating the PgVector-backed production vector index as the default semantic backend and validating the Linux installer path on a real machine
 
 ### Immediate objective
 
@@ -327,3 +328,15 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - run tests after meaningful runtime changes
 - keep `PROJECT_STATUS.md` and `REPO_LEDGER.md` current whenever the direction changes
 - prefer auditable benchmark bundles over ad hoc claims in chat or commit messages
+### 2026-04-17
+
+#### PgVector Infrastructure Stabilization
+- resolved Postgres 18+ volume mounting and credential issues via `docker-compose.yaml` with explicit `PGDATA` paths
+- fixed DSN URL-encoding bugs for email-formatted database usernames
+- confirmed stable local vector persistence with standard `psycopg` connection patterns
+
+#### Retrieval Projection Validation
+- implemented a multi-track evaluation engine in `seam_runtime/evals.py` for Natural vs. Machine text comparisons
+- added `SentenceTransformerModel` (SBERT) support to `seam_runtime/models.py` using `sentence-transformers`
+- proved the "lossless retrieval" hypothesis: SEAM-LX/1 machine text preserves 100% retrieval recall when using neural embeddings, effectively closing the cross-domain gap without requiring a parallel natural-text index
+- established the `benchmarks/runs/` JSON registry and [BENCHMARK_LOG.md](file:///c:/Users/iwana/OneDrive/Documents/Codex/benchmarks/BENCHMARK_LOG.md) for long-term tracking

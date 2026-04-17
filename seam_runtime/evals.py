@@ -9,8 +9,8 @@ from .dsl import compile_dsl
 from .models import EmbeddingModel, HashEmbeddingModel, cosine
 from .pack import pack_records, score_pack
 from .retrieval import raw_search, search_batch
+from .lossless import compress_text_lossless
 from .vector import INDEXABLE_KINDS, SQLiteVectorIndex
-
 
 FIXTURE_PATH = Path(__file__).resolve().parent.parent / "docs" / "retrieval_gold_fixtures.json"
 
@@ -53,11 +53,29 @@ def run_retrieval_benchmark(fixtures: list[RetrievalFixture] | None = None, embe
     for fixture in fixtures:
         batch = _compile_fixture_batch(fixture)
         namespace = batch.records[0].ns if batch.records else None
-        vector_scores = _vector_scores(batch.records, fixture.query, model)
+        
+        # Prepare natural and machine texts for records
+        natural_texts = {}
+        machine_texts = {}
+        for record in batch.records:
+            if record.kind in INDEXABLE_KINDS:
+                nat = SQLiteVectorIndex.render_record_text(record)
+                natural_texts[record.id] = nat
+                machine_texts[record.id] = compress_text_lossless(nat).machine_text
+                
+        mac_query = compress_text_lossless(fixture.query).machine_text
+
+        nat_scores = _vector_scores(batch.records, fixture.query, model, natural_texts)
+        mac_doc_nat_query_scores = _vector_scores(batch.records, fixture.query, model, machine_texts)
+        mac_scores = _vector_scores(batch.records, mac_query, model, machine_texts)
+
         raw_candidates = raw_search(batch.records, fixture.query, limit=fixture.budget).candidates
         mirl_candidates = search_batch(batch, fixture.query, limit=fixture.budget, vector_scores={}, namespace=namespace).candidates
-        hybrid_candidates = search_batch(batch, fixture.query, limit=fixture.budget, vector_scores=vector_scores, namespace=namespace).candidates
-        vector_ranked_ids = _rank_vector_only(vector_scores, limit=fixture.budget)
+        hybrid_candidates = search_batch(batch, fixture.query, limit=fixture.budget, vector_scores=nat_scores, namespace=namespace).candidates
+        mac_hybrid_candidates = search_batch(batch, fixture.query, limit=fixture.budget, vector_scores=mac_scores, namespace=namespace).candidates
+        vector_ranked_ids = _rank_vector_only(nat_scores, limit=fixture.budget)
+        mac_nat_q_ranked_ids = _rank_vector_only(mac_doc_nat_query_scores, limit=fixture.budget)
+        mac_ranked_ids = _rank_vector_only(mac_scores, limit=fixture.budget)
 
         packs = {}
         for mode in ("exact", "context", "narrative"):
@@ -75,6 +93,9 @@ def run_retrieval_benchmark(fixtures: list[RetrievalFixture] | None = None, embe
                     "vector": _track_report(vector_ranked_ids, fixture.expected_ids),
                     "mirl": _track_report([candidate.record.id for candidate in mirl_candidates], fixture.expected_ids),
                     "hybrid": _track_report([candidate.record.id for candidate in hybrid_candidates], fixture.expected_ids),
+                    "machine_nat_query": _track_report(mac_nat_q_ranked_ids, fixture.expected_ids),
+                    "machine_vector": _track_report(mac_ranked_ids, fixture.expected_ids),
+                    "machine_hybrid": _track_report([candidate.record.id for candidate in mac_hybrid_candidates], fixture.expected_ids),
                 },
                 "packs": packs,
             }
@@ -84,7 +105,7 @@ def run_retrieval_benchmark(fixtures: list[RetrievalFixture] | None = None, embe
         "summary": {
             "fixture_count": len(results),
             "embedding_model": model.name,
-            "tracks": {track: _aggregate_track(results, track) for track in ("raw", "vector", "mirl", "hybrid")},
+            "tracks": {track: _aggregate_track(results, track) for track in ("raw", "vector", "mirl", "hybrid", "machine_nat_query", "machine_vector", "machine_hybrid")},
             "packs": {mode: _aggregate_pack(results, mode) for mode in ("exact", "context", "narrative")},
             "success_checks": {
                 "mirl_beats_raw_on_fact_or_relation": any(_beats(result, "mirl", "raw") and result["category"] in {"fact", "relation"} for result in results),
@@ -103,13 +124,16 @@ def _compile_fixture_batch(fixture: RetrievalFixture):
     return compile_dsl(fixture.source, scope="project")
 
 
-def _vector_scores(records, query: str, model: EmbeddingModel) -> dict[str, float]:
+def _vector_scores(records, query: str, model: EmbeddingModel, texts: dict[str, str]) -> dict[str, float]:
     query_vector = model.embed(query)
     scores: dict[str, float] = {}
     for record in records:
         if record.kind not in INDEXABLE_KINDS:
             continue
-        record_vector = model.embed(SQLiteVectorIndex.render_record_text(record))
+        text = texts.get(record.id)
+        if not text:
+            continue
+        record_vector = model.embed(text)
         score = cosine(query_vector, record_vector)
         if score > 0:
             scores[record.id] = score

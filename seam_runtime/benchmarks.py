@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 import json
@@ -251,6 +251,9 @@ def _run_retrieval_family(runtime: "SeamRuntime") -> dict[str, Any]:
     for fixture in benchmark["fixtures"]:
         hybrid = fixture["tracks"]["hybrid"]
         raw = fixture["tracks"]["raw"]
+        mac_nat_q = fixture["tracks"]["machine_nat_query"]
+        mac_vec = fixture["tracks"]["machine_vector"]
+        mac_hyb = fixture["tracks"]["machine_hybrid"]
         ndcg = _ndcg_at_k(hybrid["ranked_ids"], fixture["expected_ids"])
         ndcg_scores.append(ndcg)
         case = {
@@ -265,6 +268,10 @@ def _run_retrieval_family(runtime: "SeamRuntime") -> dict[str, Any]:
                 "hybrid_ndcg_at_k": round(ndcg, 6),
                 "raw_recall_at_k": raw["recall_at_k"],
                 "hybrid_vs_raw_recall_delta": round(hybrid["recall_at_k"] - raw["recall_at_k"], 6),
+                "machine_nat_query_recall": mac_nat_q["recall_at_k"],
+                "machine_vector_recall": mac_vec["recall_at_k"],
+                "machine_hybrid_recall": mac_hyb["recall_at_k"],
+                "machine_hybrid_vs_nat_hybrid_delta": round(mac_hyb["recall_at_k"] - hybrid["recall_at_k"], 6),
                 "exact_pack_reversible": fixture["packs"]["exact"]["reversibility"] == 1.0,
                 "context_traceability": fixture["packs"]["context"]["traceability"],
             },
@@ -281,6 +288,9 @@ def _run_retrieval_family(runtime: "SeamRuntime") -> dict[str, Any]:
         "hybrid_mrr": benchmark["summary"]["tracks"]["hybrid"]["mrr"],
         "hybrid_recall_at_k": benchmark["summary"]["tracks"]["hybrid"]["recall_at_k"],
         "hybrid_ndcg_at_k": _average(ndcg_scores),
+        "machine_hybrid_hit_rate": benchmark["summary"]["tracks"]["machine_hybrid"]["hit_rate"],
+        "machine_hybrid_mrr": benchmark["summary"]["tracks"]["machine_hybrid"]["mrr"],
+        "machine_hybrid_recall_at_k": benchmark["summary"]["tracks"]["machine_hybrid"]["recall_at_k"],
         "exact_pack_reversible_rate": _ratio(
             sum(1 for case in cases if case["metrics"]["exact_pack_reversible"]),
             len(cases),
@@ -955,7 +965,9 @@ def _render_key_metrics(family_name: str, summary: dict[str, Any]) -> str:
     if family_name == "lossless":
         return f"avg_savings={float(summary.get('avg_token_savings', 0.0)):.1%}"
     if family_name == "retrieval":
-        return f"hybrid_recall={float(summary.get('hybrid_recall_at_k', 0.0)):.1%}"
+        nat = float(summary.get('hybrid_recall_at_k', 0.0))
+        mac = float(summary.get('machine_hybrid_recall_at_k', 0.0))
+        return f"hybrid_recall={nat:.1%} machine_hybrid_recall={mac:.1%}"
     if family_name == "embedding":
         return f"avg_margin={float(summary.get('avg_margin', 0.0)):.3f}"
     if family_name == "long_context":
