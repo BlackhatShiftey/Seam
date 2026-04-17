@@ -54,7 +54,7 @@ When resuming work:
 - step 12 was validating the SEAM-LX/1 machine retrieval projection hypothesis using neural embeddings (SBERT) and establishing a persistent benchmark tracking system
 - step 13 was adding formal test coverage for `PgVectorAdapter`, wiring `SEAM_PGVECTOR_DSN` env-var pickup into `SeamRuntime`, and surfacing PgVector health in `seam doctor` (55 tests green)
 - step 14 was validating the Linux installer path via `InstallerLinuxTests`: posix shim structure, PATH detection, shell profile injection/dedup, `install_seam_linux.sh` content, and doctor pgvector/dependency fields (62 tests green)
-- next implementation step is benchmark publication hardening (holdout suites, diff tooling, cross-machine reproducibility) and operator-surface polish
+- step 15 is a dashboard review and improvement pass (audit all panels, fix wrong/missing data, reduce UX friction, lock changes with snapshot tests) running in parallel with benchmark publication hardening
 
 ### Immediate objective
 

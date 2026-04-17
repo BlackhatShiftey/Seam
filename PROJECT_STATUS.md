@@ -128,9 +128,25 @@ The runtime-connected terminal dashboard and packaged CLI entrypoints now exist,
 
 ## Immediate Next Step
 
-Best next implementation task:
+Two parallel tracks are now open:
 
-Linux installer code paths are now fully covered by tests (62 green). PgVector is env-var driven and health-checked in `seam doctor`. The ledger open items are now benchmark publication hardening and operator-surface polish.
+**Track A — Dashboard improvement**
+The dashboard is live and functional but needs a full review pass. Process:
+1. Audit every panel and command for wrong data, missing data, and UX friction
+2. Prioritize: wrong data → missing data → friction → cosmetic
+3. Implement and lock each change with a `--snapshot` test
+
+Known issues to fix:
+- `Vector Store Path` shows `.seam_chroma` even when Chroma is not in use
+- PgVector backend status not visible in the Runtime panel
+- `SEAM_PGVECTOR_DSN` reachability not surfaced without running `seam doctor`
+- Benchmark dashboard command takes a raw file path, which is unintuitive
+
+**Track B — Benchmark publication hardening**
+- Holdout suites (cases never seen during development)
+- Benchmark diff tooling (structured delta between two run JSONs)
+- Publish helpers (shareable artifact with bundle hash, git SHA, tokenizer state)
+- Cross-machine reproducibility checks (detect drift between Windows and Linux runs)
 
 ## Working Rule
 

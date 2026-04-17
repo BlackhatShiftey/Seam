@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import sqlite3
 import sys
@@ -49,8 +50,8 @@ class DashboardMetrics:
     top_kinds: list[tuple[str, int]]
     model_name: str
     execution_mode: str
-    retrieval_backend: str
-    vector_path: str
+    vector_adapter_name: str
+    pgvector_configured: bool
     vector_store_size: str
 
 
@@ -101,8 +102,8 @@ class DashboardApp:
             "  compile We need durable memory for AI systems\n"
             "  retrieve translator natural language\n"
             "  context translator natural language\n"
-            "  benchmark tools/lossless_demo_input.txt --min-savings 0.75\n"
             "  stats\n"
+            "  help\n"
             "  quit"
         )
         self.command_parser = self._build_command_parser()
@@ -360,7 +361,8 @@ class DashboardApp:
                     "top_kinds": metrics.top_kinds,
                     "model_name": metrics.model_name,
                     "execution_mode": metrics.execution_mode,
-                    "retrieval_backend": metrics.retrieval_backend,
+                    "vector_adapter": metrics.vector_adapter_name,
+                    "pgvector_configured": metrics.pgvector_configured,
                     "vector_store_size": metrics.vector_store_size,
                 }
                 self._succeed("Stats", payload, "Refreshed runtime metrics.")
@@ -387,24 +389,22 @@ class DashboardApp:
 
     def _build_header(self, metrics: DashboardMetrics) -> Panel:
         title = Text("SEAM Console", style="bold cyan")
-        subtitle = Text(
-            f"runtime-connected terminal dashboard | db={metrics.db_path} | records={metrics.total_records} | tab={self.active_tab}",
-            style="white",
-        )
+        db_line = Text(f"db={metrics.db_path}  records={metrics.total_records}", style="dim white")
         tabs = Text()
-        tabs.append("Runtime", style="bold black on bright_white" if self.active_tab == "runtime" else "white")
+        tabs.append(" Runtime ", style="bold black on bright_white" if self.active_tab == "runtime" else "white on grey23")
         tabs.append("  ")
-        tabs.append("Benchmark", style="bold black on bright_white" if self.active_tab == "benchmark" else "white")
-        return Panel(Group(title, subtitle, tabs), border_style="bright_blue", box=box.ROUNDED)
+        tabs.append(" Benchmark ", style="bold black on bright_white" if self.active_tab == "benchmark" else "white on grey23")
+        return Panel(Group(title, db_line, tabs), border_style="bright_blue", box=box.ROUNDED)
 
     def _build_runtime_panels(self, metrics: DashboardMetrics):
+        pgvector_status = "[green]configured[/green]" if metrics.pgvector_configured else "[dim]not set[/dim]"
         runtime_table = Table.grid(expand=True)
         runtime_table.add_column(ratio=1)
         runtime_table.add_column(ratio=1)
         runtime_table.add_row("Execution Mode", metrics.execution_mode)
         runtime_table.add_row("Embedding Model", metrics.model_name)
-        runtime_table.add_row("Retrieval Backend", metrics.retrieval_backend)
-        runtime_table.add_row("Vector Store Path", metrics.vector_path)
+        runtime_table.add_row("Vector Adapter", metrics.vector_adapter_name)
+        runtime_table.add_row("PgVector DSN", pgvector_status)
 
         storage_table = Table.grid(expand=True)
         storage_table.add_column(ratio=1)
@@ -501,26 +501,26 @@ class DashboardApp:
 
     def _build_command_help(self):
         help_lines = [
-            "tab runtime|benchmark",
-            "compile <text>",
-            "compile-dsl <file>",
-            "search <query>",
-            "plan <query>",
-            "retrieve <query>",
-            "context <query>",
-            "benchmark <file> [--tokenizer auto|char4_approx|cl100k_base|o200k_base]",
-            "compress-doc <file> [--tokenizer auto|char4_approx|cl100k_base|o200k_base]",
-            "decompress-doc <file>",
-            "decompress-last",
-            "index",
-            "trace <record-id>",
-            "stats",
-            "help / quit",
+            ("tab", "runtime|benchmark"),
+            ("compile", "<text>"),
+            ("compile-dsl", "<file>"),
+            ("search", "<query> [--budget N]"),
+            ("plan", "<query>"),
+            ("retrieve", "<query> [--budget N] [--trace]"),
+            ("context", "<query> [--view pack|prompt|evidence|summary]"),
+            ("benchmark", "<file> [--min-savings N] [--tokenizer auto|...]"),
+            ("compress-doc", "<file>"),
+            ("decompress-doc / decompress-last", ""),
+            ("index", "[--scope S] [--namespace NS]"),
+            ("trace", "<record-id>"),
+            ("stats", ""),
+            ("help / quit", ""),
         ]
         table = Table.grid(expand=True)
-        table.add_column(ratio=1)
-        for line in help_lines:
-            table.add_row(Text(line, style="white"))
+        table.add_column(style="cyan", no_wrap=True)
+        table.add_column(style="dim white")
+        for cmd, args in help_lines:
+            table.add_row(cmd, args)
         return table
 
     def _succeed(self, title: str, payload: object, log_message: str) -> None:
@@ -589,9 +589,17 @@ class DashboardApp:
 
     def _collect_metrics(self) -> DashboardMetrics:
         db_path = Path(self.runtime.store.path)
-        execution_mode = "local" if isinstance(self.runtime.embedding_model, HashEmbeddingModel) else "cloud"
+        model = self.runtime.embedding_model
+        if isinstance(model, HashEmbeddingModel):
+            execution_mode = "local"
+        elif getattr(model, "name", "").startswith("st:"):
+            execution_mode = "local (neural)"
+        else:
+            execution_mode = "cloud"
         db_size = self._format_bytes(db_path.stat().st_size if db_path.exists() else 0)
         vector_store_size = self._format_bytes(self._directory_size(Path(self.vector_path))) if self.vector_backend == "chroma" else "embedded"
+        vector_adapter_name = getattr(self.runtime.vector_adapter, "name", "unknown")
+        pgvector_configured = bool(os.environ.get("SEAM_PGVECTOR_DSN"))
 
         total_records = 0
         vector_entries = 0
@@ -630,8 +638,8 @@ class DashboardApp:
             top_kinds=[(str(kind), int(count)) for kind, count in top_kinds],
             model_name=self.runtime.embedding_model.name,
             execution_mode=execution_mode,
-            retrieval_backend=self.vector_backend,
-            vector_path=self.vector_path,
+            vector_adapter_name=vector_adapter_name,
+            pgvector_configured=pgvector_configured,
             vector_store_size=vector_store_size,
         )
 
