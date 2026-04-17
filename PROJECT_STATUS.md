@@ -132,7 +132,7 @@ The runtime-connected terminal dashboard and packaged CLI entrypoints now exist,
 
 Best next implementation task:
 
-`PgVectorAdapter` is implemented and formally verified (54 tests green, including schema DDL, upsert, dedup, search, DSN wiring, and full runtime round-trip). The remaining step is promoting PgVector to the default semantic backend for production deployments (right now it is opt-in via `pgvector_dsn`) and validating the Linux installer path on a real machine.
+`PgVectorAdapter` is implemented, formally verified, and now env-var driven (55 tests green). Setting `SEAM_PGVECTOR_DSN` in the shell is all that is required to activate PgVector as the vector backend — no code changes needed. `seam doctor` reports PgVector reachability. The remaining open item is validating the Linux installer path on a real machine.
 
 ## Working Rule
 

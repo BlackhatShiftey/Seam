@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from .benchmarks import run_benchmark_suite, verify_benchmark_bundle
@@ -29,10 +30,11 @@ class SeamRuntime:
     ) -> None:
         self.store = SQLiteStore(store_path)
         self.embedding_model = embedding_model or default_embedding_model()
+        resolved_dsn = pgvector_dsn or os.environ.get("SEAM_PGVECTOR_DSN")
         if vector_adapter is not None:
             self.vector_adapter = vector_adapter
-        elif pgvector_dsn:
-            self.vector_adapter = PgVectorAdapter(pgvector_dsn, self.embedding_model)
+        elif resolved_dsn:
+            self.vector_adapter = PgVectorAdapter(resolved_dsn, self.embedding_model)
         else:
             self.vector_adapter = SQLiteVectorAdapter(str(store_path), self.embedding_model)
 

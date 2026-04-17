@@ -52,8 +52,8 @@ When resuming work:
 - step 10 was packaging, installed entrypoints, and one-command lossless demo flows
 - step 11 was the six-family glassbox benchmark engine, benchmark persistence, and cross-agent continuity docs
 - step 12 was validating the SEAM-LX/1 machine retrieval projection hypothesis using neural embeddings (SBERT) and establishing a persistent benchmark tracking system
-- step 13 was adding formal test coverage for `PgVectorAdapter` via `FakePgVectorAdapter`, proving schema DDL, upsert, dedup, search, DSN wiring, and full runtime round-trip all work correctly (54 tests green)
-- next implementation step is promoting PgVector to the default semantic backend for production deployments and validating the Linux installer path on a real machine
+- step 13 was adding formal test coverage for `PgVectorAdapter`, wiring `SEAM_PGVECTOR_DSN` env-var pickup into `SeamRuntime`, and surfacing PgVector health in `seam doctor` (55 tests green)
+- next implementation step is validating the Linux installer path on a real machine
 
 ### Immediate objective
 
@@ -346,3 +346,9 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - added `FakePgVectorAdapter` to `test_seam.py` — subclasses `PgVectorAdapter`, overrides `_connect()` with an in-memory cursor and SQL log, no live Postgres required
 - added `PgVectorAdapterTests` covering: schema DDL execution, record indexing, upsert dedup, scored search, DSN-based wiring in `SeamRuntime`, and full compile→persist→search round-trip
 - all 54 tests green; `PgVectorAdapter` is now formally proven, not just manually confirmed
+
+#### SEAM_PGVECTOR_DSN Environment Variable Support
+- `SeamRuntime` now picks up `SEAM_PGVECTOR_DSN` from the environment automatically — no explicit `pgvector_dsn` argument required
+- `seam doctor` now checks `SEAM_PGVECTOR_DSN`, attempts a live connection, and reports reachability in its health output
+- `seam doctor` dependency table extended to include `psycopg` and `sentence_transformers`
+- env-var pickup covered by a new test (`test_runtime_picks_up_pgvector_dsn_from_env`); 55 tests green

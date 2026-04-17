@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 from importlib.util import find_spec
 from pathlib import Path
@@ -487,6 +488,18 @@ def _render_lossless_demo_result(payload: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _check_pgvector(dsn: str | None) -> dict[str, object]:
+    if not dsn:
+        return {"configured": False}
+    try:
+        import psycopg
+        conn = psycopg.connect(dsn)
+        conn.close()
+        return {"configured": True, "reachable": True}
+    except Exception as exc:
+        return {"configured": True, "reachable": False, "error": str(exc)}
+
+
 def _build_doctor_report() -> dict[str, object]:
     runtime = SeamRuntime(":memory:")
     batch = runtime.compile_nl("SEAM doctor smoke test for durable local memory.")
@@ -495,6 +508,7 @@ def _build_doctor_report() -> dict[str, object]:
         "\n".join(["SEAM preserves exact context while compressing token usage for lossless recovery."] * 12),
         min_token_savings=0.30,
     )
+    pgvector_dsn = os.environ.get("SEAM_PGVECTOR_DSN")
     return {
         "status": "PASS" if smoke_ok and lossless_result.roundtrip_match else "FAIL",
         "python": sys.version.split()[0],
@@ -509,10 +523,13 @@ def _build_doctor_report() -> dict[str, object]:
             "token_estimator": lossless_result.artifact.token_estimator,
             "token_savings_ratio": round(lossless_result.artifact.token_savings_ratio, 6),
         },
+        "pgvector": _check_pgvector(pgvector_dsn),
         "dependencies": {
             "rich": find_spec("rich") is not None,
             "chromadb": find_spec("chromadb") is not None,
             "tiktoken": find_spec("tiktoken") is not None,
+            "psycopg": find_spec("psycopg") is not None,
+            "sentence_transformers": find_spec("sentence_transformers") is not None,
         },
     }
 
@@ -522,6 +539,13 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
         f"- {name}: {'installed' if installed else 'missing'}"
         for name, installed in payload.get("dependencies", {}).items()
     ]
+    pgvector = payload.get("pgvector", {})
+    if pgvector.get("configured"):
+        pg_line = f"PgVector: {'reachable' if pgvector.get('reachable') else 'configured but unreachable'}"
+        if not pgvector.get("reachable") and pgvector.get("error"):
+            pg_line += f" ({pgvector['error']})"
+    else:
+        pg_line = "PgVector: not configured (set SEAM_PGVECTOR_DSN to enable)"
     return "\n".join(
         [
             f"SEAM doctor: {payload.get('status')}",
@@ -535,6 +559,7 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
                 f"({payload.get('lossless', {}).get('token_savings_ratio')} savings, "
                 f"estimator={payload.get('lossless', {}).get('token_estimator')})"
             ),
+            pg_line,
             "Dependencies:",
             *dependency_lines,
         ]

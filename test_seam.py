@@ -790,6 +790,18 @@ claim c2:
         runtime = SeamRuntime(self.db_path, pgvector_dsn="postgresql://fake/db")
         self.assertIsInstance(runtime.vector_adapter, PgVectorAdapter)
 
+    def test_runtime_picks_up_pgvector_dsn_from_env(self) -> None:
+        old = os.environ.pop("SEAM_PGVECTOR_DSN", None)
+        try:
+            os.environ["SEAM_PGVECTOR_DSN"] = "postgresql://fake/db"
+            runtime = SeamRuntime(self.db_path)
+            self.assertIsInstance(runtime.vector_adapter, PgVectorAdapter)
+        finally:
+            if old is None:
+                os.environ.pop("SEAM_PGVECTOR_DSN", None)
+            else:
+                os.environ["SEAM_PGVECTOR_DSN"] = old
+
     def test_runtime_persist_search_roundtrip_with_pgvector(self) -> None:
         runtime = SeamRuntime(self.db_path, vector_adapter=self.adapter)
         batch = runtime.compile_dsl(
