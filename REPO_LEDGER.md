@@ -358,3 +358,9 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - added `InstallerLinuxTests` covering: posix shim structure (shebang, SEAM_EXE, DB export, exec line, error guard), `path_in_environment` match/no-match, shell profile injection with temp home dir, dedup guard when marker already present, and `install_seam_linux.sh` script content
 - updated doctor tests to assert new `PgVector:` line in pretty output and `pgvector`/`psycopg`/`sentence_transformers` keys in JSON output
 - 62 tests green; Linux installer code paths are now fully exercised without requiring a real Linux machine
+
+#### Linux Installer Real-Machine Validation (WSL2 Ubuntu)
+- fixed CRLF line endings in `install_seam_linux.sh` — `dash` rejected `set -eu` with CRLF terminators; added `.gitattributes` to enforce `*.sh eol=lf` permanently
+- added `python3.12-venv` as a documented prerequisite (not bundled on Debian/Ubuntu by default)
+- confirmed full install flow on Ubuntu WSL2 (Python 3.12.3): `seam --help` shows all commands, `seam dashboard` launches with persistent DB at `~/.local/share/seam/state/seam.db`, runtime log and all panels render correctly
+- updated `installers/README.md` with Linux prereqs, venv guidance, optional extras install commands, dashboard launch, and full PgVector/Docker Compose setup section

@@ -119,8 +119,8 @@ The glassbox benchmark engine now exists, but publication rigor can still improv
 
 ### 4. Cross-platform verification depth
 
-- Windows has been run and verified end to end
-- Linux installer code paths are now fully covered by `InstallerLinuxTests` (shim structure, PATH detection, shell profile injection, sh script content) — a real-machine smoke run would be the final confirmation but is no longer blocking
+- Windows: verified end to end
+- Linux: verified end to end on Ubuntu WSL2 (Python 3.12.3) — `seam --help`, `seam dashboard`, persistent DB, all panels confirmed working
 
 ### 5. Operator-surface polish
 
