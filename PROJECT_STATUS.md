@@ -126,6 +126,10 @@ The glassbox benchmark engine now exists, but publication rigor can still improv
 
 The runtime-connected terminal dashboard and packaged CLI entrypoints now exist, but operator polish is still secondary to architecture and benchmark credibility.
 
+## Full Roadmap
+
+See `ROADMAP.md` for the complete multi-track improvement plan with SOP rules for every track.
+
 ## Immediate Next Step
 
 Two parallel tracks are now open:

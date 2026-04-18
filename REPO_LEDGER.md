@@ -36,7 +36,7 @@ When resuming work:
 
 ### Current phase
 
-- phase: benchmark-system buildout, machine-projection planning, installer hardening, and cross-agent continuity
+- phase: dashboard polish, UI/UX enhancement, benchmark hardening, model skill development, and roadmap planning
 
 ### Current step
 
@@ -54,7 +54,8 @@ When resuming work:
 - step 12 was validating the SEAM-LX/1 machine retrieval projection hypothesis using neural embeddings (SBERT) and establishing a persistent benchmark tracking system
 - step 13 was adding formal test coverage for `PgVectorAdapter`, wiring `SEAM_PGVECTOR_DSN` env-var pickup into `SeamRuntime`, and surfacing PgVector health in `seam doctor` (55 tests green)
 - step 14 was validating the Linux installer path via `InstallerLinuxTests`: posix shim structure, PATH detection, shell profile injection/dedup, `install_seam_linux.sh` content, and doctor pgvector/dependency fields (62 tests green)
-- step 15 is a dashboard review and improvement pass (audit all panels, fix wrong/missing data, reduce UX friction, lock changes with snapshot tests) running in parallel with benchmark publication hardening
+- step 15 was dashboard review pass: fixed wrong backend labels (`Retrieval Backend`→`Vector Adapter`), replaced misleading Chroma path with `PgVector DSN` status, fixed SBERT execution mode label, two-column command help panel, cleaner header, removed broken benchmark file path from welcome text (62 tests still green)
+- next phase is a multi-track roadmap: dashboard animations and chat tab, command terminology refinement, benchmark hardening, model automation skills, and vector visualization — see `ROADMAP.md`
 
 ### Immediate objective
 
@@ -364,3 +365,90 @@ We do not claim machine-efficiency wins without exact reconstruction and reprodu
 - added `python3.12-venv` as a documented prerequisite (not bundled on Debian/Ubuntu by default)
 - confirmed full install flow on Ubuntu WSL2 (Python 3.12.3): `seam --help` shows all commands, `seam dashboard` launches with persistent DB at `~/.local/share/seam/state/seam.db`, runtime log and all panels render correctly
 - updated `installers/README.md` with Linux prereqs, venv guidance, optional extras install commands, dashboard launch, and full PgVector/Docker Compose setup section
+
+### 2026-04-18
+
+#### Optional Extras in pyproject.toml
+- added `[project.optional-dependencies]` with `pgvector`, `sbert`, and `all-extras` groups
+- `pip install seam-runtime[pgvector]` installs `psycopg[binary]>=3.0`
+- `pip install seam-runtime[sbert]` installs `sentence-transformers>=2.0`
+- base install remains lean; no heavy ML dependencies pulled in by default
+
+#### Dashboard Review Pass (step 15)
+- replaced misleading `Retrieval Backend` / `Vector Store Path` rows with `Vector Adapter` (shows actual adapter name: `sqlite-vector` or `pgvector`) and `PgVector DSN` (configured/not set)
+- fixed execution mode: `local (neural)` for SBERT, not `cloud`
+- commands panel redesigned as two-column table (command | args) — no more truncated tokenizer strings
+- header subtitle split into two clean lines, tab buttons now have visible background highlight
+- removed broken relative `benchmark tools/lossless_demo_input.txt` path from welcome text
+- added `import os` to `dashboard.py`; 62 tests still green
+
+#### Roadmap & SOP Blueprint
+- created `ROADMAP.md` as the full multi-track improvement plan with SOP approach for each track
+- tracks: Dashboard & UI, Command Terminology, Benchmark Hardening, Model Skills & Automation, Architecture & Scalability
+- ledger handoff block added below for next Claude session
+
+---
+
+## Handoff Block — Next Claude Session
+
+Read this block first when resuming in a new conversation.
+
+### State as of 2026-04-18
+
+**Tests:** 62 green, no failures.
+
+**Last commits (main):**
+- `a41a9bc` — Dashboard review pass: wrong data fixed, PgVector status added, UX cleaned
+- `4352a83` — Optional extras for psycopg/sentence-transformers, CRLF fix in Linux installer
+- `de17afc` — Linux installer tests + doctor hardening
+- `25bc8c7` — SEAM_PGVECTOR_DSN env var + doctor PgVector health
+- `9ffad57` — PgVector formal test coverage (FakePgVectorAdapter)
+
+**Working branch:** `main` (feature work has been going directly to main)
+
+**What is stable and proven:**
+- Full MIRL compile → verify → persist → search → pack pipeline
+- Six-family benchmark engine with auditable bundles
+- SEAM-LX/1 lossless compression with SHA-256 integrity
+- SBERT retrieval: 100% recall on machine-text vs natural-text (proven)
+- PgVectorAdapter: formally tested, env-var driven, health-checked in doctor
+- Windows installer: verified end to end
+- Linux installer: verified on Ubuntu WSL2 (Python 3.12.3)
+- Dashboard: live, connected to runtime, panels correct, PgVector status visible
+
+**What is next (see `ROADMAP.md` for full detail):**
+
+Priority 1 — Dashboard animations and chat tab (`seam_runtime/dashboard.py`)
+- NL→MIRL compilation animation using Rich `Live`
+- Benchmark progress bar and live metrics during `benchmark run`
+- Chat tab wired to Claude API with SEAM context injection
+- ASCII sparkline graphs for benchmark history
+
+Priority 2 — Command terminology refinement
+- Audit all CLI verbs for consistency and intuitive naming
+- Propose a thematic naming scheme (see ROADMAP.md Track B)
+- Keep compatibility aliases; never break existing scripts
+
+Priority 3 — Benchmark hardening
+- Holdout suites (cases never seen during dev)
+- Benchmark diff tooling (compare two run JSONs)
+- Gold standard benchmarks (BEIR, MTEB)
+
+Priority 4 — Model automation skills
+- Auto-compression pipeline (watch dir → compress → persist)
+- SEAM as Claude tool set (compile, search, context as tool_use functions)
+
+**Key files to read when resuming:**
+1. `PROJECT_STATUS.md` — current snapshot
+2. `REPO_LEDGER.md` — this file, engineering history
+3. `ROADMAP.md` — multi-track improvement plan and SOP
+4. `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` — benchmark policy
+5. `seam_runtime/dashboard.py` — dashboard source (next active file)
+6. `seam_runtime/cli.py` — CLI command definitions
+
+**Rules to preserve:**
+- SQLite is canonical truth — never make Chroma or PgVector canonical
+- No lossy compression — lossless roundtrip must always pass SHA-256
+- No benchmark wins without bundle verification
+- All new features need tests before merge
+- Keep `PROJECT_STATUS.md` and `REPO_LEDGER.md` updated on every direction change
