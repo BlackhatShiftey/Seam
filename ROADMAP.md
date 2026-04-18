@@ -5,6 +5,38 @@
 
 ---
 
+## Track A0 — True Interactive TUI (foundation for all UI work)
+
+### A0: Migrate Dashboard to Textual — Live Panels, In-Place Input, Scrollable Boxes
+
+**What:** Replace the current Rich-based re-render loop with a proper interactive TUI using **Textual**. The dashboard becomes a persistent session: input is handled at the bottom of the screen in-place, panels update reactively without flashing or reprinting, and every data panel is independently scrollable within its bordered box. A `seam-dash` CLI entrypoint launches it directly.
+
+**Why first:** Every other Track A item (animations, graphs, chat tab, presentation mode) is easier and cleaner to build on a proper TUI framework than on top of a re-render loop. This is the foundation.
+
+**How:**
+- Migrate from `Rich.Live` full-screen re-render → **Textual** widgets with reactive data bindings
+- Each panel becomes a Textual `DataTable`, `ListView`, or custom `ScrollView` widget — independently scrollable
+- Input bar at the bottom is a Textual `Input` widget; on submit it runs the existing `execute()` logic and updates only the affected panel
+- Add `seam-dash = "seam_runtime.dashboard:main"` to `[project.scripts]` in `pyproject.toml`
+- Keep `seam dashboard` as an alias; keep `--snapshot` (headless) mode working throughout
+
+**Panels that get independent scroll:**
+- Memory Records
+- Search / Retrieval Results
+- Benchmark Results
+- Runtime Log / Event stream
+- Chat (when Track A5 lands)
+
+**SOP:**
+1. Add `textual>=0.50` as optional extra (`seam-runtime[dash]`) or promote to base if dashboard is a primary interface
+2. Port existing panels to Textual widgets one at a time — keep snapshot fallback working at every step
+3. Wire `Input` widget at bottom; results update the relevant panel reactively
+4. Add `seam-dash` console entrypoint to `pyproject.toml`
+5. Test: `--snapshot` headless export must still pass; add ≥3 Textual widget tests
+6. Gate: no full-screen flash on any input; all panels scroll independently; works on Windows terminal and Linux/WSL2
+
+---
+
 ## Current State Snapshot
 
 SEAM is a working machine-first memory compiler and operator glassbox with:

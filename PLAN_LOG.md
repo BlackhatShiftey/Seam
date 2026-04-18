@@ -326,3 +326,48 @@ Set: 2026-04-18. See `ROADMAP.md` Track E3.
 Status: not started
 
 ---
+
+### 2026-04-18 (continued)
+
+#### [PLANNED] True interactive TUI dashboard — live panels, in-place input, scrollable boxes
+Set: 2026-04-18. User request: make the dashboard a proper live terminal UI.
+
+**What:**
+- `seam-dash` (or `seam dashboard`) launches a full interactive TUI — one persistent session, never re-renders the whole screen on input
+- Input is handled in-place at the bottom of the screen; results update the relevant panel without flashing or reprinting
+- Panels that hold constantly-updating data (records, search results, benchmark stats, logs) are independently scrollable within their own bordered boxes — user can scroll one panel while the others keep refreshing
+- The dashboard becomes its own first-class CLI tool (`seam-dash` console entrypoint in `pyproject.toml`)
+
+**How (proposed stack):**
+- Migrate from `Rich.Live` (which re-renders the full layout) to **Textual** — a proper TUI framework built on Rich that supports:
+  - widgets with independent scroll buffers
+  - reactive data bindings (panels auto-update when data changes)
+  - keyboard-driven input without re-rendering the whole screen
+  - proper focus management between panels
+- Alternatively: keep Rich but use `Rich.Live` + `Rich.Layout` with a custom input loop that patches only the changed panel regions (harder, less clean)
+- Textual is the recommended path — it is designed exactly for this and outputs a polished app
+
+**Panels that need independent scroll:**
+- Memory Records panel (grows with every compile)
+- Search / Retrieval Results panel
+- Benchmark Results panel
+- Runtime Log / Event stream
+- Chat history (when Chat tab is added — Track A5)
+
+**Entrypoint:**
+- Add `seam-dash = "seam_runtime.dashboard:main"` to `[project.scripts]` in `pyproject.toml`
+- `seam-dash` launches the TUI directly; `seam dashboard` remains as an alias
+
+**SOP:**
+1. Install `textual` as an optional extra (`seam-runtime[dash]`) or promote to a base dependency if the dashboard is a primary interface
+2. Port existing dashboard panels to Textual widgets one at a time — keep the Rich snapshot fallback working throughout
+3. Implement scrollable `DataTable` or `ListView` widgets for records, results, logs
+4. Wire input bar at the bottom as a Textual `Input` widget — on submit, runs the existing `execute()` logic and updates the relevant panel reactively
+5. Add `seam-dash` console entrypoint to `pyproject.toml`
+6. Test: `--snapshot` mode must still work (Textual supports headless export)
+7. Gate: all 62 existing tests must pass; add at least 3 TUI widget tests
+
+**Gate:** Dashboard must not flash or re-render the whole screen on any user input. Each panel scrolls independently. Works on Windows terminal and Linux/WSL2.
+Status: not started
+
+---
