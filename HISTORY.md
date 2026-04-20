@@ -1043,3 +1043,81 @@ Completed Phase 1 context-memory migration in repo root.
 - Updated ROADMAP.md to remove duplicated state snapshot and point to HISTORY entries.
 - Reduced required startup read budget to under 2,000 estimated tokens.
 ---END-ENTRY-#048---
+
+---BEGIN-ENTRY-#049---
+id: 049
+date: 2026-04-20T08:19:21Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, command, pyproject, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,pyproject.toml,test_seam.py
+supersedes: none
+tokens: 83
+---
+A0 Textual migration baseline started.
+- Added Textual interactive dashboard path with persistent input and independently scrollable panels.
+- Preserved Rich snapshot/script rendering path for `seam dashboard --snapshot` and scripted `--run` flows.
+- Added `seam-dash` entrypoint and `dash` optional dependency in pyproject.
+- Added Textual dashboard tests (widget mount + command routing), skipped when Textual is not installed.
+Refs: see HISTORY#047 for roadmap pointer.
+---END-ENTRY-#049---
+
+---BEGIN-ENTRY-#050---
+id: 050
+date: 2026-04-20T16:59:32Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, command, roadmap, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,ROADMAP.md
+supersedes: none
+tokens: 92
+---
+Continued A0 Textual migration with tab/state synchronization.
+- Added explicit tab bar rendering and refresh logic tied to `tab runtime|benchmark`.
+- Side panel now syncs with active tab: runtime events in Runtime mode, benchmark search-log entries in Benchmark mode.
+- Added Textual test coverage for tab-switch side-panel behavior.
+- Added Track F roadmap items for operator setup docs, documented error playbooks, and how-to runbooks.
+Refs: see HISTORY#049 for prior A0 baseline.
+---END-ENTRY-#050---
+
+---BEGIN-ENTRY-#051---
+id: 051
+date: 2026-04-20T19:07:05Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, pyproject, readme, command, history, snapshot
+commits: none
+refs: pyproject.toml,requirements.txt,seam_runtime/dashboard.py,README.md,installers/README.md,docs/setup.md,docs/errors.md,docs/howto/README.md,test_seam.py
+supersedes: none
+tokens: 114
+---
+Dependency and docs hardening for Textual testability and operator setup.
+- Installed `textual` and fixed Textual dashboard widget implementation so Textual tests execute and pass in an environment with deps installed.
+- Updated dependency constraints to keep `rich` compatible with Textual (`rich>=14.2,<16`) in pyproject and requirements.
+- Added copy/paste setup and troubleshooting docs: docs/setup.md, docs/errors.md, docs/howto/README.md.
+- Linked setup/troubleshooting docs from README and installers/README; documented `dash` extra install path.
+- Verified dashboard/Textual test suite and doctor pass with installed dependencies.
+Refs: see HISTORY#050 for prior dashboard tab-state migration.
+---END-ENTRY-#051---
+
+---BEGIN-ENTRY-#052---
+id: 052
+date: 2026-04-20T20:22:36Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, animation, command, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: none
+tokens: 105
+---
+Expanded Textual dashboard toward full CLI assistant surface.
+- Added SEAM logo header, chat panel, command-history panel, MIRL compression animation panel, and live token/db metric bars.
+- Added input-mode shortcuts and routing: /model, /cmd, /hybrid, /help, /clear, plus ! force-command and ? force-chat.
+- Added model-chat client integration path (OpenAI-compatible via SEAM_CHAT_API_KEY/OPENAI_API_KEY).
+- Updated Textual tests to validate ! command path and shortcut mode switching.
+- Verified dashboard test suite passes with dependencies installed.
+Refs: see HISTORY#051 for dependency/docs hardening baseline.
+---END-ENTRY-#052---

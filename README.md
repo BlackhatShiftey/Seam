@@ -73,6 +73,7 @@ cd Seam
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -e ".[dash]"
 ```
 
 Run the core test suite:
@@ -85,6 +86,13 @@ Notes:
 
 - `seam doctor` reports `FAIL` if required deps (`rich`, `chromadb`, `tiktoken`) are missing
 - optional extras are only for additional backends/features beyond base runtime
+- `.[dash]` installs `textual` so `seam-dash` and Textual dashboard tests run without skips
+
+## Setup and Troubleshooting Docs
+
+- Setup commands: `docs/setup.md`
+- Documented errors and fixes: `docs/errors.md`
+- Task runbooks: `docs/howto/README.md`
 
 ## Guarded Real-Adapter Validation
 

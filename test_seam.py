@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import asyncio
 import unittest
 from contextlib import redirect_stdout
 from importlib.util import find_spec
@@ -14,7 +15,7 @@ from experimental.retrieval_orchestrator.adapters import SQLiteIRAdapter
 from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime.cli import run_cli
-from seam_runtime.dashboard import run_dashboard
+from seam_runtime.dashboard import TextualDashboardApp, run_dashboard
 from seam_runtime.installer import (
     PATH_MARKER_BEGIN,
     _ensure_posix_shell_profiles,
@@ -763,6 +764,104 @@ claim c2:
         finally:
             if source_path.exists():
                 source_path.unlink()
+
+    def test_textual_dashboard_mounts_core_panels(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                self.assertIsNotNone(app.query_one("#memory-panel"))
+                self.assertIsNotNone(app.query_one("#retrieval-panel"))
+                self.assertIsNotNone(app.query_one("#benchmark-panel"))
+                self.assertIsNotNone(app.query_one("#command-input"))
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_routes_retrieval_output(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("!retrieve translator natural language --budget 3")
+                await pilot.pause()
+                joined = "\n".join(app.retrieval_lines)
+                self.assertIn("retrieve translator natural language", joined)
+                self.assertIn("clm:2", joined)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_routes_compile_output(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("!compile We need durable memory for AI systems")
+                await pilot.pause()
+                joined = "\n".join(app.memory_lines)
+                self.assertIn("Compile", joined)
+                self.assertIn("\"persist\"", joined)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_tab_switch_updates_side_panel_mode(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        source_path = Path(f"lossless_textual_{uuid4().hex}.txt")
+        source_path.write_text(("SEAM preserves exact context while compressing token usage. " * 10).strip(), encoding="utf-8")
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("!tab benchmark")
+                await pilot.pause()
+                self.assertTrue(any("No benchmark search log yet" in line for line in app.side_lines))
+
+                app.process_command(f"!benchmark {source_path} --min-savings 0.75")
+                await pilot.pause()
+                self.assertTrue(any("iter=" in line for line in app.side_lines))
+
+                app.process_command("!tab runtime")
+                await pilot.pause()
+                self.assertTrue(any("tab to runtime" in line.lower() for line in app.side_lines))
+
+        try:
+            asyncio.run(_check())
+        finally:
+            if source_path.exists():
+                source_path.unlink()
+
+    def test_textual_dashboard_shortcuts_switch_modes(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("/cmd")
+                await pilot.pause()
+                self.assertEqual(app.input_mode, "command")
+                app.process_command("/model")
+                await pilot.pause()
+                self.assertEqual(app.input_mode, "model")
+
+        asyncio.run(_check())
 
 class InstallerLinuxTests(unittest.TestCase):
     def test_posix_shim_has_valid_sh_structure(self) -> None:

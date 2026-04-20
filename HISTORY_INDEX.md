@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 48
-total_tokens: ~3474
-latest_id: 048
+total_entries: 52
+total_tokens: ~3868
+latest_id: 052
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,10 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 052 | 2026-04-20 | done | 4e57d2cdbb1096b8 | dashboard,textual,chat,animation,+ | none |
+| 051 | 2026-04-20 | done | 1eeeb306a2c9c60d | dashboard,textual,pyproject,readme,+ | none |
+| 050 | 2026-04-20 | done | 38a362f679122d7a | dashboard,textual,command,roadmap,+ | none |
+| 049 | 2026-04-20 | done | 153cb8822ac23ab2 | dashboard,textual,command,pyproject,+ | none |
 | 048 | 2026-04-20 | done | 12b41ce45774dce2 | history,snapshot,multi-agent,protocol,+ | none |
 | 047 | 2026-04-18 | planned | 72b2b3a51c3f54fc | compile,persist,retrieval,search,+ | none |
 | 046 | 2026-04-18 | planned | 7c1c6caa81932ba6 | compile,search,roadmap,status | none |
@@ -63,16 +67,16 @@ compact: true
 ## topic index (latest ids, max 5)
 
 - alias: count=2 latest=#033, #002
-- animation: count=2 latest=#032, #028
+- animation: count=3 latest=#052, #032, #028
 - benchmark: count=18 latest=#047, #040, #039, #038, #037
 - bundle: count=2 latest=#015, #008
-- chat: count=1 latest=#031
+- chat: count=2 latest=#052, #031
 - chroma: count=2 latest=#017, #001
 - codec: count=2 latest=#018, #006
-- command: count=8 latest=#045, #033, #024, #018, #008
+- command: count=12 latest=#052, #051, #050, #049, #045
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=6 latest=#042, #041, #033, #026, #018
-- dashboard: count=12 latest=#047, #032, #031, #030, #029
+- dashboard: count=16 latest=#052, #051, #050, #049, #047
 - diff: count=1 latest=#037
 - doctor: count=3 latest=#019, #014, #013
 - extras: count=1 latest=#022
@@ -80,7 +84,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
 - handoff: count=1 latest=#025
-- history: count=2 latest=#048, #027
+- history: count=6 latest=#052, #051, #050, #049, #048
 - holdout: count=1 latest=#036
 - installer: count=6 latest=#035, #021, #020, #015, #014
 - integrity: count=1 latest=#048
@@ -95,17 +99,18 @@ compact: true
 - pgvector: count=10 latest=#044, #026, #023, #022, #019
 - plan: count=3 latest=#027, #017, #003
 - protocol: count=1 latest=#048
-- pyproject: count=1 latest=#022
+- pyproject: count=3 latest=#051, #049, #022
 - rank: count=3 latest=#017, #005, #001
-- readme: count=2 latest=#035, #009
+- readme: count=3 latest=#051, #035, #009
 - retrieval: count=10 latest=#047, #038, #023, #017, #011
-- roadmap: count=18 latest=#046, #045, #044, #043, #042
+- roadmap: count=19 latest=#050, #046, #045, #044, #043
 - roundtrip: count=2 latest=#007, #006
 - sbert: count=3 latest=#023, #022, #011
 - search: count=9 latest=#047, #046, #041, #033, #031
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=1 latest=#048
+- snapshot: count=5 latest=#052, #051, #050, #049, #048
 - status: count=19 latest=#046, #045, #044, #043, #042
+- textual: count=4 latest=#052, #051, #050, #049
 - vector: count=16 latest=#044, #038, #034, #026, #023
 - verify: count=13 latest=#040, #037, #026, #024, #021
 - windows: count=2 latest=#020, #007
@@ -113,6 +118,6 @@ compact: true
 
 ## status rollup
 
-- roots: 48
-- done: 28
+- roots: 52
+- done: 32
 - planned: 20

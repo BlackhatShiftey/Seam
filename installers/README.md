@@ -45,6 +45,9 @@ Base install now includes required runtime packages from `requirements.txt`, inc
 Use extras only for optional backends:
 
 ```sh
+# Textual dashboard and Textual dashboard tests
+~/.local/share/seam/runtime/bin/pip install -e "/path/to/seam/repo[dash]"
+
 # PgVector backend (requires a running Postgres with pgvector extension)
 ~/.local/share/seam/runtime/bin/pip install -e "/path/to/seam/repo[pgvector]"
 
@@ -92,6 +95,7 @@ Default persistent database paths:
 
 | Extra | Package installed | When you need it |
 |---|---|---|
+| `dash` | `textual>=0.50` | Textual dashboard UI and Textual dashboard tests |
 | `pgvector` | `psycopg[binary]>=3.0` | PgVector as the vector backend (set `SEAM_PGVECTOR_DSN`) |
 | `sbert` | `sentence-transformers>=2.0` | Neural SBERT embeddings |
 | `all-extras` | both | Full production setup |
@@ -181,3 +185,9 @@ Exact machine-language demo:
 seam demo lossless /path/to/document.txt /path/to/document.seamlx --min-savings 0.75
 seam demo lossless /path/to/document.seamlx /path/to/rebuilt.txt --rebuild
 ```
+
+## Setup and Troubleshooting References
+
+- `docs/setup.md`
+- `docs/errors.md`
+- `docs/howto/README.md`

@@ -6,6 +6,7 @@ import os
 import shlex
 import sqlite3
 import sys
+import time
 from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,6 +27,17 @@ except ImportError as exc:  # pragma: no cover - user-facing guard
     escape = lambda value: value  # type: ignore[assignment]
     _RICH_IMPORT_ERROR = exc
 
+try:
+    from textual import on
+    from textual.app import App, ComposeResult
+    from textual.containers import Horizontal
+    from textual.widgets import Footer, Input, Static
+
+    _TEXTUAL_IMPORT_ERROR = None
+except ImportError as exc:  # pragma: no cover - optional dashboard path
+    on = App = ComposeResult = Horizontal = Footer = Input = Static = None  # type: ignore[assignment]
+    _TEXTUAL_IMPORT_ERROR = exc
+
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
 
 from .context_views import CONTEXT_VIEWS, build_context_payload
@@ -33,6 +45,7 @@ from .lossless import LOSSLESS_CODECS, LOSSLESS_TRANSFORMS, TOKENIZER_CHOICES, b
 from .mirl import IRBatch
 from .models import HashEmbeddingModel
 from .runtime import SeamRuntime
+from .installer import default_runtime_db_path
 
 
 @dataclass
@@ -65,6 +78,512 @@ class DashboardEvent:
 class DashboardParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:  # pragma: no cover - exercised through controller
         raise ValueError(message)
+
+
+class SeamChatClient:
+    def __init__(self) -> None:
+        self.base_url = os.environ.get("SEAM_CHAT_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+        self.model = os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini")
+        self.api_key = os.environ.get("SEAM_CHAT_API_KEY") or os.environ.get("OPENAI_API_KEY")
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.api_key)
+
+    def complete(self, messages: list[dict[str, str]], context_prompt: str) -> str:
+        if not self.configured:
+            return (
+                "Chat model is not configured.\n"
+                "Set SEAM_CHAT_API_KEY (or OPENAI_API_KEY) and optionally SEAM_CHAT_MODEL / SEAM_CHAT_BASE_URL."
+            )
+        try:
+            import httpx
+
+            payload_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the SEAM dashboard assistant. Keep answers concise, actionable, and grounded in runtime state.\n\n"
+                        f"Runtime context:\n{context_prompt}"
+                    ),
+                },
+                *messages[-8:],
+            ]
+            response = httpx.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "temperature": 0.2,
+                    "messages": payload_messages,
+                },
+                timeout=45.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            choices = data.get("choices", [])
+            if not choices:
+                return "No response choices were returned by the chat model."
+            content = choices[0].get("message", {}).get("content", "")
+            return str(content).strip() or "(empty model response)"
+        except Exception as exc:
+            return f"Chat request failed: {exc}"
+
+
+if App is not None and Static is not None and Input is not None:
+    class _TextualPanel(Static):
+        def __init__(self, title: str, panel_id: str) -> None:
+            super().__init__("", id=panel_id, markup=False)
+            self._title = title
+            self._lines: list[str] = []
+
+        def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.border_title = self._title
+            self._refresh_content()
+
+        def set_title(self, title: str) -> None:
+            self._title = title
+            self.border_title = title
+
+        def set_lines(self, lines: list[str]) -> None:
+            self._lines = lines[-200:]
+            self._refresh_content()
+
+        def _refresh_content(self) -> None:
+            self.update("\n".join(self._lines[-200:]) if self._lines else "(empty)")
+
+
+    class TextualDashboardApp(App[None]):
+        CSS = """
+        Screen {
+            layout: vertical;
+        }
+        #logo-header {
+            height: 8;
+            border: round $primary;
+            padding: 0 1;
+        }
+        #metrics {
+            height: 8;
+            border: round $primary;
+            padding: 0 1;
+        }
+        #tab-bar {
+            height: 3;
+            border: round $primary;
+            padding: 0 1;
+        }
+        #top-row, #middle-row, #bottom-row {
+            height: 1fr;
+            layout: horizontal;
+        }
+        #command-input {
+            dock: bottom;
+            border: round $primary;
+        }
+        #memory-panel, #retrieval-panel, #benchmark-panel, #result-panel, #runtime-log-panel, #chat-panel, #command-history-panel, #mirl-panel {
+            width: 1fr;
+            border: round $primary;
+            margin: 0 1 1 1;
+            padding: 0 1;
+        }
+        """
+
+        BINDINGS = [("ctrl+c", "quit", "Quit"), ("ctrl+d", "quit", "Quit")]
+
+        def __init__(
+            self,
+            runtime: SeamRuntime,
+            vector_backend: str = "seam",
+            vector_path: str = ".seam_chroma",
+            vector_collection: str = "seam_hybrid",
+        ) -> None:
+            super().__init__()
+            self.controller = DashboardApp(
+                runtime,
+                vector_backend=vector_backend,
+                vector_path=vector_path,
+                vector_collection=vector_collection,
+                no_clear=True,
+            )
+            self.memory_lines: list[str] = []
+            self.retrieval_lines: list[str] = []
+            self.benchmark_lines: list[str] = []
+            self.result_lines: list[str] = []
+            self.side_lines: list[str] = []
+            self.chat_lines: list[str] = []
+            self.chat_history: list[dict[str, str]] = []
+            self.command_history_lines: list[str] = []
+            self.mirl_lines: list[str] = []
+            self.chat_client = SeamChatClient()
+            self.input_mode = "model"
+            self.command_names = {
+                "help",
+                "quit",
+                "exit",
+                "tab",
+                "compile",
+                "compile-nl",
+                "compile-dsl",
+                "dsl",
+                "search",
+                "plan",
+                "retrieve",
+                "context",
+                "index",
+                "trace",
+                "benchmark",
+                "compress-doc",
+                "lossless-compress",
+                "decompress-doc",
+                "lossless-decompress",
+                "decompress-last",
+                "stats",
+            }
+            self._animation_phase = 0
+            self._anim_until = 0.0
+            self._anim_label = "idle"
+            self._anim_preview = ""
+            self._token_source_total = 0
+            self._token_machine_total = 0
+            self._token_events: deque[tuple[float, int]] = deque(maxlen=32)
+
+        def compose(self) -> ComposeResult:
+            yield Static("", id="logo-header")
+            yield Static("", id="metrics")
+            yield Static("", id="tab-bar")
+            with Horizontal(id="top-row"):
+                yield _TextualPanel("Memory Records", "memory-panel")
+                yield _TextualPanel("Search / Retrieval", "retrieval-panel")
+                yield _TextualPanel("Benchmark", "benchmark-panel")
+            with Horizontal(id="middle-row"):
+                yield _TextualPanel("MIRL Compression", "mirl-panel")
+                yield _TextualPanel("Command History", "command-history-panel")
+                yield _TextualPanel("Chat", "chat-panel")
+            with Horizontal(id="bottom-row"):
+                yield _TextualPanel("Results", "result-panel")
+                yield _TextualPanel("Runtime Log", "runtime-log-panel")
+            yield Input(placeholder="", id="command-input")
+            yield Footer()
+
+        def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
+            self._refresh_logo()
+            self._refresh_metrics()
+            self._refresh_tab_bar()
+            self._refresh_input_placeholder()
+            self._sync_side_panel()
+            self.query_one("#benchmark-panel", _TextualPanel).set_lines(["Run `benchmark <file>` to populate benchmark results."])
+            self.query_one("#chat-panel", _TextualPanel).set_lines(
+                [
+                    "Chat ready.",
+                    "Shortcuts: /model /cmd /hybrid /help",
+                    "Model mode: plain text chats, !<command> runs terminal commands.",
+                ]
+            )
+            self.query_one("#command-history-panel", _TextualPanel).set_lines(["No commands launched yet."])
+            self.query_one("#mirl-panel", _TextualPanel).set_lines(["Idle. Run compile/compress/benchmark for live machine animation."])
+            self._push_result("Welcome", self.controller.result_body)
+            self.set_interval(0.25, self._tick_mirl_animation)
+            self.set_interval(1.0, self._tick_metrics)
+
+        @on(Input.Submitted, "#command-input")
+        def _on_command_submitted(self, event: Input.Submitted) -> None:  # pragma: no cover - textual runtime behavior
+            command = event.value.strip()
+            event.input.value = ""
+            if not command:
+                return
+            self.process_command(command)
+
+        def process_command(self, command: str) -> None:
+            raw = command.strip()
+            if not raw:
+                return
+            if raw.startswith("/"):
+                self._handle_shortcut(raw)
+                return
+            force_command = raw.startswith("!")
+            force_chat = raw.startswith("?")
+            candidate = raw[1:].strip() if (force_command or force_chat) else raw
+            token = candidate.split()[0].lower() if candidate else ""
+
+            if self.input_mode == "model":
+                if not force_command:
+                    self._handle_chat_message(candidate)
+                    return
+            elif self.input_mode == "command":
+                if force_chat:
+                    self._handle_chat_message(candidate)
+                    return
+            else:  # hybrid
+                if force_chat:
+                    self._handle_chat_message(candidate)
+                    return
+                if not force_command and token not in self.command_names:
+                    self._handle_chat_message(candidate)
+                    return
+
+            command = candidate
+            self._execute_dashboard_command(command)
+
+        def _execute_dashboard_command(self, command: str) -> None:
+            self._record_command("launch", command)
+            should_exit = self.controller.execute(command)
+            title = self.controller.result_title
+            body = self.controller.result_body
+            self._route_command_output(command, title, body)
+            self._push_result(title, body)
+            self._sync_side_panel()
+            self._refresh_metrics()
+            self._refresh_tab_bar()
+            self._record_command("done", f"{command} -> {title}")
+            self._capture_token_metrics_from_command(command)
+            if should_exit:
+                self.exit()
+
+        def _handle_shortcut(self, raw: str) -> None:
+            shortcut = raw.strip().lower()
+            if shortcut in {"/model", "/m"}:
+                self.input_mode = "model"
+                self._refresh_input_placeholder()
+                self._push_result("Input Mode", "Switched to model mode. Plain text chats. Use !<command> for terminal commands.")
+                self._record_command("mode", "model")
+                self._refresh_tab_bar()
+                return
+            if shortcut in {"/cmd", "/command", "/c"}:
+                self.input_mode = "command"
+                self._refresh_input_placeholder()
+                self._push_result("Input Mode", "Switched to command mode. Plain text runs terminal commands. Use ?<message> to chat.")
+                self._record_command("mode", "command")
+                self._refresh_tab_bar()
+                return
+            if shortcut in {"/hybrid", "/h"}:
+                self.input_mode = "hybrid"
+                self._refresh_input_placeholder()
+                self._push_result("Input Mode", "Switched to hybrid mode. Commands auto-detect; unknown input goes to chat.")
+                self._record_command("mode", "hybrid")
+                self._refresh_tab_bar()
+                return
+            if shortcut in {"/clear", "/cls"}:
+                self.chat_lines.clear()
+                self.chat_history.clear()
+                self.query_one("#chat-panel", _TextualPanel).set_lines(["Chat cleared."])
+                self._push_result("Chat", "Chat history cleared.")
+                self._record_command("chat", "clear")
+                return
+            if shortcut in {"/help", "/?"}:
+                self._push_result(
+                    "Shortcuts",
+                    (
+                        "/model  -> plain text chats, !<command> for commands\n"
+                        "/cmd    -> plain text commands, ?<message> for chat\n"
+                        "/hybrid -> auto route (commands or chat)\n"
+                        "/clear  -> clear chat history"
+                    ),
+                )
+                self._record_command("help", "shortcuts")
+                return
+            self._push_result("Shortcut Error", f"Unknown shortcut: {raw}. Use /help.")
+            self._record_command("error", f"shortcut {raw}")
+
+        def _route_command_output(self, command: str, title: str, body: str) -> None:
+            token = command.split()[0].lower()
+            if token in {"compile", "compile-nl", "compile-dsl", "dsl", "stats", "trace", "index"}:
+                self.memory_lines.extend([f"{title}: {command}", body, ""])
+                self.query_one("#memory-panel", _TextualPanel).set_lines(self.memory_lines)
+                if token in {"compile", "compile-nl", "compile-dsl", "dsl"}:
+                    self._trigger_mirl_animation("compile", body)
+                return
+            if token in {"search", "retrieve", "context", "plan"}:
+                self.retrieval_lines.extend([f"{title}: {command}", body, ""])
+                self.query_one("#retrieval-panel", _TextualPanel).set_lines(self.retrieval_lines)
+                return
+            if token in {"benchmark", "compress-doc", "lossless-compress", "decompress-doc", "lossless-decompress", "decompress-last"}:
+                self.benchmark_lines.extend([f"{title}: {command}", body, ""])
+                self.query_one("#benchmark-panel", _TextualPanel).set_lines(self.benchmark_lines)
+                if token in {"benchmark", "compress-doc", "lossless-compress"}:
+                    self._trigger_mirl_animation(token, body)
+            if token == "tab":
+                self._record_command("state", f"active tab => {self.controller.active_tab}")
+
+        def _push_result(self, title: str, body: str) -> None:
+            self.result_lines.extend([f"{title}", body, ""])
+            self.query_one("#result-panel", _TextualPanel).set_lines(self.result_lines)
+
+        def _sync_side_panel(self) -> None:
+            panel = self.query_one("#runtime-log-panel", _TextualPanel)
+            if self.controller.active_tab == "benchmark":
+                attempts = (self.controller.last_benchmark_payload or {}).get("search_log", [])
+                if not attempts:
+                    lines = ["No benchmark search log yet. Run `benchmark <file>` to populate this panel."]
+                else:
+                    lines = []
+                    for attempt in attempts[-16:]:
+                        flags = f" flags={','.join(attempt.get('flags', []))}" if attempt.get("flags") else ""
+                        lines.append(
+                            (
+                                f"iter={attempt.get('iteration')} status={attempt.get('status')} "
+                                f"{attempt.get('transform')}/{attempt.get('codec')} "
+                                f"savings={float(attempt.get('token_savings_ratio', 0.0)):.1%} "
+                                f"tokens={attempt.get('machine_tokens')}{flags}"
+                            )
+                        )
+                panel.set_title("Benchmark Log")
+            else:
+                lines = [f"{event.timestamp} {event.kind}: {event.message}" for event in list(self.controller.events)]
+                panel.set_title("Runtime Log")
+            self.side_lines = lines
+            panel.set_lines(lines)
+
+        def _refresh_metrics(self) -> None:
+            metrics = self.controller._collect_metrics()
+            db_bytes = Path(metrics.db_path).stat().st_size if Path(metrics.db_path).exists() else 0
+            db_ratio = min(1.0, db_bytes / float(1024 * 1024 * 1024))
+            source_tokens = self._token_source_total
+            machine_tokens = self._token_machine_total
+            compressed = max(source_tokens - machine_tokens, 0)
+            savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
+            token_rate = self._estimate_token_rate()
+            summary = (
+                f"DB: {metrics.db_path}\n"
+                f"Records={metrics.total_records} Vectors={metrics.vector_entries} Packs={metrics.pack_entries} Mode={metrics.execution_mode}\n"
+                f"Adapter={metrics.vector_adapter_name} | Tab={self.controller.active_tab}\n"
+                f"Token rate: {token_rate:.1f} tok/s\n"
+                f"Compressed tokens: {compressed} (source={source_tokens}, machine={machine_tokens})\n"
+                f"DB size bar      {self._bar(db_ratio)}\n"
+                f"Compression bar  {self._bar(savings_ratio)}"
+            )
+            self.query_one("#metrics", Static).update(summary)
+
+        def _refresh_tab_bar(self) -> None:
+            runtime = "[Runtime]" if self.controller.active_tab == "runtime" else "Runtime"
+            benchmark = "[Benchmark]" if self.controller.active_tab == "benchmark" else "Benchmark"
+            self.query_one("#tab-bar", Static).update(
+                f"Tabs: {runtime}  {benchmark} | Input mode: {self.input_mode} | /model /cmd /hybrid /help"
+            )
+
+        def _refresh_input_placeholder(self) -> None:
+            widget = self.query_one("#command-input", Input)
+            if self.input_mode == "model":
+                widget.placeholder = "Model mode: type to chat | !<command> to run dashboard commands | /help"
+            elif self.input_mode == "command":
+                widget.placeholder = "Command mode: type command | ?<message> to chat | /help"
+            else:
+                widget.placeholder = "Hybrid mode: commands auto-detect, otherwise chat | /help"
+
+        def _refresh_logo(self) -> None:
+            logo = (
+                "  _____  ______          __  \n"
+                " / ____|/ __ \\ \\        / /  \n"
+                "| (___ | |  | \\ \\  /\\  / /   \n"
+                " \\___ \\| |  | |\\ \\/  \\/ /    \n"
+                " ____) | |__| | \\  /\\  /     \n"
+                "|_____/ \\____/   \\/  \\/      \n"
+                "SEAM Glassbox Dashboard"
+            )
+            self.query_one("#logo-header", Static).update(logo)
+
+        def _handle_chat_message(self, message: str) -> None:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            self.chat_history.append({"role": "user", "content": message})
+            context_prompt = self._build_chat_context_prompt(message)
+            assistant = self.chat_client.complete(self.chat_history, context_prompt)
+            self.chat_history.append({"role": "assistant", "content": assistant})
+            self.chat_lines.extend(
+                [
+                    f"{timestamp} user: {message}",
+                    f"{timestamp} seam: {assistant}",
+                    "",
+                ]
+            )
+            self.query_one("#chat-panel", _TextualPanel).set_lines(self.chat_lines)
+            self._push_result("Chat", assistant)
+            self._record_command("chat", message)
+
+        def _build_chat_context_prompt(self, message: str) -> str:
+            try:
+                rag = self.controller.orchestrator.rag(message, budget=5, pack_budget=384, lens="rag", mode="context").to_dict()
+                prompt_view = build_context_payload(rag, view="prompt")
+                if isinstance(prompt_view, dict):
+                    return json.dumps(prompt_view, indent=2)[:4000]
+                return str(prompt_view)[:4000]
+            except Exception as exc:
+                return f"(context retrieval failed: {exc})"
+
+        def _record_command(self, phase: str, text: str) -> None:
+            self.command_history_lines.append(f"{datetime.now().strftime('%H:%M:%S')} {phase}: {text}")
+            self.query_one("#command-history-panel", _TextualPanel).set_lines(self.command_history_lines)
+
+        def _trigger_mirl_animation(self, label: str, body: str) -> None:
+            self._anim_label = label
+            self._anim_until = time.monotonic() + 4.0
+            compact = body.replace("\n", " ").replace("\r", " ")
+            self._anim_preview = compact[:120]
+
+        def _tick_mirl_animation(self) -> None:
+            self._animation_phase = (self._animation_phase + 1) % 8
+            if time.monotonic() > self._anim_until:
+                lines = [
+                    "Idle. Run compile/compress/benchmark for live machine animation.",
+                    "Pipeline: DSL -> MIRL -> SEAM-LX/1",
+                ]
+                self.query_one("#mirl-panel", _TextualPanel).set_lines(lines)
+                return
+            frames = ["[=   ]", "[==  ]", "[=== ]", "[ ===]", "[  ==]", "[   =]", "[ == ]", "[=== ]"]
+            frame = frames[self._animation_phase]
+            pseudo = f"{self._anim_label.upper()} :: dsl::tokenize -> mirl::graph -> lx1::machine_stream"
+            machine_line = (self._anim_preview or "emit 01011001|clm|ent|sym|ctx")[:120]
+            self.query_one("#mirl-panel", _TextualPanel).set_lines(
+                [
+                    f"{frame} MIRL compression live",
+                    pseudo,
+                    machine_line,
+                ]
+            )
+
+        def _tick_metrics(self) -> None:
+            self._refresh_metrics()
+
+        def _capture_token_metrics_from_command(self, command: str) -> None:
+            token = command.split()[0].lower()
+            source_tokens: int | None = None
+            machine_tokens: int | None = None
+            if token == "benchmark" and self.controller.last_benchmark_payload:
+                artifact = self.controller.last_benchmark_payload.get("artifact", {})
+                source_tokens = int(artifact.get("source_tokens", 0) or 0)
+                machine_tokens = int(artifact.get("machine_tokens", 0) or 0)
+            elif token in {"compress-doc", "lossless-compress"}:
+                try:
+                    payload = json.loads(self.controller.result_body)
+                    source_tokens = int(payload.get("source_tokens", 0) or 0)
+                    machine_tokens = int(payload.get("machine_tokens", 0) or 0)
+                except Exception:
+                    pass
+            if source_tokens is not None and machine_tokens is not None and source_tokens > 0:
+                self._token_source_total += source_tokens
+                self._token_machine_total += machine_tokens
+                self._token_events.append((time.monotonic(), source_tokens))
+
+        def _estimate_token_rate(self) -> float:
+            if len(self._token_events) < 2:
+                return 0.0
+            first_t, _ = self._token_events[0]
+            last_t, _ = self._token_events[-1]
+            elapsed = max(1e-6, last_t - first_t)
+            total = sum(tokens for _, tokens in self._token_events)
+            return total / elapsed
+
+        @staticmethod
+        def _bar(ratio: float, width: int = 24) -> str:
+            clamped = max(0.0, min(1.0, ratio))
+            filled = int(round(clamped * width))
+            return f"[{'#' * filled}{'-' * (width - filled)}] {clamped * 100:5.1f}%"
+else:
+    class TextualDashboardApp:  # pragma: no cover - exercised when textual is missing
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            _ensure_textual()
 
 
 class DashboardApp:
@@ -721,6 +1240,15 @@ def run_dashboard(
     if snapshot:
         app.render()
         return
+    if _TEXTUAL_IMPORT_ERROR is None:
+        textual_app = TextualDashboardApp(
+            runtime,
+            vector_backend=vector_backend,
+            vector_path=vector_path,
+            vector_collection=vector_collection,
+        )
+        textual_app.run()
+        return
     app.run_interactive()
 
 
@@ -730,3 +1258,37 @@ def _ensure_rich() -> None:
             "The dashboard requires 'rich'. Install dependencies with:\n"
             "  .\\.venv\\Scripts\\python -m pip install -r requirements.txt"
         ) from _RICH_IMPORT_ERROR
+
+
+def _ensure_textual() -> None:
+    if _TEXTUAL_IMPORT_ERROR is not None:  # pragma: no cover - environment-dependent path
+        raise SystemExit(
+            "The interactive dashboard requires 'textual'. Install optional dependencies with:\n"
+            "  pip install seam-runtime[dash]"
+        ) from _TEXTUAL_IMPORT_ERROR
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Launch the SEAM interactive dashboard")
+    parser.add_argument("--db", default=default_runtime_db_path(), help="SQLite database path")
+    parser.add_argument("--snapshot", action="store_true", help="Render one Rich dashboard frame and exit")
+    parser.add_argument("--run", dest="dashboard_commands", action="append", default=[], help="Run a dashboard command non-interactively")
+    parser.add_argument("--no-clear", action="store_true", help="Do not clear the terminal in Rich snapshot/script mode")
+    parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
+    parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
+    parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
+    args = parser.parse_args(argv)
+
+    if not args.snapshot and not args.dashboard_commands:
+        _ensure_textual()
+
+    runtime = SeamRuntime(args.db)
+    run_dashboard(
+        runtime,
+        vector_backend=args.vector_backend,
+        vector_path=args.vector_path,
+        vector_collection=args.vector_collection,
+        snapshot=args.snapshot,
+        commands=args.dashboard_commands,
+        no_clear=args.no_clear,
+    )

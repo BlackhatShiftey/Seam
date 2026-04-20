@@ -394,6 +394,60 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 ---
 
+## Track F — Docs, Setup Guides, and Error Playbooks
+
+### F1: Operator Setup Guide with Exact Commands
+
+**What:** Publish a single setup guide with exact copy/paste commands for Windows, Linux, and WSL2, including optional extras and verification commands.
+
+**SOP:**
+1. Add `docs/setup.md` with exact command blocks for:
+   - creating virtual env
+   - installing base deps
+   - installing extras (`[dash]`, `[pgvector]`, `[sbert]`, `[all-extras]`)
+   - running smoke checks (`seam doctor`, `seam dashboard --snapshot`, benchmark smoke)
+2. Add a short "known good first run" section with expected command output fragments.
+3. Link `docs/setup.md` from root `README.md` and `installers/README.md`.
+4. Gate: a clean machine can reach `seam doctor: PASS` by following only this doc.
+
+---
+
+### F2: Documented Error Catalog and Fix Procedures
+
+**What:** Create a troubleshooting catalog that maps common operator errors to exact recovery steps.
+
+**SOP:**
+1. Add `docs/errors.md` with one section per documented error:
+   - symptom text (exact error snippets)
+   - root cause
+   - fix commands
+   - verification command after fix
+2. Include current high-frequency paths:
+   - missing optional dependency (Textual/PgVector/SBERT)
+   - pgvector DSN configured but unreachable
+   - Chroma path/index sync failures
+   - benchmark bundle verification failures
+3. Add "do not proceed" blockers and escalation steps.
+4. Gate: each documented error has at least one reproducible verification command.
+
+---
+
+### F3: How-To Runbooks for Daily Operations
+
+**What:** Add task-oriented runbooks for common operator workflows so users can execute standard flows without source code spelunking.
+
+**SOP:**
+1. Add `docs/howto/` with runbooks:
+   - ingest and retrieve memory
+   - run guarded real-adapter checks
+   - archive benchmark bundles to Documents
+   - recover from interrupted runs
+2. Keep runbooks command-first with short explanation blocks.
+3. Add a top-level index file `docs/howto/README.md`.
+4. Gate: every runbook has prerequisites, exact commands, and a success checklist.
+
+---
+
 ## Recommended Course — Priority Order
 
 Work these in sequence. Each track has a clear gate before moving on.
