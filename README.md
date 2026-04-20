@@ -115,6 +115,24 @@ Run any heavy command behind the standalone guard:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_guarded.ps1 -Command "python -m pytest -q" -StopOnLimit
 ```
 
+Store benchmark runs to your Documents folder with publication-ready metadata:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\store_benchmark.ps1 -Suite all
+```
+
+Default storage path:
+
+- `%USERPROFILE%\Documents\SEAM\benchmarks\<suite>\<YYYY-MM-DD>\<timestamp>_<run_id>\`
+
+Each run folder includes:
+
+- `benchmark_report.json` (raw report)
+- `publication_manifest.json` (bundle/case/fixture hashes + git/tokenizer/dependency state)
+- `case_hashes.json`
+- `command.txt`
+- `research_notes.md`
+
 ## Installer Flow
 
 If you want the "download installer, run installer, type `seam`" path, use the installer entrypoint for your platform.
