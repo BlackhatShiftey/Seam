@@ -29,7 +29,7 @@ SEAM is operating as a local machine-first memory runtime with:
 
 - Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
 - Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
-- Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with publication metadata and hashes.
+- Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
 - Default memory guardrails are `82%` warning and `90%` hard limit.
 
 ## Working Rule

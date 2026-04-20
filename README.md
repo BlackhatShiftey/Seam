@@ -123,7 +123,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\store_benchmark.ps1 -Suite al
 
 Default storage path:
 
-- `%USERPROFILE%\Documents\SEAM\benchmarks\<suite>\<YYYY-MM-DD>\<timestamp>_<run_id>\`
+- `%USERPROFILE%\Documents\SEAM\benchmarks\<suite>\<YYYY-MM-DD>\<seq>_<timestamp>_<run_id>\`
 
 Each run folder includes:
 
@@ -132,6 +132,15 @@ Each run folder includes:
 - `case_hashes.json`
 - `command.txt`
 - `research_notes.md`
+- `environment_snapshot.json`
+
+Day-level index:
+
+- `_index.json` in each date folder tracks sequence, run id, status, hashes, and folder path.
+
+Safety rule:
+
+- `store_benchmark.ps1` rejects output paths inside the git repo by default so benchmark artifacts stay local and out of commits.
 
 ## Installer Flow
 

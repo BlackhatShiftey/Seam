@@ -12,7 +12,8 @@ param(
     [string]$OutputRoot = "",
 
     [switch]$IncludeMachineText,
-    [switch]$NoGuard
+    [switch]$NoGuard,
+    [switch]$AllowRepoOutput
 )
 
 Set-StrictMode -Version Latest
@@ -26,8 +27,14 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $documents "SEAM\benchmarks"
 }
 
+$repoRootFull = [System.IO.Path]::GetFullPath($repoRoot)
+$outputRootFull = [System.IO.Path]::GetFullPath($OutputRoot)
+if (-not $AllowRepoOutput -and $outputRootFull.StartsWith($repoRootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "OutputRoot points into the git repo. Use a local path outside repo (default: Documents\\SEAM\\benchmarks)."
+}
+
 $dateFolder = Get-Date -Format "yyyy-MM-dd"
-$suiteFolder = Join-Path (Join-Path $OutputRoot $Suite) $dateFolder
+$suiteFolder = Join-Path (Join-Path $outputRootFull $Suite) $dateFolder
 New-Item -ItemType Directory -Force -Path $suiteFolder | Out-Null
 
 $tmpJson = Join-Path $env:TEMP ("seam_benchmark_" + [guid]::NewGuid().ToString("N") + ".json")
@@ -119,7 +126,19 @@ try {
     $runIdRaw = [string]$report.manifest.run_id
     $runIdSafe = $runIdRaw -replace "[:\\/*?\""<>\|]", "-"
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $runFolder = Join-Path $suiteFolder ($timestamp + "_" + $runIdSafe)
+
+    $maxSequence = 0
+    $existingRunDirs = Get-ChildItem -LiteralPath $suiteFolder -Directory -ErrorAction SilentlyContinue
+    foreach ($dir in $existingRunDirs) {
+        if ($dir.Name -match "^(\\d{3})_") {
+            $value = [int]$matches[1]
+            if ($value -gt $maxSequence) {
+                $maxSequence = $value
+            }
+        }
+    }
+    $sequenceText = "{0:D3}" -f ($maxSequence + 1)
+    $runFolder = Join-Path $suiteFolder ($sequenceText + "_" + $timestamp + "_" + $runIdSafe)
     New-Item -ItemType Directory -Force -Path $runFolder | Out-Null
 
     $reportPath = Join-Path $runFolder "benchmark_report.json"
@@ -127,6 +146,7 @@ try {
     $publicationPath = Join-Path $runFolder "publication_manifest.json"
     $caseHashPath = Join-Path $runFolder "case_hashes.json"
     $researchNotesPath = Join-Path $runFolder "research_notes.md"
+    $envSnapshotPath = Join-Path $runFolder "environment_snapshot.json"
 
     Set-Content -LiteralPath $reportPath -Value $reportText -Encoding utf8
     Set-Content -LiteralPath $commandPath -Value $commandForRecord -Encoding utf8
@@ -147,6 +167,23 @@ try {
     }
     ($publication | ConvertTo-Json -Depth 100) | Set-Content -LiteralPath $publicationPath -Encoding utf8
 
+    $gitStatus = (& git status --short 2>$null) -join "`n"
+    $envSnapshot = [ordered]@{
+        generated_at = (Get-Date).ToString("o")
+        sequence = $sequenceText
+        output_root = $outputRootFull
+        run_folder = $runFolder
+        machine_name = $env:COMPUTERNAME
+        user_name = $env:USERNAME
+        powershell_version = $PSVersionTable.PSVersion.ToString()
+        python = $report.manifest.python
+        platform = $report.manifest.platform
+        db_path = $DbPath
+        git_sha = $report.manifest.git_sha
+        git_status = $gitStatus
+    }
+    ($envSnapshot | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $envSnapshotPath -Encoding utf8
+
     $summaryStatus = [string]$report.summary.status
     $summaryPass = [string]$report.summary.passed_cases
     $summaryTotal = [string]$report.summary.case_count
@@ -154,6 +191,7 @@ try {
 # Benchmark Research Notes
 
 - generated_at: $($publication.generated_at)
+- sequence: $sequenceText
 - suite: $Suite
 - run_id: $($report.manifest.run_id)
 - status: $summaryStatus
@@ -178,6 +216,31 @@ try {
 - Keep interpretation separate from raw report data.
 "@
     Set-Content -LiteralPath $researchNotesPath -Value $notes -Encoding utf8
+
+    $indexPath = Join-Path $suiteFolder "_index.json"
+    $indexRows = @()
+    if (Test-Path $indexPath) {
+        try {
+            $existingIndex = Get-Content -Raw -LiteralPath $indexPath | ConvertFrom-Json
+            if ($existingIndex) {
+                $indexRows = @($existingIndex)
+            }
+        } catch {
+            $indexRows = @()
+        }
+    }
+    $indexRows += [ordered]@{
+        sequence = $sequenceText
+        timestamp = $timestamp
+        run_id = $report.manifest.run_id
+        suite = $Suite
+        status = $summaryStatus
+        case_count = $summaryTotal
+        passed_cases = $summaryPass
+        bundle_hash = $report.bundle_hash
+        folder = $runFolder
+    }
+    ($indexRows | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $indexPath -Encoding utf8
 
     Write-Host "[benchmark-store] stored run at: $runFolder"
     Write-Host "[benchmark-store] bundle_hash: $($report.bundle_hash)"

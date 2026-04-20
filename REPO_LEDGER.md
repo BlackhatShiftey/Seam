@@ -47,7 +47,7 @@ and `HISTORY_INDEX.md`.
 - Default guardrail for local runs: warn around `82%` RAM usage and treat `90%` RAM as hard limit unless explicitly overridden for a task.
 - Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_guarded.ps1` for heavy commands so CPU/RAM/disk are watched during execution.
 - Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_real_adapters_guarded.ps1` for end-to-end real-adapter validation; it starts pgvector, runs guarded checks, and cleans up containers/artifacts on exit.
-- Archive benchmarks with `C:\Users\iwana\OneDrive\Documents\Codex\scripts\store_benchmark.ps1` to keep publication-required hashes and reproducibility metadata in Documents.
+- Archive benchmarks with `C:\Users\iwana\OneDrive\Documents\Codex\scripts\store_benchmark.ps1` to keep publication-required hashes and reproducibility metadata in Documents; outputs are sequence+time indexed and blocked from writing inside the git repo by default.
 
 ## Benchmark Publication Policy
 
