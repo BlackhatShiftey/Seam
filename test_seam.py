@@ -777,6 +777,8 @@ claim c2:
                 self.assertIsNotNone(app.query_one("#memory-panel"))
                 self.assertIsNotNone(app.query_one("#retrieval-panel"))
                 self.assertIsNotNone(app.query_one("#benchmark-panel"))
+                self.assertIsNotNone(app.query_one("#chat-row"))
+                self.assertIsNotNone(app.query_one("#chat-panel"))
                 self.assertIsNotNone(app.query_one("#command-input"))
 
         asyncio.run(_check())
@@ -799,6 +801,68 @@ claim c2:
 
         asyncio.run(_check())
 
+    def test_textual_dashboard_chat_row_sits_above_input(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                chat_row = app.query_one("#chat-row")
+                command_input = app.query_one("#command-input")
+                self.assertLess(chat_row.region.y, command_input.region.y)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_panels_autofollow_latest_output(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                for idx in range(320):
+                    app._record_command("run", f"command-{idx}")
+                await pilot.pause()
+                panel = app.query_one("#command-history-panel")
+                self.assertTrue(panel.can_focus)
+                self.assertGreater(panel.max_scroll_y, 0)
+                self.assertGreaterEqual(panel.scroll_y, panel.max_scroll_y - 1.0)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_focused_panel_supports_keyboard_scrolling(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                for idx in range(500):
+                    app._record_command("run", f"command-{idx}")
+                await pilot.pause()
+                panel = app.query_one("#command-history-panel")
+                await pilot.click("#command-history-panel")
+                await pilot.pause()
+                self.assertIs(app.focused, panel)
+                before = panel.scroll_y
+                await pilot.press("pageup")
+                await pilot.pause()
+                after_pageup = panel.scroll_y
+                await pilot.press("pagedown")
+                await pilot.pause()
+                after_pagedown = panel.scroll_y
+                self.assertLess(after_pageup, before)
+                self.assertGreater(after_pagedown, after_pageup)
+
+        asyncio.run(_check())
+
     def test_textual_dashboard_routes_compile_output(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
@@ -813,6 +877,21 @@ claim c2:
                 joined = "\n".join(app.memory_lines)
                 self.assertIn("Compile", joined)
                 self.assertIn("\"persist\"", joined)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_hybrid_mode_routes_bare_commands(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("help")
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Dashboard Help")
 
         asyncio.run(_check())
 
@@ -854,12 +933,71 @@ claim c2:
         async def _check() -> None:
             async with app.run_test() as pilot:
                 await pilot.pause()
-                app.process_command("/cmd")
+                app.process_command("?shell")
                 await pilot.pause()
-                self.assertEqual(app.input_mode, "command")
-                app.process_command("/model")
+                self.assertEqual(app.input_mode, "shell")
+                app.process_command("?seam")
                 await pilot.pause()
-                self.assertEqual(app.input_mode, "model")
+                self.assertEqual(app.input_mode, "seam")
+                app.process_command("?agent")
+                await pilot.pause()
+                self.assertEqual(app.input_mode, "agent")
+                app.process_command("?hybrid")
+                await pilot.pause()
+                self.assertEqual(app.input_mode, "hybrid")
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_shortcuts_switch_chat_model(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("?model gpt-4.1-mini")
+                await pilot.pause()
+                self.assertEqual(app.chat_client.model, "gpt-4.1-mini")
+                self.assertIn("Switched chat model to gpt-4.1-mini", "\n".join(app.result_lines))
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_bang_runs_shell_commands(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("!pwd")
+                await pilot.pause()
+                self.assertIn("Shell", "\n".join(app.result_lines))
+                self.assertIn(str(app.shell_cwd), "\n".join(app.result_lines))
+                history = "\n".join(app.command_history_lines)
+                self.assertIn("[SHELL] pwd", history)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_double_question_forces_chat_outside_agent_mode(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("?shell")
+                await pilot.pause()
+                app.process_command("??What mode am I in?")
+                await pilot.pause()
+                self.assertGreaterEqual(len(app.chat_history), 2)
+                self.assertEqual(app.chat_history[0]["role"], "user")
+                self.assertEqual(app.chat_history[0]["content"], "What mode am I in?")
 
         asyncio.run(_check())
 
@@ -875,7 +1013,7 @@ claim c2:
                 await pilot.pause()
                 app.process_command("What is the active mode?")
                 await pilot.pause()
-                app.process_command(f"/savechat {export_path}")
+                app.process_command(f"?savechat {export_path}")
                 await pilot.pause()
                 self.assertTrue(export_path.exists())
                 rows = [line.strip() for line in export_path.read_text(encoding="utf-8").splitlines() if line.strip()]

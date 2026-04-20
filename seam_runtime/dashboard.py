@@ -5,6 +5,7 @@ import json
 import os
 import shlex
 import sqlite3
+import subprocess
 import sys
 import time
 from collections import Counter, deque
@@ -31,11 +32,11 @@ try:
     from textual import on
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal
-    from textual.widgets import Footer, Input, Static
+    from textual.widgets import Input, Log, Static
 
     _TEXTUAL_IMPORT_ERROR = None
 except ImportError as exc:  # pragma: no cover - optional dashboard path
-    on = App = ComposeResult = Horizontal = Footer = Input = Static = None  # type: ignore[assignment]
+    on = App = ComposeResult = Horizontal = Input = Log = Static = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
@@ -85,6 +86,16 @@ class SeamChatClient:
         self.base_url = os.environ.get("SEAM_CHAT_BASE_URL", "https://api.openai.com/v1").rstrip("/")
         self.model = os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini")
         self.api_key = os.environ.get("SEAM_CHAT_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        configured_models = [item.strip() for item in os.environ.get("SEAM_CHAT_MODELS", "").split(",") if item.strip()]
+        self.available_models = configured_models or [
+            self.model,
+            "gpt-4.1-mini",
+            "gpt-4.1",
+            "gpt-4o-mini",
+            "o4-mini",
+        ]
+        if self.model not in self.available_models:
+            self.available_models.insert(0, self.model)
 
     @property
     def configured(self) -> bool:
@@ -133,12 +144,26 @@ class SeamChatClient:
             return f"Chat request failed: {exc}"
 
 
-if App is not None and Static is not None and Input is not None:
-    class _TextualPanel(Static):
+if App is not None and Static is not None and Input is not None and Log is not None:
+    class _TextualPanel(Log):
+        can_focus = True
+        BINDINGS = [
+            ("up", "scroll_up", "Up"),
+            ("down", "scroll_down", "Down"),
+            ("left", "scroll_left", "Left"),
+            ("right", "scroll_right", "Right"),
+            ("pageup", "page_up", "Page Up"),
+            ("pagedown", "page_down", "Page Down"),
+            ("home", "scroll_home", "Top"),
+            ("end", "scroll_end", "Bottom"),
+            ("k", "scroll_up", "Up"),
+            ("j", "scroll_down", "Down"),
+        ]
+
         def __init__(self, title: str, panel_id: str) -> None:
-            super().__init__("", id=panel_id, markup=False)
+            super().__init__(highlight=False, max_lines=2000, auto_scroll=True, id=panel_id)
             self._title = title
-            self._lines: list[str] = []
+            self._panel_lines: list[str] = []
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
             self.border_title = self._title
@@ -149,11 +174,30 @@ if App is not None and Static is not None and Input is not None:
             self.border_title = title
 
         def set_lines(self, lines: list[str]) -> None:
-            self._lines = lines[-200:]
-            self._refresh_content()
+            self._panel_lines = lines[-2000:]
+            self.clear()
+            if self._panel_lines:
+                self.write_lines(self._panel_lines)
+            else:
+                self.write_line("(empty)")
+            self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
 
         def _refresh_content(self) -> None:
-            self.update("\n".join(self._lines[-200:]) if self._lines else "(empty)")
+            self.clear()
+            if self._panel_lines:
+                self.write_lines(self._panel_lines)
+            else:
+                self.write_line("(empty)")
+            self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
+
+        def on_mouse_down(self, event: Any) -> None:  # pragma: no cover - textual runtime behavior
+            self.focus()
+
+        def action_page_up(self) -> None:
+            self.scroll_page_up(animate=False, force=True)
+
+        def action_page_down(self) -> None:
+            self.scroll_page_down(animate=False, force=True)
 
 
     class TextualDashboardApp(App[None]):
@@ -162,17 +206,20 @@ if App is not None and Static is not None and Input is not None:
             layout: vertical;
         }
         #logo-header {
-            height: 7;
-            border: round $primary;
+            height: 4;
+            border: round #4f8cfb;
             padding: 0 1;
+            color: #8df6ff;
+            background: #050b1e;
+            text-style: bold;
         }
         #metrics {
-            height: 7;
+            height: 4;
             border: round $primary;
             padding: 0 1;
         }
         #tab-bar {
-            height: 2;
+            height: 1;
             border: round $primary;
             padding: 0 1;
         }
@@ -181,6 +228,10 @@ if App is not None and Static is not None and Input is not None:
             layout: horizontal;
         }
         #bottom-row {
+            height: 2fr;
+            layout: horizontal;
+        }
+        #chat-row {
             height: 2fr;
             layout: horizontal;
         }
@@ -193,6 +244,11 @@ if App is not None and Static is not None and Input is not None:
             border: round $primary;
             margin: 0 1;
             padding: 0 1;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+        #memory-panel:focus, #retrieval-panel:focus, #benchmark-panel:focus, #result-panel:focus, #runtime-log-panel:focus, #chat-panel:focus, #command-history-panel:focus, #mirl-panel:focus {
+            border: heavy #7efbff;
         }
         """
 
@@ -224,7 +280,8 @@ if App is not None and Static is not None and Input is not None:
             self.mirl_lines: list[str] = []
             self.chat_client = SeamChatClient()
             self.transcript_dir = Path(os.environ.get("SEAM_CHAT_TRANSCRIPT_DIR", ".seam/chat_transcripts"))
-            self.input_mode = "model"
+            self.input_mode = "hybrid"
+            self.shell_cwd = Path.cwd()
             self.command_names = {
                 "help",
                 "quit",
@@ -267,12 +324,12 @@ if App is not None and Static is not None and Input is not None:
             with Horizontal(id="middle-row"):
                 yield _TextualPanel("MIRL Compression", "mirl-panel")
                 yield _TextualPanel("Command History", "command-history-panel")
-                yield _TextualPanel("Chat", "chat-panel")
+                yield _TextualPanel("Runtime Log", "runtime-log-panel")
             with Horizontal(id="bottom-row"):
                 yield _TextualPanel("Results", "result-panel")
-                yield _TextualPanel("Runtime Log", "runtime-log-panel")
+            with Horizontal(id="chat-row"):
+                yield _TextualPanel("Chat", "chat-panel")
             yield Input(placeholder="", id="command-input")
-            yield Footer()
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
             self._refresh_logo()
@@ -283,9 +340,10 @@ if App is not None and Static is not None and Input is not None:
             self.query_one("#benchmark-panel", _TextualPanel).set_lines(["Run `benchmark <file>` to populate benchmark results."])
             self.query_one("#chat-panel", _TextualPanel).set_lines(
                 [
-                    "Chat ready.",
-                    "Shortcuts: /model /cmd /hybrid /help /savechat",
-                    "Model mode: plain text chats, !<command> runs terminal commands.",
+                    "Harness ready.",
+                    "Shortcuts: ?help ?agent ?shell ?seam ?hybrid ?model <name> ?savechat",
+                    "Hybrid mode: known SEAM commands execute directly, plain text chats, !<shell> runs shell.",
+                    "Use ??<message> to force chat from shell or SEAM mode.",
                 ]
             )
             self.query_one("#command-history-panel", _TextualPanel).set_lines(["No command events yet."])
@@ -306,32 +364,35 @@ if App is not None and Static is not None and Input is not None:
             raw = command.strip()
             if not raw:
                 return
-            if raw.startswith("/"):
+            if raw.startswith("??"):
+                self._handle_chat_message(raw[2:].strip())
+                return
+            if raw.startswith("?") or raw.startswith("/"):
                 self._handle_shortcut(raw)
                 return
-            force_command = raw.startswith("!")
-            force_chat = raw.startswith("?")
-            candidate = raw[1:].strip() if (force_command or force_chat) else raw
-            token = candidate.split()[0].lower() if candidate else ""
+            if raw.startswith("!"):
+                candidate = raw[1:].strip()
+                token = candidate.split()[0].lower() if candidate else ""
+                if token in self.command_names:
+                    self._execute_dashboard_command(candidate)
+                else:
+                    self._execute_shell_command(candidate)
+                return
 
-            if self.input_mode == "model":
-                if not force_command:
-                    self._handle_chat_message(candidate)
-                    return
-            elif self.input_mode == "command":
-                if force_chat:
-                    self._handle_chat_message(candidate)
-                    return
-            else:  # hybrid
-                if force_chat:
-                    self._handle_chat_message(candidate)
-                    return
-                if not force_command and token not in self.command_names:
-                    self._handle_chat_message(candidate)
-                    return
-
-            command = candidate
-            self._execute_dashboard_command(command)
+            token = raw.split()[0].lower()
+            if self.input_mode == "agent":
+                self._handle_chat_message(raw)
+                return
+            if self.input_mode == "shell":
+                self._execute_shell_command(raw)
+                return
+            if self.input_mode == "seam":
+                self._execute_dashboard_command(raw)
+                return
+            if token in self.command_names:
+                self._execute_dashboard_command(raw)
+                return
+            self._handle_chat_message(raw)
 
         def _execute_dashboard_command(self, command: str) -> None:
             started_at = time.perf_counter()
@@ -352,60 +413,206 @@ if App is not None and Static is not None and Input is not None:
                 self.exit()
 
         def _handle_shortcut(self, raw: str) -> None:
-            parts = raw.strip().split(maxsplit=1)
+            prefix = raw[:1]
+            content = raw[1:].strip()
+            parts = content.split(maxsplit=1)
             shortcut = parts[0].lower() if parts else ""
             argument = parts[1].strip() if len(parts) > 1 else ""
             argument = argument.strip("\"'")
-            if shortcut in {"/model", "/m"}:
-                self.input_mode = "model"
+            if prefix == "/" and shortcut in {"model", "m"}:
+                shortcut = "agent"
+            elif prefix == "/" and shortcut in {"cmd", "command", "c"}:
+                shortcut = "seam"
+            elif prefix == "/" and shortcut in {"hybrid", "h"}:
+                shortcut = "hybrid"
+            elif prefix == "/" and shortcut in {"clear", "cls"}:
+                shortcut = "clear"
+            elif prefix == "/" and shortcut in {"help", "?"}:
+                shortcut = "help"
+            elif prefix == "/" and shortcut in {"savechat", "save-chat", "export-chat", "exportchat"}:
+                shortcut = "savechat"
+
+            if shortcut in {"agent", "chat", "a"}:
+                self.input_mode = "agent"
                 self._refresh_input_placeholder()
-                self._push_result("Input Mode", "Switched to model mode. Plain text chats. Use !<command> for terminal commands.")
-                self._record_command("mode", "model")
+                self._push_result("Input Mode", "Switched to agent mode. Plain text chats. Use !<shell> for shell work.")
+                self._record_command("mode", "agent")
+                self._append_chat_activity("harness", "mode -> agent")
                 self._refresh_tab_bar()
+                self._refresh_logo()
                 return
-            if shortcut in {"/cmd", "/command", "/c"}:
-                self.input_mode = "command"
+            if shortcut in {"shell", "bash", "sh"}:
+                self.input_mode = "shell"
                 self._refresh_input_placeholder()
-                self._push_result("Input Mode", "Switched to command mode. Plain text runs terminal commands. Use ?<message> to chat.")
-                self._record_command("mode", "command")
+                self._push_result("Input Mode", f"Switched to shell mode. Plain text runs shell commands from {self.shell_cwd}. Use ??<message> to chat.")
+                self._record_command("mode", "shell")
+                self._append_chat_activity("harness", f"mode -> shell ({self.shell_cwd})")
                 self._refresh_tab_bar()
+                self._refresh_logo()
                 return
-            if shortcut in {"/hybrid", "/h"}:
+            if shortcut in {"seam", "cmd", "command", "c"}:
+                self.input_mode = "seam"
+                self._refresh_input_placeholder()
+                self._push_result("Input Mode", "Switched to SEAM mode. Plain text runs dashboard commands. Use ??<message> to chat.")
+                self._record_command("mode", "seam")
+                self._append_chat_activity("harness", "mode -> seam")
+                self._refresh_tab_bar()
+                self._refresh_logo()
+                return
+            if shortcut in {"hybrid", "h"}:
                 self.input_mode = "hybrid"
                 self._refresh_input_placeholder()
-                self._push_result("Input Mode", "Switched to hybrid mode. Commands auto-detect; unknown input goes to chat.")
+                self._push_result("Input Mode", "Switched to hybrid mode. Known SEAM commands run directly, other text chats, and !<shell> runs shell.")
                 self._record_command("mode", "hybrid")
+                self._append_chat_activity("harness", "mode -> hybrid")
                 self._refresh_tab_bar()
+                self._refresh_logo()
                 return
-            if shortcut in {"/clear", "/cls"}:
+            if shortcut in {"clear", "cls"}:
                 self.chat_lines.clear()
                 self.chat_history.clear()
                 self.query_one("#chat-panel", _TextualPanel).set_lines(["Chat cleared."])
                 self._push_result("Chat", "Chat history cleared.")
                 self._record_command("chat", "clear")
                 return
-            if shortcut in {"/help", "/?"}:
+            if shortcut == "model":
+                if not argument:
+                    current = self.chat_client.model
+                    available = "\n".join(f"- {name}" for name in self.chat_client.available_models)
+                    self._push_result("Chat Model", f"Current model: {current}\nAvailable models:\n{available}")
+                    self._record_command("state", f"model -> {current}")
+                    return
+                self.chat_client.model = argument
+                if argument not in self.chat_client.available_models:
+                    self.chat_client.available_models.insert(0, argument)
+                self._push_result("Chat Model", f"Switched chat model to {argument}")
+                self._record_command("state", f"model -> {argument}")
+                self._append_chat_activity("harness", f"model -> {argument}")
+                self._refresh_logo()
+                return
+            if shortcut == "models":
+                current = self.chat_client.model
+                rows = [f"{name} (current)" if name == current else name for name in self.chat_client.available_models]
+                self._push_result("Available Models", "\n".join(rows))
+                self._record_command("state", "models")
+                return
+            if shortcut == "status":
+                self._push_result(
+                    "Harness Status",
+                    (
+                        f"Input mode: {self.input_mode}\n"
+                        f"Chat model: {self.chat_client.model}\n"
+                        f"Shell cwd: {self.shell_cwd}\n"
+                        f"Active tab: {self.controller.active_tab}"
+                    ),
+                )
+                self._record_command("state", "status")
+                return
+            if shortcut in {"help", ""}:
                 self._push_result(
                     "Shortcuts",
                     (
-                        "/model  -> plain text chats, !<command> for commands\n"
-                        "/cmd    -> plain text commands, ?<message> for chat\n"
-                        "/hybrid -> auto route (commands or chat)\n"
-                        "/clear  -> clear chat history\n"
-                        "/savechat [path] -> export chat transcript (.jsonl)\n"
-                        "/export-chat [path] -> alias for /savechat"
+                        "?agent   -> plain text chats\n"
+                        "?shell   -> plain text shell commands\n"
+                        "?seam    -> plain text SEAM dashboard commands\n"
+                        "?hybrid  -> known SEAM commands run, other text chats\n"
+                        "?model [name] -> show or switch chat model\n"
+                        "?models  -> list available chat models\n"
+                        "?status  -> show current harness state\n"
+                        "?clear   -> clear chat history\n"
+                        "?savechat [path] -> export chat transcript (.jsonl)\n"
+                        "!<shell> -> run a shell command immediately\n"
+                        "??<text> -> force a chat message from shell/SEAM modes\n"
+                        "Legacy /model /cmd /hybrid /savechat aliases still work."
                     ),
                 )
                 self._record_command("help", "shortcuts")
                 return
-            if shortcut in {"/savechat", "/save-chat", "/export-chat", "/exportchat"}:
+            if shortcut in {"savechat", "save-chat", "export-chat", "exportchat"}:
                 destination = Path(argument).expanduser() if argument else self._default_chat_export_path()
                 target, count = self._save_chat_transcript(destination)
                 self._push_result("Chat Transcript", f"Exported {count} messages to {target}")
                 self._record_command("state", f"chat transcript -> {target}")
                 return
-            self._push_result("Shortcut Error", f"Unknown shortcut: {raw}. Use /help.")
+            self._push_result("Shortcut Error", f"Unknown shortcut: {raw}. Use ?help.")
             self._record_command("error", f"shortcut {raw}")
+
+        def _execute_shell_command(self, command: str) -> None:
+            shell_command = command.strip()
+            if not shell_command:
+                self._push_result("Shell", "Enter a shell command after '!'.")
+                self._record_command("error", "empty shell input")
+                return
+            self._record_command("shell", shell_command)
+            started_at = time.perf_counter()
+            try:
+                token, _, remainder = shell_command.partition(" ")
+                token = token.lower()
+                if token in {"cd", "chdir"}:
+                    destination = remainder.strip() or str(Path.home())
+                    next_cwd = Path(destination).expanduser()
+                    if not next_cwd.is_absolute():
+                        next_cwd = self.shell_cwd / next_cwd
+                    next_cwd = next_cwd.resolve()
+                    if not next_cwd.exists() or not next_cwd.is_dir():
+                        raise FileNotFoundError(f"No such directory: {next_cwd}")
+                    self.shell_cwd = next_cwd
+                    body = f"cwd -> {self.shell_cwd}"
+                    returncode = 0
+                elif token in {"pwd", "cwd"} and not remainder.strip():
+                    body = str(self.shell_cwd)
+                    returncode = 0
+                else:
+                    completed = self._run_shell_subprocess(shell_command)
+                    returncode = completed.returncode
+                    stdout = completed.stdout.strip()
+                    stderr = completed.stderr.strip()
+                    sections = [f"cwd: {self.shell_cwd}", f"exit_code: {returncode}"]
+                    if stdout:
+                        sections.extend(["", "stdout:", stdout])
+                    if stderr:
+                        sections.extend(["", "stderr:", stderr])
+                    if not stdout and not stderr:
+                        sections.extend(["", "(no output)"])
+                    body = "\n".join(sections)
+                elapsed = max(0.0, time.perf_counter() - started_at)
+                self._push_result("Shell", body)
+                if returncode == 0:
+                    self._record_command("ok", f"{shell_command} -> shell ({self._format_elapsed(elapsed)})")
+                else:
+                    self._record_command("err", f"{shell_command} -> shell exit {returncode} ({self._format_elapsed(elapsed)})")
+                self.controller._log("shell", f"{shell_command} -> exit {returncode}")
+                self._sync_side_panel()
+                self._refresh_logo()
+                preview = body.splitlines()[0] if body else "(no output)"
+                self._append_chat_activity("shell", f"!{shell_command}", preview)
+            except Exception as exc:
+                self._push_result("Shell", str(exc))
+                self._record_command("err", f"{shell_command} -> {type(exc).__name__}")
+                self.controller._log("shell", f"{shell_command} -> {type(exc).__name__}")
+                self._sync_side_panel()
+                self._append_chat_activity("shell", f"!{shell_command}", str(exc))
+
+        def _run_shell_subprocess(self, command: str) -> subprocess.CompletedProcess[str]:
+            timeout_seconds = float(os.environ.get("SEAM_SHELL_TIMEOUT_SECONDS", "45"))
+            if os.name == "nt":
+                return subprocess.run(
+                    ["powershell", "-NoLogo", "-NoProfile", "-Command", command],
+                    capture_output=True,
+                    text=True,
+                    cwd=self.shell_cwd,
+                    timeout=timeout_seconds,
+                    check=False,
+                )
+            shell_executable = os.environ.get("SHELL", "/bin/bash")
+            return subprocess.run(
+                [shell_executable, "-lc", command],
+                capture_output=True,
+                text=True,
+                cwd=self.shell_cwd,
+                timeout=timeout_seconds,
+                check=False,
+            )
 
         def _route_command_output(self, command: str, title: str, body: str) -> None:
             token = command.split()[0].lower()
@@ -480,34 +687,35 @@ if App is not None and Static is not None and Input is not None:
             runtime = "[Runtime]" if self.controller.active_tab == "runtime" else "Runtime"
             benchmark = "[Benchmark]" if self.controller.active_tab == "benchmark" else "Benchmark"
             self.query_one("#tab-bar", Static).update(
-                f"Tabs: {runtime}  {benchmark} | Input mode: {self.input_mode} | /model /cmd /hybrid /savechat /help"
+                f"Tabs: {runtime}  {benchmark} | Input mode: {self.input_mode} | ?agent ?shell ?seam ?hybrid ?model ?help"
             )
 
         def _refresh_input_placeholder(self) -> None:
             widget = self.query_one("#command-input", Input)
-            if self.input_mode == "model":
-                widget.placeholder = "Model mode: type to chat | !<command> to run dashboard commands | /help"
-            elif self.input_mode == "command":
-                widget.placeholder = "Command mode: type command | ?<message> to chat | /help"
+            if self.input_mode == "agent":
+                widget.placeholder = "Agent mode: type to chat | !<shell> | ?help"
+            elif self.input_mode == "shell":
+                widget.placeholder = "Shell mode: type shell commands | ??<message> to chat | ?help"
+            elif self.input_mode == "seam":
+                widget.placeholder = "SEAM mode: type dashboard commands | ??<message> | !<shell> | ?help"
             else:
-                widget.placeholder = "Hybrid mode: commands auto-detect, otherwise chat | /help"
+                widget.placeholder = "Hybrid mode: known SEAM commands auto-run, otherwise chat | !<shell> | ?help"
 
         def _refresh_logo(self) -> None:
             chat_status = "configured" if self.chat_client.configured else "offline"
+            model = self.chat_client.model
+            launch_dir = Path.cwd()
             logo = (
-                "  _____  ______          __  \n"
-                " / ____|/ __ \\ \\        / /  \n"
-                "| (___ | |  | \\ \\  /\\  / /   \n"
-                " \\___ \\| |  | |\\ \\/  \\/ /    \n"
-                " ____) | |__| | \\  /\\  /     \n"
-                "|_____/ \\____/   \\/  \\/      \n"
-                f"SEAM Glassbox Dashboard | Model: {self.chat_client.model} ({chat_status})"
+                "[#2f63ff]..............................................................[/]\n"
+                "[#66b8ff]::[/] [bold #a6fcff]SEAM[/] [#66b8ff]::[/] [#9ddfff]v0.1.0[/] [#66b8ff]::[/] [#7fe0ff]MIRL Interpreter & Persistence Engine[/] [#66b8ff]::[/]\n"
+                f"[#5fc8ff]Launched from:[/] [#bfefff]{launch_dir}[/]   [#5fc8ff]Shell cwd:[/] [#bfefff]{self.shell_cwd}[/]\n"
+                f"[#5fc8ff]Model:[/] [#bfefff]{model}[/] [#66b8ff]([/][#7efdb9]{chat_status}[/][#66b8ff])[/]   [#5fc8ff]Mode:[/] [#bfefff]{self.input_mode}[/]   [#2f63ff]GLOW=ON[/]"
             )
             self.query_one("#logo-header", Static).update(logo)
 
         def _handle_chat_message(self, message: str) -> None:
             if not message:
-                self._push_result("Chat", "Enter a message after '?' or switch to /model mode and type normally.")
+                self._push_result("Chat", "Enter a message after ?? or switch to ?agent mode and type normally.")
                 self._record_command("error", "empty chat input")
                 return
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -526,6 +734,14 @@ if App is not None and Static is not None and Input is not None:
             self._push_result("Chat", assistant)
             self._record_command("chat", message)
 
+        def _append_chat_activity(self, speaker: str, message: str, detail: str | None = None) -> None:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            self.chat_lines.append(f"{timestamp} {speaker}: {message}")
+            if detail:
+                self.chat_lines.append(f"{timestamp} {speaker}: {detail}")
+            self.chat_lines.append("")
+            self.query_one("#chat-panel", _TextualPanel).set_lines(self.chat_lines)
+
         def _build_chat_context_prompt(self, message: str) -> str:
             try:
                 rag = self.controller.orchestrator.rag(message, budget=5, pack_budget=384, lens="rag", mode="context").to_dict()
@@ -543,6 +759,7 @@ if App is not None and Static is not None and Input is not None:
                 "err": "[ERR]",
                 "mode": "[MODE]",
                 "chat": "[CHAT]",
+                "shell": "[SHELL]",
                 "help": "[HELP]",
                 "state": "[STATE]",
                 "error": "[ERR]",
@@ -557,19 +774,25 @@ if App is not None and Static is not None and Input is not None:
             self._anim_preview = compact[:120]
 
         def _tick_mirl_animation(self) -> None:
+            if not self.is_mounted:
+                return
             self._animation_phase = (self._animation_phase + 1) % 8
+            try:
+                panel = self.query_one("#mirl-panel", _TextualPanel)
+            except Exception:  # pragma: no cover - timer can fire during teardown
+                return
             if time.monotonic() > self._anim_until:
                 lines = [
                     "Idle. Run compile/compress/benchmark for live machine animation.",
                     "Pipeline: DSL -> MIRL -> SEAM-LX/1",
                 ]
-                self.query_one("#mirl-panel", _TextualPanel).set_lines(lines)
+                panel.set_lines(lines)
                 return
             frames = ["[=   ]", "[==  ]", "[=== ]", "[ ===]", "[  ==]", "[   =]", "[ == ]", "[=== ]"]
             frame = frames[self._animation_phase]
             pseudo = f"{self._anim_label.upper()} :: dsl::tokenize -> mirl::graph -> lx1::machine_stream"
             machine_line = (self._anim_preview or "emit 01011001|clm|ent|sym|ctx")[:120]
-            self.query_one("#mirl-panel", _TextualPanel).set_lines(
+            panel.set_lines(
                 [
                     f"{frame} MIRL compression live",
                     pseudo,
@@ -578,7 +801,12 @@ if App is not None and Static is not None and Input is not None:
             )
 
         def _tick_metrics(self) -> None:
-            self._refresh_metrics()
+            if not self.is_mounted:
+                return
+            try:
+                self._refresh_metrics()
+            except Exception:  # pragma: no cover - timer can fire during teardown
+                return
 
         def _capture_token_metrics_from_command(self, command: str) -> None:
             token = command.split()[0].lower()
@@ -666,7 +894,7 @@ class DashboardApp:
             chroma_path=vector_path,
             chroma_collection=vector_collection,
         )
-        self.events: deque[DashboardEvent] = deque(maxlen=10)
+        self.events: deque[DashboardEvent] = deque(maxlen=2000)
         self.active_tab = "runtime"
         self.last_benchmark_payload: dict[str, Any] | None = None
         self.last_machine_text: str | None = None

@@ -1141,3 +1141,143 @@ Dashboard polish follow-up delivered for CLI-like Textual experience.
 - Added Textual tests for transcript export and command-history status/timing; verified focused dashboard/Textual suite passes.
 Refs: see HISTORY#052 for prior dashboard expansion baseline.
 ---END-ENTRY-#053---
+
+---BEGIN-ENTRY-#054---
+id: 054
+date: 2026-04-20T21:07:09Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, command, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: none
+tokens: 140
+---
+Adjusted Textual dashboard UX to match the requested layout and interaction model.
+- Replaced the old ASCII-art header with a cleaner SEAM engine header block (versioned line + launch path + model status).
+- Moved chat into its own dedicated full-width row directly above the command input.
+- Enabled per-panel scroll behavior (`overflow-y/x: auto`) and made panels focusable for improved scrolling interaction.
+- Kept runtime log visible by moving it to the middle row beside MIRL and command history.
+- Updated Textual mount test coverage to assert the new chat-row surface.
+- Verified targeted Textual tests pass after layout/scroll changes.
+Refs: see HISTORY#053 for prior CLI polish baseline.
+---END-ENTRY-#054---
+
+---BEGIN-ENTRY-#055---
+id: 055
+date: 2026-04-20T21:12:37Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, tui, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,branding/screenshots/retro-preview-v8-raster.png
+supersedes: none
+tokens: 114
+---
+Dashboard visual loop update focused on header/logo and panel ergonomics.
+- Replaced prior header treatment with a brighter SEAM brand line using glow-like cyan/blue accent styling.
+- Kept chat in its dedicated full-width row directly above input.
+- Enabled scrolling ergonomics by making panels focusable and setting panel overflow-x/overflow-y to auto.
+- Preserved runtime log visibility by placing it in the middle row with MIRL and command history.
+- Captured a new dashboard screenshot artifact for iterative review.
+Refs: see HISTORY#054 for previous layout move and scroll baseline.
+---END-ENTRY-#055---
+
+---BEGIN-ENTRY-#056---
+id: 056
+date: 2026-04-20T21:22:06Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, tui, command, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,branding/screenshots/retro-preview-v9-raster.png
+supersedes: none
+tokens: 144
+---
+Refined Textual dashboard behavior to act like independent scrollable sub-windows.
+- Enabled panel focus + keyboard scrolling (arrows, PgUp/PgDn, Home/End, j/k) and click-to-focus interaction for each panel.
+- Added auto-follow-to-latest on panel updates so new command/chat/runtime output stays visible without manual repositioning.
+- Increased retained per-panel history window from 200 to 2000 lines to reduce truncation pressure during active sessions.
+- Rebalanced layout for smaller terminals: reduced header/metrics/tab fixed heights, expanded chat row, and removed footer line to free vertical space.
+- Added focused regression tests for chat-row placement above input and panel auto-follow behavior.
+- Captured screenshot loop artifact for visual review.
+Refs: see HISTORY#055 for prior glow/header loop baseline.
+---END-ENTRY-#056---
+
+---BEGIN-ENTRY-#057---
+id: 057
+date: 2026-04-20T21:29:02Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, command, tui, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,branding/screenshots/retro-preview-v10-raster.png
+supersedes: none
+tokens: 133
+---
+Fixed panel scrolling by moving Textual panes onto true scrollback widgets.
+- Replaced Static-based content panes with Log-based panes to ensure reliable independent scroll behavior under overflow.
+- Added click-to-focus + keyboard scrolling bindings per pane (arrows, PgUp/PgDn, Home/End, j/k).
+- Enforced auto-follow to newest output after pane updates while preserving manual pane focus/scroll interaction.
+- Increased pane retention to 2000 lines and kept responsive compact layout with chat above input.
+- Added/kept tests validating chat-row placement and pane auto-follow under heavy command-history load.
+- Captured updated screenshot showing independent pane scrollbars under full content.
+Refs: see HISTORY#056 for prior pane ergonomics baseline.
+---END-ENTRY-#057---
+
+---BEGIN-ENTRY-#058---
+id: 058
+date: 2026-04-20T21:34:16Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, command, tui, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: none
+tokens: 145
+---
+Finalized dashboard pane scroll behavior for real-world overflow sessions.
+- Switched Textual dashboard panes from Static content widgets to Log-based scrollback panes for reliable independent scrolling under heavy output.
+- Bound pane-local navigation keys (arrows, PgUp/PgDn, Home/End, j/k) and focus-on-mouse-down so each pane behaves as an independent sub-window.
+- Increased pane line retention to 2000 and expanded runtime event history retention from 10 to 2000 so latest data remains visible while preserving longer context.
+- Added teardown-safe timer guards to avoid race exceptions while app test contexts close.
+- Verified pane scroll movement with direct scroll_y proof run and reran targeted Textual test coverage.
+Refs: see HISTORY#057 for previous pane loop baseline.
+---END-ENTRY-#058---
+
+---BEGIN-ENTRY-#059---
+id: 059
+date: 2026-04-20T21:40:28Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, command, tui, history, snapshot
+commits: none
+refs: test_seam.py
+supersedes: none
+tokens: 87
+---
+Added regression coverage for pane-local keyboard scrolling.
+- Added a Textual test that fills command history, click-focuses the pane, and verifies `PageUp` / `PageDown` change scroll position in a realistic terminal size.
+- Confirmed the focused-pane scroll regression passes along with the targeted dashboard/Textual suite.
+- Re-verified dashboard snapshot rendering and latest snapshot integrity before closing the handoff loop.
+Refs: see HISTORY#058 for the pane-scroll implementation baseline.
+---END-ENTRY-#059---
+
+---BEGIN-ENTRY-#060---
+id: 060
+date: 2026-04-20T21:48:15Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, command, tui, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: none
+tokens: 153
+---
+Added harness-style chat bar routing for the Textual dashboard.
+- Changed the dashboard input bar to default to hybrid routing: known SEAM commands execute directly, plain text chats, `!` can run shell commands, and `??` forces chat from shell/SEAM modes.
+- Added `?` shortcuts for harness control including `?agent`, `?shell`/`?bash`, `?seam`, `?hybrid`, `?model`, `?models`, `?status`, and `?savechat`, while keeping legacy slash aliases working.
+- Added shell cwd persistence helpers (`cd`, `pwd`) plus captured shell output logging, and exposed current mode/model/cwd in the header and placeholder copy.
+- Expanded Textual regression coverage for hybrid bare-command routing, model switching, shell bang execution, forced chat escape, and updated transcript-export shortcut behavior.
+Refs: see HISTORY#059 for the prior dashboard pane-scroll regression baseline.
+---END-ENTRY-#060---

@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 53
-total_tokens: ~3983
-latest_id: 053
+total_entries: 60
+total_tokens: ~4899
+latest_id: 060
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,13 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 060 | 2026-04-20 | done | 4ea6cae90e77bd47 | dashboard,textual,chat,command,+ | none |
+| 059 | 2026-04-20 | done | 4fb5512c2568109a | dashboard,textual,command,tui,+ | none |
+| 058 | 2026-04-20 | done | e2494df193234832 | dashboard,textual,command,tui,+ | none |
+| 057 | 2026-04-20 | done | cc0a44195909dfe8 | dashboard,textual,chat,command,+ | none |
+| 056 | 2026-04-20 | done | 8c027a4ad10d1bd3 | dashboard,textual,chat,tui,+ | none |
+| 055 | 2026-04-20 | done | b683221c57b52a45 | dashboard,textual,chat,tui,+ | none |
+| 054 | 2026-04-20 | done | b25c62e49b6c4241 | dashboard,textual,chat,command,+ | none |
 | 053 | 2026-04-20 | done | e90a78712b420b15 | dashboard,textual,chat,command,+ | none |
 | 052 | 2026-04-20 | done | 4e57d2cdbb1096b8 | dashboard,textual,chat,animation,+ | none |
 | 051 | 2026-04-20 | done | 1eeeb306a2c9c60d | dashboard,textual,pyproject,readme,+ | none |
@@ -71,13 +78,13 @@ compact: true
 - animation: count=3 latest=#052, #032, #028
 - benchmark: count=18 latest=#047, #040, #039, #038, #037
 - bundle: count=2 latest=#015, #008
-- chat: count=3 latest=#053, #052, #031
+- chat: count=8 latest=#060, #057, #056, #055, #054
 - chroma: count=2 latest=#017, #001
 - codec: count=2 latest=#018, #006
-- command: count=13 latest=#053, #052, #051, #050, #049
+- command: count=19 latest=#060, #059, #058, #057, #056
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=6 latest=#042, #041, #033, #026, #018
-- dashboard: count=17 latest=#053, #052, #051, #050, #049
+- dashboard: count=24 latest=#060, #059, #058, #057, #056
 - diff: count=1 latest=#037
 - doctor: count=3 latest=#019, #014, #013
 - extras: count=1 latest=#022
@@ -85,7 +92,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
 - handoff: count=1 latest=#025
-- history: count=7 latest=#053, #052, #051, #050, #049
+- history: count=14 latest=#060, #059, #058, #057, #056
 - holdout: count=1 latest=#036
 - installer: count=6 latest=#035, #021, #020, #015, #014
 - integrity: count=1 latest=#048
@@ -109,9 +116,10 @@ compact: true
 - sbert: count=3 latest=#023, #022, #011
 - search: count=9 latest=#047, #046, #041, #033, #031
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=6 latest=#053, #052, #051, #050, #049
+- snapshot: count=13 latest=#060, #059, #058, #057, #056
 - status: count=19 latest=#046, #045, #044, #043, #042
-- textual: count=5 latest=#053, #052, #051, #050, #049
+- textual: count=12 latest=#060, #059, #058, #057, #056
+- tui: count=6 latest=#060, #059, #058, #057, #056
 - vector: count=16 latest=#044, #038, #034, #026, #023
 - verify: count=13 latest=#040, #037, #026, #024, #021
 - windows: count=2 latest=#020, #007
@@ -119,6 +127,6 @@ compact: true
 
 ## status rollup
 
-- roots: 53
-- done: 33
+- roots: 60
+- done: 40
 - planned: 20
