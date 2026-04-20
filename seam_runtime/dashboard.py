@@ -162,22 +162,26 @@ if App is not None and Static is not None and Input is not None:
             layout: vertical;
         }
         #logo-header {
-            height: 8;
+            height: 7;
             border: round $primary;
             padding: 0 1;
         }
         #metrics {
-            height: 8;
+            height: 7;
             border: round $primary;
             padding: 0 1;
         }
         #tab-bar {
-            height: 3;
+            height: 2;
             border: round $primary;
             padding: 0 1;
         }
-        #top-row, #middle-row, #bottom-row {
+        #top-row, #middle-row {
             height: 1fr;
+            layout: horizontal;
+        }
+        #bottom-row {
+            height: 2fr;
             layout: horizontal;
         }
         #command-input {
@@ -187,7 +191,7 @@ if App is not None and Static is not None and Input is not None:
         #memory-panel, #retrieval-panel, #benchmark-panel, #result-panel, #runtime-log-panel, #chat-panel, #command-history-panel, #mirl-panel {
             width: 1fr;
             border: round $primary;
-            margin: 0 1 1 1;
+            margin: 0 1;
             padding: 0 1;
         }
         """
@@ -219,6 +223,7 @@ if App is not None and Static is not None and Input is not None:
             self.command_history_lines: list[str] = []
             self.mirl_lines: list[str] = []
             self.chat_client = SeamChatClient()
+            self.transcript_dir = Path(os.environ.get("SEAM_CHAT_TRANSCRIPT_DIR", ".seam/chat_transcripts"))
             self.input_mode = "model"
             self.command_names = {
                 "help",
@@ -279,11 +284,11 @@ if App is not None and Static is not None and Input is not None:
             self.query_one("#chat-panel", _TextualPanel).set_lines(
                 [
                     "Chat ready.",
-                    "Shortcuts: /model /cmd /hybrid /help",
+                    "Shortcuts: /model /cmd /hybrid /help /savechat",
                     "Model mode: plain text chats, !<command> runs terminal commands.",
                 ]
             )
-            self.query_one("#command-history-panel", _TextualPanel).set_lines(["No commands launched yet."])
+            self.query_one("#command-history-panel", _TextualPanel).set_lines(["No command events yet."])
             self.query_one("#mirl-panel", _TextualPanel).set_lines(["Idle. Run compile/compress/benchmark for live machine animation."])
             self._push_result("Welcome", self.controller.result_body)
             self.set_interval(0.25, self._tick_mirl_animation)
@@ -329,8 +334,10 @@ if App is not None and Static is not None and Input is not None:
             self._execute_dashboard_command(command)
 
         def _execute_dashboard_command(self, command: str) -> None:
-            self._record_command("launch", command)
+            started_at = time.perf_counter()
+            self._record_command("run", command)
             should_exit = self.controller.execute(command)
+            elapsed = max(0.0, time.perf_counter() - started_at)
             title = self.controller.result_title
             body = self.controller.result_body
             self._route_command_output(command, title, body)
@@ -338,13 +345,17 @@ if App is not None and Static is not None and Input is not None:
             self._sync_side_panel()
             self._refresh_metrics()
             self._refresh_tab_bar()
-            self._record_command("done", f"{command} -> {title}")
+            phase = "ok" if self.controller.last_command_ok else "err"
+            self._record_command(phase, f"{command} -> {title} ({self._format_elapsed(elapsed)})")
             self._capture_token_metrics_from_command(command)
             if should_exit:
                 self.exit()
 
         def _handle_shortcut(self, raw: str) -> None:
-            shortcut = raw.strip().lower()
+            parts = raw.strip().split(maxsplit=1)
+            shortcut = parts[0].lower() if parts else ""
+            argument = parts[1].strip() if len(parts) > 1 else ""
+            argument = argument.strip("\"'")
             if shortcut in {"/model", "/m"}:
                 self.input_mode = "model"
                 self._refresh_input_placeholder()
@@ -380,10 +391,18 @@ if App is not None and Static is not None and Input is not None:
                         "/model  -> plain text chats, !<command> for commands\n"
                         "/cmd    -> plain text commands, ?<message> for chat\n"
                         "/hybrid -> auto route (commands or chat)\n"
-                        "/clear  -> clear chat history"
+                        "/clear  -> clear chat history\n"
+                        "/savechat [path] -> export chat transcript (.jsonl)\n"
+                        "/export-chat [path] -> alias for /savechat"
                     ),
                 )
                 self._record_command("help", "shortcuts")
+                return
+            if shortcut in {"/savechat", "/save-chat", "/export-chat", "/exportchat"}:
+                destination = Path(argument).expanduser() if argument else self._default_chat_export_path()
+                target, count = self._save_chat_transcript(destination)
+                self._push_result("Chat Transcript", f"Exported {count} messages to {target}")
+                self._record_command("state", f"chat transcript -> {target}")
                 return
             self._push_result("Shortcut Error", f"Unknown shortcut: {raw}. Use /help.")
             self._record_command("error", f"shortcut {raw}")
@@ -461,7 +480,7 @@ if App is not None and Static is not None and Input is not None:
             runtime = "[Runtime]" if self.controller.active_tab == "runtime" else "Runtime"
             benchmark = "[Benchmark]" if self.controller.active_tab == "benchmark" else "Benchmark"
             self.query_one("#tab-bar", Static).update(
-                f"Tabs: {runtime}  {benchmark} | Input mode: {self.input_mode} | /model /cmd /hybrid /help"
+                f"Tabs: {runtime}  {benchmark} | Input mode: {self.input_mode} | /model /cmd /hybrid /savechat /help"
             )
 
         def _refresh_input_placeholder(self) -> None:
@@ -474,6 +493,7 @@ if App is not None and Static is not None and Input is not None:
                 widget.placeholder = "Hybrid mode: commands auto-detect, otherwise chat | /help"
 
         def _refresh_logo(self) -> None:
+            chat_status = "configured" if self.chat_client.configured else "offline"
             logo = (
                 "  _____  ______          __  \n"
                 " / ____|/ __ \\ \\        / /  \n"
@@ -481,11 +501,15 @@ if App is not None and Static is not None and Input is not None:
                 " \\___ \\| |  | |\\ \\/  \\/ /    \n"
                 " ____) | |__| | \\  /\\  /     \n"
                 "|_____/ \\____/   \\/  \\/      \n"
-                "SEAM Glassbox Dashboard"
+                f"SEAM Glassbox Dashboard | Model: {self.chat_client.model} ({chat_status})"
             )
             self.query_one("#logo-header", Static).update(logo)
 
         def _handle_chat_message(self, message: str) -> None:
+            if not message:
+                self._push_result("Chat", "Enter a message after '?' or switch to /model mode and type normally.")
+                self._record_command("error", "empty chat input")
+                return
             timestamp = datetime.now().strftime("%H:%M:%S")
             self.chat_history.append({"role": "user", "content": message})
             context_prompt = self._build_chat_context_prompt(message)
@@ -513,7 +537,17 @@ if App is not None and Static is not None and Input is not None:
                 return f"(context retrieval failed: {exc})"
 
         def _record_command(self, phase: str, text: str) -> None:
-            self.command_history_lines.append(f"{datetime.now().strftime('%H:%M:%S')} {phase}: {text}")
+            badge = {
+                "run": "[RUN]",
+                "ok": "[OK]",
+                "err": "[ERR]",
+                "mode": "[MODE]",
+                "chat": "[CHAT]",
+                "help": "[HELP]",
+                "state": "[STATE]",
+                "error": "[ERR]",
+            }.get(phase, f"[{phase.upper()}]")
+            self.command_history_lines.append(f"{datetime.now().strftime('%H:%M:%S')} {badge} {text}")
             self.query_one("#command-history-panel", _TextualPanel).set_lines(self.command_history_lines)
 
         def _trigger_mirl_animation(self, label: str, body: str) -> None:
@@ -580,6 +614,29 @@ if App is not None and Static is not None and Input is not None:
             clamped = max(0.0, min(1.0, ratio))
             filled = int(round(clamped * width))
             return f"[{'#' * filled}{'-' * (width - filled)}] {clamped * 100:5.1f}%"
+
+        @staticmethod
+        def _format_elapsed(seconds: float) -> str:
+            if seconds < 1.0:
+                return f"{int(round(seconds * 1000))}ms"
+            return f"{seconds:.2f}s"
+
+        def _default_chat_export_path(self) -> Path:
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            return self.transcript_dir / f"chat-{stamp}.jsonl"
+
+        def _save_chat_transcript(self, destination: Path) -> tuple[Path, int]:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with destination.open("w", encoding="utf-8") as handle:
+                for idx, message in enumerate(self.chat_history, start=1):
+                    row = {
+                        "index": idx,
+                        "role": str(message.get("role", "")),
+                        "content": str(message.get("content", "")),
+                    }
+                    handle.write(json.dumps(row, sort_keys=True))
+                    handle.write("\n")
+            return destination.resolve(), len(self.chat_history)
 else:
     class TextualDashboardApp:  # pragma: no cover - exercised when textual is missing
         def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -614,6 +671,7 @@ class DashboardApp:
         self.last_benchmark_payload: dict[str, Any] | None = None
         self.last_machine_text: str | None = None
         self.last_command = "help"
+        self.last_command_ok = True
         self.result_title = "Welcome"
         self.result_body = (
             "SEAM dashboard is live.\n\n"
@@ -722,6 +780,7 @@ class DashboardApp:
         if not command:
             self.result_title = "No Command"
             self.result_body = "Enter a command or type `help`."
+            self.last_command_ok = False
             return False
 
         self.last_command = command
@@ -735,17 +794,20 @@ class DashboardApp:
             self.result_title = "Dashboard Exit"
             self.result_body = "SEAM dashboard closed cleanly."
             self._log("system", "Dashboard shutdown requested.")
+            self.last_command_ok = True
             return True
         if args.command == "help":
             self.result_title = "Dashboard Help"
             self.result_body = self._help_text()
             self._log("help", "Displayed interactive command help.")
+            self.last_command_ok = True
             return False
         if args.command == "tab":
             self.active_tab = args.view
             self.result_title = "Dashboard Tab"
             self.result_body = f"Switched to the {args.view} tab."
             self._log("system", f"Switched dashboard tab to {args.view}.")
+            self.last_command_ok = True
             return False
 
         try:
@@ -1045,11 +1107,13 @@ class DashboardApp:
     def _succeed(self, title: str, payload: object, log_message: str) -> None:
         self.result_title = title
         self.result_body = self._format_payload(payload)
+        self.last_command_ok = True
         self._log(title.lower(), log_message)
 
     def _fail(self, title: str, message: str) -> None:
         self.result_title = title
         self.result_body = message
+        self.last_command_ok = False
         self._log("error", message)
 
     def _log(self, kind: str, message: str) -> None:

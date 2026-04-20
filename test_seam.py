@@ -863,6 +863,53 @@ claim c2:
 
         asyncio.run(_check())
 
+    def test_textual_dashboard_shortcuts_export_chat_transcript(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+        export_path = Path(f"chat_export_{uuid4().hex}.jsonl")
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("What is the active mode?")
+                await pilot.pause()
+                app.process_command(f"/savechat {export_path}")
+                await pilot.pause()
+                self.assertTrue(export_path.exists())
+                rows = [line.strip() for line in export_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+                self.assertGreaterEqual(len(rows), 2)
+                self.assertTrue(any('"role": "user"' in line for line in rows))
+                self.assertTrue(any('"role": "assistant"' in line for line in rows))
+
+        try:
+            asyncio.run(_check())
+        finally:
+            if export_path.exists():
+                export_path.unlink()
+
+    def test_textual_dashboard_command_history_includes_status_badges_and_timing(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("!help")
+                await pilot.pause()
+                app.process_command("!trace missing:id")
+                await pilot.pause()
+                history = "\n".join(app.command_history_lines)
+                self.assertIn("[RUN] help", history)
+                self.assertIn("[OK] help -> Dashboard Help", history)
+                self.assertIn("[ERR] trace missing:id -> KeyError", history)
+                self.assertRegex(history, r"\(\d+ms\)|\(\d+\.\d+s\)")
+
+        asyncio.run(_check())
+
 class InstallerLinuxTests(unittest.TestCase):
     def test_posix_shim_has_valid_sh_structure(self) -> None:
         shim = render_posix_shim(

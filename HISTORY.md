@@ -1121,3 +1121,23 @@ Expanded Textual dashboard toward full CLI assistant surface.
 - Verified dashboard test suite passes with dependencies installed.
 Refs: see HISTORY#051 for dependency/docs hardening baseline.
 ---END-ENTRY-#052---
+
+---BEGIN-ENTRY-#053---
+id: 053
+date: 2026-04-20T20:36:17Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, chat, command, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: none
+tokens: 115
+---
+Dashboard polish follow-up delivered for CLI-like Textual experience.
+- Tightened Textual layout density (header/metrics/tab sizing, larger results row, reduced panel margins) for higher information throughput.
+- Added chat transcript export shortcuts: `/savechat [path]` and `/export-chat [path]`, with default output to `.seam/chat_transcripts/chat-<timestamp>.jsonl`.
+- Added command-history status badges and timing annotations (`[RUN]`, `[OK]`, `[ERR]`, with ms/s elapsed formatting).
+- Added defensive empty-chat handling and header chat model/status indicator.
+- Added Textual tests for transcript export and command-history status/timing; verified focused dashboard/Textual suite passes.
+Refs: see HISTORY#052 for prior dashboard expansion baseline.
+---END-ENTRY-#053---

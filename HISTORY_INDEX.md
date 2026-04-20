@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 52
-total_tokens: ~3868
-latest_id: 052
+total_entries: 53
+total_tokens: ~3983
+latest_id: 053
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 053 | 2026-04-20 | done | e90a78712b420b15 | dashboard,textual,chat,command,+ | none |
 | 052 | 2026-04-20 | done | 4e57d2cdbb1096b8 | dashboard,textual,chat,animation,+ | none |
 | 051 | 2026-04-20 | done | 1eeeb306a2c9c60d | dashboard,textual,pyproject,readme,+ | none |
 | 050 | 2026-04-20 | done | 38a362f679122d7a | dashboard,textual,command,roadmap,+ | none |
@@ -70,13 +71,13 @@ compact: true
 - animation: count=3 latest=#052, #032, #028
 - benchmark: count=18 latest=#047, #040, #039, #038, #037
 - bundle: count=2 latest=#015, #008
-- chat: count=2 latest=#052, #031
+- chat: count=3 latest=#053, #052, #031
 - chroma: count=2 latest=#017, #001
 - codec: count=2 latest=#018, #006
-- command: count=12 latest=#052, #051, #050, #049, #045
+- command: count=13 latest=#053, #052, #051, #050, #049
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=6 latest=#042, #041, #033, #026, #018
-- dashboard: count=16 latest=#052, #051, #050, #049, #047
+- dashboard: count=17 latest=#053, #052, #051, #050, #049
 - diff: count=1 latest=#037
 - doctor: count=3 latest=#019, #014, #013
 - extras: count=1 latest=#022
@@ -84,7 +85,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
 - handoff: count=1 latest=#025
-- history: count=6 latest=#052, #051, #050, #049, #048
+- history: count=7 latest=#053, #052, #051, #050, #049
 - holdout: count=1 latest=#036
 - installer: count=6 latest=#035, #021, #020, #015, #014
 - integrity: count=1 latest=#048
@@ -108,9 +109,9 @@ compact: true
 - sbert: count=3 latest=#023, #022, #011
 - search: count=9 latest=#047, #046, #041, #033, #031
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=5 latest=#052, #051, #050, #049, #048
+- snapshot: count=6 latest=#053, #052, #051, #050, #049
 - status: count=19 latest=#046, #045, #044, #043, #042
-- textual: count=4 latest=#052, #051, #050, #049
+- textual: count=5 latest=#053, #052, #051, #050, #049
 - vector: count=16 latest=#044, #038, #034, #026, #023
 - verify: count=13 latest=#040, #037, #026, #024, #021
 - windows: count=2 latest=#020, #007
@@ -118,6 +119,6 @@ compact: true
 
 ## status rollup
 
-- roots: 52
-- done: 32
+- roots: 53
+- done: 33
 - planned: 20
