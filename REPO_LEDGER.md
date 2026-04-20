@@ -37,6 +37,17 @@ and `HISTORY_INDEX.md`.
 - `HISTORY_INDEX.md` and snapshots are derived artifacts; `HISTORY.md` is authoritative.
 - The `handoff/archive` branch is reserved for PDF and handoff artifact publication, not primary runtime/source work.
 
+## Runtime Service Safety Policy
+
+- External services for real-adapter tests (for example Docker pgvector) must be started only for the active test window.
+- Every service started for a test run must be explicitly stopped and removed at the end of that run.
+- Prefer non-conflicting ports for temporary services and verify they are released after cleanup.
+- Keep resource monitoring lightweight during runs (snapshot checks or low-frequency polling) to avoid adding load.
+- If a run fails or exits early, perform the same shutdown/cleanup sequence before continuing.
+- Default guardrail for local runs: warn around `82%` RAM usage and treat `90%` RAM as hard limit unless explicitly overridden for a task.
+- Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_guarded.ps1` for heavy commands so CPU/RAM/disk are watched during execution.
+- Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_real_adapters_guarded.ps1` for end-to-end real-adapter validation; it starts pgvector, runs guarded checks, and cleans up containers/artifacts on exit.
+
 ## Benchmark Publication Policy
 
 Published benchmark statements must include:
