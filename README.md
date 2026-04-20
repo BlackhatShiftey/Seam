@@ -133,6 +133,7 @@ Each run folder includes:
 - `command.txt`
 - `research_notes.md`
 - `environment_snapshot.json`
+- includes canonical `daily_run_sequence` for same-day ordering
 
 Day-level index:
 

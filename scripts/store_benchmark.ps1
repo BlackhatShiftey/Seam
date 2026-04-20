@@ -130,7 +130,7 @@ try {
     $maxSequence = 0
     $existingRunDirs = Get-ChildItem -LiteralPath $suiteFolder -Directory -ErrorAction SilentlyContinue
     foreach ($dir in $existingRunDirs) {
-        if ($dir.Name -match "^(\\d{3})_") {
+        if ($dir.Name -match '^(\d{3})_') {
             $value = [int]$matches[1]
             if ($value -gt $maxSequence) {
                 $maxSequence = $value
@@ -154,6 +154,7 @@ try {
 
     $publication = [ordered]@{
         generated_at = (Get-Date).ToString("o")
+        daily_run_sequence = $sequenceText
         command = $commandForRecord
         suite = $Suite
         run_id = $report.manifest.run_id
@@ -171,6 +172,7 @@ try {
     $envSnapshot = [ordered]@{
         generated_at = (Get-Date).ToString("o")
         sequence = $sequenceText
+        daily_run_sequence = $sequenceText
         output_root = $outputRootFull
         run_folder = $runFolder
         machine_name = $env:COMPUTERNAME
@@ -192,6 +194,7 @@ try {
 
 - generated_at: $($publication.generated_at)
 - sequence: $sequenceText
+- daily_run_sequence: $sequenceText
 - suite: $Suite
 - run_id: $($report.manifest.run_id)
 - status: $summaryStatus
@@ -231,6 +234,7 @@ try {
     }
     $indexRows += [ordered]@{
         sequence = $sequenceText
+        daily_run_sequence = $sequenceText
         timestamp = $timestamp
         run_id = $report.manifest.run_id
         suite = $Suite
