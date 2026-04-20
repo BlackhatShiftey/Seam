@@ -24,3 +24,13 @@ credentials.json
 service_account.json
 config.local.*
 *.secret
+
+# Local agent/tooling state
+.claude/
+.lingma/
+.pytest_cache/
+build/
+seam_runtime/_handoff_20260419/
+
+# Derived snapshot payloads (keep directory marker only)
+.seam/snapshots/*.json

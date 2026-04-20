@@ -3,6 +3,7 @@ import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from importlib.util import find_spec
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -633,9 +634,13 @@ claim c2:
         with redirect_stdout(stream):
             run_cli(["doctor"])
         payload = stream.getvalue()
-        self.assertIn("SEAM doctor: PASS", payload)
+        required = ["rich", "chromadb", "tiktoken"]
+        missing = [name for name in required if find_spec(name) is None]
+        expected = "PASS" if not missing else "FAIL"
+        self.assertIn(f"SEAM doctor: {expected}", payload)
         self.assertIn("Compile smoke: PASS", payload)
         self.assertIn("PgVector:", payload)
+        self.assertIn("Required deps:", payload)
 
     def test_cli_doctor_reports_pgvector_not_configured_when_dsn_absent(self) -> None:
         old = os.environ.pop("SEAM_PGVECTOR_DSN", None)
@@ -653,8 +658,15 @@ claim c2:
         with redirect_stdout(stream):
             run_cli(["doctor", "--format", "json"])
         payload = json.loads(stream.getvalue())
-        self.assertEqual(payload["status"], "PASS")
+        required = ["rich", "chromadb", "tiktoken"]
+        missing = [name for name in required if find_spec(name) is None]
+        expected = "PASS" if not missing else "FAIL"
+        self.assertEqual(payload["status"], expected)
         self.assertIn("dependencies", payload)
+        self.assertIn("required_dependencies", payload)
+        self.assertIn("missing_required_dependencies", payload)
+        self.assertEqual(sorted(payload["required_dependencies"]), sorted(required))
+        self.assertEqual(sorted(payload["missing_required_dependencies"]), sorted(missing))
         self.assertIn("psycopg", payload["dependencies"])
         self.assertIn("sentence_transformers", payload["dependencies"])
         self.assertIn("pgvector", payload)

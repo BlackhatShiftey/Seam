@@ -66,9 +66,14 @@ def ensure_virtualenv(layout: InstallLayout, python_executable: str | None = Non
 
 def install_repo(layout: InstallLayout, upgrade_pip: bool = True) -> None:
     python_bin = layout.venv_dir / ("Scripts/python.exe" if layout.is_windows else "bin/python")
+    requirements_path = layout.repo_root / "requirements.txt"
     if upgrade_pip:
         subprocess.run([str(python_bin), "-m", "pip", "install", "--upgrade", "pip"], check=True)
-    subprocess.run([str(python_bin), "-m", "pip", "install", str(layout.repo_root)], check=True)
+    if requirements_path.exists():
+        subprocess.run([str(python_bin), "-m", "pip", "install", "-r", str(requirements_path)], check=True)
+        subprocess.run([str(python_bin), "-m", "pip", "install", "--no-deps", str(layout.repo_root)], check=True)
+    else:
+        subprocess.run([str(python_bin), "-m", "pip", "install", str(layout.repo_root)], check=True)
     ensure_persistence(layout)
 
 

@@ -1,6 +1,6 @@
 # SEAM Improvement Roadmap & SOP Blueprint
 
-**Last updated:** 2026-04-18
+**Last updated:** 2026-04-20
 **Status:** Active planning document. This is the living roadmap for SEAM development beyond the stable v1 core.
 
 ---
@@ -37,22 +37,8 @@
 
 ---
 
-## Current State Snapshot
-
-SEAM is a working machine-first memory compiler and operator glassbox with:
-
-- Full MIRL compile → verify → persist → search → pack pipeline
-- Six-family glassbox benchmark engine with auditable bundles
-- SEAM-LX/1 lossless compression (SHA-256 verified roundtrip)
-- SBERT retrieval: 100% recall proven on machine-text projections
-- PgVector backend: formally tested, env-var driven, health-checked
-- Windows + Linux (WSL2) installers: both verified end to end
-- Runtime-connected terminal dashboard with correct panel data
-- 62 tests green, no failures
-
----
-
 ## Track A — Dashboard & UI Enhancement
+History pointer: see `HISTORY#047` (interactive TUI baseline) and `HISTORY#024` (dashboard review stabilization).
 
 ### A1: NL→MIRL Compilation Animation
 
@@ -179,6 +165,7 @@ SEAM is a working machine-first memory compiler and operator glassbox with:
 ---
 
 ## Track B — Command Terminology & README Refinement
+History pointer: see `HISTORY#002`, `HISTORY#024`, `HISTORY#033`.
 
 ### B1: Command Naming Audit
 
@@ -250,6 +237,7 @@ All commands should feel like natural operations on a memory system:
 ---
 
 ## Track C — Benchmark Hardening
+History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardening items `HISTORY#036`-`HISTORY#040`.
 
 ### C1: Holdout Suites
 
@@ -319,6 +307,7 @@ All commands should feel like natural operations on a memory system:
 ---
 
 ## Track D — Model Skills & Automation
+History pointer: see `HISTORY#041`-`HISTORY#043`.
 
 ### D1: SEAM as Claude Tool Set
 
@@ -366,6 +355,7 @@ All commands should feel like natural operations on a memory system:
 ---
 
 ## Track E — Architecture & Scalability
+History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HISTORY#044`-`HISTORY#046`.
 
 ### E1: PgVector as Configurable Default
 

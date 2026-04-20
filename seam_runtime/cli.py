@@ -509,8 +509,19 @@ def _build_doctor_report() -> dict[str, object]:
         min_token_savings=0.30,
     )
     pgvector_dsn = os.environ.get("SEAM_PGVECTOR_DSN")
+    dependencies = {
+        "rich": find_spec("rich") is not None,
+        "chromadb": find_spec("chromadb") is not None,
+        "tiktoken": find_spec("tiktoken") is not None,
+        "psycopg": find_spec("psycopg") is not None,
+        "sentence_transformers": find_spec("sentence_transformers") is not None,
+    }
+    required_dependencies = ["rich", "chromadb", "tiktoken"]
+    missing_required = [name for name in required_dependencies if not dependencies.get(name)]
+    deps_ok = not missing_required
+    status = "PASS" if smoke_ok and lossless_result.roundtrip_match and deps_ok else "FAIL"
     return {
-        "status": "PASS" if smoke_ok and lossless_result.roundtrip_match else "FAIL",
+        "status": status,
         "python": sys.version.split()[0],
         "db_mode": "in-memory",
         "default_db_path": default_runtime_db_path(),
@@ -524,13 +535,9 @@ def _build_doctor_report() -> dict[str, object]:
             "token_savings_ratio": round(lossless_result.artifact.token_savings_ratio, 6),
         },
         "pgvector": _check_pgvector(pgvector_dsn),
-        "dependencies": {
-            "rich": find_spec("rich") is not None,
-            "chromadb": find_spec("chromadb") is not None,
-            "tiktoken": find_spec("tiktoken") is not None,
-            "psycopg": find_spec("psycopg") is not None,
-            "sentence_transformers": find_spec("sentence_transformers") is not None,
-        },
+        "dependencies": dependencies,
+        "required_dependencies": required_dependencies,
+        "missing_required_dependencies": missing_required,
     }
 
 
@@ -560,6 +567,11 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
                 f"estimator={payload.get('lossless', {}).get('token_estimator')})"
             ),
             pg_line,
+            (
+                "Required deps: OK"
+                if not payload.get("missing_required_dependencies")
+                else f"Required deps: missing ({', '.join(payload.get('missing_required_dependencies', []))})"
+            ),
             "Dependencies:",
             *dependency_lines,
         ]

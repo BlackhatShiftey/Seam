@@ -22,7 +22,8 @@ if (-not $SkipPipUpgrade) {
     & $venvPython -m pip install --upgrade pip
 }
 
-& $venvPython -m pip install -e .
+& $venvPython -m pip install -r (Join-Path $repoRoot "requirements.txt")
+& $venvPython -m pip install --no-deps -e .
 
 if (-not (Test-Path $venvSeam)) {
     throw "Expected seam.exe to exist at $venvSeam after install."

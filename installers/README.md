@@ -41,7 +41,8 @@ The installer creates a self-contained SEAM runtime at `~/.local/share/seam/runt
 
 ### Install optional extras
 
-The base install is intentionally lean. Install optional backends after the main install:
+Base install now includes required runtime packages from `requirements.txt`, including `rich`, `chromadb`, and `tiktoken`.
+Use extras only for optional backends:
 
 ```sh
 # PgVector backend (requires a running Postgres with pgvector extension)

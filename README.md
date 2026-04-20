@@ -62,7 +62,8 @@ In other words, SEAM is meant to help an agent use fewer tokens against its own 
 
 ## Bare Checkout Setup
 
-SEAM's core runtime, tests, and benchmark engine work from a bare checkout with standard-library Python only. If you want the installed terminal commands so you can type `seam` directly, use the installer path below.
+SEAM now treats `rich`, `chromadb`, and `tiktoken` as required base dependencies.
+If you want the installed terminal commands so you can type `seam` directly, use the installer path below.
 
 Recommended baseline:
 
@@ -71,6 +72,7 @@ git clone <your-fork-or-repo-url>
 cd Seam
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 Run the core test suite:
@@ -81,8 +83,8 @@ Run the core test suite:
 
 Notes:
 
-- if `rich` is not installed, dashboard-specific tests skip automatically
-- the lossless codec and benchmark families do not require `rich`, `chromadb`, or `tiktoken`
+- `seam doctor` reports `FAIL` if required deps (`rich`, `chromadb`, `tiktoken`) are missing
+- optional extras are only for additional backends/features beyond base runtime
 
 ## Installer Flow
 
@@ -151,9 +153,9 @@ To drop into a shell where you can type `seam` directly:
 
 Optional extras:
 
-- `rich` for the terminal dashboard
-- `chromadb` for the optional Chroma vector backend
-- `tiktoken` for tokenizer-backed benchmark counts
+- `pgvector` for PostgreSQL pgvector backend
+- `sbert` for sentence-transformer embeddings
+- `all-extras` for both
 
 ## Quick Start
 
