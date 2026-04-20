@@ -38,23 +38,17 @@ if (-not (Test-Path $guardScript)) {
     throw "Missing guarded runner: $guardScript"
 }
 
-function Invoke-Guarded {
+function Invoke-GuardedCommand {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$FilePath,
+        [string]$CommandText,
+
         [Parameter(Mandatory = $true)]
-        [string[]]$ArgumentList
+        [string]$Label
     )
 
-    $quotedFile = "'" + ($FilePath -replace "'", "''") + "'"
-    $quotedArgs = @()
-    foreach ($arg in $ArgumentList) {
-        $quotedArgs += "'" + ($arg -replace "'", "''") + "'"
-    }
-    $commandText = "& $quotedFile $($quotedArgs -join ' '); exit `$LASTEXITCODE"
-
     $guardParams = @{
-        Command = $commandText
+        Command = $CommandText
         WarnCpuPercent = $WarnCpuPercent
         MaxCpuPercent = $MaxCpuPercent
         WarnMemoryPercent = $WarnMemoryPercent
@@ -70,8 +64,25 @@ function Invoke-Guarded {
     & $guardScript @guardParams
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Guarded command failed (exit $LASTEXITCODE): $FilePath $($ArgumentList -join ' ')"
+        throw "Guarded command failed (exit $LASTEXITCODE): $Label"
     }
+}
+
+function Invoke-Guarded {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(Mandatory = $true)]
+        [string[]]$ArgumentList
+    )
+
+    $quotedFile = "'" + ($FilePath -replace "'", "''") + "'"
+    $quotedArgs = @()
+    foreach ($arg in $ArgumentList) {
+        $quotedArgs += "'" + ($arg -replace "'", "''") + "'"
+    }
+    $commandText = "& $quotedFile $($quotedArgs -join ' '); exit `$LASTEXITCODE"
+    Invoke-GuardedCommand -CommandText $commandText -Label ("{0} {1}" -f $FilePath, ($ArgumentList -join " "))
 }
 
 function Remove-IfExists {
@@ -143,15 +154,33 @@ try {
     Write-Host "[real-adapters] sqlite-vector + chroma smoke..."
     Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $sqliteDb, "compile-nl", "SEAM real adapter smoke for sqlite and chroma retrieval.", "--persist")
     Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $sqliteDb, "index", "--vector-backend", "seam", "--format", "json")
-    Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $sqliteDb, "retrieve", "real adapter smoke retrieval", "--vector-backend", "seam", "--trace", "--format", "json")
+    Invoke-GuardedCommand -Label "sqlite retrieval gate" -CommandText @"
+`$json = & python seam.py --db '$sqliteDb' retrieve 'seam_real_adapter_smoke_sqlite_chroma_retrieval' --vector-backend seam --trace --format json
+`$obj = `$json | ConvertFrom-Json
+if ((`$obj.candidates | Measure-Object).Count -lt 1) { throw 'Expected sqlite-vector retrieval candidate.' }
+`$json
+exit `$LASTEXITCODE
+"@
     Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $sqliteDb, "index", "--vector-backend", "chroma", "--vector-path", $chromaPath, "--vector-collection", "seam_hybrid_guard", "--format", "json")
-    Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $sqliteDb, "retrieve", "real adapter smoke retrieval", "--vector-backend", "chroma", "--vector-path", $chromaPath, "--vector-collection", "seam_hybrid_guard", "--trace", "--format", "json")
+    Invoke-GuardedCommand -Label "chroma retrieval gate" -CommandText @"
+`$json = & python seam.py --db '$sqliteDb' retrieve 'seam_real_adapter_smoke_sqlite_chroma_retrieval' --vector-backend chroma --vector-path '$chromaPath' --vector-collection 'seam_hybrid_guard' --trace --format json
+`$obj = `$json | ConvertFrom-Json
+if ((`$obj.candidates | Measure-Object).Count -lt 1) { throw 'Expected chroma retrieval candidate.' }
+`$json
+exit `$LASTEXITCODE
+"@
 
     Write-Host "[real-adapters] pgvector smoke..."
     $env:SEAM_PGVECTOR_DSN = $dsn
     Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "doctor")
     Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $pgvectorDb, "compile-nl", "SEAM real adapter smoke for pgvector retrieval.", "--persist")
-    Invoke-Guarded -FilePath "python" -ArgumentList @("seam.py", "--db", $pgvectorDb, "retrieve", "pgvector smoke retrieval", "--trace", "--format", "json")
+    Invoke-GuardedCommand -Label "pgvector retrieval gate" -CommandText @"
+`$json = & python seam.py --db '$pgvectorDb' retrieve 'seam_real_adapter_smoke_pgvector_retrieval' --trace --format json
+`$obj = `$json | ConvertFrom-Json
+if ((`$obj.candidates | Measure-Object).Count -lt 1) { throw 'Expected pgvector retrieval candidate.' }
+`$json
+exit `$LASTEXITCODE
+"@
 
     if (-not $SkipPytest) {
         Write-Host "[real-adapters] full test suite under guard..."

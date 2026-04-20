@@ -86,6 +86,35 @@ Notes:
 - `seam doctor` reports `FAIL` if required deps (`rich`, `chromadb`, `tiktoken`) are missing
 - optional extras are only for additional backends/features beyond base runtime
 
+## Guarded Real-Adapter Validation
+
+Use guarded runners to avoid resource spikes and enforce cleanup.
+
+Resource guard defaults:
+
+- RAM warning at `82%`
+- RAM hard limit at `90%`
+- CPU warning/hard limit at `75%` / `85%`
+- Disk warning/hard limit at `85%` / `92%`
+
+Run full real-adapter validation (SQLite vector + Chroma + PgVector) with automatic start/cleanup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_real_adapters_guarded.ps1
+```
+
+Run only smoke checks (skip full pytest):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_real_adapters_guarded.ps1 -SkipPytest
+```
+
+Run any heavy command behind the standalone guard:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_guarded.ps1 -Command "python -m pytest -q" -StopOnLimit
+```
+
 ## Installer Flow
 
 If you want the "download installer, run installer, type `seam`" path, use the installer entrypoint for your platform.

@@ -23,6 +23,13 @@ SEAM is operating as a local machine-first memory runtime with:
 - Reduce startup context overhead by relying on compact index + surgical history reads
 - Keep roadmap execution tied to history entries and supersedes chains
 - Continue feature delivery without reintroducing duplicated continuity text
+- Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
+
+## Operational Baseline
+
+- Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
+- Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
+- Default memory guardrails are `82%` warning and `90%` hard limit.
 
 ## Working Rule
 
