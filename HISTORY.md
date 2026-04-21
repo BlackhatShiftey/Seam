@@ -1281,3 +1281,22 @@ Added harness-style chat bar routing for the Textual dashboard.
 - Expanded Textual regression coverage for hybrid bare-command routing, model switching, shell bang execution, forced chat escape, and updated transcript-export shortcut behavior.
 Refs: see HISTORY#059 for the prior dashboard pane-scroll regression baseline.
 ---END-ENTRY-#060---
+
+---BEGIN-ENTRY-#061---
+id: 061
+date: 2026-04-21T02:21:26Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, tui, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,seam_runtime/ui/animations.py,seam_runtime/ui/bars.py,seam_runtime/ui/logo.py,seam_runtime/ui/theme.py,branding/assets/mature/palette.json,branding/assets/mature/preview.html,branding/assets/mature/restart-dashboard.bat,branding/assets/mature/seam-terminal-logo.txt
+supersedes: none
+tokens: 110
+---
+Published the extracted dashboard UI layer and mature branding assets.
+- Added `seam_runtime/ui/` primitives for theme, logo, bars, and MIRL animation rendering.
+- Wired the Textual dashboard to the new UI layer for header markup, progress bars, and MIRL animation engine updates.
+- Added mature branding asset files under `branding/assets/mature/` for palette, preview, restart helper, and terminal logo reference.
+- Re-verified the dashboard code with `py_compile` and a snapshot render before packaging the repo state.
+Refs: see HISTORY#060 for the prior dashboard harness controls baseline.
+---END-ENTRY-#061---

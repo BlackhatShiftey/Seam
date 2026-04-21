@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 60
-total_tokens: ~4899
-latest_id: 060
+total_entries: 61
+total_tokens: ~5009
+latest_id: 061
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 061 | 2026-04-21 | done | c61b823cc9977bcc | dashboard,textual,tui,history,+ | none |
 | 060 | 2026-04-20 | done | 4ea6cae90e77bd47 | dashboard,textual,chat,command,+ | none |
 | 059 | 2026-04-20 | done | 4fb5512c2568109a | dashboard,textual,command,tui,+ | none |
 | 058 | 2026-04-20 | done | e2494df193234832 | dashboard,textual,command,tui,+ | none |
@@ -84,7 +85,7 @@ compact: true
 - command: count=19 latest=#060, #059, #058, #057, #056
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=6 latest=#042, #041, #033, #026, #018
-- dashboard: count=24 latest=#060, #059, #058, #057, #056
+- dashboard: count=25 latest=#061, #060, #059, #058, #057
 - diff: count=1 latest=#037
 - doctor: count=3 latest=#019, #014, #013
 - extras: count=1 latest=#022
@@ -92,7 +93,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
 - handoff: count=1 latest=#025
-- history: count=14 latest=#060, #059, #058, #057, #056
+- history: count=15 latest=#061, #060, #059, #058, #057
 - holdout: count=1 latest=#036
 - installer: count=6 latest=#035, #021, #020, #015, #014
 - integrity: count=1 latest=#048
@@ -116,10 +117,10 @@ compact: true
 - sbert: count=3 latest=#023, #022, #011
 - search: count=9 latest=#047, #046, #041, #033, #031
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=13 latest=#060, #059, #058, #057, #056
+- snapshot: count=14 latest=#061, #060, #059, #058, #057
 - status: count=19 latest=#046, #045, #044, #043, #042
-- textual: count=12 latest=#060, #059, #058, #057, #056
-- tui: count=6 latest=#060, #059, #058, #057, #056
+- textual: count=13 latest=#061, #060, #059, #058, #057
+- tui: count=7 latest=#061, #060, #059, #058, #057
 - vector: count=16 latest=#044, #038, #034, #026, #023
 - verify: count=13 latest=#040, #037, #026, #024, #021
 - windows: count=2 latest=#020, #007
@@ -127,6 +128,6 @@ compact: true
 
 ## status rollup
 
-- roots: 60
-- done: 40
+- roots: 61
+- done: 41
 - planned: 20

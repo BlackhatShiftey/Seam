@@ -47,6 +47,9 @@ from .mirl import IRBatch
 from .models import HashEmbeddingModel
 from .runtime import SeamRuntime
 from .installer import default_runtime_db_path
+from .ui import animations as _ui_animations
+from .ui import bars as _ui_bars
+from .ui import logo as _ui_logo
 
 
 @dataclass
@@ -206,7 +209,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
             layout: vertical;
         }
         #logo-header {
-            height: 4;
+            height: 6;
             border: round #4f8cfb;
             padding: 0 1;
             color: #8df6ff;
@@ -312,6 +315,10 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._token_source_total = 0
             self._token_machine_total = 0
             self._token_events: deque[tuple[float, int]] = deque(maxlen=32)
+            # New ui/ animation engine — drives the MIRL panel with a
+            # streaming IR view + RAW→IR→PACK pipeline visual on
+            # compile/compress/benchmark triggers.
+            self._anim_engine = _ui_animations.AnimationEngine(height=6)
 
         def compose(self) -> ComposeResult:
             yield Static("", id="logo-header")
@@ -702,16 +709,17 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 widget.placeholder = "Hybrid mode: known SEAM commands auto-run, otherwise chat | !<shell> | ?help"
 
         def _refresh_logo(self) -> None:
-            chat_status = "configured" if self.chat_client.configured else "offline"
-            model = self.chat_client.model
-            launch_dir = Path.cwd()
-            logo = (
-                "[#2f63ff]..............................................................[/]\n"
-                "[#66b8ff]::[/] [bold #a6fcff]SEAM[/] [#66b8ff]::[/] [#9ddfff]v0.1.0[/] [#66b8ff]::[/] [#7fe0ff]MIRL Interpreter & Persistence Engine[/] [#66b8ff]::[/]\n"
-                f"[#5fc8ff]Launched from:[/] [#bfefff]{launch_dir}[/]   [#5fc8ff]Shell cwd:[/] [#bfefff]{self.shell_cwd}[/]\n"
-                f"[#5fc8ff]Model:[/] [#bfefff]{model}[/] [#66b8ff]([/][#7efdb9]{chat_status}[/][#66b8ff])[/]   [#5fc8ff]Mode:[/] [#bfefff]{self.input_mode}[/]   [#2f63ff]GLOW=ON[/]"
+            fields = _ui_logo.HeaderFields(
+                version="v0.1.0",
+                tagline="MIRL Interpreter & Persistence Engine",
+                launch_dir=str(Path.cwd()),
+                shell_cwd=str(self.shell_cwd),
+                model=self.chat_client.model,
+                chat_status="configured" if self.chat_client.configured else "offline",
+                mode=self.input_mode,
+                glow=True,
             )
-            self.query_one("#logo-header", Static).update(logo)
+            self.query_one("#logo-header", Static).update(_ui_logo.header_markup(fields))
 
         def _handle_chat_message(self, message: str) -> None:
             if not message:
@@ -768,10 +776,22 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self.query_one("#command-history-panel", _TextualPanel).set_lines(self.command_history_lines)
 
         def _trigger_mirl_animation(self, label: str, body: str) -> None:
+            # Keep legacy attributes around in case any callsite still
+            # reads them; the live render now goes through ``_anim_engine``.
             self._anim_label = label
             self._anim_until = time.monotonic() + 4.0
             compact = body.replace("\n", " ").replace("\r", " ")
             self._anim_preview = compact[:120]
+            # Heuristic token estimates — body is the just-emitted MIRL
+            # text, source isn't tracked here yet so use length/4 as a
+            # crude proxy for source tokens and ~1/3 of that for machine
+            # tokens (typical SEAM compression ratio in current bench).
+            source_tokens = max(1, len(body) // 4)
+            machine_tokens = max(1, source_tokens // 3)
+            kind = "compile" if label.lower().startswith("compile") else (
+                "compress" if "compress" in label.lower() else "compile"
+            )
+            self._anim_engine.trigger_compress(label, source_tokens, machine_tokens, kind)
 
         def _tick_mirl_animation(self) -> None:
             if not self.is_mounted:
@@ -781,24 +801,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 panel = self.query_one("#mirl-panel", _TextualPanel)
             except Exception:  # pragma: no cover - timer can fire during teardown
                 return
-            if time.monotonic() > self._anim_until:
-                lines = [
-                    "Idle. Run compile/compress/benchmark for live machine animation.",
-                    "Pipeline: DSL -> MIRL -> SEAM-LX/1",
-                ]
-                panel.set_lines(lines)
-                return
-            frames = ["[=   ]", "[==  ]", "[=== ]", "[ ===]", "[  ==]", "[   =]", "[ == ]", "[=== ]"]
-            frame = frames[self._animation_phase]
-            pseudo = f"{self._anim_label.upper()} :: dsl::tokenize -> mirl::graph -> lx1::machine_stream"
-            machine_line = (self._anim_preview or "emit 01011001|clm|ent|sym|ctx")[:120]
-            panel.set_lines(
-                [
-                    f"{frame} MIRL compression live",
-                    pseudo,
-                    machine_line,
-                ]
-            )
+            lines = self._anim_engine.tick_and_render()
+            panel.set_lines(lines)
 
         def _tick_metrics(self) -> None:
             if not self.is_mounted:
@@ -839,9 +843,12 @@ if App is not None and Static is not None and Input is not None and Log is not N
 
         @staticmethod
         def _bar(ratio: float, width: int = 24) -> str:
-            clamped = max(0.0, min(1.0, ratio))
-            filled = int(round(clamped * width))
-            return f"[{'#' * filled}{'-' * (width - filled)}] {clamped * 100:5.1f}%"
+            # Thin shim over ui.bars.solid — old callers expect a single
+            # string, the new bar emits Rich markup which Static renders
+            # natively. If you need a different bar kind (segmented,
+            # indeterminate, error), call ui.bars directly at the use
+            # site rather than overloading this helper.
+            return _ui_bars.solid(ratio, width=width)
 
         @staticmethod
         def _format_elapsed(seconds: float) -> str:
