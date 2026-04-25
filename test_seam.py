@@ -37,6 +37,7 @@ from seam_runtime.models import (
 )
 from seam_runtime.pack import score_pack, unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
+from seam_runtime.ui.animations import AnimationEngine
 from seam_runtime.vector import INDEXABLE_KINDS
 from seam_runtime.vector_adapters import PgVectorAdapter
 from seam_runtime.verify import verify_ir
@@ -746,6 +747,21 @@ claim c2:
         self.assertIn("missing:id", output)
         self.assertIn("Runtime Log", output)
 
+    def test_mirl_animation_settles_on_completed_frame(self) -> None:
+        engine = AnimationEngine(height=4)
+        self.assertFalse(engine.active)
+        self.assertIn("Idle", "\n".join(engine.tick_and_render(now=0.0)))
+
+        engine.trigger_compress("compile", source_tokens=90, machine_tokens=30, kind="compile")
+        rows: list[str] = []
+        for tick in range(40):
+            rows = engine.tick_and_render(now=tick * 0.25)
+
+        self.assertFalse(engine.active)
+        self.assertTrue(engine.has_completed_frame)
+        self.assertIn("complete", "\n".join(rows))
+        self.assertEqual(rows, engine.tick_and_render(now=30.0))
+
     def test_dashboard_benchmark_tab_renders_benchmark_surface(self) -> None:
         if Console is None:
             self.skipTest("rich is not installed")
@@ -788,7 +804,75 @@ claim c2:
                 self.assertIsNotNone(app.query_one("#benchmark-panel"))
                 self.assertIsNotNone(app.query_one("#chat-row"))
                 self.assertIsNotNone(app.query_one("#chat-panel"))
+                self.assertIsNotNone(app.query_one("#command-palette"))
                 self.assertIsNotNone(app.query_one("#command-input"))
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_command_palette_filters_prefix_menus(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app._update_command_palette("/retr")
+                await pilot.pause()
+                self.assertTrue(app._palette_matches)
+                self.assertEqual(app._palette_matches[0].trigger, "/")
+                self.assertEqual(app._palette_matches[0].command, "retrieve")
+
+                app._update_command_palette("/")
+                await pilot.pause()
+                slash_commands = {item.command for item in app._palette_matches}
+                self.assertIn("compile", slash_commands)
+                self.assertIn("retrieve", slash_commands)
+                self.assertIn("agent", slash_commands)
+                self.assertIn("shell", slash_commands)
+                self.assertIn("model", slash_commands)
+
+                app._update_command_palette("!git")
+                await pilot.pause()
+                self.assertTrue(app._palette_matches)
+                self.assertEqual(app._palette_matches[0].trigger, "!")
+                self.assertIn("git", app._palette_matches[0].command)
+
+                app._update_command_palette("?mod")
+                await pilot.pause()
+                self.assertTrue(app._palette_matches)
+                self.assertEqual(app._palette_matches[0].trigger, "?")
+                self.assertEqual(app._palette_matches[0].command, "model")
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_command_palette_accepts_selection(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                input_widget = app.query_one("#command-input")
+                app._update_command_palette("/stats")
+                await pilot.pause()
+                app._accept_palette_selection(input_widget, submit=True)
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Stats")
+                self.assertEqual(input_widget.value, "")
+
+                app.process_command("/stats")
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Stats")
+
+                app._update_command_palette("/compile")
+                await pilot.pause()
+                app._accept_palette_selection(input_widget, submit=True)
+                await pilot.pause()
+                self.assertEqual(input_widget.value, "/compile ")
 
         asyncio.run(_check())
 

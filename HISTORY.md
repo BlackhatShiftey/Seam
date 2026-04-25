@@ -1376,3 +1376,100 @@ Windows repo-local dashboard launcher moved into the scripts tree.
 - Linked the launcher from `README.md` and `installers/README.md`.
 - Verified `cmd /c scripts\windows\launch_dashboard.bat --help` resolves the repo-local `seam-dash` command successfully.
 ---END-ENTRY-#065---
+
+---BEGIN-ENTRY-#066---
+id: 066
+date: 2026-04-25T06:55:46Z
+agent: codex-gpt-5
+status: done
+topics: pgvector, vector, verify, windows, command, history, snapshot
+commits: none
+refs: docker-compose.yaml,.env,seam_runtime/vector_adapters.py,seam.py
+supersedes: none
+tokens: 169
+---
+Local pgvector setup brought online for SEAM.
+- Docker Compose service `seam-pgvector` is running from `docker-compose.yaml` with pgvector image `pgvector/pgvector:0.8.2-pg18-trixie`.
+- Recreated the stale Compose volume after `.env` credentials and the old database volume disagreed.
+- Moved local `SEAM_PGVECTOR_PORT` from 5432 to 55432 because a Windows `postgres` process already owned localhost:5432; Docker now publishes `55432->5432`.
+- Installed `psycopg[binary]` for Python 3.14 using the working global interpreter; repo `.venv` can run SEAM but still has `_ssl` / `_ctypes` DLL issues for pip/psycopg-heavy paths.
+- Verified `python seam.py doctor` reports `PgVector: reachable` when `SEAM_PGVECTOR_DSN` is built from `.env` with psycopg conninfo escaping.
+- Verified real indexing: a SEAM compile/persist smoke wrote pgvector rows, PostgreSQL has extension `vector`, and `seam_vector_index` contains indexed rows.
+Refs: see HISTORY#019 and HISTORY#026 for prior pgvector adapter baseline.
+---END-ENTRY-#066---
+
+---BEGIN-ENTRY-#067---
+id: 067
+date: 2026-04-25T14:34:44Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, pgvector, windows, command, history, snapshot
+commits: none
+refs: scripts/windows/launch_dashboard.bat,scripts/windows/launch_dashboard.ps1
+supersedes: 065
+tokens: 107
+---
+Dashboard launcher now propagates pgvector configuration.
+- Added `scripts/windows/launch_dashboard.ps1` and routed the BAT launcher through it.
+- The PowerShell launcher reads local `.env`, builds `SEAM_PGVECTOR_DSN` as a psycopg conninfo string without printing secrets, preserves `SEAM_DB_PATH`, and uses `python seam.py dashboard` when pgvector is configured.
+- Verified `cmd /c scripts\windows\launch_dashboard.bat --snapshot --no-clear --run stats` renders dashboard stats with `pgvector_configured: true` and vector adapter `pgvector` while the Docker service is mapped on port 55432.
+Refs: supersedes the launcher behavior from HISTORY#065 for pgvector-enabled dashboard sessions.
+---END-ENTRY-#067---
+
+---BEGIN-ENTRY-#068---
+id: 068
+date: 2026-04-25T14:45:17Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, animation, mirl, verify, history, snapshot
+commits: none
+refs: seam_runtime/ui/animations.py,seam_runtime/dashboard.py,test_seam.py
+supersedes: 067
+tokens: 156
+---
+MIRL compression animation now settles after completion.
+- Changed the UI animation engine so idle is static, triggered compression/compile pipelines run to completion, and completed frames remain stable instead of falling back into an endlessly moving MIRL stream.
+- Updated the Textual dashboard timer so it only writes the MIRL panel while an animation is running or just completing, then stops updating that panel until the next compile/compress/benchmark trigger.
+- Added a focused unit test proving the animation returns idle before trigger, completes, and renders the same final frame on later ticks.
+- Verified dashboard/UI py_compile, the focused animation test, the Textual compile route test, and a dashboard snapshot render.
+Refs: follows the dashboard animation baseline from HISTORY#067 and HISTORY#065.
+---END-ENTRY-#068---
+
+---BEGIN-ENTRY-#069---
+id: 069
+date: 2026-04-25T15:09:40Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, command, chat, tui, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: 068
+tokens: 162
+---
+Added Codex/Claude-style prefix command palette to the Textual dashboard.
+- `/` now opens a SEAM command palette for dashboard commands such as compile, retrieve, context, stats, benchmark, and mode aliases.
+- `!` opens a force-command/shell palette with SEAM command entries plus common shell helpers such as pwd, cd, git status, docker ps, and python.
+- `?` opens the shortcut/mode palette for agent, shell, seam, hybrid, model, status, clear, savechat, forced chat, and help.
+- Palette filters as the operator types, ranks command-prefix matches above description matches, and supports Up/Down, Tab, Enter, and Esc.
+- Added Textual tests covering palette mount, filtering for all three prefix families, and selection behavior for immediate commands vs commands needing arguments.
+Refs: builds on the dashboard harness behavior in HISTORY#068.
+---END-ENTRY-#069---
+
+---BEGIN-ENTRY-#070---
+id: 070
+date: 2026-04-25T15:18:13Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, command, tui, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: 069
+tokens: 141
+---
+Slash palette now exposes the full slash command surface.
+- Changed `/` palette entries to insert real slash commands such as `/compile`, `/retrieve`, `/stats`, `/agent`, `/shell`, `/model`, `/savechat`, and `/quit` instead of mixing bare dashboard commands with a few slash aliases.
+- Added routing so slash-prefixed operational commands dispatch into the dashboard command parser; `/stats` is verified as an executable slash command.
+- Plain `/` now keeps the full slash match list and renders it as a compact multi-column command grid so operators can see the whole slash surface at once.
+- Updated focused Textual palette tests for full slash menu contents and slash command execution.
+Refs: refines HISTORY#069.
+---END-ENTRY-#070---

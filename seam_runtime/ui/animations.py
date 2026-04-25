@@ -314,11 +314,15 @@ class CompressionPipeline:
     # -- render -------------------------------------------------------------
 
     def render(self) -> list[str]:
-        if not self.active:
+        if not self.active and not self.has_completed_frame:
             return []
         header = self._header()
         bar_rows = [self._stage_row(s, i) for i, s in enumerate(self.stages)]
         return [header, ""] + bar_rows + [self._summary_row()]
+
+    @property
+    def has_completed_frame(self) -> bool:
+        return bool(self.stages) and all(stage.done for stage in self.stages)
 
     def _header(self) -> str:
         title = theme.fg(theme.ACCENT, f"⟶ COMPRESS  {self.label}")
@@ -374,6 +378,7 @@ class AnimationEngine:
     def __init__(self, height: int = 6) -> None:
         self.stream = MachineStream(height=height)
         self.pipeline = CompressionPipeline()
+        self._idle_lines = ["Idle. Run compile/compress/benchmark for live machine animation."]
 
     def trigger_compress(self, label: str,
                          source_tokens: int = 0,
@@ -381,17 +386,32 @@ class AnimationEngine:
                          kind: str = "compress") -> None:
         self.pipeline.trigger(label, source_tokens, machine_tokens, kind)
 
+    @property
+    def active(self) -> bool:
+        return self.pipeline.active
+
+    @property
+    def has_completed_frame(self) -> bool:
+        return self.pipeline.has_completed_frame
+
     def tick_and_render(self, now: float | None = None) -> list[str]:
         if now is None:
             now = time.monotonic()
+        if not self.pipeline.active:
+            if self.pipeline.has_completed_frame:
+                return self.pipeline.render() + ["", theme.fg(theme.STATUS_OK, "complete")]
+            return list(self._idle_lines)
         self.stream.tick(now)
+        was_active = self.pipeline.active
         self.pipeline.tick(now)
         if self.pipeline.active:
             # Show the pipeline on top, fade-out stream below.
             pipe = self.pipeline.render()
             stream_tail = self.stream.render(now)[-2:]
             return pipe + ["", theme.fg(theme.FRAME_DIM, "── live IR stream ──")] + stream_tail
-        return self.stream.render(now)
+        if was_active and self.pipeline.has_completed_frame:
+            return self.pipeline.render() + ["", theme.fg(theme.STATUS_OK, "complete")]
+        return list(self._idle_lines)
 
 
 # ---- Preview ---------------------------------------------------------------

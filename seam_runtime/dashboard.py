@@ -79,6 +79,14 @@ class DashboardEvent:
     message: str
 
 
+@dataclass(frozen=True)
+class CommandPaletteItem:
+    trigger: str
+    command: str
+    insert_text: str
+    description: str
+
+
 class DashboardParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:  # pragma: no cover - exercised through controller
         raise ValueError(message)
@@ -231,6 +239,15 @@ if App is not None and Static is not None and Input is not None and Log is not N
             border: round $primary;
             padding: 0 1;
         }
+        #command-palette {
+            height: 12;
+            border: round #7efbff;
+            padding: 0 1;
+            margin: 0 1;
+            color: #d8f7ff;
+            background: #050b1e;
+            display: none;
+        }
         #top-row, #middle-row {
             height: 1fr;
             layout: horizontal;
@@ -325,6 +342,11 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 "decompress-last",
                 "stats",
             }
+            self._palette_items = self._build_command_palette_items()
+            self._palette_matches: list[CommandPaletteItem] = []
+            self._palette_index = 0
+            self._palette_trigger = ""
+            self._palette_query = ""
             self._animation_phase = 0
             self._anim_until = 0.0
             self._anim_label = "idle"
@@ -336,6 +358,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
             # streaming IR view + RAW→IR→PACK pipeline visual on
             # compile/compress/benchmark triggers.
             self._anim_engine = _ui_animations.AnimationEngine(height=6)
+            self._mirl_animation_running = False
 
         def compose(self) -> ComposeResult:
             yield Static("", id="logo-header")
@@ -353,6 +376,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 yield _TextualPanel("Results", "result-panel")
             with Horizontal(id="chat-row"):
                 yield _TextualPanel("Chat", "chat-panel")
+            yield Static("", id="command-palette")
             yield Input(placeholder="", id="command-input")
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
@@ -379,10 +403,226 @@ if App is not None and Static is not None and Input is not None and Log is not N
         @on(Input.Submitted, "#command-input")
         def _on_command_submitted(self, event: Input.Submitted) -> None:  # pragma: no cover - textual runtime behavior
             command = event.value.strip()
+            if self._palette_matches and command in {"/", "!", "?"}:
+                self._accept_palette_selection(event.input, submit=False)
+                return
             event.input.value = ""
+            self._hide_command_palette()
             if not command:
                 return
             self.process_command(command)
+
+        @on(Input.Changed, "#command-input")
+        def _on_command_input_changed(self, event: Input.Changed) -> None:  # pragma: no cover - textual runtime behavior
+            self._update_command_palette(event.value)
+
+        def on_key(self, event: Any) -> None:  # pragma: no cover - textual runtime behavior
+            if self.focused is not self.query_one("#command-input", Input):
+                return
+            if not self._palette_matches:
+                return
+            if event.key == "escape":
+                self._hide_command_palette()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in {"down", "ctrl+n"}:
+                self._move_palette_selection(1)
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in {"up", "ctrl+p"}:
+                self._move_palette_selection(-1)
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key == "tab":
+                input_widget = self.query_one("#command-input", Input)
+                self._accept_palette_selection(input_widget, submit=False)
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key == "enter":
+                input_widget = self.query_one("#command-input", Input)
+                self._accept_palette_selection(input_widget, submit=True)
+                event.prevent_default()
+                event.stop()
+
+        def _build_command_palette_items(self) -> list[CommandPaletteItem]:
+            return [
+                CommandPaletteItem("/", "compile", "/compile ", "compile natural language into MIRL"),
+                CommandPaletteItem("/", "compile-dsl", "/compile-dsl ", "compile a SEAM DSL file"),
+                CommandPaletteItem("/", "retrieve", "/retrieve ", "rank memory results for a query"),
+                CommandPaletteItem("/", "context", "/context ", "build generation context from memory"),
+                CommandPaletteItem("/", "search", "/search ", "combined lexical/vector search"),
+                CommandPaletteItem("/", "plan", "/plan ", "show retrieval plan before execution"),
+                CommandPaletteItem("/", "index", "/index ", "sync persisted records into vector indexes"),
+                CommandPaletteItem("/", "trace", "/trace ", "trace one MIRL record id"),
+                CommandPaletteItem("/", "stats", "/stats", "refresh runtime metrics"),
+                CommandPaletteItem("/", "benchmark", "/benchmark ", "run lossless/retrieval benchmark"),
+                CommandPaletteItem("/", "compress-doc", "/compress-doc ", "compress a source document"),
+                CommandPaletteItem("/", "decompress-doc", "/decompress-doc ", "decompress a source artifact"),
+                CommandPaletteItem("/", "decompress-last", "/decompress-last", "decompress last compressed artifact"),
+                CommandPaletteItem("/", "tab runtime", "/tab runtime", "switch to runtime view"),
+                CommandPaletteItem("/", "tab benchmark", "/tab benchmark", "switch to benchmark view"),
+                CommandPaletteItem("/", "help", "/help", "show dashboard command help"),
+                CommandPaletteItem("/", "agent", "/agent", "switch input to agent/chat mode"),
+                CommandPaletteItem("/", "shell", "/shell", "switch input to shell mode"),
+                CommandPaletteItem("/", "seam", "/seam", "switch input to SEAM command mode"),
+                CommandPaletteItem("/", "cmd", "/cmd", "alias for SEAM command mode"),
+                CommandPaletteItem("/", "hybrid", "/hybrid", "switch input to hybrid mode"),
+                CommandPaletteItem("/", "model", "/model ", "show or switch chat model"),
+                CommandPaletteItem("/", "models", "/models", "list available chat models"),
+                CommandPaletteItem("/", "status", "/status", "show harness mode and runtime state"),
+                CommandPaletteItem("/", "clear", "/clear", "clear chat history"),
+                CommandPaletteItem("/", "savechat", "/savechat ", "export chat transcript"),
+                CommandPaletteItem("/", "quit", "/quit", "close the dashboard"),
+                CommandPaletteItem("!", "compile", "!compile ", "force a SEAM compile command"),
+                CommandPaletteItem("!", "retrieve", "!retrieve ", "force a SEAM retrieval command"),
+                CommandPaletteItem("!", "context", "!context ", "force a SEAM context command"),
+                CommandPaletteItem("!", "stats", "!stats", "force dashboard stats command"),
+                CommandPaletteItem("!", "pwd", "!pwd", "print shell working directory"),
+                CommandPaletteItem("!", "cd", "!cd ", "change shell working directory"),
+                CommandPaletteItem("!", "dir", "!dir", "list files in PowerShell"),
+                CommandPaletteItem("!", "git status", "!git status --short", "show concise git status"),
+                CommandPaletteItem("!", "docker ps", "!docker ps", "show running Docker containers"),
+                CommandPaletteItem("!", "python", "!python ", "run Python from the current shell"),
+                CommandPaletteItem("?", "agent", "?agent", "plain text chats with the model"),
+                CommandPaletteItem("?", "shell", "?shell", "plain text runs shell commands"),
+                CommandPaletteItem("?", "seam", "?seam", "plain text runs dashboard commands"),
+                CommandPaletteItem("?", "hybrid", "?hybrid", "known commands execute, other text chats"),
+                CommandPaletteItem("?", "model", "?model ", "show or switch chat model"),
+                CommandPaletteItem("?", "models", "?models", "list available chat models"),
+                CommandPaletteItem("?", "status", "?status", "show harness mode and runtime state"),
+                CommandPaletteItem("?", "clear", "?clear", "clear chat history"),
+                CommandPaletteItem("?", "savechat", "?savechat ", "export chat transcript"),
+                CommandPaletteItem("?", "??", "??", "force a chat message from any mode"),
+                CommandPaletteItem("?", "help", "?help", "show shortcut help"),
+            ]
+
+        def _update_command_palette(self, value: str) -> None:
+            raw = value.strip()
+            if not raw or raw[0] not in {"/", "!", "?"}:
+                self._hide_command_palette()
+                return
+            trigger = raw[0]
+            query = raw[1:].strip().lower()
+            if trigger in {"/", "!", "?"} and " " in raw[1:].lstrip():
+                self._hide_command_palette()
+                return
+
+            matches = [
+                item
+                for item in self._palette_items
+                if item.trigger == trigger
+                and (
+                    not query
+                    or query in item.command.lower()
+                    or query in item.description.lower()
+                    or query in item.insert_text.lower()
+                )
+            ]
+            if query:
+                matches.sort(key=lambda item: self._palette_match_rank(item, query))
+            self._palette_trigger = trigger
+            self._palette_query = query
+            max_matches = 32 if trigger == "/" and not query else 8
+            self._palette_matches = matches[:max_matches]
+            self._palette_index = min(self._palette_index, max(0, len(self._palette_matches) - 1))
+            self._render_command_palette()
+
+        @staticmethod
+        def _palette_match_rank(item: CommandPaletteItem, query: str) -> tuple[int, int, str]:
+            command = item.command.lower()
+            insert_text = item.insert_text.lower().lstrip("/!?")
+            description = item.description.lower()
+            if command == query:
+                bucket = 0
+            elif command.startswith(query):
+                bucket = 1
+            elif insert_text.startswith(query):
+                bucket = 2
+            elif query in command:
+                bucket = 3
+            elif query in insert_text:
+                bucket = 4
+            elif query in description:
+                bucket = 5
+            else:
+                bucket = 6
+            return (bucket, len(command), command)
+
+        def _render_command_palette(self) -> None:
+            palette = self.query_one("#command-palette", Static)
+            if not self._palette_matches:
+                palette.update("")
+                palette.styles.display = "none"
+                return
+            palette.styles.display = "block"
+            title = {
+                "/": "SEAM commands",
+                "!": "force command / shell",
+                "?": "mode shortcuts",
+            }.get(self._palette_trigger, "commands")
+            rows = [f"[bold cyan]{escape(title)}[/]  [dim]Up/Down move · Tab/Enter select · Esc close[/]"]
+            if self._palette_trigger == "/" and not self._palette_query:
+                rows.extend(self._render_slash_command_grid())
+                palette.update("\n".join(rows))
+                return
+            for idx, item in enumerate(self._palette_matches):
+                selected = idx == self._palette_index
+                marker = ">" if selected else " "
+                row = f"{marker} {escape(item.trigger + item.command):<22} {escape(item.description)}"
+                if selected:
+                    row = f"[reverse]{row}[/reverse]"
+                rows.append(row)
+            palette.update("\n".join(rows))
+
+        def _render_slash_command_grid(self) -> list[str]:
+            commands = [item.trigger + item.command for item in self._palette_matches]
+            columns = 3
+            rows: list[str] = []
+            for start in range(0, len(commands), columns):
+                cells = []
+                for offset, command in enumerate(commands[start:start + columns]):
+                    idx = start + offset
+                    marker = ">" if idx == self._palette_index else " "
+                    cell = f"{marker} {escape(command):<18}"
+                    if idx == self._palette_index:
+                        cell = f"[reverse]{cell}[/reverse]"
+                    cells.append(cell)
+                rows.append("  ".join(cells))
+            return rows
+
+        def _hide_command_palette(self) -> None:
+            self._palette_matches = []
+            self._palette_index = 0
+            self._palette_trigger = ""
+            self._palette_query = ""
+            try:
+                palette = self.query_one("#command-palette", Static)
+                palette.update("")
+                palette.styles.display = "none"
+            except Exception:
+                return
+
+        def _move_palette_selection(self, delta: int) -> None:
+            if not self._palette_matches:
+                return
+            self._palette_index = (self._palette_index + delta) % len(self._palette_matches)
+            self._render_command_palette()
+
+        def _accept_palette_selection(self, input_widget: Input, submit: bool = False) -> None:
+            if not self._palette_matches:
+                return
+            item = self._palette_matches[self._palette_index]
+            input_widget.value = item.insert_text
+            input_widget.cursor_position = len(input_widget.value)
+            self._hide_command_palette()
+            if submit and not input_widget.value.endswith(" "):
+                command = input_widget.value.strip()
+                input_widget.value = ""
+                self.process_command(command)
 
         def process_command(self, command: str) -> None:
             raw = command.strip()
@@ -443,18 +683,26 @@ if App is not None and Static is not None and Input is not None and Log is not N
             shortcut = parts[0].lower() if parts else ""
             argument = parts[1].strip() if len(parts) > 1 else ""
             argument = argument.strip("\"'")
-            if prefix == "/" and shortcut in {"model", "m"}:
-                shortcut = "agent"
-            elif prefix == "/" and shortcut in {"cmd", "command", "c"}:
+            if prefix == "/" and shortcut in self.command_names:
+                command = shortcut if not argument else f"{shortcut} {argument}"
+                self._execute_dashboard_command(command)
+                return
+            if prefix == "/" and shortcut in {"cmd", "command", "c"}:
                 shortcut = "seam"
             elif prefix == "/" and shortcut in {"hybrid", "h"}:
                 shortcut = "hybrid"
+            elif prefix == "/" and shortcut in {"agent", "chat", "a"}:
+                shortcut = "agent"
+            elif prefix == "/" and shortcut in {"shell", "bash", "sh"}:
+                shortcut = "shell"
             elif prefix == "/" and shortcut in {"clear", "cls"}:
                 shortcut = "clear"
             elif prefix == "/" and shortcut in {"help", "?"}:
                 shortcut = "help"
             elif prefix == "/" and shortcut in {"savechat", "save-chat", "export-chat", "exportchat"}:
                 shortcut = "savechat"
+            elif prefix == "/" and shortcut in {"model", "m", "models", "status"}:
+                pass
 
             if shortcut in {"agent", "chat", "a"}:
                 self.input_mode = "agent"
@@ -809,9 +1057,12 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 "compress" if "compress" in label.lower() else "compile"
             )
             self._anim_engine.trigger_compress(label, source_tokens, machine_tokens, kind)
+            self._mirl_animation_running = True
 
         def _tick_mirl_animation(self) -> None:
             if not self.is_mounted:
+                return
+            if not self._mirl_animation_running:
                 return
             self._animation_phase = (self._animation_phase + 1) % 8
             try:
@@ -820,6 +1071,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             lines = self._anim_engine.tick_and_render()
             panel.set_lines(lines)
+            if not self._anim_engine.active:
+                self._mirl_animation_running = False
 
         def _tick_metrics(self) -> None:
             if not self.is_mounted:
