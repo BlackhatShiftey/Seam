@@ -1473,3 +1473,136 @@ Slash palette now exposes the full slash command surface.
 - Updated focused Textual palette tests for full slash menu contents and slash command execution.
 Refs: refines HISTORY#069.
 ---END-ENTRY-#070---
+
+---BEGIN-ENTRY-#071---
+id: 071
+date: 2026-04-25T16:02:11Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, chat, command, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: 070
+tokens: 96
+---
+Expanded the dashboard chat model defaults.
+- Added DEFAULT_CHAT_MODELS in seam_runtime/dashboard.py with OpenAI defaults plus current OpenRouter-compatible agent/coding models: Qwen, DeepSeek, Xiaomi MiMo, Kimi, GLM, Claude, Gemini, and Pareto Code Router.
+- Preserved SEAM_CHAT_MODELS as the operator override for custom comma-separated model lists.
+- Added focused test coverage for the new OpenRouter agent model defaults.
+- Verified with focused pytest selection and dashboard snapshot render.
+Refs: see HISTORY#070 for prior command palette/model shortcut behavior.
+---END-ENTRY-#071---
+
+---BEGIN-ENTRY-#072---
+id: 072
+date: 2026-04-25T16:04:41Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, chat, command, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: 071
+tokens: 87
+---
+Added Grok models to the dashboard chat defaults.
+- Added current OpenRouter xAI model IDs for Grok 4.20, Grok 4.20 Multi-Agent, Grok 4.1 Fast, and Grok Code Fast 1 to DEFAULT_CHAT_MODELS.
+- Extended regression coverage so Grok entries remain part of the default available chat models.
+- Verified with focused dashboard model tests and dashboard snapshot render.
+Refs: see HISTORY#071 for the broader default model list expansion.
+---END-ENTRY-#072---
+
+---BEGIN-ENTRY-#073---
+id: 073
+date: 2026-04-25T16:05:15Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, chat, command, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py
+supersedes: 072
+tokens: 85
+---
+Added Gemma models to the expanded dashboard chat defaults.
+- Added current OpenRouter Google Gemma 4 model IDs for 31B and 26B variants, including free routes where available.
+- Kept Grok entries from HISTORY#072 and the broader OpenRouter agent/coding defaults from HISTORY#071.
+- Extended regression coverage so Gemma entries remain in DEFAULT_CHAT_MODELS and SeamChatClient defaults.
+- Verified with focused dashboard model tests and dashboard snapshot render.
+---END-ENTRY-#073---
+
+---BEGIN-ENTRY-#074---
+id: 074
+date: 2026-04-25T16:10:22Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, chat, command, readme, verify, history, snapshot
+commits: none
+refs: docs/setup.md,README.md
+supersedes: 073
+tokens: 92
+---
+Documented dashboard OpenRouter model switching across supported setup targets.
+- Added copy/paste OpenRouter chat configuration to docs/setup.md for Windows PowerShell and Linux/WSL2 bash.
+- Documented temporary session env vars, persistent user defaults, ?models / ?model dashboard switching, and SEAM_CHAT_MODELS overrides.
+- Added a README pointer from the dashboard quick start to the setup doc.
+- Re-ran focused dashboard model tests after doc changes.
+Refs: see HISTORY#073 for Gemma/Grok/default model list implementation.
+---END-ENTRY-#074---
+
+---BEGIN-ENTRY-#075---
+id: 075
+date: 2026-04-25T16:14:02Z
+agent: codex-gpt-5
+status: done
+topics: readme, ledger, handoff, history, snapshot, protocol
+commits: none
+refs: docs/README.md,docs/archive/README.md,REPO_LEDGER.md,README.md
+supersedes: 074
+tokens: 124
+---
+Separated active docs from inactive historical documentation.
+- Added docs/README.md as the active docs index and source-of-truth pointer.
+- Added docs/archive/README.md to mark archived docs as traceability records, not current instructions.
+- Moved the old UI-layer handoff into docs/archive/handoffs/ so root docs do not mix active guidance with historical handoff prose.
+- Updated REPO_LEDGER.md with the Documentation Separation Policy and linked docs/README.md from README.md.
+- This establishes the path for future Ubuntu verification docs: keep current commands in active setup/howto docs and move superseded notes under docs/archive/.
+Refs: see HISTORY#074 for current OpenRouter dashboard setup docs.
+---END-ENTRY-#075---
+
+---BEGIN-ENTRY-#076---
+id: 076
+date: 2026-04-25T16:22:00Z
+agent: codex-gpt-5
+status: done
+topics: readme, ledger, history, protocol, verify, snapshot
+commits: none
+refs: archive/README.md,archive/code/README.md,docs/CODE_LAYOUT.md,REPO_LEDGER.md,.gitignore
+supersedes: 075
+tokens: 122
+---
+Formalized active versus inactive code separation.
+- Added archive/README.md and archive/code/README.md to define inactive code as opt-in historical context, not runtime source.
+- Added docs/CODE_LAYOUT.md as the active map for runtime code, tooling, prototypes, inactive code, and generated artifacts.
+- Updated REPO_LEDGER.md with a Code Separation Policy and linked the code map from README.md and docs/README.md.
+- Moved the local ignored build/ tree to archive/code/generated-build-20260425 and ignored archive/code/generated-build*/ so generated source copies do not appear as active code.
+- Verified focused dashboard model tests still pass.
+Refs: see HISTORY#075 for the active/inactive docs split.
+---END-ENTRY-#076---
+
+---BEGIN-ENTRY-#077---
+id: 077
+date: 2026-04-25T16:23:56Z
+agent: codex-gpt-5
+status: done
+topics: protocol, search, readme, ledger, verify, history, snapshot
+commits: none
+refs: AGENTS.md,.rgignore,docs/CODE_LAYOUT.md
+supersedes: 076
+tokens: 107
+---
+Hardened agent context boundaries for active versus inactive code/docs.
+- Updated AGENTS.md startup reads to include docs/CODE_LAYOUT.md and to treat archive/code, docs/archive, build, .venv, and generated/cache paths as inactive unless explicitly requested.
+- Added .rgignore so normal ripgrep searches skip inactive, generated, and cache-heavy paths.
+- Updated docs/CODE_LAYOUT.md with the search rule.
+- Focused dashboard model tests still pass; rg verification was attempted but this Windows environment returned the known rg.exe Access is denied error.
+Refs: see HISTORY#076 for active/inactive code separation policy.
+---END-ENTRY-#077---

@@ -52,6 +52,40 @@ from .ui import bars as _ui_bars
 from .ui import logo as _ui_logo
 
 
+DEFAULT_CHAT_MODELS = [
+    # OpenAI defaults for the stock https://api.openai.com/v1 endpoint.
+    "gpt-4o-mini",
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "o4-mini",
+    # Strong OpenRouter-compatible coding and agent models.
+    "openrouter/pareto-code",
+    "qwen/qwen3-coder",
+    "qwen/qwen3-coder-next",
+    "qwen/qwen3-coder-plus",
+    "qwen/qwen3.6-plus",
+    "deepseek/deepseek-v4-pro",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v3.2",
+    "xiaomi/mimo-v2.5-pro",
+    "xiaomi/mimo-v2.5",
+    "moonshotai/kimi-k2.6",
+    "z-ai/glm-5.1",
+    "x-ai/grok-4.20",
+    "x-ai/grok-4.20-multi-agent",
+    "x-ai/grok-4.1-fast",
+    "x-ai/grok-code-fast-1",
+    "anthropic/claude-sonnet-4.6",
+    "anthropic/claude-opus-4.7",
+    "google/gemini-3.1-pro-preview",
+    "google/gemini-3.1-flash-lite-preview",
+    "google/gemma-4-31b-it",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it",
+    "google/gemma-4-26b-a4b-it:free",
+]
+
+
 @dataclass
 class DashboardMetrics:
     db_path: str
@@ -98,13 +132,7 @@ class SeamChatClient:
         self.model = os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini")
         self.api_key = os.environ.get("SEAM_CHAT_API_KEY") or os.environ.get("OPENAI_API_KEY")
         configured_models = [item.strip() for item in os.environ.get("SEAM_CHAT_MODELS", "").split(",") if item.strip()]
-        self.available_models = configured_models or [
-            self.model,
-            "gpt-4.1-mini",
-            "gpt-4.1",
-            "gpt-4o-mini",
-            "o4-mini",
-        ]
+        self.available_models = configured_models or list(DEFAULT_CHAT_MODELS)
         if self.model not in self.available_models:
             self.available_models.insert(0, self.model)
 

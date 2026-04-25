@@ -90,6 +90,8 @@ Notes:
 
 ## Setup and Troubleshooting Docs
 
+- Docs index and active/archive split: `docs/README.md`
+- Active/inactive code layout: `docs/CODE_LAYOUT.md`
 - Setup commands: `docs/setup.md`
 - Documented errors and fixes: `docs/errors.md`
 - Task runbooks: `docs/howto/README.md`
@@ -270,6 +272,11 @@ Useful non-interactive snapshots:
 seam dashboard --snapshot --no-clear
 seam dashboard --run "tab benchmark" --run "benchmark tools/lossless_demo_input.txt --min-savings 0.75" --run "decompress-last" --no-clear
 ```
+
+Dashboard chat can use OpenRouter or any OpenAI-compatible backend through
+`SEAM_CHAT_BASE_URL`, `SEAM_CHAT_API_KEY`, `SEAM_CHAT_MODEL`, and
+`SEAM_CHAT_MODELS`. Copy/paste setup and model switching commands for Windows
+and Linux/WSL2 live in `docs/setup.md`.
 
 ## Benchmark Glassbox
 

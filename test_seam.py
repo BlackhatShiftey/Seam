@@ -15,7 +15,7 @@ from experimental.retrieval_orchestrator.adapters import SQLiteIRAdapter
 from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime.cli import run_cli
-from seam_runtime.dashboard import TextualDashboardApp, run_dashboard
+from seam_runtime.dashboard import DEFAULT_CHAT_MODELS, SeamChatClient, TextualDashboardApp, run_dashboard
 from seam_runtime.installer import (
     InstallLayout,
     PATH_MARKER_BEGIN,
@@ -1056,6 +1056,31 @@ claim c2:
                 self.assertIn("Switched chat model to gpt-4.1-mini", "\n".join(app.result_lines))
 
         asyncio.run(_check())
+
+    def test_dashboard_default_chat_models_include_openrouter_agent_models(self) -> None:
+        expected = {
+            "openrouter/pareto-code",
+            "qwen/qwen3-coder",
+            "qwen/qwen3-coder-next",
+            "qwen/qwen3-coder-plus",
+            "deepseek/deepseek-v4-pro",
+            "deepseek/deepseek-v4-flash",
+            "xiaomi/mimo-v2.5-pro",
+            "xiaomi/mimo-v2.5",
+            "moonshotai/kimi-k2.6",
+            "z-ai/glm-5.1",
+            "x-ai/grok-4.20",
+            "x-ai/grok-4.20-multi-agent",
+            "x-ai/grok-4.1-fast",
+            "x-ai/grok-code-fast-1",
+            "google/gemma-4-31b-it",
+            "google/gemma-4-31b-it:free",
+            "google/gemma-4-26b-a4b-it",
+            "google/gemma-4-26b-a4b-it:free",
+        }
+        self.assertTrue(expected.issubset(set(DEFAULT_CHAT_MODELS)))
+        with patch.dict(os.environ, {"SEAM_CHAT_MODEL": "gpt-4o-mini"}, clear=True):
+            self.assertTrue(expected.issubset(set(SeamChatClient().available_models)))
 
     def test_textual_dashboard_bang_runs_shell_commands(self) -> None:
         if find_spec("textual") is None:

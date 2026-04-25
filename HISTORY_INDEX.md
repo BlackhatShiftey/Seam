@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 70
-total_tokens: ~6300
-latest_id: 070
+total_entries: 77
+total_tokens: ~7013
+latest_id: 077
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,13 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 077 | 2026-04-25 | done | b7ed0ec9803f202a | protocol,search,readme,ledger,+ | 076 |
+| 076 | 2026-04-25 | done | 51d52ebc6d1fb271 | readme,ledger,history,protocol,+ | 075 |
+| 075 | 2026-04-25 | done | 8206c379051114a0 | readme,ledger,handoff,history,+ | 074 |
+| 074 | 2026-04-25 | done | 603e38f2965bc455 | dashboard,chat,command,readme,+ | 073 |
+| 073 | 2026-04-25 | done | 0b7972bfe545ebba | dashboard,chat,command,verify,+ | 072 |
+| 072 | 2026-04-25 | done | a5e9b00925fe5635 | dashboard,chat,command,verify,+ | 071 |
+| 071 | 2026-04-25 | done | c51553c0b6d39cb4 | dashboard,chat,command,verify,+ | 070 |
 | 070 | 2026-04-25 | done | 680ac8042d707b46 | dashboard,command,tui,verify,+ | 069 |
 | 069 | 2026-04-25 | done | 76eb4354d05d9aac | dashboard,command,chat,tui,+ | 068 |
 | 068 | 2026-04-25 | done | 0869955c361913d0 | dashboard,animation,mirl,verify,+ | 067 |
@@ -88,25 +95,25 @@ compact: true
 - animation: count=4 latest=#068, #052, #032, #028
 - benchmark: count=18 latest=#047, #040, #039, #038, #037
 - bundle: count=2 latest=#015, #008
-- chat: count=9 latest=#069, #060, #057, #056, #055
+- chat: count=13 latest=#074, #073, #072, #071, #069
 - chroma: count=2 latest=#017, #001
 - codec: count=2 latest=#018, #006
-- command: count=24 latest=#070, #069, #067, #066, #065
+- command: count=28 latest=#074, #073, #072, #071, #070
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=6 latest=#042, #041, #033, #026, #018
-- dashboard: count=32 latest=#070, #069, #068, #067, #065
+- dashboard: count=36 latest=#074, #073, #072, #071, #070
 - diff: count=1 latest=#037
 - doctor: count=3 latest=#019, #014, #013
 - extras: count=1 latest=#022
 - fixture: count=2 latest=#039, #008
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
-- handoff: count=1 latest=#025
-- history: count=24 latest=#070, #069, #068, #067, #066
+- handoff: count=2 latest=#075, #025
+- history: count=31 latest=#077, #076, #075, #074, #073
 - holdout: count=1 latest=#036
 - installer: count=7 latest=#063, #035, #021, #020, #015
 - integrity: count=1 latest=#048
-- ledger: count=3 latest=#048, #025, #024
+- ledger: count=6 latest=#077, #076, #075, #048, #025
 - lexical: count=1 latest=#004
 - linux: count=2 latest=#021, #014
 - lx1: count=3 latest=#018, #011, #006
@@ -117,27 +124,27 @@ compact: true
 - persist: count=18 latest=#047, #044, #042, #036, #032
 - pgvector: count=12 latest=#067, #066, #044, #026, #023
 - plan: count=3 latest=#027, #017, #003
-- protocol: count=2 latest=#064, #048
+- protocol: count=5 latest=#077, #076, #075, #064, #048
 - pyproject: count=3 latest=#051, #049, #022
 - rank: count=3 latest=#017, #005, #001
-- readme: count=4 latest=#065, #051, #035, #009
+- readme: count=8 latest=#077, #076, #075, #074, #065
 - retrieval: count=10 latest=#047, #038, #023, #017, #011
 - roadmap: count=19 latest=#050, #046, #045, #044, #043
 - roundtrip: count=2 latest=#007, #006
 - sbert: count=3 latest=#023, #022, #011
-- search: count=9 latest=#047, #046, #041, #033, #031
+- search: count=10 latest=#077, #047, #046, #041, #033
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=22 latest=#070, #069, #068, #067, #066
+- snapshot: count=29 latest=#077, #076, #075, #074, #073
 - status: count=19 latest=#046, #045, #044, #043, #042
 - textual: count=15 latest=#063, #062, #061, #060, #059
 - tui: count=9 latest=#070, #069, #061, #060, #059
 - vector: count=17 latest=#066, #044, #038, #034, #026
-- verify: count=17 latest=#070, #069, #068, #066, #040
+- verify: count=23 latest=#077, #076, #074, #073, #072
 - windows: count=7 latest=#067, #066, #065, #063, #062
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 50
+- done: 57
 - planned: 20

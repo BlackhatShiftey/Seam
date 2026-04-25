@@ -8,11 +8,14 @@ Read in order:
 1. `PROJECT_STATUS.md`
 2. `REPO_LEDGER.md`
 3. `HISTORY_INDEX.md`
+4. `docs/CODE_LAYOUT.md`
 
 Then:
 - Prefer latest valid snapshot in `.seam/snapshots/`.
 - If snapshot verification fails, fall back to index-first reads.
 - Never read all of `HISTORY.md`; pull only needed entries by indexed line/byte ranges.
+- Treat `archive/code/`, `docs/archive/`, `build/`, `.venv/`, and generated/cache paths as inactive unless the user explicitly asks for historical or retired material.
+- For normal code search, stay in active paths: `seam_runtime/`, `seam.py`, `experimental/`, `tools/`, `scripts/`, `installers/`, `docs/`, tests, and root status files.
 
 ## Session End
 
@@ -30,6 +33,7 @@ Use `tools/history/*` scripts for entry writes, index rebuild, integrity verific
 - Snapshot integrity must be verified before use.
 - Status updates never edit old entries; use `supersedes`.
 - Use pointer cards across docs (`see HISTORY#NNN`), not duplicated prose.
+- Active docs/code and archived docs/code must stay separated; do not copy stale archive prose or code back into active paths without rewriting and verifying it.
 
 ## Entry Schema
 

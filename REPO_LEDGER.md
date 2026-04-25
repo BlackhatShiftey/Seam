@@ -37,6 +37,22 @@ and `HISTORY_INDEX.md`.
 - `HISTORY_INDEX.md` and snapshots are derived artifacts; `HISTORY.md` is authoritative.
 - The `handoff/archive` branch is reserved for PDF and handoff artifact publication, not primary runtime/source work.
 
+## Documentation Separation Policy
+
+- Active operator and engineering docs live in `docs/` and are indexed by `docs/README.md`.
+- Inactive docs, old handoffs, superseded setup notes, and historical coding artifacts live under `docs/archive/`.
+- Archived docs are traceability records, not current instructions.
+- When old prose is useful, rewrite the current part into an active doc and point to `HISTORY#NNN`; do not duplicate stale context across active docs.
+
+## Code Separation Policy
+
+- Active runtime code lives in `seam_runtime/` and `seam.py`.
+- Active operator/dev tooling lives in `tools/`, `scripts/`, and `installers/`.
+- `experimental/` is active prototype code: less stable than runtime code, but still importable and testable.
+- Inactive or retired code lives under `archive/code/` and must not be imported, packaged, or used as current behavior.
+- Generated build copies live in ignored paths (`build/` or `archive/code/generated-build*/`) and should not guide implementation decisions.
+- The current code map is `docs/CODE_LAYOUT.md`.
+
 ## Runtime Service Safety Policy
 
 - External services for real-adapter tests (for example Docker pgvector) must be started only for the active test window.
