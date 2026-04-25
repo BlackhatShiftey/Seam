@@ -17,6 +17,12 @@ From the repo root:
 powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
 ```
 
+For repo-local dashboard runs on Windows, use the launcher under `scripts\windows`:
+
+```powershell
+.\scripts\windows\launch_dashboard.bat
+```
+
 ## Linux (including WSL2)
 
 ### Prerequisites

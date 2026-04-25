@@ -217,6 +217,12 @@ To drop into a shell where you can type `seam` directly:
 . .\scripts\enter_seam.ps1
 ```
 
+Windows repo-local dashboard launcher:
+
+```powershell
+.\scripts\windows\launch_dashboard.bat
+```
+
 Optional extras:
 
 - `pgvector` for PostgreSQL pgvector backend
@@ -250,6 +256,12 @@ Requires `rich`:
 
 ```powershell
 seam dashboard
+```
+
+On Windows, a repo-local launcher is also available when you want to run the checkout dashboard against the persistent installed database if it exists:
+
+```powershell
+.\scripts\windows\launch_dashboard.bat
 ```
 
 Useful non-interactive snapshots:

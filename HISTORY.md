@@ -1358,3 +1358,21 @@ tokens: 87
 ---
 Added a Codex-facing project config at `seam_runtime/config.toml` for the SEAM workspace. The profile keeps reasoning high, enables memories, trusts the active OneDrive repo paths, and documents a token-frugal standby policy: startup should use compact repo state docs and indexed history reads; skills should be loaded only when named or clearly needed; plugin/connectors should stay as domain-specific capability packs rather than default context for ordinary SEAM coding turns.
 ---END-ENTRY-#064---
+
+---BEGIN-ENTRY-#065---
+id: 065
+date: 2026-04-25T06:13:35Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, windows, command, readme, history, snapshot
+commits: none
+refs: README.md,installers/README.md,scripts/windows/launch_dashboard.bat
+supersedes: none
+tokens: 92
+---
+Windows repo-local dashboard launcher moved into the scripts tree.
+- Moved the root `launch_dashboard.bat` into `scripts/windows/launch_dashboard.bat` so Windows operator helpers live together instead of at repo root.
+- Kept the launcher repo-root aware from its new location; it prefers `.venv\Scripts\seam-dash.exe`, falls back to `python -m seam_runtime.dashboard`, and reuses `%LOCALAPPDATA%\SEAM\state\seam.db` when present.
+- Linked the launcher from `README.md` and `installers/README.md`.
+- Verified `cmd /c scripts\windows\launch_dashboard.bat --help` resolves the repo-local `seam-dash` command successfully.
+---END-ENTRY-#065---

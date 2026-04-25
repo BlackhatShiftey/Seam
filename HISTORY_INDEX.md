@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 64
-total_tokens: ~5473
-latest_id: 064
+total_entries: 65
+total_tokens: ~5565
+latest_id: 065
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,8 +11,9 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 065 | 2026-04-25 | done | 1917870c95cfe3ad | dashboard,windows,command,readme,+ | none |
 | 064 | 2026-04-25 | done | 3c8f79c983856deb | protocol,multi-agent,mcp,history | none |
-| 063 | 2026-04-21 | done | ec397d3e207d71f4 | installer,dashboard,textual,windows,+ | none |
+| 063 | 2026-04-21 | done | 00bb98b62b970f48 | installer,dashboard,textual,windows,+ | none |
 | 062 | 2026-04-21 | done | 609e5f92a3ed4218 | dashboard,textual,windows,history,+ | none |
 | 061 | 2026-04-21 | done | c61b823cc9977bcc | dashboard,textual,tui,history,+ | none |
 | 060 | 2026-04-20 | done | 4ea6cae90e77bd47 | dashboard,textual,chat,command,+ | none |
@@ -85,10 +86,10 @@ compact: true
 - chat: count=8 latest=#060, #057, #056, #055, #054
 - chroma: count=2 latest=#017, #001
 - codec: count=2 latest=#018, #006
-- command: count=19 latest=#060, #059, #058, #057, #056
+- command: count=20 latest=#065, #060, #059, #058, #057
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=6 latest=#042, #041, #033, #026, #018
-- dashboard: count=27 latest=#063, #062, #061, #060, #059
+- dashboard: count=28 latest=#065, #063, #062, #061, #060
 - diff: count=1 latest=#037
 - doctor: count=3 latest=#019, #014, #013
 - extras: count=1 latest=#022
@@ -96,7 +97,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
 - handoff: count=1 latest=#025
-- history: count=18 latest=#064, #063, #062, #061, #060
+- history: count=19 latest=#065, #064, #063, #062, #061
 - holdout: count=1 latest=#036
 - installer: count=7 latest=#063, #035, #021, #020, #015
 - integrity: count=1 latest=#048
@@ -114,25 +115,24 @@ compact: true
 - protocol: count=2 latest=#064, #048
 - pyproject: count=3 latest=#051, #049, #022
 - rank: count=3 latest=#017, #005, #001
-- readme: count=3 latest=#051, #035, #009
+- readme: count=4 latest=#065, #051, #035, #009
 - retrieval: count=10 latest=#047, #038, #023, #017, #011
 - roadmap: count=19 latest=#050, #046, #045, #044, #043
 - roundtrip: count=2 latest=#007, #006
 - sbert: count=3 latest=#023, #022, #011
 - search: count=9 latest=#047, #046, #041, #033, #031
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=16 latest=#063, #062, #061, #060, #059
+- snapshot: count=17 latest=#065, #063, #062, #061, #060
 - status: count=19 latest=#046, #045, #044, #043, #042
 - textual: count=15 latest=#063, #062, #061, #060, #059
 - tui: count=7 latest=#061, #060, #059, #058, #057
 - vector: count=16 latest=#044, #038, #034, #026, #023
 - verify: count=13 latest=#040, #037, #026, #024, #021
-- windows: count=4 latest=#063, #062, #020, #007
+- windows: count=5 latest=#065, #063, #062, #020, #007
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
-- roots: 64
-- done: 43
-- in-progress: 1
+- roots: 65
+- done: 45
 - planned: 20
