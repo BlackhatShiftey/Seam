@@ -20,7 +20,7 @@ def main(argv: list[str] | None = None) -> int:
     layout = detect_layout(args.repo_root)
     ensure_virtualenv(layout)
     install_repo(layout, upgrade_pip=not args.skip_pip_upgrade)
-    seam_shim, benchmark_shim = write_shims(layout)
+    seam_shim, benchmark_shim, dashboard_shim = write_shims(layout)
     updated_profiles = ensure_path_access(layout)
     doctor = run_doctor(layout)
 
@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Persistent DB: {layout.persistent_db_path}")
     print(f"Command shim: {seam_shim}")
     print(f"Benchmark shim: {benchmark_shim}")
+    print(f"Dashboard shim: {dashboard_shim}")
     if updated_profiles:
         print("Updated shell profiles:")
         for profile in updated_profiles:

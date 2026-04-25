@@ -17,15 +17,24 @@ from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lin
 from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import TextualDashboardApp, run_dashboard
 from seam_runtime.installer import (
+    InstallLayout,
     PATH_MARKER_BEGIN,
     _ensure_posix_shell_profiles,
     default_runtime_db_path,
+    detect_layout,
+    install_repo,
     path_in_environment,
     render_posix_shim,
     render_windows_cmd_shim,
+    write_shims,
 )
 from seam_runtime.lossless import benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
-from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel, cosine, default_embedding_model
+from seam_runtime.models import (
+    HashEmbeddingModel,
+    OpenAICompatibleEmbeddingModel,
+    cosine,
+    default_embedding_model,
+)
 from seam_runtime.pack import score_pack, unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
 from seam_runtime.vector import INDEXABLE_KINDS
@@ -1114,6 +1123,134 @@ class InstallerLinuxTests(unittest.TestCase):
         self.assertIn("python3", content)
         self.assertIn("install_seam.py", content)
         self.assertIn("set -eu", content)
+
+    def test_detect_layout_includes_dashboard_entry(self) -> None:
+        layout = detect_layout()
+        self.assertIn("seam-dash", layout.dashboard_entry.name)
+        if layout.is_windows:
+            self.assertEqual(layout.dashboard_entry.name, "seam-dash.exe")
+            self.assertEqual(layout.dashboard_entry.parent, layout.venv_dir / "Scripts")
+        else:
+            self.assertEqual(layout.dashboard_entry.name, "seam-dash")
+            self.assertEqual(layout.dashboard_entry.parent, layout.venv_dir / "bin")
+
+    def test_write_shims_returns_three_paths_posix_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            install_root = root / "install"
+            venv_dir = install_root / "runtime"
+            bin_dir = install_root / "bin"
+            layout = InstallLayout(
+                repo_root=repo_root,
+                install_root=install_root,
+                venv_dir=venv_dir,
+                bin_dir=bin_dir,
+                seam_entry=venv_dir / "bin" / "seam",
+                benchmark_entry=venv_dir / "bin" / "seam-benchmark",
+                dashboard_entry=venv_dir / "bin" / "seam-dash",
+                persistent_db_path=install_root / "state" / "seam.db",
+                is_windows=False,
+            )
+            seam_shim, benchmark_shim, dashboard_shim = write_shims(layout)
+            self.assertEqual(seam_shim, bin_dir / "seam")
+            self.assertEqual(benchmark_shim, bin_dir / "seam-benchmark")
+            self.assertEqual(dashboard_shim, bin_dir / "seam-dash")
+            self.assertTrue(dashboard_shim.exists())
+            content = dashboard_shim.read_text(encoding="utf-8")
+            self.assertIn("seam-dash", content)
+            self.assertIn('export SEAM_DB_PATH=', content)
+
+    def test_write_shims_returns_three_paths_windows_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            install_root = root / "install"
+            venv_dir = install_root / "runtime"
+            bin_dir = install_root / "bin"
+            layout = InstallLayout(
+                repo_root=repo_root,
+                install_root=install_root,
+                venv_dir=venv_dir,
+                bin_dir=bin_dir,
+                seam_entry=venv_dir / "Scripts" / "seam.exe",
+                benchmark_entry=venv_dir / "Scripts" / "seam-benchmark.exe",
+                dashboard_entry=venv_dir / "Scripts" / "seam-dash.exe",
+                persistent_db_path=install_root / "state" / "seam.db",
+                is_windows=True,
+            )
+            seam_shim, benchmark_shim, dashboard_shim = write_shims(layout)
+            self.assertEqual(seam_shim, bin_dir / "seam.cmd")
+            self.assertEqual(benchmark_shim, bin_dir / "seam-benchmark.cmd")
+            self.assertEqual(dashboard_shim, bin_dir / "seam-dash.cmd")
+            self.assertTrue(dashboard_shim.exists())
+            content = dashboard_shim.read_text(encoding="ascii")
+            self.assertIn("seam-dash.exe", content)
+            self.assertIn("SEAM_DB_PATH", content)
+
+    def test_install_repo_includes_dashboard_extra_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            install_root = root / "install"
+            venv_dir = install_root / "runtime"
+            bin_dir = install_root / "bin"
+            (repo_root).mkdir(parents=True, exist_ok=True)
+            layout = InstallLayout(
+                repo_root=repo_root,
+                install_root=install_root,
+                venv_dir=venv_dir,
+                bin_dir=bin_dir,
+                seam_entry=venv_dir / "bin" / "seam",
+                benchmark_entry=venv_dir / "bin" / "seam-benchmark",
+                dashboard_entry=venv_dir / "bin" / "seam-dash",
+                persistent_db_path=install_root / "state" / "seam.db",
+                is_windows=False,
+            )
+            calls: list[list[str]] = []
+            def _fake_run(cmd, check=True, **kwargs):  # pragma: no cover - test shim
+                calls.append(list(cmd))
+                class _Result:
+                    returncode = 0
+                return _Result()
+            with patch("seam_runtime.installer.subprocess.run", side_effect=_fake_run):
+                install_repo(layout, upgrade_pip=False)
+            install_cmds = [call for call in calls if "install" in call]
+            self.assertTrue(install_cmds)
+            package_specs = [arg for call in install_cmds for arg in call if arg.endswith("[dash]")]
+            self.assertTrue(package_specs, f"Expected a [dash] extra install in {install_cmds}")
+            self.assertEqual(package_specs[0], f"{repo_root}[dash]")
+
+    def test_install_repo_respects_include_dashboard_false(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            install_root = root / "install"
+            venv_dir = install_root / "runtime"
+            bin_dir = install_root / "bin"
+            repo_root.mkdir(parents=True, exist_ok=True)
+            layout = InstallLayout(
+                repo_root=repo_root,
+                install_root=install_root,
+                venv_dir=venv_dir,
+                bin_dir=bin_dir,
+                seam_entry=venv_dir / "bin" / "seam",
+                benchmark_entry=venv_dir / "bin" / "seam-benchmark",
+                dashboard_entry=venv_dir / "bin" / "seam-dash",
+                persistent_db_path=install_root / "state" / "seam.db",
+                is_windows=False,
+            )
+            calls: list[list[str]] = []
+            def _fake_run(cmd, check=True, **kwargs):  # pragma: no cover - test shim
+                calls.append(list(cmd))
+                class _Result:
+                    returncode = 0
+                return _Result()
+            with patch("seam_runtime.installer.subprocess.run", side_effect=_fake_run):
+                install_repo(layout, upgrade_pip=False, include_dashboard=False)
+            for call in calls:
+                for arg in call:
+                    self.assertFalse(arg.endswith("[dash]"), f"Unexpected [dash] arg in {call}")
 
 
 class PgVectorAdapterTests(unittest.TestCase):

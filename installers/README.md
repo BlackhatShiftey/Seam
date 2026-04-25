@@ -80,8 +80,8 @@ Both platform installers call the same Python installer core in `install_seam.py
 That installer:
 
 - creates a dedicated SEAM runtime under the user home directory
-- installs SEAM into that runtime
-- creates `seam` and `seam-benchmark` command shims
+- installs SEAM into that runtime with the `[dash]` extra (so the Textual dashboard works without extra setup)
+- creates `seam`, `seam-benchmark`, and `seam-dash` command shims
 - sets up a persistent default database for the installed runtime
 - updates PATH or shell profile state as needed
 - runs `seam doctor`

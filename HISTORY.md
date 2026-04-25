@@ -1300,3 +1300,61 @@ Published the extracted dashboard UI layer and mature branding assets.
 - Re-verified the dashboard code with `py_compile` and a snapshot render before packaging the repo state.
 Refs: see HISTORY#060 for the prior dashboard harness controls baseline.
 ---END-ENTRY-#061---
+
+---BEGIN-ENTRY-#062---
+id: 062
+date: 2026-04-21T19:36:27Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, textual, windows, history, snapshot
+commits: none
+refs: launch_dashboard.bat,seam_runtime/installer.py,installers/install_seam.py,pyproject.toml
+supersedes: none
+tokens: 184
+---
+Launcher/config audit for the dashboard on Windows.
+- Verified the configured user install still exists under `%LOCALAPPDATA%\SEAM` with `seam.cmd` and persistent DB `state\seam.db`.
+- Confirmed the repo-local dashboard path had drifted: `launch_dashboard.bat` launched the checkout `.venv` directly and therefore defaulted to repo `seam.db` instead of the configured persistent DB.
+- Verified the repo `.venv` has the `dash` extra and current dashboard code, while the installed runtime is older and does not include `textual` or a dashboard entrypoint.
+- Updated `launch_dashboard.bat` so it prefers the repo-local `seam-dash.exe`, reuses an existing `SEAM_DB_PATH` if present, otherwise defaults to `%LOCALAPPDATA%\SEAM\state\seam.db` when available, and only pauses on failure.
+- Verified the fixed launcher with `cmd /c launch_dashboard.bat --snapshot --no-clear`; it now attaches to the configured installed DB again.
+Refs: installed runtime remains a separate environment from the repo checkout; see HISTORY#061 for the latest dashboard UI-layer baseline.
+---END-ENTRY-#062---
+
+---BEGIN-ENTRY-#063---
+id: 063
+date: 2026-04-21T19:49:14Z
+agent: codex-gpt-5
+status: done
+topics: installer, dashboard, textual, windows, history, snapshot
+commits: none
+refs: seam_runtime/installer.py,installers/install_seam.py,scripts/bootstrap_seam.ps1,scripts/install_global_seam_command.ps1,README.md,installers/README.md,test_seam.py
+supersedes: none
+tokens: 193
+---
+Global dashboard install fix — complete.
+- Added `dashboard_entry` to `InstallLayout` (Windows: `Scripts/seam-dash.exe`, POSIX: `bin/seam-dash`).
+- Changed `install_repo()` to default `include_dashboard=True`, installing `repo[dash]` so `textual` is always present in the global venv.
+- Extended `write_shims()` to return a third `seam-dash` shim (`.cmd` on Windows, executable shell script on POSIX).
+- Updated `installers/install_seam.py` to print the dashboard shim path alongside seam and seam-benchmark.
+- Updated `scripts/bootstrap_seam.ps1` to install `.[dash]` and validate `seam-dash.exe` after install.
+- Updated `scripts/install_global_seam_command.ps1` to write a `seam-dash.cmd` shim into the user PATH target directory.
+- Added five installer tests covering layout detection, shim generation (Windows + POSIX), and include_dashboard flag behavior.
+- Verified global install at `%LOCALAPPDATA%\SEAM`: `seam-dash.cmd` → `seam-dash.exe` resolves correctly; `textual 8.2.4` present in runtime venv; `seam-dash --help` returns correct usage.
+- Full test suite: 81 tests, all passing.
+Refs: see HISTORY#062 for the prior launcher-only fix that restored the configured DB path.
+---END-ENTRY-#063---
+
+---BEGIN-ENTRY-#064---
+id: 064
+date: 2026-04-25T04:22:49Z
+agent: codex-gpt-5
+status: done
+topics: protocol, multi-agent, mcp, history
+commits: none
+refs: seam_runtime/config.toml
+supersedes: none
+tokens: 87
+---
+Added a Codex-facing project config at `seam_runtime/config.toml` for the SEAM workspace. The profile keeps reasoning high, enables memories, trusts the active OneDrive repo paths, and documents a token-frugal standby policy: startup should use compact repo state docs and indexed history reads; skills should be loaded only when named or clearly needed; plugin/connectors should stay as domain-specific capability packs rather than default context for ordinary SEAM coding turns.
+---END-ENTRY-#064---

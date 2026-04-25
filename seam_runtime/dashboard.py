@@ -161,6 +161,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
             ("end", "scroll_end", "Bottom"),
             ("k", "scroll_up", "Up"),
             ("j", "scroll_down", "Down"),
+            ("escape", "focus_input", "Back to input"),
         ]
 
         def __init__(self, title: str, panel_id: str) -> None:
@@ -170,6 +171,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
             self.border_title = self._title
+            self.border_subtitle = "Tab/S+Tab · Esc→input"
             self._refresh_content()
 
         def set_title(self, title: str) -> None:
@@ -201,6 +203,9 @@ if App is not None and Static is not None and Input is not None and Log is not N
 
         def action_page_down(self) -> None:
             self.scroll_page_down(animate=False, force=True)
+
+        def action_focus_input(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.app.query_one("#command-input", Input).focus()
 
 
     class TextualDashboardApp(App[None]):
@@ -238,6 +243,16 @@ if App is not None and Static is not None and Input is not None and Log is not N
             height: 2fr;
             layout: horizontal;
         }
+        /* Focused row expands to give the panel room to breathe */
+        #top-row:focus-within, #middle-row:focus-within {
+            height: 4fr;
+        }
+        #bottom-row:focus-within {
+            height: 4fr;
+        }
+        #chat-row:focus-within {
+            height: 4fr;
+        }
         #command-input {
             dock: bottom;
             border: round $primary;
@@ -250,8 +265,10 @@ if App is not None and Static is not None and Input is not None and Log is not N
             overflow-y: auto;
             overflow-x: auto;
         }
+        /* Focused panel: wider than its siblings + bright border */
         #memory-panel:focus, #retrieval-panel:focus, #benchmark-panel:focus, #result-panel:focus, #runtime-log-panel:focus, #chat-panel:focus, #command-history-panel:focus, #mirl-panel:focus {
             border: heavy #7efbff;
+            width: 3fr;
         }
         """
 

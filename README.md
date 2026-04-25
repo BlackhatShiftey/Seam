@@ -170,8 +170,8 @@ sh ./installers/install_seam_linux.sh
 What the installer does:
 
 - creates a dedicated SEAM runtime under your home directory instead of relying on a repo-local venv
-- installs SEAM into that dedicated runtime
-- creates global `seam` and `seam-benchmark` shims
+- installs SEAM into that dedicated runtime with the `[dash]` extra so the Textual dashboard works out of the box
+- creates global `seam`, `seam-benchmark`, and `seam-dash` shims
 - configures a persistent default database in the SEAM install state directory
 - updates a user PATH location or shell profile as needed
 - runs `seam doctor`
@@ -181,6 +181,7 @@ After the installer finishes, open a new terminal and type:
 ```text
 seam doctor
 seam --help
+seam-dash --help
 ```
 
 Default persistence paths:
@@ -205,9 +206,9 @@ Fastest repo-local development path:
 That script will:
 
 - create `.venv` if needed
-- install SEAM in editable mode
-- install global `seam` and `seam-benchmark` shims into a user PATH location
-- verify `seam.exe` and `seam-benchmark.exe`
+- install SEAM in editable mode with the `[dash]` extra
+- install global `seam`, `seam-benchmark`, and `seam-dash` shims into a user PATH location
+- verify `seam.exe`, `seam-benchmark.exe`, and `seam-dash.exe`
 - run `seam doctor`
 
 To drop into a shell where you can type `seam` directly:
