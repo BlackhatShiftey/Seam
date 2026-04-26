@@ -1558,5 +1558,224 @@ class FakeChromaClient:
         return self.collection
 
 
+class LX1NotationTests(unittest.TestCase):
+    """LX/1 compact AI-readable notation — encode/decode and token savings."""
+
+    def _make_ent(self) -> "MIRLRecord":
+        from seam_runtime.mirl import MIRLRecord, RecordKind, Status
+        return MIRLRecord(
+            id="ent:user:local",
+            kind=RecordKind.ENT,
+            ns="local.default",
+            scope="project",
+            attrs={"entity_type": "user", "label": "local_user"},
+        )
+
+    def _make_clm(self) -> "MIRLRecord":
+        from seam_runtime.mirl import MIRLRecord, RecordKind, Status
+        return MIRLRecord(
+            id="clm:1",
+            kind=RecordKind.CLM,
+            ns="local.default",
+            scope="project",
+            conf=0.92,
+            status=Status.ASSERTED,
+            prov=["prov:compile:1"],
+            evidence=["span:1"],
+            attrs={"subject": "ent:project:seam", "predicate": "goal", "object": "build_memory_runtime"},
+        )
+
+    def _make_sta(self) -> "MIRLRecord":
+        from seam_runtime.mirl import MIRLRecord, RecordKind
+        return MIRLRecord(
+            id="sta:ent:project:seam",
+            kind=RecordKind.STA,
+            ns="local.default",
+            scope="project",
+            conf=0.9,
+            prov=["prov:compile:1"],
+            evidence=["span:1"],
+            attrs={"target": "ent:project:seam", "fields": {"goal": "build_memory_runtime", "scope": ["db", "rag"]}},
+        )
+
+    def _make_raw(self) -> "MIRLRecord":
+        from seam_runtime.mirl import MIRLRecord, RecordKind, Status
+        return MIRLRecord(
+            id="raw:1",
+            kind=RecordKind.RAW,
+            ns="local.default",
+            scope="project",
+            status=Status.OBSERVED,
+            attrs={"source_ref": "local://input", "content": "I want to build a memory runtime", "media_type": "text/plain"},
+        )
+
+    def test_encode_ent_omits_defaults(self) -> None:
+        from seam_runtime.lx1 import encode_record
+        line = encode_record(self._make_ent())
+        self.assertTrue(line.startswith("E ent:user:local "))
+        self.assertNotIn("local.default", line)
+        self.assertNotIn("project", line)
+        self.assertNotIn("asserted", line)
+        self.assertIn("entity_type=user", line)
+        self.assertIn("label=local_user", line)
+
+    def test_roundtrip_ent(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        original = self._make_ent()
+        line = encode_record(original)
+        restored = decode_record(line)
+        self.assertEqual(restored.id, original.id)
+        self.assertEqual(restored.kind, original.kind)
+        self.assertEqual(restored.attrs, original.attrs)
+        self.assertAlmostEqual(restored.conf, original.conf)
+        self.assertEqual(restored.status, original.status)
+
+    def test_roundtrip_clm_with_meta(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        original = self._make_clm()
+        line = encode_record(original)
+        self.assertIn("~c=0.92", line)
+        self.assertIn("~@prov:compile:1", line)
+        self.assertIn("~^span:1", line)
+        restored = decode_record(line)
+        self.assertEqual(restored.id, original.id)
+        self.assertEqual(restored.prov, original.prov)
+        self.assertEqual(restored.evidence, original.evidence)
+        self.assertAlmostEqual(restored.conf, 0.92)
+        self.assertEqual(restored.attrs, original.attrs)
+
+    def test_roundtrip_sta_with_nested_dict(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        original = self._make_sta()
+        line = encode_record(original)
+        restored = decode_record(line)
+        self.assertEqual(restored.id, original.id)
+        self.assertEqual(restored.attrs["target"], "ent:project:seam")
+        fields = restored.attrs["fields"]
+        self.assertEqual(fields["goal"], "build_memory_runtime")
+        self.assertEqual(fields["scope"], ["db", "rag"])
+
+    def test_roundtrip_raw_with_quoted_content(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        original = self._make_raw()
+        line = encode_record(original)
+        self.assertIn('content="I want to build a memory runtime"', line)
+        restored = decode_record(line)
+        self.assertEqual(restored.attrs["content"], "I want to build a memory runtime")
+        self.assertEqual(restored.attrs["source_ref"], "local://input")
+        self.assertEqual(restored.attrs["media_type"], "text/plain")
+
+    def test_roundtrip_observed_status(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        from seam_runtime.mirl import Status
+        original = self._make_raw()
+        line = encode_record(original)
+        self.assertIn("~s=o", line)
+        restored = decode_record(line)
+        self.assertEqual(restored.status, Status.OBSERVED)
+
+    def test_batch_roundtrip(self) -> None:
+        from seam_runtime.lx1 import decode, encode
+        from seam_runtime.mirl import IRBatch
+        batch = IRBatch([self._make_ent(), self._make_clm(), self._make_sta()])
+        compact = encode(batch)
+        self.assertTrue(compact.startswith("!LX1 "))
+        restored = decode(compact)
+        self.assertEqual(len(restored.records), 3)
+        ids = {r.id for r in restored.records}
+        self.assertIn("ent:user:local", ids)
+        self.assertIn("clm:1", ids)
+        self.assertIn("sta:ent:project:seam", ids)
+
+    def test_token_savings_vs_verbose_mirl(self) -> None:
+        from seam_runtime.lx1 import encode, token_savings_report
+        from seam_runtime.mirl import IRBatch
+        batch = IRBatch([self._make_ent(), self._make_clm(), self._make_sta(), self._make_raw()])
+        verbose = batch.to_text()
+        compact = encode(batch)
+        report = token_savings_report(verbose, compact)
+        self.assertGreater(report["token_savings_ratio"], 0.50,
+                           "LX/1 should save >50% of tokens vs verbose MIRL JSON")
+        self.assertGreater(report["intelligence_per_token_gain"], 2.0,
+                           "LX/1 should deliver >2x intelligence per token vs verbose MIRL")
+
+    def test_compile_nl_lx1_roundtrip(self) -> None:
+        from seam_runtime.lx1 import decode, encode, token_savings_report
+        runtime = SeamRuntime(":memory:")
+        batch = runtime.compile_nl(
+            "I want to build a durable memory runtime for AI that works without losing information."
+        )
+        verbose = batch.to_text()
+        compact = encode(batch)
+        report = token_savings_report(verbose, compact)
+        self.assertGreater(report["token_savings_ratio"], 0.50)
+        restored = decode(compact)
+        original_ids = {r.id for r in batch.records}
+        restored_ids = {r.id for r in restored.records}
+        self.assertEqual(original_ids, restored_ids)
+
+    def test_lx1_encode_cli_command(self) -> None:
+        import tempfile
+        runtime = SeamRuntime(":memory:")
+        batch = runtime.compile_nl("SEAM stores knowledge efficiently.")
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mirl", delete=False) as f:
+            f.write(batch.to_text())
+            mirl_path = f.name
+        try:
+            buf = StringIO()
+            with redirect_stdout(buf):
+                run_cli(["lx1-encode", mirl_path])
+            output = buf.getvalue()
+            self.assertIn("!LX1", output)
+            self.assertIn("ns=local.default", output)
+        finally:
+            Path(mirl_path).unlink(missing_ok=True)
+
+    def test_lx1_benchmark_cli_command(self) -> None:
+        import tempfile
+        runtime = SeamRuntime(":memory:")
+        batch = runtime.compile_nl("SEAM stores knowledge efficiently.")
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".mirl", delete=False) as f:
+            f.write(batch.to_text())
+            mirl_path = f.name
+        try:
+            buf = StringIO()
+            with redirect_stdout(buf):
+                run_cli(["lx1-benchmark", mirl_path])
+            output = buf.getvalue()
+            self.assertIn("Token savings", output)
+            self.assertIn("Intelligence/token", output)
+        finally:
+            Path(mirl_path).unlink(missing_ok=True)
+
+    def test_reserved_token_strings_roundtrip(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        from seam_runtime.mirl import MIRLRecord, RecordKind
+        record = MIRLRecord(
+            id="ent:test",
+            kind=RecordKind.ENT,
+            attrs={"status_label": "true", "flag": "null", "active": "false"},
+        )
+        line = encode_record(record)
+        restored = decode_record(line)
+        self.assertEqual(restored.attrs["status_label"], "true")
+        self.assertEqual(restored.attrs["flag"], "null")
+        self.assertEqual(restored.attrs["active"], "false")
+
+    def test_numeric_attr_types_roundtrip(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        from seam_runtime.mirl import MIRLRecord, RecordKind
+        record = MIRLRecord(
+            id="span:1",
+            kind=RecordKind.SPAN,
+            attrs={"start": 0, "end": 42, "score": 0.95},
+        )
+        line = encode_record(record)
+        restored = decode_record(line)
+        self.assertEqual(restored.attrs["start"], 0)
+        self.assertEqual(restored.attrs["end"], 42)
+        self.assertAlmostEqual(restored.attrs["score"], 0.95)
+
+
 if __name__ == "__main__":
     unittest.main()
