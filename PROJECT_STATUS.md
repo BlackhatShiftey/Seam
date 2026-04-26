@@ -1,22 +1,29 @@
 # SEAM Project Status
 
-Last updated: 2026-04-20
+Last updated: 2026-04-25
 
 ## Current State
 
 SEAM is operating as a local machine-first memory runtime with:
 
 - MIRL compile/verify/persist/search/context flows in production use
-- structured + vector retrieval and runtime dashboard surface
+- Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, and independently scrollable panes
+- Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - lossless SEAM-LX/1 compression with integrity verification
-- PgVector support and installer coverage across Windows/Linux paths
+- PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
+- Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
 
 ## What Is Stable
 
 - Core runtime paths (compile, verify, persist, search, context, benchmark)
+- Textual dashboard (interactive TUI, chat, slash palette, MIRL animation, independent pane scrolling)
+- Dashboard installers: `seam-dash` shim on Windows (`.cmd`) and POSIX; `seam-dash` entrypoint in `pyproject.toml`
+- Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `.env`
+- pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
 - Dashboard snapshot/smoke-test behavior
 - Benchmark bundle verification workflow
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
+- Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
 
 ## Active Focus
 
@@ -24,13 +31,16 @@ SEAM is operating as a local machine-first memory runtime with:
 - Keep roadmap execution tied to history entries and supersedes chains
 - Continue feature delivery without reintroducing duplicated continuity text
 - Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
+- Roadmap planned items (#028–#047) are open: dashboard animations, benchmark progress bars, sparkline graphs, command terminology audit, holdout suites, benchmark diff, BEIR/MTEB benchmarks, Claude tool set, auto-compression pipeline, batch compile, PgVector migration helper, multi-tenant namespacing, REST API surface
 
 ## Operational Baseline
 
+- Use `scripts/windows/launch_dashboard.bat` (wraps `launch_dashboard.ps1`) to start the dashboard on Windows with pgvector configured.
 - Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
 - Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
 - Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
 - Default memory guardrails are `82%` warning and `90%` hard limit.
+- pgvector Docker Compose: `docker compose up -d seam-pgvector`; port 55432; credentials in `.env`.
 
 ## Working Rule
 

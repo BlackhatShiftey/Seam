@@ -22,6 +22,7 @@ from .lossless import (
     decompress_text_lossless,
     render_lossless_benchmark_pretty,
 )
+from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -91,15 +92,15 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_verify_parser.add_argument("bundle")
     benchmark_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
-    compile_nl_parser = subparsers.add_parser("compile-nl", help="Compile natural language into MIRL")
+    compile_nl_parser = subparsers.add_parser("compile-nl", aliases=["remember"], help="Compile natural language into MIRL and persist (use --no-persist to skip storing)")
     compile_nl_parser.add_argument("text")
     compile_nl_parser.add_argument("--source-ref", default="local://input")
-    compile_nl_parser.add_argument("--persist", action="store_true")
+    compile_nl_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
     _add_rag_sync_args(compile_nl_parser)
 
-    compile_dsl_parser = subparsers.add_parser("compile-dsl", help="Compile SEAM DSL into MIRL")
+    compile_dsl_parser = subparsers.add_parser("compile-dsl", help="Compile SEAM DSL into MIRL and persist (use --no-persist to skip storing)")
     compile_dsl_parser.add_argument("file")
-    compile_dsl_parser.add_argument("--persist", action="store_true")
+    compile_dsl_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
     _add_rag_sync_args(compile_dsl_parser)
 
     verify_parser = subparsers.add_parser("verify", help="Verify MIRL from a text file")
@@ -191,6 +192,23 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser = subparsers.add_parser("doctor", help="Check SEAM install health and run a lightweight smoke test")
     doctor_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
+    lx1_encode_parser = subparsers.add_parser("lx1-encode", help="Encode MIRL records to LX/1 compact AI-readable notation")
+    lx1_encode_parser.add_argument("source", help="MIRL text file or - for stdin")
+    lx1_encode_parser.add_argument("--output", help="Write output to file instead of stdout")
+    lx1_encode_parser.add_argument("--ns", default="local.default")
+    lx1_encode_parser.add_argument("--scope", default="project")
+
+    lx1_decode_parser = subparsers.add_parser("lx1-decode", help="Decode LX/1 compact notation back to MIRL records")
+    lx1_decode_parser.add_argument("source", help="LX/1 file or - for stdin")
+    lx1_decode_parser.add_argument("--output", help="Write MIRL text to file instead of stdout")
+    lx1_decode_parser.add_argument("--persist", action="store_true", help="Persist decoded records to the database")
+
+    lx1_benchmark_parser = subparsers.add_parser("lx1-benchmark", help="Show token savings of LX/1 notation vs verbose MIRL")
+    lx1_benchmark_parser.add_argument("source", help="MIRL text file or - for stdin")
+    lx1_benchmark_parser.add_argument("--ns", default="local.default")
+    lx1_benchmark_parser.add_argument("--scope", default="project")
+    lx1_benchmark_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
 
@@ -280,20 +298,54 @@ def run_cli(argv: list[str] | None = None) -> None:
         print(_render_lossless_demo_result(payload))
         return
 
+    if args.command == "lx1-encode":
+        batch = IRBatch.from_text(_read_text_source(args.source))
+        compact = lx1_encode(batch, ns=args.ns, scope=args.scope)
+        if args.output:
+            _write_text_output(args.output, compact)
+        else:
+            print(compact)
+        return
+    if args.command == "lx1-decode":
+        compact = _read_text_source(args.source)
+        batch = lx1_decode(compact)
+        mirl_text = batch.to_text()
+        if args.output:
+            _write_text_output(args.output, mirl_text)
+        else:
+            print(mirl_text)
+        if args.persist:
+            runtime = SeamRuntime(args.db)
+            runtime.persist_ir(batch)
+        return
+    if args.command == "lx1-benchmark":
+        mirl_text = _read_text_source(args.source)
+        batch = IRBatch.from_text(mirl_text)
+        compact = lx1_encode(batch, ns=args.ns, scope=args.scope)
+        report = token_savings_report(mirl_text, compact)
+        if args.format == "json":
+            print(json.dumps(report, indent=2))
+            return
+        print(_render_lx1_benchmark_pretty(report))
+        return
+
     runtime = SeamRuntime(args.db)
 
     if args.command == "ingest":
         text = _read_text_source(args.source)
         print(runtime.compile_nl(text, source_ref=args.source).to_text())
         return
-    if args.command == "compile-nl":
+    if args.command in {"compile-nl", "remember"}:
         batch = runtime.compile_nl(args.text, source_ref=args.source_ref)
         if args.persist or args.sync_index:
             runtime.persist_ir(batch)
             if args.sync_index:
                 orchestrator = _build_retrieval_orchestrator(runtime, args)
                 orchestrator.sync_persistent_indexes(record_ids=[record.id for record in batch.records])
-        print(batch.to_text())
+        if args.persist:
+            print(f"Encoded {len(batch.records)} records → stored in {args.db}")
+        else:
+            print(batch.to_text())
         return
     if args.command == "compile-dsl":
         batch = runtime.compile_dsl(Path(args.file).read_text(encoding="utf-8"))
@@ -302,7 +354,10 @@ def run_cli(argv: list[str] | None = None) -> None:
             if args.sync_index:
                 orchestrator = _build_retrieval_orchestrator(runtime, args)
                 orchestrator.sync_persistent_indexes(record_ids=[record.id for record in batch.records])
-        print(batch.to_text())
+        if args.persist:
+            print(f"Encoded {len(batch.records)} records → stored in {args.db}")
+        else:
+            print(batch.to_text())
         return
     if args.command == "verify":
         batch = IRBatch.from_text(Path(args.file).read_text(encoding="utf-8"))
@@ -697,6 +752,19 @@ def _render_ids(payload: dict[str, object]) -> str:
     if "record_ids" in payload:
         return "\n".join(payload.get("record_ids", []))
     return ""
+
+
+def _render_lx1_benchmark_pretty(report: dict[str, object]) -> str:
+    return "\n".join([
+        "LX/1 notation benchmark",
+        f"Original MIRL tokens : {report.get('original_tokens')}",
+        f"LX/1 compact tokens  : {report.get('compact_tokens')}",
+        f"Token savings        : {float(report.get('token_savings_ratio', 0)):.1%}",
+        f"Intelligence/token   : {float(report.get('intelligence_per_token_gain', 0)):.2f}x",
+        f"Original chars       : {report.get('original_chars')}",
+        f"LX/1 chars           : {report.get('compact_chars')}",
+        f"Char savings         : {float(report.get('char_savings_ratio', 0)):.1%}",
+    ])
 
 
 def _record_signal(record: dict[str, object]) -> str:
