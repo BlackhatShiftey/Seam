@@ -92,15 +92,15 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_verify_parser.add_argument("bundle")
     benchmark_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
-    compile_nl_parser = subparsers.add_parser("compile-nl", help="Compile natural language into MIRL")
+    compile_nl_parser = subparsers.add_parser("compile-nl", aliases=["remember"], help="Compile natural language into MIRL and persist (use --no-persist to skip storing)")
     compile_nl_parser.add_argument("text")
     compile_nl_parser.add_argument("--source-ref", default="local://input")
-    compile_nl_parser.add_argument("--persist", action="store_true")
+    compile_nl_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
     _add_rag_sync_args(compile_nl_parser)
 
-    compile_dsl_parser = subparsers.add_parser("compile-dsl", help="Compile SEAM DSL into MIRL")
+    compile_dsl_parser = subparsers.add_parser("compile-dsl", help="Compile SEAM DSL into MIRL and persist (use --no-persist to skip storing)")
     compile_dsl_parser.add_argument("file")
-    compile_dsl_parser.add_argument("--persist", action="store_true")
+    compile_dsl_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
     _add_rag_sync_args(compile_dsl_parser)
 
     verify_parser = subparsers.add_parser("verify", help="Verify MIRL from a text file")
@@ -335,14 +335,17 @@ def run_cli(argv: list[str] | None = None) -> None:
         text = _read_text_source(args.source)
         print(runtime.compile_nl(text, source_ref=args.source).to_text())
         return
-    if args.command == "compile-nl":
+    if args.command in {"compile-nl", "remember"}:
         batch = runtime.compile_nl(args.text, source_ref=args.source_ref)
         if args.persist or args.sync_index:
             runtime.persist_ir(batch)
             if args.sync_index:
                 orchestrator = _build_retrieval_orchestrator(runtime, args)
                 orchestrator.sync_persistent_indexes(record_ids=[record.id for record in batch.records])
-        print(batch.to_text())
+        if args.persist:
+            print(f"Encoded {len(batch.records)} records → stored in {args.db}")
+        else:
+            print(batch.to_text())
         return
     if args.command == "compile-dsl":
         batch = runtime.compile_dsl(Path(args.file).read_text(encoding="utf-8"))
@@ -351,7 +354,10 @@ def run_cli(argv: list[str] | None = None) -> None:
             if args.sync_index:
                 orchestrator = _build_retrieval_orchestrator(runtime, args)
                 orchestrator.sync_persistent_indexes(record_ids=[record.id for record in batch.records])
-        print(batch.to_text())
+        if args.persist:
+            print(f"Encoded {len(batch.records)} records → stored in {args.db}")
+        else:
+            print(batch.to_text())
         return
     if args.command == "verify":
         batch = IRBatch.from_text(Path(args.file).read_text(encoding="utf-8"))
