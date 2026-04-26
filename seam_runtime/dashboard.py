@@ -31,12 +31,13 @@ except ImportError as exc:  # pragma: no cover - user-facing guard
 try:
     from textual import on
     from textual.app import App, ComposeResult
-    from textual.containers import Horizontal
-    from textual.widgets import Input, Log, Static
+    from textual.containers import Horizontal, Vertical
+    from textual.widgets import Input, Log, Static, TabbedContent, TabPane
 
     _TEXTUAL_IMPORT_ERROR = None
 except ImportError as exc:  # pragma: no cover - optional dashboard path
-    on = App = ComposeResult = Horizontal = Input = Log = Static = None  # type: ignore[assignment]
+    on = App = ComposeResult = Horizontal = Vertical = Input = Log = Static = None  # type: ignore[assignment]
+    TabbedContent = TabPane = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
@@ -249,6 +250,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
         Screen {
             layout: vertical;
         }
+
+        /* ── Header band ─────────────────────────────────────────── */
         #logo-header {
             height: 6;
             border: round #4f8cfb;
@@ -258,15 +261,91 @@ if App is not None and Static is not None and Input is not None and Log is not N
             text-style: bold;
         }
         #metrics {
-            height: 4;
+            height: 3;
             border: round $primary;
             padding: 0 1;
         }
-        #tab-bar {
-            height: 1;
+
+        /* ── IDE body: explorer | tabs | chat+results ────────────── */
+        #ide-layout {
+            height: 1fr;
+        }
+
+        /* Explorer sidebar */
+        #explorer-panel {
+            width: 26;
+            border: round #4f8cfb;
+            padding: 0 1;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: #050b1e;
+        }
+        #explorer-panel:focus {
+            border: heavy #7efbff;
+        }
+
+        /* Centre: TabbedContent fills remaining width */
+        #main-tabs {
+            width: 1fr;
+            height: 1fr;
+        }
+        TabPane {
+            padding: 0;
+            height: 1fr;
+        }
+
+        /* Tab content panels fill their pane */
+        #memory-panel, #retrieval-panel, #benchmark-panel,
+        #overview-panel, #mirl-panel, #prov-panel {
+            width: 1fr;
+            height: 1fr;
             border: round $primary;
             padding: 0 1;
+            overflow-y: auto;
+            overflow-x: auto;
         }
+
+        /* Live tab: two panels side-by-side */
+        #live-row {
+            height: 1fr;
+        }
+        #runtime-log-panel, #command-history-panel {
+            width: 1fr;
+            height: 1fr;
+            border: round $primary;
+            padding: 0 1;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        /* Right column: chat (tall) + results */
+        #right-col {
+            width: 34;
+        }
+        #chat-panel {
+            height: 2fr;
+            border: round $primary;
+            padding: 0 1;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+        #result-panel {
+            height: 1fr;
+            border: round $primary;
+            padding: 0 1;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        /* Focused: highlight any panel */
+        #memory-panel:focus, #retrieval-panel:focus, #benchmark-panel:focus,
+        #overview-panel:focus, #mirl-panel:focus, #prov-panel:focus,
+        #runtime-log-panel:focus, #command-history-panel:focus,
+        #chat-panel:focus, #result-panel:focus {
+            border: heavy #7efbff;
+        }
+
+        /* ── Command palette overlay ──────────────────────────────── */
         #command-palette {
             height: 12;
             border: round #7efbff;
@@ -276,44 +355,11 @@ if App is not None and Static is not None and Input is not None and Log is not N
             background: #050b1e;
             display: none;
         }
-        #top-row, #middle-row {
-            height: 1fr;
-            layout: horizontal;
-        }
-        #bottom-row {
-            height: 2fr;
-            layout: horizontal;
-        }
-        #chat-row {
-            height: 2fr;
-            layout: horizontal;
-        }
-        /* Focused row expands to give the panel room to breathe */
-        #top-row:focus-within, #middle-row:focus-within {
-            height: 4fr;
-        }
-        #bottom-row:focus-within {
-            height: 4fr;
-        }
-        #chat-row:focus-within {
-            height: 4fr;
-        }
+
+        /* ── Input bar docked to bottom ──────────────────────────── */
         #command-input {
             dock: bottom;
             border: round $primary;
-        }
-        #memory-panel, #retrieval-panel, #benchmark-panel, #result-panel, #runtime-log-panel, #chat-panel, #command-history-panel, #mirl-panel {
-            width: 1fr;
-            border: round $primary;
-            margin: 0 1;
-            padding: 0 1;
-            overflow-y: auto;
-            overflow-x: auto;
-        }
-        /* Focused panel: wider than its siblings + bright border */
-        #memory-panel:focus, #retrieval-panel:focus, #benchmark-panel:focus, #result-panel:focus, #runtime-log-panel:focus, #chat-panel:focus, #command-history-panel:focus, #mirl-panel:focus {
-            border: heavy #7efbff;
-            width: 3fr;
         }
         """
 
@@ -389,41 +435,83 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._mirl_animation_running = False
 
         def compose(self) -> ComposeResult:
+            # ── Header: logo + slim metrics bar (always visible) ──────
             yield Static("", id="logo-header")
             yield Static("", id="metrics")
-            yield Static("", id="tab-bar")
-            with Horizontal(id="top-row"):
-                yield _TextualPanel("Memory Records", "memory-panel")
-                yield _TextualPanel("Search / Retrieval", "retrieval-panel")
-                yield _TextualPanel("Benchmark", "benchmark-panel")
-            with Horizontal(id="middle-row"):
-                yield _TextualPanel("MIRL Compression", "mirl-panel")
-                yield _TextualPanel("Command History", "command-history-panel")
-                yield _TextualPanel("Runtime Log", "runtime-log-panel")
-            with Horizontal(id="bottom-row"):
-                yield _TextualPanel("Results", "result-panel")
-            with Horizontal(id="chat-row"):
-                yield _TextualPanel("Chat", "chat-panel")
+            # ── IDE body ──────────────────────────────────────────────
+            with Horizontal(id="ide-layout"):
+                # Left: file-explorer sidebar
+                yield _TextualPanel("Explorer", "explorer-panel")
+                # Centre: tabbed workspace
+                with TabbedContent(id="main-tabs"):
+                    with TabPane("Overview", id="tab-overview"):
+                        yield _TextualPanel("Overview", "overview-panel")
+                    with TabPane("Memory", id="tab-memory"):
+                        yield _TextualPanel("Memory Records", "memory-panel")
+                    with TabPane("Retrieval", id="tab-retrieval"):
+                        yield _TextualPanel("Search / Retrieval", "retrieval-panel")
+                    with TabPane("Benchmarks", id="tab-benchmarks"):
+                        yield _TextualPanel("Benchmark", "benchmark-panel")
+                    with TabPane("Compression", id="tab-compression"):
+                        yield _TextualPanel("MIRL Compression", "mirl-panel")
+                    with TabPane("Live", id="tab-live"):
+                        with Horizontal(id="live-row"):
+                            yield _TextualPanel("Runtime Log", "runtime-log-panel")
+                            yield _TextualPanel("Command History", "command-history-panel")
+                    with TabPane("Provenance", id="tab-prov"):
+                        yield _TextualPanel("Provenance Graph", "prov-panel")
+                # Right: chat + results (always visible alongside tabs)
+                with Vertical(id="right-col"):
+                    yield _TextualPanel("Chat", "chat-panel")
+                    yield _TextualPanel("Results", "result-panel")
+            # ── Overlay: command palette + input bar ──────────────────
             yield Static("", id="command-palette")
             yield Input(placeholder="", id="command-input")
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
             self._refresh_logo()
             self._refresh_metrics()
-            self._refresh_tab_bar()
             self._refresh_input_placeholder()
             self._sync_side_panel()
+            self._refresh_explorer()
+            self._refresh_overview()
             self.query_one("#benchmark-panel", _TextualPanel).set_lines(["Run `benchmark <file>` to populate benchmark results."])
+            self.query_one("#retrieval-panel", _TextualPanel).set_lines(["Run search/retrieve/context/plan to populate this panel."])
+            self.query_one("#memory-panel", _TextualPanel).set_lines(["Run compile, stats, or trace to populate this panel."])
             self.query_one("#chat-panel", _TextualPanel).set_lines(
                 [
-                    "Harness ready.",
-                    "Shortcuts: ?help ?agent ?shell ?seam ?hybrid ?model <name> ?savechat",
-                    "Hybrid mode: known SEAM commands execute directly, plain text chats, !<shell> runs shell.",
-                    "Use ??<message> to force chat from shell or SEAM mode.",
+                    "Harness ready — SEAM IDE dashboard.",
+                    "",
+                    "  /compile <text>    compile NL into MIRL records",
+                    "  /search  <query>   lexical + vector search",
+                    "  /retrieve <query>  ranked retrieval",
+                    "  /benchmark <file>  lossless compression benchmark",
+                    "  /stats             refresh runtime metrics",
+                    "  /help              full command reference",
+                    "",
+                    "Prefixes:  /command   !shell-cmd   ?mode-switch   ??chat",
+                    "Type / to open the command palette.",
                 ]
             )
-            self.query_one("#command-history-panel", _TextualPanel).set_lines(["No command events yet."])
-            self.query_one("#mirl-panel", _TextualPanel).set_lines(["Idle. Run compile/compress/benchmark for live machine animation."])
+            self.query_one("#command-history-panel", _TextualPanel).set_lines(["No commands yet."])
+            self.query_one("#mirl-panel", _TextualPanel).set_lines(
+                [
+                    "SEAM-LX/1 Compression Engine",
+                    "",
+                    "Idle — run compile/compress/benchmark to trigger the",
+                    "live RAW → IR → PACK → LX/1 animation.",
+                ]
+            )
+            self.query_one("#prov-panel", _TextualPanel).set_lines(
+                [
+                    "Provenance Graph  [placeholder]",
+                    "",
+                    "Coming soon: interactive DAG of memory records, their",
+                    "evidence spans, and pack/retrieval lineage.",
+                    "",
+                    "Use  trace <record-id>  to inspect a single record now.",
+                ]
+            )
             self._push_result("Welcome", self.controller.result_body)
             self.set_interval(0.25, self._tick_mirl_animation)
             self.set_interval(1.0, self._tick_metrics)
@@ -916,50 +1004,48 @@ if App is not None and Static is not None and Input is not None and Log is not N
 
         def _route_command_output(self, command: str, title: str, body: str) -> None:
             token = command.split()[0].lower()
+            try:
+                tabs = self.query_one("#main-tabs", TabbedContent)
+            except Exception:
+                tabs = None
+
             if token in {"compile", "compile-nl", "compile-dsl", "dsl", "stats", "trace", "index"}:
                 self.memory_lines.extend([f"{title}: {command}", body, ""])
                 self.query_one("#memory-panel", _TextualPanel).set_lines(self.memory_lines)
+                if tabs:
+                    tabs.active = "tab-memory"
                 if token in {"compile", "compile-nl", "compile-dsl", "dsl"}:
                     self._trigger_mirl_animation("compile", body)
                 return
             if token in {"search", "retrieve", "context", "plan"}:
                 self.retrieval_lines.extend([f"{title}: {command}", body, ""])
                 self.query_one("#retrieval-panel", _TextualPanel).set_lines(self.retrieval_lines)
+                if tabs:
+                    tabs.active = "tab-retrieval"
                 return
             if token in {"benchmark", "compress-doc", "lossless-compress", "decompress-doc", "lossless-decompress", "decompress-last"}:
                 self.benchmark_lines.extend([f"{title}: {command}", body, ""])
                 self.query_one("#benchmark-panel", _TextualPanel).set_lines(self.benchmark_lines)
+                if tabs:
+                    tabs.active = "tab-benchmarks"
                 if token in {"benchmark", "compress-doc", "lossless-compress"}:
                     self._trigger_mirl_animation(token, body)
             if token == "tab":
                 self._record_command("state", f"active tab => {self.controller.active_tab}")
+                if tabs:
+                    _tab_map = {"benchmark": "tab-benchmarks", "runtime": "tab-overview"}
+                    tabs.active = _tab_map.get(self.controller.active_tab, "tab-overview")
 
         def _push_result(self, title: str, body: str) -> None:
             self.result_lines.extend([f"{title}", body, ""])
             self.query_one("#result-panel", _TextualPanel).set_lines(self.result_lines)
 
         def _sync_side_panel(self) -> None:
+            # Benchmark search-log goes into #benchmark-panel via _route_command_output.
+            # This panel always shows the live runtime event stream.
             panel = self.query_one("#runtime-log-panel", _TextualPanel)
-            if self.controller.active_tab == "benchmark":
-                attempts = (self.controller.last_benchmark_payload or {}).get("search_log", [])
-                if not attempts:
-                    lines = ["No benchmark search log yet. Run `benchmark <file>` to populate this panel."]
-                else:
-                    lines = []
-                    for attempt in attempts[-16:]:
-                        flags = f" flags={','.join(attempt.get('flags', []))}" if attempt.get("flags") else ""
-                        lines.append(
-                            (
-                                f"iter={attempt.get('iteration')} status={attempt.get('status')} "
-                                f"{attempt.get('transform')}/{attempt.get('codec')} "
-                                f"savings={float(attempt.get('token_savings_ratio', 0.0)):.1%} "
-                                f"tokens={attempt.get('machine_tokens')}{flags}"
-                            )
-                        )
-                panel.set_title("Benchmark Log")
-            else:
-                lines = [f"{event.timestamp} {event.kind}: {event.message}" for event in list(self.controller.events)]
-                panel.set_title("Runtime Log")
+            lines = [f"{event.timestamp} {event.kind}: {event.message}" for event in list(self.controller.events)]
+            panel.set_title("Runtime Log")
             self.side_lines = lines
             panel.set_lines(lines)
 
@@ -973,22 +1059,26 @@ if App is not None and Static is not None and Input is not None and Log is not N
             savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
             token_rate = self._estimate_token_rate()
             summary = (
-                f"DB: {metrics.db_path}\n"
-                f"Records={metrics.total_records} Vectors={metrics.vector_entries} Packs={metrics.pack_entries} Mode={metrics.execution_mode}\n"
-                f"Adapter={metrics.vector_adapter_name} | Tab={self.controller.active_tab}\n"
-                f"Token rate: {token_rate:.1f} tok/s\n"
-                f"Compressed tokens: {compressed} (source={source_tokens}, machine={machine_tokens})\n"
-                f"DB size bar      {self._bar(db_ratio)}\n"
-                f"Compression bar  {self._bar(savings_ratio)}"
+                f"[{metrics.db_size}] {metrics.db_path}  "
+                f"records={metrics.total_records}  vectors={metrics.vector_entries}  "
+                f"packs={metrics.pack_entries}  mode={self.input_mode}\n"
+                f"tok/s={token_rate:.0f}  compressed={compressed} (src={source_tokens} → mch={machine_tokens})  "
+                f"DB:{self._bar(db_ratio, 14)}  lx1:{self._bar(savings_ratio, 14)}"
             )
             self.query_one("#metrics", Static).update(summary)
 
         def _refresh_tab_bar(self) -> None:
-            runtime = "[Runtime]" if self.controller.active_tab == "runtime" else "Runtime"
-            benchmark = "[Benchmark]" if self.controller.active_tab == "benchmark" else "Benchmark"
-            self.query_one("#tab-bar", Static).update(
-                f"Tabs: {runtime}  {benchmark} | Input mode: {self.input_mode} | ?agent ?shell ?seam ?hybrid ?model ?help"
-            )
+            # Sync TabbedContent active state from the controller's coarse tab flag.
+            # Fine-grained switching happens in _route_command_output; this handles
+            # the legacy `tab runtime` / `tab benchmark` dashboard commands.
+            try:
+                tabs = self.query_one("#main-tabs", TabbedContent)
+                if self.controller.active_tab == "benchmark" and tabs.active not in {"tab-benchmarks"}:
+                    tabs.active = "tab-benchmarks"
+                elif self.controller.active_tab == "runtime" and tabs.active == "tab-benchmarks":
+                    tabs.active = "tab-overview"
+            except Exception:
+                return
 
         def _refresh_input_placeholder(self) -> None:
             widget = self.query_one("#command-input", Input)
@@ -1107,7 +1197,81 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             try:
                 self._refresh_metrics()
+                self._refresh_explorer()
+                self._refresh_overview()
             except Exception:  # pragma: no cover - timer can fire during teardown
+                return
+
+        def _refresh_explorer(self) -> None:
+            try:
+                metrics = self.controller._collect_metrics()
+                lines = [
+                    "seam/",
+                    f"  ├─ .seam.db   [{metrics.db_size}]",
+                    f"  ├─ memory     {metrics.total_records}",
+                    f"  ├─ vectors    {metrics.vector_entries}",
+                    f"  ├─ packs      {metrics.pack_entries}",
+                    f"  ├─ prov       {metrics.provenance_entries}",
+                    f"  ├─ symbols    {metrics.symbol_entries}",
+                    f"  └─ raw        {metrics.raw_entries}",
+                    "",
+                    f"namespaces  ({metrics.namespaces})",
+                    f"scopes      ({metrics.scopes})",
+                    "",
+                    f"model:    {metrics.model_name}",
+                    f"adapter:  {metrics.vector_adapter_name}",
+                    f"mode:     {metrics.execution_mode}",
+                ]
+                self.query_one("#explorer-panel", _TextualPanel).set_lines(lines)
+            except Exception:
+                return
+
+        def _refresh_overview(self) -> None:
+            try:
+                metrics = self.controller._collect_metrics()
+                source_tokens = self._token_source_total
+                machine_tokens = self._token_machine_total
+                compressed = max(source_tokens - machine_tokens, 0)
+                savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
+                total = max(metrics.total_records, 1)
+                lines = [
+                    "─── SEAM Runtime Overview ─────────────────────────────────",
+                    f"  Database   {metrics.db_path}",
+                    f"  Size       {metrics.db_size}   execution={metrics.execution_mode}",
+                    f"  Model      {metrics.model_name}",
+                    f"  Adapter    {metrics.vector_adapter_name}   pgvector={'configured' if metrics.pgvector_configured else 'not set'}",
+                    "",
+                    "─── Record Counts ─────────────────────────────────────────",
+                    f"  Total       {metrics.total_records}",
+                    f"  Vectors     {metrics.vector_entries}",
+                    f"  Packs       {metrics.pack_entries}",
+                    f"  Provenance  {metrics.provenance_entries}",
+                    f"  Symbols     {metrics.symbol_entries}",
+                    f"  Raw docs    {metrics.raw_entries}",
+                    f"  Namespaces  {metrics.namespaces}    Scopes  {metrics.scopes}",
+                    "",
+                    "─── Top Record Kinds ──────────────────────────────────────",
+                ]
+                for kind, count in metrics.top_kinds:
+                    bar = _ui_bars.solid(count / total, width=20, show_pct=False)
+                    lines.append(f"  {kind:<12} {count:>5}  {bar}")
+                if not metrics.top_kinds:
+                    lines.append("  (no records yet)")
+                lines += [
+                    "",
+                    "─── Token Budget ──────────────────────────────────────────",
+                    f"  Source tokens   {source_tokens}",
+                    f"  Machine tokens  {machine_tokens}",
+                    f"  Savings         {self._bar(savings_ratio, 20)}",
+                    "",
+                    "─── Quick Commands ────────────────────────────────────────",
+                    "  /compile <text>     compile NL into MIRL",
+                    "  /search  <query>    lexical + vector search",
+                    "  /benchmark <file>   lossless compression benchmark",
+                    "  /stats              refresh all metrics",
+                ]
+                self.query_one("#overview-panel", _TextualPanel).set_lines(lines)
+            except Exception:
                 return
 
         def _capture_token_metrics_from_command(self, command: str) -> None:

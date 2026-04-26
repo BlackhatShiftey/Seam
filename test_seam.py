@@ -799,11 +799,18 @@ claim c2:
         async def _check() -> None:
             async with app.run_test() as pilot:
                 await pilot.pause()
+                # IDE layout: panels exist in DOM regardless of which tab is active
                 self.assertIsNotNone(app.query_one("#memory-panel"))
                 self.assertIsNotNone(app.query_one("#retrieval-panel"))
                 self.assertIsNotNone(app.query_one("#benchmark-panel"))
-                self.assertIsNotNone(app.query_one("#chat-row"))
+                self.assertIsNotNone(app.query_one("#overview-panel"))
+                self.assertIsNotNone(app.query_one("#mirl-panel"))
+                self.assertIsNotNone(app.query_one("#prov-panel"))
+                self.assertIsNotNone(app.query_one("#explorer-panel"))
+                self.assertIsNotNone(app.query_one("#ide-layout"))
+                self.assertIsNotNone(app.query_one("#right-col"))
                 self.assertIsNotNone(app.query_one("#chat-panel"))
+                self.assertIsNotNone(app.query_one("#result-panel"))
                 self.assertIsNotNone(app.query_one("#command-palette"))
                 self.assertIsNotNone(app.query_one("#command-input"))
 
@@ -894,7 +901,7 @@ claim c2:
 
         asyncio.run(_check())
 
-    def test_textual_dashboard_chat_row_sits_above_input(self) -> None:
+    def test_textual_dashboard_chat_panel_sits_above_input(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
         runtime = SeamRuntime(self.db_path)
@@ -903,9 +910,11 @@ claim c2:
         async def _check() -> None:
             async with app.run_test() as pilot:
                 await pilot.pause()
-                chat_row = app.query_one("#chat-row")
+                # In the IDE layout the right column (#right-col) holds chat
+                # and result panels; it must sit above the docked command input.
+                right_col = app.query_one("#right-col")
                 command_input = app.query_one("#command-input")
-                self.assertLess(chat_row.region.y, command_input.region.y)
+                self.assertLess(right_col.region.y, command_input.region.y)
 
         asyncio.run(_check())
 
@@ -939,6 +948,9 @@ claim c2:
                 await pilot.pause()
                 for idx in range(500):
                     app._record_command("run", f"command-{idx}")
+                # Switch to the Live tab where #command-history-panel lives
+                from textual.widgets import TabbedContent
+                app.query_one("#main-tabs", TabbedContent).active = "tab-live"
                 await pilot.pause()
                 panel = app.query_one("#command-history-panel")
                 await pilot.click("#command-history-panel")
@@ -991,6 +1003,7 @@ claim c2:
     def test_textual_dashboard_tab_switch_updates_side_panel_mode(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
+        from textual.widgets import TabbedContent
         runtime = SeamRuntime(self.db_path)
         source_path = Path(f"lossless_textual_{uuid4().hex}.txt")
         source_path.write_text(("SEAM preserves exact context while compressing token usage. " * 10).strip(), encoding="utf-8")
@@ -999,17 +1012,21 @@ claim c2:
         async def _check() -> None:
             async with app.run_test() as pilot:
                 await pilot.pause()
+                # Switching to benchmark via the tab command should activate that tab
                 app.process_command("!tab benchmark")
                 await pilot.pause()
-                self.assertTrue(any("No benchmark search log yet" in line for line in app.side_lines))
+                tabs = app.query_one("#main-tabs", TabbedContent)
+                self.assertEqual(tabs.active, "tab-benchmarks")
 
+                # Running a benchmark populates benchmark_lines and switches the tab
                 app.process_command(f"!benchmark {source_path} --min-savings 0.75")
                 await pilot.pause()
-                self.assertTrue(any("iter=" in line for line in app.side_lines))
+                self.assertTrue(any("Benchmark" in line for line in app.benchmark_lines))
 
+                # Switching back to runtime shows overview tab
                 app.process_command("!tab runtime")
                 await pilot.pause()
-                self.assertTrue(any("tab to runtime" in line.lower() for line in app.side_lines))
+                self.assertNotEqual(tabs.active, "tab-benchmarks")
 
         try:
             asyncio.run(_check())
