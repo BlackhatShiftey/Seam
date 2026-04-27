@@ -20,6 +20,9 @@ from tools.history.rebuild_index import build_index_text, rebuild
 from tools.history.verify_integrity import parse_index_hashes, verify
 from tools.history.write_snapshot import write_snapshot
 from tools.history.load_snapshot import load_and_verify
+from tools.history.build_context_pack import build_context_pack
+from tools.history.verify_continuity import verify_continuity
+from tools.history.verify_routing import verify_routing
 
 
 class TempRepoBase(unittest.TestCase):
@@ -44,6 +47,7 @@ class TempRepoBase(unittest.TestCase):
         from tools.history import write_snapshot as ws
         from tools.history import load_snapshot as ls
         from tools.history import rebuild_index as ri
+        from tools.history import verify_continuity as vc
         return _MultiPatch(
             [
                 (history_lib, "HISTORY_PATH", self.history),
@@ -55,6 +59,9 @@ class TempRepoBase(unittest.TestCase):
                 (ls, "SNAPSHOTS_DIR", self.snaps),
                 (ri, "HISTORY_PATH", self.history),
                 (ri, "INDEX_PATH", self.index),
+                (vc, "HISTORY_PATH", self.history),
+                (vc, "INDEX_PATH", self.index),
+                (vc, "SNAPSHOTS_DIR", self.snaps),
             ]
         )
 
@@ -265,6 +272,167 @@ class TestSurgicalRead(TempRepoBase):
         target = entries[1]
         slice_bytes = data[target.byte_start : target.byte_end + 1]
         self.assertEqual(compute_entry_hash(slice_bytes), target.hash)
+
+
+class TestContextPack(TempRepoBase):
+    def test_builds_latest_topic_pack_with_chain(self):
+        self.write_entries(
+            [
+                sample_entry(1, status="planned", topics="dashboard"),
+                sample_entry(2, status="done", supersedes="001", topics="dashboard,verify"),
+                sample_entry(3, status="done", topics="installer"),
+                sample_entry(4, status="done", supersedes="002", topics="dashboard,history"),
+            ]
+        )
+        entries = parse_entries(self.history.read_bytes())
+        pack = build_context_pack(
+            entries,
+            latest=1,
+            topics={"dashboard"},
+            topic_limit=1,
+            token_budget=999,
+        )
+        self.assertEqual(pack.included_ids, [4, 2, 1])
+        self.assertIn("---BEGIN-ENTRY-#004---", pack.pack)
+        self.assertIn("---BEGIN-ENTRY-#001---", pack.pack)
+        self.assertNotIn("---BEGIN-ENTRY-#003---", pack.pack)
+
+    def test_respects_token_budget(self):
+        self.write_entries([sample_entry(1), sample_entry(2), sample_entry(3)])
+        entries = parse_entries(self.history.read_bytes())
+        pack = build_context_pack(entries, latest=3, token_budget=15)
+        self.assertEqual(pack.included_ids, [3])
+        self.assertEqual(pack.skipped_ids, [2, 1])
+
+
+class TestVerifyContinuity(TempRepoBase):
+    def test_continuity_ok_with_latest_snapshot(self):
+        self.write_entries([sample_entry(1), sample_entry(2, supersedes="001")])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+            write_snapshot(
+                agent="claude-test",
+                entry_ids=[2, 1],
+                token_budget=999,
+                snapshots_dir=self.snaps,
+            )
+            ok, errs = verify_continuity(
+                history_path=self.history,
+                index_path=self.index,
+                snapshots_dir=self.snaps,
+                scan_secrets=False,
+                verify_routes=False,
+            )
+        self.assertTrue(ok, f"Errors: {errs}")
+
+    def test_continuity_fails_when_latest_snapshot_missing(self):
+        self.write_entries([sample_entry(1), sample_entry(2)])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+            write_snapshot(
+                agent="claude-test",
+                entry_ids=[1],
+                token_budget=999,
+                snapshots_dir=self.snaps,
+            )
+            ok, errs = verify_continuity(
+                history_path=self.history,
+                index_path=self.index,
+                snapshots_dir=self.snaps,
+                scan_secrets=False,
+                verify_routes=False,
+            )
+        self.assertFalse(ok)
+        self.assertTrue(any("latest entry #002" in err for err in errs))
+
+    def test_continuity_fails_on_broken_supersedes(self):
+        self.write_entries([sample_entry(1), sample_entry(2, supersedes="999")])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+            write_snapshot(
+                agent="claude-test",
+                entry_ids=[2],
+                token_budget=999,
+                snapshots_dir=self.snaps,
+            )
+            ok, errs = verify_continuity(
+                history_path=self.history,
+                index_path=self.index,
+                snapshots_dir=self.snaps,
+                scan_secrets=False,
+                verify_routes=False,
+            )
+        self.assertFalse(ok)
+        self.assertTrue(any("supersedes missing entry #999" in err for err in errs))
+
+
+class TestVerifyRouting(TempRepoBase):
+    def _write_manifest(self, manifest: dict) -> Path:
+        path = self.root / "routing_manifest.json"
+        path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        return path
+
+    def _manifest(self) -> dict:
+        ledger = self.root / "docs" / "ledgers" / "maintenance" / "docker.md"
+        ledger.parent.mkdir(parents=True)
+        ledger.write_text("# Docker\n", encoding="utf-8")
+        return {
+            "schema": "seam-history-routing/v1",
+            "version": 1,
+            "updated": "2026-04-26",
+            "routes": [
+                {
+                    "id": "maintenance",
+                    "parent": None,
+                    "status": "active",
+                    "description": "Maintenance",
+                    "match_topics": ["verify"],
+                    "match_refs": [],
+                    "ledger": None,
+                    "introduced": "001",
+                    "supersedes": "none",
+                    "moved_to": None,
+                    "retired_reason": None,
+                },
+                {
+                    "id": "maintenance/docker",
+                    "parent": "maintenance",
+                    "status": "active",
+                    "description": "Docker maintenance",
+                    "match_topics": ["docker"],
+                    "match_refs": ["docker"],
+                    "ledger": "docs/ledgers/maintenance/docker.md",
+                    "introduced": "001",
+                    "supersedes": "none",
+                    "moved_to": None,
+                    "retired_reason": None,
+                },
+            ],
+        }
+
+    def test_verify_routing_ok(self):
+        self.write_entries([sample_entry(1, topics="verify")])
+        manifest = self._write_manifest(self._manifest())
+        ok, errs = verify_routing(manifest, repo_root=self.root, history_path=self.history)
+        self.assertTrue(ok, f"Errors: {errs}")
+
+    def test_verify_routing_detects_missing_parent(self):
+        self.write_entries([sample_entry(1, topics="verify")])
+        data = self._manifest()
+        data["routes"][1]["parent"] = "missing"
+        manifest = self._write_manifest(data)
+        ok, errs = verify_routing(manifest, repo_root=self.root, history_path=self.history)
+        self.assertFalse(ok)
+        self.assertTrue(any("parent missing" in err or "does not match path" in err for err in errs))
+
+    def test_verify_routing_detects_missing_history_ref(self):
+        self.write_entries([sample_entry(1, topics="verify")])
+        data = self._manifest()
+        data["routes"][0]["introduced"] = "999"
+        manifest = self._write_manifest(data)
+        ok, errs = verify_routing(manifest, repo_root=self.root, history_path=self.history)
+        self.assertFalse(ok)
+        self.assertTrue(any("missing HISTORY#999" in err for err in errs))
 
 
 if __name__ == "__main__":

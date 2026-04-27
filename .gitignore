@@ -14,6 +14,7 @@ conversations/
 # Secrets and credentials - NEVER commit these
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 *.p12

@@ -105,7 +105,8 @@ if ($existing) {
 $stamp = Get-Date -Format "yyyyMMddHHmmss"
 $containerName = "seam-pgvector-guard-$stamp"
 $volumeName = "$containerName-data"
-$dsn = "postgresql://seam:local-test-password@localhost:$PgPort/seam"
+$pgPassword = [guid]::NewGuid().ToString("N")
+$dsn = "host=localhost port=$PgPort dbname=seam user=seam password=$pgPassword"
 
 $sqliteDb = Join-Path $repoRoot ("real_adapter_sqlite_" + [guid]::NewGuid().ToString("N") + ".db")
 $pgvectorDb = Join-Path $repoRoot ("real_adapter_pgvector_" + [guid]::NewGuid().ToString("N") + ".db")
@@ -119,7 +120,7 @@ try {
         --name $containerName `
         -e POSTGRES_DB=seam `
         -e POSTGRES_USER=seam `
-        -e POSTGRES_PASSWORD=local-test-password `
+        -e POSTGRES_PASSWORD=$pgPassword `
         -e PGDATA=/var/lib/postgresql/data/pgdata `
         -p "${PgPort}:5432" `
         -v "${volumeName}:/var/lib/postgresql/data" `

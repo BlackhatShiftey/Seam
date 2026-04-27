@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-04-20
+Last updated: 2026-04-26
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -25,10 +25,19 @@ and `HISTORY_INDEX.md`.
 - SQLite is canonical source of truth.
 - Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
 - Lossless claims require exact reconstruction and integrity checks.
+- SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
+- A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.
 - Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA).
 - Compatibility CLI aliases are acceptable during naming transitions.
 - Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
 - Cross-file duplication is disallowed; use pointer cards (`see HISTORY#NNN`).
+
+## AI-Native Compression Policy
+
+- The compressed language is the working document for AI question answering.
+- Direct readability is mandatory for documents, text, images, audio, and video: quotes, table cells, OCR spans, image regions, timestamps, transcript spans, and provenance must be represented in machine-readable records.
+- Opaque payload formats such as SEAM-LX/1 may be retained for exact rebuilds and hash checks, but they must not be the only artifact used for semantic read/query workflows.
+- Future compression interpreters and codecs must optimize intelligence per token while preserving exact detail access through MIRL or a successor SEAM machine language.
 
 ## Handoff Policy
 
@@ -36,6 +45,29 @@ and `HISTORY_INDEX.md`.
 - Session close writes one validated snapshot in `.seam/snapshots/`.
 - `HISTORY_INDEX.md` and snapshots are derived artifacts; `HISTORY.md` is authoritative.
 - The `handoff/archive` branch is reserved for PDF and handoff artifact publication, not primary runtime/source work.
+
+## Temporal Continuity Policy
+
+- Every material repo change must produce an append-only `HISTORY.md` entry, rebuilt `HISTORY_INDEX.md`, verified integrity, and one validated snapshot.
+- History entries must preserve the temporal chain: previous state, new state, `supersedes` link when applicable, successes, failures, skipped verification, changed files, and unresolved next steps.
+- Stable repo facts live here in `REPO_LEDGER.md`; detailed session chronology lives in `HISTORY.md`. Do not duplicate long prose across both files.
+- Agents must update this ledger when changing stable repo policy, architecture, active/archive routing, runtime safety rules, durable operator workflows, benchmark publication rules, or cross-agent protocol.
+- Agents must update `PROJECT_STATUS.md` when the current operating state or active focus changes.
+- Model-specific guides such as `CLAUDE.md`, `GEMINI.md`, and `ANTIGRAVITY.md` must route back to `AGENTS.md` and must not create a competing protocol.
+
+## Context Budget Policy
+
+- Full continuity is preserved in append-only history, but normal startup must not load full history.
+- `HISTORY_INDEX.md` is the compact route map; `.seam/snapshots/` are bounded handoff packs; `tools.history.build_context_pack` builds topic/latest/supersedes packs under an explicit token budget.
+- `tools.history.verify_continuity` is the quality gate for history/index/snapshot freshness, supersedes validity, and session-link/secret hygiene.
+- Prefer task-specific context packs over broad scans. If a pack is insufficient, add targeted topics, explicit entries, or refs instead of reading all of `HISTORY.md`.
+
+## Data Routing Policy
+
+- `tools/history/routing_manifest.json` defines logical branches for AI-searchable history such as `maintenance/docker`, `maintenance/pgvector`, `protocol/context`, and `protocol/security`.
+- Route classifications are mutable, but route mutations must remain reconstructable through `HISTORY.md`, manifest lifecycle fields, and stable topic ledgers under `docs/ledgers/`.
+- `tools.history.verify_routing` checks route tree integrity, parent links, route lifecycle fields, ledger paths, and referenced history entries.
+- Deleting a classification means removing it from active use through `status=retired` or `status=moved`; the audit trail must remain.
 
 ## Documentation Separation Policy
 

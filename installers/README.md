@@ -109,7 +109,11 @@ Default persistent database paths:
 To activate PgVector after installing the extra, set the DSN in your environment:
 
 ```sh
-export SEAM_PGVECTOR_DSN="postgresql://user:password@localhost:5432/seam"
+export SEAM_LOCAL_ENV="$HOME/.config/seam/.env"
+set -a
+. "$SEAM_LOCAL_ENV"
+set +a
+export SEAM_PGVECTOR_DSN="host=localhost port=5432 dbname=seam user=$POSTGRES_USER password=$POSTGRES_PASSWORD"
 seam doctor  # should show: PgVector: reachable
 ```
 
@@ -118,34 +122,40 @@ seam doctor  # should show: PgVector: reachable
 A `docker-compose.yaml` is included at the repo root for local development. From the repo root:
 
 ```sh
-docker compose up -d
+mkdir -p "$HOME/.config/seam"
+cp .env.example "$HOME/.config/seam/.env"
+# Edit "$HOME/.config/seam/.env" locally and set POSTGRES_PASSWORD before starting Docker.
+docker compose --env-file "$HOME/.config/seam/.env" up -d
+set -a
+. "$HOME/.config/seam/.env"
+set +a
 ```
 
-This starts a Postgres 18 instance with the pgvector extension pre-installed, listening on port `5432`. The default credentials are:
+This starts a Postgres 18 instance with the pgvector extension pre-installed, listening on port `5432`. Runtime values come from your local `.env` file:
 
 | Setting | Default |
 |---|---|
 | Database | `seam` |
 | User | `seam` |
-| Password | `local-test-password` |
+| Password | set locally in `.env` |
 | Port | `5432` |
 
 Set the DSN to match:
 
 ```sh
-export SEAM_PGVECTOR_DSN="postgresql://seam:local-test-password@localhost:5432/seam"
+export SEAM_PGVECTOR_DSN="host=localhost port=${SEAM_PGVECTOR_PORT:-5432} dbname=$POSTGRES_DB user=$POSTGRES_USER password=$POSTGRES_PASSWORD"
 ```
 
 To override any default, set the corresponding environment variable before running `docker compose up`:
 
 ```sh
-POSTGRES_PASSWORD=mypassword SEAM_PGVECTOR_PORT=5433 docker compose up -d
+POSTGRES_PASSWORD="<local-password>" SEAM_PGVECTOR_PORT=5433 docker compose up -d
 ```
 
 To persist the DSN across terminal sessions, add the export to your shell profile (`.bashrc`, `.zshrc`, etc.):
 
 ```sh
-echo 'export SEAM_PGVECTOR_DSN="postgresql://seam:local-test-password@localhost:5432/seam"' >> ~/.bashrc
+echo 'export SEAM_PGVECTOR_DSN="host=localhost port=${SEAM_PGVECTOR_PORT:-5432} dbname=$POSTGRES_DB user=$POSTGRES_USER password=$POSTGRES_PASSWORD"' >> ~/.bashrc
 source ~/.bashrc
 ```
 

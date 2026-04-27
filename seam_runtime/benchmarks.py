@@ -15,7 +15,14 @@ from uuid import uuid4
 from .context_views import build_context_payload, render_context_pretty
 from .dsl import compile_dsl
 from .evals import default_retrieval_fixtures, run_retrieval_benchmark
-from .lossless import benchmark_text_lossless, count_prompt_tokens
+from .lossless import (
+    benchmark_text_lossless,
+    compress_text_readable,
+    count_prompt_tokens,
+    decompress_text_readable,
+    parse_readable_machine_text,
+    query_readable_compressed,
+)
 from .models import HashEmbeddingModel, cosine
 from .vector import INDEXABLE_KINDS, SQLiteVectorIndex
 
@@ -24,11 +31,12 @@ if TYPE_CHECKING:
 
 
 BENCHMARK_VERSION = "SEAM-BENCH/1"
-BENCHMARK_SUITES = ("lossless", "retrieval", "embedding", "long_context", "persistence", "agent_tasks")
+BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_context", "persistence", "agent_tasks")
 
 BENCHMARK_ROOT = Path(__file__).resolve().parent.parent / "benchmarks"
 FIXTURE_ROOT = BENCHMARK_ROOT / "fixtures"
 LOSSLESS_FIXTURE_PATH = FIXTURE_ROOT / "lossless_cases.json"
+READABLE_FIXTURE_PATH = FIXTURE_ROOT / "readable_cases.json"
 LONG_CONTEXT_FIXTURE_PATH = FIXTURE_ROOT / "long_context_cases.json"
 AGENT_TASK_FIXTURE_PATH = FIXTURE_ROOT / "agent_tasks.json"
 RETRIEVAL_FIXTURE_PATH = Path(__file__).resolve().parent.parent / "docs" / "retrieval_gold_fixtures.json"
@@ -54,6 +62,14 @@ def run_benchmark_suite(
                 runtime,
                 tokenizer=tokenizer,
                 min_token_savings=min_token_savings,
+                persist=persist,
+                include_machine_text=include_machine_text,
+            )
+            continue
+        if family == "readable":
+            family_reports[family] = _run_readable_family(
+                runtime,
+                tokenizer=tokenizer,
                 persist=persist,
                 include_machine_text=include_machine_text,
             )
@@ -238,6 +254,102 @@ def _run_lossless_family(
     }
     return {
         "family": "lossless",
+        "summary": summary,
+        "cases": cases,
+        "improvement_loop": _unique_actions(case["improvement_loop"] for case in cases),
+    }
+
+
+def _run_readable_family(
+    runtime: "SeamRuntime",
+    tokenizer: str,
+    persist: bool,
+    include_machine_text: bool,
+) -> dict[str, Any]:
+    cases: list[dict[str, Any]] = []
+    for config in _load_json_fixture(READABLE_FIXTURE_PATH, _default_readable_cases()):
+        text = _resolve_lossless_text(config)
+        artifact = compress_text_readable(
+            text,
+            source_ref=str(config.get("source_ref", f"benchmark://readable/{config['name']}")),
+            granularity=str(config.get("granularity", "auto")),
+            tokenizer=tokenizer,
+        )
+        parsed = parse_readable_machine_text(artifact.machine_text)
+        direct_text = _read_rc1_text_direct(parsed)
+        rebuilt = decompress_text_readable(artifact.machine_text)
+        direct_sha256 = hashlib.sha256(direct_text.encode("utf-8")).hexdigest()
+        rebuilt_sha256 = hashlib.sha256(rebuilt.encode("utf-8")).hexdigest()
+        source_quotes = _quote_span_records(text)
+        compressed_quotes = _compressed_quote_records(parsed)
+        source_terms = sorted(set(_benchmark_terms(text)))
+        compressed_terms = sorted(set(parsed.get("index", {}).get("terms", {}).keys()))
+        query_checks = _readable_query_checks(artifact.machine_text, config, source_quotes)
+        direct_quote_match = source_quotes == compressed_quotes
+        term_coverage = set(source_terms).issubset(set(compressed_terms))
+        direct_text_match = direct_text == text and direct_sha256 == artifact.sha256
+        rebuild_match = rebuilt == text and rebuilt_sha256 == artifact.sha256
+        direct_query_exactness = all(item["ok"] for item in query_checks)
+        info_equivalent = direct_text_match and rebuild_match and direct_quote_match and term_coverage and direct_query_exactness
+        artifact_id = None
+        if persist:
+            artifact_id = runtime.store.write_machine_artifact(
+                source_type="benchmark.readable",
+                source_id=config["name"],
+                artifact=artifact.to_dict(include_machine_text=True),
+                roundtrip_ok=rebuild_match,
+                metadata={"family": "readable", "case": config["name"], "format": "SEAM-RC/1"},
+            )
+        trace = {
+            "source_sha256": artifact.sha256,
+            "direct_read_sha256": direct_sha256,
+            "rebuilt_sha256": rebuilt_sha256,
+            "direct_read_text": direct_text if bool(config.get("include_direct_text_trace", False)) else None,
+            "source_quotes": source_quotes,
+            "compressed_quotes": compressed_quotes,
+            "source_terms": source_terms,
+            "compressed_terms": compressed_terms,
+            "query_checks": query_checks,
+            "artifact": artifact.to_dict(include_machine_text=include_machine_text),
+        }
+        case = {
+            "case_id": config["name"],
+            "status": "PASS" if info_equivalent else "FAIL",
+            "metrics": {
+                "roundtrip_match": rebuild_match,
+                "direct_text_match": direct_text_match,
+                "direct_quote_match": direct_quote_match,
+                "direct_query_exactness": direct_query_exactness,
+                "term_coverage": term_coverage,
+                "info_equivalent": info_equivalent,
+                "quote_count": len(source_quotes),
+                "query_check_count": len(query_checks),
+                "token_savings_ratio": round(artifact.token_savings_ratio, 6),
+                "intelligence_per_token_gain": round(artifact.intelligence_per_token_gain, 6),
+                "machine_tokens": artifact.machine_tokens,
+                "original_tokens": artifact.original_tokens,
+            },
+            "trace": trace,
+            "debug_flags": _readable_flags(direct_text_match, rebuild_match, direct_quote_match, direct_query_exactness, term_coverage),
+            "improvement_loop": _readable_actions(config["name"], direct_text_match, rebuild_match, direct_quote_match, direct_query_exactness, term_coverage),
+        }
+        if artifact_id is not None:
+            case["artifact_id"] = artifact_id
+        cases.append(_stamp_case_hash(case))
+
+    summary = {
+        "case_count": len(cases),
+        "pass_rate": _ratio(sum(1 for case in cases if case["status"] == "PASS"), len(cases)),
+        "exactness_rate": _ratio(sum(1 for case in cases if case["metrics"]["roundtrip_match"]), len(cases)),
+        "direct_text_exact_rate": _ratio(sum(1 for case in cases if case["metrics"]["direct_text_match"]), len(cases)),
+        "direct_read_equivalence_rate": _ratio(sum(1 for case in cases if case["metrics"]["info_equivalent"]), len(cases)),
+        "direct_query_exactness_rate": _ratio(sum(1 for case in cases if case["metrics"]["direct_query_exactness"]), len(cases)),
+        "quote_match_rate": _ratio(sum(1 for case in cases if case["metrics"]["direct_quote_match"]), len(cases)),
+        "avg_token_savings": _average(case["metrics"]["token_savings_ratio"] for case in cases),
+        "avg_gain": _average(case["metrics"]["intelligence_per_token_gain"] for case in cases),
+    }
+    return {
+        "family": "readable",
         "summary": summary,
         "cases": cases,
         "improvement_loop": _unique_actions(case["improvement_loop"] for case in cases),
@@ -717,6 +829,69 @@ def _default_lossless_cases() -> list[dict[str, Any]]:
     ]
 
 
+def _default_readable_cases() -> list[dict[str, Any]]:
+    return [
+        {
+            "name": "rc1_recipe_exact_direct_read",
+            "text": "\n".join(
+                [
+                    "Recipe: Lemon Rice",
+                    "Yield: 2 servings",
+                    "Ingredients:",
+                    "- 1 cup cooked rice",
+                    "- 1 tablespoon lemon juice",
+                    "- 1 teaspoon olive oil",
+                    "- 1/4 teaspoon salt",
+                    "Steps:",
+                    "1. Warm the olive oil in a pan for 30 seconds.",
+                    "2. Stir in the cooked rice and salt.",
+                    "3. Turn off the heat and fold in the lemon juice.",
+                    "Note: \"Serve immediately while warm.\"",
+                ]
+            ),
+            "queries": [
+                "Recipe Lemon Rice",
+                "1 tablespoon lemon juice",
+                "1/4 teaspoon salt",
+                "Warm the olive oil in a pan for 30 seconds",
+                '"Serve immediately while warm."',
+            ],
+            "include_direct_text_trace": True,
+        },
+        {
+            "name": "rc1_exact_quote_table_number",
+            "text": "\n".join(
+                [
+                    '# Operator Note',
+                    'Decision: "SEAM-RC/1 is the working compressed document."',
+                    'Budget table:',
+                    '| item | value |',
+                    '| original_tokens | 128 |',
+                    '| rc1_tokens | 96 |',
+                    'Requirement: quote spans, table cells, numbers, and provenance stay directly queryable.',
+                ]
+            ),
+            "queries": [
+                '"SEAM-RC/1 is the working compressed document."',
+                "original_tokens 128",
+                "rc1_tokens 96",
+            ],
+        },
+        {
+            "name": "rc1_repeated_direct_read_contract",
+            "text": (
+                'Rule: "Compressed SEAM language is read directly." '
+                "Exact source details remain in machine-language chunks. "
+                'Rule: "Compressed SEAM language is read directly."'
+            ),
+            "queries": [
+                '"Compressed SEAM language is read directly."',
+                "machine-language chunks",
+            ],
+        },
+    ]
+
+
 def _default_long_context_cases() -> list[dict[str, Any]]:
     return [
         {
@@ -823,7 +998,7 @@ def _build_long_context_dsl(config: dict[str, Any]) -> str:
 
 def _dataset_manifest() -> list[dict[str, str]]:
     items = []
-    for path in [LOSSLESS_FIXTURE_PATH, LONG_CONTEXT_FIXTURE_PATH, AGENT_TASK_FIXTURE_PATH, RETRIEVAL_FIXTURE_PATH, LOSSLESS_DEMO_PATH]:
+    for path in [LOSSLESS_FIXTURE_PATH, READABLE_FIXTURE_PATH, LONG_CONTEXT_FIXTURE_PATH, AGENT_TASK_FIXTURE_PATH, RETRIEVAL_FIXTURE_PATH, LOSSLESS_DEMO_PATH]:
         if path.exists():
             items.append({"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     return items
@@ -855,6 +1030,121 @@ def _lossless_actions(result, case_id: str) -> list[str]:
         actions.append(f"{case_id}: add stronger reversible transforms or codec ordering because token savings target was missed.")
     if any(flag.startswith("iteration_") for flag in result.flags):
         actions.append(f"{case_id}: review fluctuation log and promote stable reversible rules from the best candidate search.")
+    return actions
+
+
+def _quote_span_records(text: str) -> list[dict[str, Any]]:
+    import re
+
+    return [
+        {
+            "text": match.group(0),
+            "value": match.group(1),
+            "start": match.start(),
+            "end": match.end(),
+        }
+        for match in re.finditer(r'"([^"]*)"', text)
+    ]
+
+
+def _compressed_quote_records(parsed: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "text": str(quote["text"]),
+            "value": str(quote.get("value", "")),
+            "start": int(quote["start"]),
+            "end": int(quote["end"]),
+        }
+        for quote in parsed.get("quotes", [])
+    ]
+
+
+def _read_rc1_text_direct(parsed: dict[str, Any]) -> str:
+    chunks = {str(chunk["id"]): str(chunk["text"]) for chunk in parsed.get("chunks", [])}
+    return "".join(chunks[str(item["id"])] for item in parsed.get("order", []))
+
+
+def _benchmark_terms(text: str) -> list[str]:
+    import re
+
+    terms: list[str] = []
+    for token in re.findall(r"[a-z0-9_:-]+", text.lower()):
+        terms.append(token)
+        stripped = token.strip(":-")
+        if stripped and stripped != token:
+            terms.append(stripped)
+    return terms
+
+
+def _readable_query_checks(machine_text: str, config: dict[str, Any], source_quotes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    query_texts = list(config.get("queries", []))
+    for quote in source_quotes:
+        query = str(quote["text"])
+        if query not in query_texts:
+            query_texts.append(query)
+    checks: list[dict[str, Any]] = []
+    for query in query_texts:
+        result = query_readable_compressed(machine_text, str(query), limit=5)
+        hits = result.to_dict()["hits"]
+        expected = _expected_query_text(str(query), source_quotes)
+        ok = any(_hit_satisfies_expected(hit, expected) for hit in hits)
+        checks.append(
+            {
+                "query": str(query),
+                "expected": expected,
+                "ok": ok,
+                "top_hits": hits[:3],
+            }
+        )
+    return checks
+
+
+def _expected_query_text(query: str, source_quotes: list[dict[str, Any]]) -> str:
+    if query.startswith('"') and query.endswith('"'):
+        return query
+    lowered = query.lower()
+    for quote in source_quotes:
+        if lowered in str(quote["text"]).lower() or lowered in str(quote["value"]).lower():
+            return str(quote["text"])
+    return query
+
+
+def _hit_satisfies_expected(hit: dict[str, Any], expected: str) -> bool:
+    text = str(hit.get("text", ""))
+    if expected == text or expected.lower() in text.lower():
+        return True
+    expected_terms = set(_benchmark_terms(expected))
+    hit_terms = set(_benchmark_terms(text))
+    return bool(expected_terms) and expected_terms.issubset(hit_terms)
+
+
+def _readable_flags(direct_text_match: bool, rebuild_match: bool, direct_quote_match: bool, direct_query_exactness: bool, term_coverage: bool) -> list[str]:
+    flags = []
+    if not direct_text_match:
+        flags.append("rc1_direct_text_mismatch")
+    if not rebuild_match:
+        flags.append("rc1_rebuild_mismatch")
+    if not direct_quote_match:
+        flags.append("rc1_quote_mismatch")
+    if not direct_query_exactness:
+        flags.append("rc1_direct_query_miss")
+    if not term_coverage:
+        flags.append("rc1_term_coverage_gap")
+    return flags
+
+
+def _readable_actions(case_id: str, direct_text_match: bool, rebuild_match: bool, direct_quote_match: bool, direct_query_exactness: bool, term_coverage: bool) -> list[str]:
+    actions = []
+    if not direct_text_match:
+        actions.append(f"{case_id}: inspect SEAM-RC/1 CHUNK and ORDER records because direct compressed-language readback is not source-exact.")
+    if not rebuild_match:
+        actions.append(f"{case_id}: inspect SEAM-RC/1 ORDER and CHUNK records because exact rebuild diverged from source.")
+    if not direct_quote_match:
+        actions.append(f"{case_id}: inspect QUOTE record extraction because source quote spans are not preserved 1:1.")
+    if not direct_query_exactness:
+        actions.append(f"{case_id}: improve readable-query matching because compressed-language reads missed expected source facts.")
+    if not term_coverage:
+        actions.append(f"{case_id}: inspect INDEX generation because source terms are not all represented in RC/1 postings.")
     return actions
 
 
@@ -964,6 +1254,11 @@ def _agent_task_actions(
 def _render_key_metrics(family_name: str, summary: dict[str, Any]) -> str:
     if family_name == "lossless":
         return f"avg_savings={float(summary.get('avg_token_savings', 0.0)):.1%}"
+    if family_name == "readable":
+        return (
+            f"direct_text={float(summary.get('direct_text_exact_rate', 0.0)):.1%} "
+            f"direct_read={float(summary.get('direct_read_equivalence_rate', 0.0)):.1%}"
+        )
     if family_name == "retrieval":
         nat = float(summary.get('hybrid_recall_at_k', 0.0))
         mac = float(summary.get('machine_hybrid_recall_at_k', 0.0))

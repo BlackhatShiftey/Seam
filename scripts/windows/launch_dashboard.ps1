@@ -47,8 +47,16 @@ function ConvertTo-ConnInfoValue {
     return "'$escaped'"
 }
 
-if (-not $env:SEAM_PGVECTOR_DSN -and (Test-Path ".env")) {
-    $envValues = Read-DotEnv -Path ".env"
+function Get-SeamLocalEnvPath {
+    if ($env:SEAM_LOCAL_ENV) {
+        return $env:SEAM_LOCAL_ENV
+    }
+    return (Join-Path ([Environment]::GetFolderPath("MyDocuments")) "SEAM\local\.env")
+}
+
+$localEnvPath = Get-SeamLocalEnvPath
+if (-not $env:SEAM_PGVECTOR_DSN -and (Test-Path $localEnvPath)) {
+    $envValues = Read-DotEnv -Path $localEnvPath
     $required = @("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "SEAM_PGVECTOR_PORT")
     $hasPgConfig = $true
     foreach ($key in $required) {

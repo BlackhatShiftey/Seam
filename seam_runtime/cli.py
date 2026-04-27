@@ -16,10 +16,14 @@ from .installer import default_runtime_db_path
 from .lossless import (
     LOSSLESS_CODECS,
     LOSSLESS_TRANSFORMS,
+    READABLE_GRANULARITIES,
     TOKENIZER_CHOICES,
     benchmark_text_lossless,
+    compress_text_readable,
     compress_text_lossless,
+    decompress_text_readable,
     decompress_text_lossless,
+    query_readable_compressed,
     render_lossless_benchmark_pretty,
 )
 from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
@@ -42,6 +46,32 @@ def build_parser() -> argparse.ArgumentParser:
     lossless_compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
     lossless_compress_parser.add_argument("--output")
     lossless_compress_parser.add_argument("--format", choices=["machine", "json"], default="machine")
+
+    readable_compress_parser = subparsers.add_parser(
+        "readable-compress",
+        aliases=["compress-readable"],
+        help="Compress text into directly readable SEAM-RC/1 machine language",
+    )
+    readable_compress_parser.add_argument("source")
+    readable_compress_parser.add_argument("--source-ref")
+    readable_compress_parser.add_argument("--granularity", choices=READABLE_GRANULARITIES, default="auto")
+    readable_compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+    readable_compress_parser.add_argument("--output")
+    readable_compress_parser.add_argument("--format", choices=["machine", "json"], default="machine")
+
+    readable_query_parser = subparsers.add_parser(
+        "readable-query",
+        aliases=["query-compressed"],
+        help="Ask a SEAM-RC/1 compressed document directly without rebuilding the source",
+    )
+    readable_query_parser.add_argument("source")
+    readable_query_parser.add_argument("query")
+    readable_query_parser.add_argument("--limit", type=int, default=5)
+    readable_query_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    readable_rebuild_parser = subparsers.add_parser("readable-rebuild", help="Verify and rebuild exact text from SEAM-RC/1")
+    readable_rebuild_parser.add_argument("source")
+    readable_rebuild_parser.add_argument("--output")
 
     lossless_decompress_parser = subparsers.add_parser("lossless-decompress", aliases=["decompress-doc"], help="Restore a SEAM lossless document back to exact text")
     lossless_decompress_parser.add_argument("source")
@@ -225,7 +255,39 @@ def run_cli(argv: list[str] | None = None) -> None:
         if args.format == "json":
             print(json.dumps(artifact.to_dict(include_machine_text=True), indent=2))
             return
-        print(artifact.machine_text)
+        _print_text(artifact.machine_text)
+        return
+    if args.command in {"readable-compress", "compress-readable"}:
+        text = _read_text_source(args.source)
+        artifact = compress_text_readable(
+            text,
+            source_ref=args.source_ref or args.source,
+            granularity=args.granularity,
+            tokenizer=args.tokenizer,
+        )
+        if args.output:
+            _write_text_output(args.output, artifact.machine_text)
+        if args.format == "json":
+            print(json.dumps(artifact.to_dict(include_machine_text=True), indent=2))
+            return
+        _print_text(artifact.machine_text)
+        return
+    if args.command in {"readable-query", "query-compressed"}:
+        machine_text = _read_text_source(args.source)
+        result = query_readable_compressed(machine_text, args.query, limit=args.limit)
+        payload = result.to_dict()
+        if args.format == "json":
+            print(json.dumps(payload, indent=2))
+            return
+        _print_text(_render_readable_query_pretty(payload))
+        return
+    if args.command == "readable-rebuild":
+        text = decompress_text_readable(_read_text_source(args.source))
+        if args.output:
+            _write_text_output(args.output, text)
+            print(args.output)
+            return
+        _print_text(text)
         return
     if args.command in {"lossless-decompress", "decompress-doc"}:
         machine_text = _read_text_source(args.source)
@@ -234,7 +296,7 @@ def run_cli(argv: list[str] | None = None) -> None:
             _write_text_output(args.output, text)
             print(args.output)
             return
-        print(text)
+        _print_text(text)
         return
     if args.command in {"lossless-benchmark", "benchmark-doc"}:
         text = _read_text_source(args.source)
@@ -514,9 +576,18 @@ def _read_text_source(source: str) -> str:
 
 def _write_text_output(target: str, text: str) -> None:
     if target == "-":
-        print(text)
+        _print_text(text)
         return
     Path(target).write_bytes(text.encode("utf-8"))
+
+
+def _print_text(text: str) -> None:
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:
+        print(text)
+        return
+    buffer.write(text.encode("utf-8"))
+    buffer.write(b"\n")
 
 
 def _render_lossless_demo_result(payload: dict[str, object]) -> str:
@@ -540,6 +611,31 @@ def _render_lossless_demo_result(payload: dict[str, object]) -> str:
     if payload.get("log_output"):
         lines.append(f"Log output: {payload.get('log_output')}")
     lines.extend(["", render_lossless_benchmark_pretty(payload)])
+    return "\n".join(lines)
+
+
+def _render_readable_query_pretty(payload: dict[str, object]) -> str:
+    lines = [
+        "Readable query results",
+        f"Source: {payload.get('source_ref')}",
+        f"SHA256: {payload.get('sha256')}",
+        f"Query: {payload.get('query')}",
+    ]
+    hits = payload.get("hits", [])
+    if not hits:
+        lines.append("No direct compressed-language hits.")
+        return "\n".join(lines)
+    for index, hit in enumerate(hits, start=1):
+        reasons = ", ".join(str(reason) for reason in hit.get("reasons", []))
+        span = ""
+        if hit.get("start") is not None and hit.get("end") is not None:
+            span = f" span={hit.get('start')}..{hit.get('end')}"
+        lines.append(
+            f"{index}. {hit.get('record_type')} {hit.get('record_id')} score={hit.get('score')}{span}"
+        )
+        if reasons:
+            lines.append(f"   reasons={reasons}")
+        lines.append(f"   {str(hit.get('text', '')).rstrip()}")
     return "\n".join(lines)
 
 

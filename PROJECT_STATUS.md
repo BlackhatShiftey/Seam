@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-04-25
+Last updated: 2026-04-26
 
 ## Current State
 
@@ -18,16 +18,21 @@ SEAM is operating as a local machine-first memory runtime with:
 - Core runtime paths (compile, verify, persist, search, context, benchmark)
 - Textual dashboard (interactive TUI, chat, slash palette, MIRL animation, independent pane scrolling)
 - Dashboard installers: `seam-dash` shim on Windows (`.cmd`) and POSIX; `seam-dash` entrypoint in `pyproject.toml`
-- Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `.env`
+- Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `SEAM_LOCAL_ENV` or a private Documents `SEAM\local\.env`
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
 - Dashboard snapshot/smoke-test behavior
 - Benchmark bundle verification workflow
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
 - Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
+- Token-bounded context loading via history snapshots and `tools.history.build_context_pack`
+- Route-aware data classification through `tools/history/routing_manifest.json` and `docs/ledgers/`
 
 ## Active Focus
 
 - Reduce startup context overhead by relying on compact index + surgical history reads
+- Preserve near-complete temporal history without loading all history into model context
+- Keep maintenance, security, context, and runtime facts logically routed for AI search without duplicating chronology
+- Make compression produce directly readable AI-native machine language, with opaque byte payloads used only as optional reconstruction/integrity backing layers
 - Keep roadmap execution tied to history entries and supersedes chains
 - Continue feature delivery without reintroducing duplicated continuity text
 - Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
@@ -39,8 +44,11 @@ SEAM is operating as a local machine-first memory runtime with:
 - Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
 - Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
 - Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
+- Use `python -m tools.history.build_context_pack --topics <tags> --latest <n> --token-budget <budget>` for bounded task context.
+- Use `python -m tools.history.verify_continuity` before ending a changed session.
+- Use `python -m tools.history.verify_routing` after changing data classifications or ledgers.
 - Default memory guardrails are `82%` warning and `90%` hard limit.
-- pgvector Docker Compose: `docker compose up -d seam-pgvector`; port 55432; credentials in `.env`.
+- pgvector Docker Compose: `docker compose --env-file <private-env> up -d seam-pgvector`; port 55432; credentials stay outside the repo.
 
 ## Working Rule
 

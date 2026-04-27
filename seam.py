@@ -5,7 +5,18 @@ from pathlib import Path
 
 from seam_runtime.cli import run_cli
 from seam_runtime.dsl import compile_dsl
-from seam_runtime.lossless import LosslessArtifact, LosslessBenchmarkResult, benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
+from seam_runtime.lossless import (
+    LosslessArtifact,
+    LosslessBenchmarkResult,
+    ReadableCompressionArtifact,
+    ReadableQueryResult,
+    benchmark_text_lossless,
+    compress_text_lossless,
+    compress_text_readable,
+    decompress_text_lossless,
+    decompress_text_readable,
+    query_readable_compressed,
+)
 from seam_runtime.mirl import IRBatch, MIRLRecord, Pack
 from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel
 from seam_runtime.nl import compile_nl
@@ -62,6 +73,18 @@ def lossless_compress(text: str, codec: str = "auto", transform: str = "auto", t
 
 def lossless_decompress(machine_text: str) -> str:
     return decompress_text_lossless(machine_text)
+
+
+def readable_compress(text: str, source_ref: str = "local://input", granularity: str = "auto", tokenizer: str = "auto") -> ReadableCompressionArtifact:
+    return compress_text_readable(text, source_ref=source_ref, granularity=granularity, tokenizer=tokenizer)
+
+
+def readable_query(machine_text: str, query: str, limit: int = 5) -> ReadableQueryResult:
+    return query_readable_compressed(machine_text, query=query, limit=limit)
+
+
+def readable_decompress(machine_text: str) -> str:
+    return decompress_text_readable(machine_text)
 
 
 def lossless_benchmark(

@@ -1606,3 +1606,259 @@ Hardened agent context boundaries for active versus inactive code/docs.
 - Focused dashboard model tests still pass; rg verification was attempted but this Windows environment returned the known rg.exe Access is denied error.
 Refs: see HISTORY#076 for active/inactive code separation policy.
 ---END-ENTRY-#077---
+
+---BEGIN-ENTRY-#078---
+id: 078
+date: 2026-04-26T21:40:15Z
+agent: codex-gpt-5
+status: done
+topics: protocol, verify, pgvector, readme, history, snapshot
+commits: none
+refs: AGENTS.md,CLAUDE.md,docker-compose.yaml,.gitignore,.env.example,docs/SOP_MODEL_INTEGRATION.md,docs/errors.md,installers/README.md,scripts/run_real_adapters_guarded.ps1
+supersedes: 077
+tokens: 159
+---
+Hardened repo hygiene against session links and secret-shaped values.
+- Added explicit no-session-link and no-secret rules to AGENTS.md and CLAUDE.md, covering commit messages, HISTORY.md, snapshots, handoffs, docs, and comments.
+- Removed embedded PgVector password-style DSN examples from active docs and switched examples to local environment/conninfo flow.
+- Changed docker-compose.yaml so POSTGRES_PASSWORD must come from local .env instead of a tracked default.
+- Changed the guarded real-adapter runner to generate a throwaway Postgres password at runtime instead of storing a fixed value in source.
+- Re-enabled safe .env.example tracking while keeping real .env files ignored.
+- Verified focused PgVector/doctor tests pass and candidate repo/security scan finds no API keys, private keys, provider session URLs, embedded password DSNs, or prior hardcoded local test password strings.
+---END-ENTRY-#078---
+
+---BEGIN-ENTRY-#079---
+id: 079
+date: 2026-04-26T21:42:43Z
+agent: codex-gpt-5
+status: done
+topics: protocol, ledger, history, snapshot, multi-agent, verify
+commits: none
+refs: AGENTS.md,CLAUDE.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 078
+tokens: 153
+---
+Extended Claude and multi-agent continuity rules so the repo preserves the efficient SEAM history system.
+- Added a Temporal Chain section to AGENTS.md requiring every material change to record previous/new state, verification, failures or partial work, unresolved next steps, and supersedes links.
+- Clarified when REPO_LEDGER.md and PROJECT_STATUS.md must be updated instead of treating HISTORY.md as the only continuity surface.
+- Expanded CLAUDE.md so Claude must follow the startup reads, append history after repo changes, rebuild the index, verify integrity, write snapshots, update the ledger for stable policy/workflow changes, and preserve failures rather than flattening the timeline.
+- Updated REPO_LEDGER.md with the stable Temporal Continuity Policy and model-guide routing rule.
+- Verified history integrity before recording this entry.
+---END-ENTRY-#079---
+
+---BEGIN-ENTRY-#080---
+id: 080
+date: 2026-04-26T22:01:18Z
+agent: codex-gpt-5
+status: done
+topics: protocol, history, snapshot, verify, ledger, status
+commits: none
+refs: tools/history/build_context_pack.py,tools/history/verify_continuity.py,tools/history/test_history_tools.py,AGENTS.md,CLAUDE.md,REPO_LEDGER.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 079
+tokens: 171
+---
+Implemented token-bounded history context and continuity validation tooling.
+- Added tools.history.build_context_pack to select latest entries, topic-relevant entries, explicit entry ids, refs/body matches, and supersedes chains under a token budget without loading all of HISTORY.md into agent context.
+- Added tools.history.verify_continuity to enforce integrity, latest_id freshness, valid supersedes links, latest snapshot coverage, and session-link/key hygiene over tracked plus candidate files.
+- Added unit coverage for context pack chain selection, token-budget skipping, latest snapshot validation, and broken supersedes detection.
+- Updated AGENTS.md and CLAUDE.md so future agents use bounded context packs and run verify_continuity at session end.
+- Updated REPO_LEDGER.md with a Context Budget Policy and PROJECT_STATUS.md with the current token-bounded continuity baseline.
+- Verified history-tool tests pass, context-pack generation works under a small token budget, and verify_continuity reports OK before recording this entry.
+---END-ENTRY-#080---
+
+---BEGIN-ENTRY-#081---
+id: 081
+date: 2026-04-26T22:07:15Z
+agent: codex-gpt-5
+status: done
+topics: protocol, verify, history, snapshot
+commits: none
+refs: .env,.gitignore,AGENTS.md,CLAUDE.md,tools/history/verify_continuity.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 080
+tokens: 128
+---
+Verified session-link and secret hygiene after the token-bounded continuity implementation.
+- Ran a high-confidence scan across repo text files plus ignored local .env files for provider session URLs, API-key formats, private-key blocks, embedded-password DSNs, and actual env secret values.
+- Neutralized the ignored local .env file so it contains only placeholder values and no embedded DSN or local password value.
+- Confirmed .env remains ignored and .env.example remains explicitly allowed for placeholder setup.
+- Verified tools.history.verify_continuity reports OK after the cleanup.
+- No secret values, API keys, SSH/private keys, provider session links, or password-in-DSN values were printed or recorded.
+---END-ENTRY-#081---
+
+---BEGIN-ENTRY-#082---
+id: 082
+date: 2026-04-26T22:08:58Z
+agent: codex-gpt-5
+status: done
+topics: protocol, verify, history, snapshot
+commits: none
+refs: AGENTS.md,CLAUDE.md,.gitignore,HISTORY.md,HISTORY_INDEX.md
+supersedes: 081
+tokens: 145
+---
+Hardened the security cleanup rule to delete or redact discovered private artifacts immediately.
+- Removed the ignored local .env file from the repo folder after the earlier scan identified it as the only real local secret-shaped risk.
+- Updated AGENTS.md and CLAUDE.md so all agents must delete local secret/session artifacts or redact values immediately when found, without preserving them in history, snapshots, commits, docs, or chat responses.
+- Re-ran the high-confidence repo and git-message scan for provider session URLs, API-key formats, private-key blocks, embedded-password DSNs, and env secret values; it returned zero findings.
+- Verified .env is absent and remains ignored by .gitignore.
+- Verified tools.history.verify_continuity reports OK before recording this entry.
+---END-ENTRY-#082---
+
+---BEGIN-ENTRY-#083---
+id: 083
+date: 2026-04-26T22:11:05Z
+agent: codex-gpt-5
+status: done
+topics: protocol, verify, pgvector, windows, history, snapshot
+commits: none
+refs: scripts/windows/launch_dashboard.ps1,docs/errors.md,installers/README.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 082
+tokens: 122
+---
+Moved local PgVector credential preservation out of the repo while keeping normal tests credential-free.
+- Updated scripts/windows/launch_dashboard.ps1 to load PgVector settings from SEAM_LOCAL_ENV or the private default Documents\SEAM\local\.env instead of repo-root .env.
+- Updated docs/errors.md and installers/README.md to use external env files and docker compose --env-file rather than storing secrets in the repo checkout.
+- Verified repo-root .env is absent and SEAM_PGVECTOR_DSN is absent in the shell.
+- Verified the full Python test suite runs without credentials: python -m pytest test_seam.py tools/history/test_history_tools.py passed 108 tests.
+- Verified cmd /c scripts\windows\launch_dashboard.bat --help works without credentials.
+---END-ENTRY-#083---
+
+---BEGIN-ENTRY-#084---
+id: 084
+date: 2026-04-26T22:14:35Z
+agent: codex-gpt-5
+status: done
+topics: pgvector, verify, docker, windows, history, snapshot
+commits: none
+refs: scripts/run_real_adapters_guarded.ps1,HISTORY.md,HISTORY_INDEX.md
+supersedes: 083
+tokens: 114
+---
+Stopped stale local pgvector service after Docker real-adapter verification.
+- Verified Docker was available and repo-root .env plus SEAM_PGVECTOR_DSN were absent.
+- The default guarded real-adapter run initially refused to start because port 55432 was already occupied.
+- Retried the guarded real-adapter run on port 55433; sqlite-vector, Chroma, PgVector, doctor, retrieval gates, and full pytest suite passed.
+- Identified the stale listener on 55432 as Docker container seam-pgvector using pgvector/pgvector:0.8.2-pg18-trixie.
+- Stopped seam-pgvector without deleting Docker volumes; confirmed port 55432 is free and no Docker containers are running.
+---END-ENTRY-#084---
+
+---BEGIN-ENTRY-#085---
+id: 085
+date: 2026-04-26T22:15:02Z
+agent: codex-gpt-5
+status: done
+topics: protocol, history, verify, docker, snapshot
+commits: none
+refs: AGENTS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 084
+tokens: 91
+---
+Added docker to the controlled history topic vocabulary after recording the stale pgvector container cleanup.
+- Docker is part of the established real-adapter validation workflow through scripts/run_real_adapters_guarded.ps1.
+- The previous entry used the docker topic to record stopping the stale seam-pgvector service and freeing port 55432.
+- Updated AGENTS.md so future Docker-backed verification and cleanup entries can use docker as a valid controlled topic instead of overloading pgvector or verify.
+---END-ENTRY-#085---
+
+---BEGIN-ENTRY-#086---
+id: 086
+date: 2026-04-26T22:34:24Z
+agent: codex-gpt-5
+status: done
+topics: classification, audit, protocol, history, ledger, verify, snapshot
+commits: none
+refs: tools/history/routing_manifest.json,tools/history/verify_routing.py,tools/history/build_context_pack.py,tools/history/verify_continuity.py,tools/history/test_history_tools.py,docs/DATA_ROUTING.md,docs/ledgers/README.md,AGENTS.md,CLAUDE.md,REPO_LEDGER.md,PROJECT_STATUS.md,docs/README.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 085
+tokens: 184
+---
+Implemented self-improving data routing for efficient, auditable history reconstruction.
+- Added tools/history/routing_manifest.json as the mutable classification map for logical routes such as maintenance/docker, maintenance/pgvector, protocol/context, protocol/security, runtime/dashboard, docs/archive-routing, and benchmark/publication.
+- Added docs/DATA_ROUTING.md plus docs/ledgers/ topic ledgers so stable maintenance, protocol, context, and security facts have logical homes without duplicating full chronology.
+- Added tools.history.verify_routing to validate route ids, parent links, lifecycle fields, moved/retired route requirements, ledger paths, and referenced HISTORY entries.
+- Extended tools.history.build_context_pack with --route and routing-manifest support so agents can load route-specific history under a token budget.
+- Extended tools.history.verify_continuity so taxonomy validation participates in the session-end corruption defense gate.
+- Updated AGENTS.md, CLAUDE.md, REPO_LEDGER.md, PROJECT_STATUS.md, and docs/README.md to make route-aware context loading, ledgers, and routing verification part of the official protocol.
+- Verified route-aware packing for maintenance/docker, routing validation, continuity validation, compileall, history-tool tests, and focused PgVector/doctor tests.
+---END-ENTRY-#086---
+
+---BEGIN-ENTRY-#087---
+id: 087
+date: 2026-04-26T23:02:05Z
+agent: codex-gpt-5
+status: done
+topics: mirl, compress, protocol, ledger, classification, history, snapshot
+commits: none
+refs: docs/MIRL_V1.md,REPO_LEDGER.md,PROJECT_STATUS.md,docs/README.md,tools/history/routing_manifest.json,docs/ledgers/runtime/compression.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 086
+tokens: 176
+---
+Codified readable lossless compression as the SEAM architecture direction.
+- Updated docs/MIRL_V1.md so SEAM compression is only complete when the compressed artifact is directly readable AI-native machine language.
+- Recorded that quote spans, tables, image regions, OCR, video time ranges, transcript spans, events, and provenance must remain addressable inside the compressed language.
+- Updated REPO_LEDGER.md with the stable AI-native compression policy: opaque byte payloads such as SEAM-LX/1 are allowed as reconstruction/integrity backing layers, but not as the sole artifact for semantic read/query workflows.
+- Updated PROJECT_STATUS.md so readable compression is an active focus.
+- Added runtime/compression route metadata plus docs/ledgers/runtime/compression.md so future agents can load the relevant compression context directly.
+- No runtime codec behavior was changed in this entry; the next implementation step is a readable artifact type and interpreter/query path over the compressed language.
+---END-ENTRY-#087---
+
+---BEGIN-ENTRY-#088---
+id: 088
+date: 2026-04-26T23:19:09Z
+agent: codex-gpt-5
+status: done
+topics: mirl, compress, lx1, codec, search, verify, history, snapshot
+commits: none
+refs: seam_runtime/lossless.py,seam_runtime/cli.py,seam.py,test_seam.py,docs/MIRL_V1.md,docs/ledgers/runtime/compression.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 087
+tokens: 172
+---
+Implemented the first directly readable lossless compression runtime slice.
+- Added SEAM-RC/1 in seam_runtime/lossless.py as a text-readable machine-language artifact with META, CHUNK, ORDER, QUOTE, and INDEX records.
+- Added readable compression/query/rebuild APIs so SEAM can query compressed language directly and only rebuild exact text for audit.
+- Added CLI commands: readable-compress, readable-query, query-compressed, and readable-rebuild.
+- Exported readable_compress, readable_query, and readable_decompress from seam.py.
+- Added tests proving an exact quoted detail is returned from SEAM-RC/1 without rebuilding the source document, plus CLI coverage for the same path.
+- Updated docs/MIRL_V1.md and docs/ledgers/runtime/compression.md with the implemented SEAM-RC/1 format and commands.
+- Verification: python -m compileall seam.py seam_runtime\lossless.py seam_runtime\cli.py passed; focused readable tests passed; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 113 tests; manual readable-compress/readable-query smoke returned an exact QUOTE hit from the compressed file.
+---END-ENTRY-#088---
+
+---BEGIN-ENTRY-#089---
+id: 089
+date: 2026-04-26T23:25:45Z
+agent: codex-gpt-5
+status: done
+topics: benchmark, mirl, compress, verify, history, snapshot
+commits: none
+refs: seam_runtime/benchmarks.py,test_seam.py,docs/MIRL_V1.md,docs/ledgers/runtime/compression.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 088
+tokens: 204
+---
+Added the SEAM-RC/1 readable compression benchmark gate.
+- Added readable to BENCHMARK_SUITES so benchmark run readable and benchmark run all include the RC/1 direct-read comparison family.
+- The readable benchmark compresses source text into SEAM-RC/1, parses the compressed records, verifies exact rebuild/hash, compares source quote spans to QUOTE records, verifies source term coverage through INDEX records, and runs direct readable-query checks against the compressed language.
+- Added default cases covering exact quote retrieval, table/cell-style numeric facts, repeated quotes, and direct compressed-language chunk reads.
+- Updated benchmark summaries and pretty rendering with direct_read equivalence metrics.
+- Added tests for runtime readable benchmarks, CLI readable benchmark JSON, and the expanded all-suite family count.
+- Updated docs/MIRL_V1.md and docs/ledgers/runtime/compression.md with the readable benchmark command and 1:1 gate criteria.
+- Verification: focused readable benchmark tests passed; python seam.py benchmark run readable --tokenizer char4_approx --format pretty passed; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 115 tests; compileall passed for benchmark/runtime touched files.
+---END-ENTRY-#089---
+
+---BEGIN-ENTRY-#090---
+id: 090
+date: 2026-04-26T23:29:00Z
+agent: codex-gpt-5
+status: done
+topics: benchmark, mirl, compress, verify, history, snapshot
+commits: none
+refs: seam_runtime/benchmarks.py,seam_runtime/lossless.py,test_seam.py,docs/MIRL_V1.md,docs/ledgers/runtime/compression.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 089
+tokens: 218
+---
+Hardened the SEAM-RC/1 benchmark into a 100% recipe/direct-read gate.
+- Added rc1_recipe_exact_direct_read as the lead readable benchmark case with title, yield, ingredients, measurements, ordered steps, and a quoted serving note.
+- Added direct_text_match and direct_text_exact_rate so the benchmark reads exact full text from RC/1 CHUNK and ORDER records without using byte-level decompression.
+- Kept audit rebuild/hash checks, but made direct compressed-language readback part of info_equivalent.
+- Tightened query term normalization so recipe headings such as Recipe: match natural queries like Recipe Lemon Rice while preserving exact record text.
+- Updated tests to assert the recipe direct_read_text equals the original recipe exactly and that readable direct_text_exact_rate stays 1.0.
+- Updated docs/MIRL_V1.md and docs/ledgers/runtime/compression.md to state RC/1 exactness cannot fall below 100% and that recipe text must be directly readable back from compressed language.
+- Verification: focused readable benchmark tests passed; python seam.py benchmark run readable --tokenizer char4_approx --format pretty passed with direct_text=100.0% and direct_read=100.0%; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 115 tests; compileall passed for touched benchmark/lossless/test files.
+---END-ENTRY-#090---

@@ -63,8 +63,16 @@ Look for:
 ### Fix (Docker local Postgres with pgvector)
 
 ```powershell
-docker compose up -d
-$env:SEAM_PGVECTOR_DSN="postgresql://seam:local-test-password@localhost:5432/seam"
+$localEnv = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "SEAM\local\.env"
+New-Item -ItemType Directory -Force -Path (Split-Path $localEnv)
+Copy-Item .env.example $localEnv
+# Edit $localEnv locally first; do not commit it.
+docker compose --env-file $localEnv up -d
+Get-Content $localEnv | Where-Object { $_ -and $_ -notmatch '^\s*#' } | ForEach-Object {
+    $name, $value = $_ -split '=', 2
+    Set-Item -Path "Env:$name" -Value $value
+}
+$env:SEAM_PGVECTOR_DSN="host=localhost port=5432 dbname=seam user=$env:POSTGRES_USER password=$env:POSTGRES_PASSWORD"
 .\.venv\Scripts\seam.exe doctor
 ```
 
@@ -123,4 +131,3 @@ Stop and resolve before continuing:
 - Lossless roundtrip failures
 - Benchmark verification hash mismatch for published claims
 - PgVector configured but unreachable when pgvector is the selected backend
-

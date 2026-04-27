@@ -8,8 +8,9 @@ This folder is the active operator and engineering documentation surface.
 - `errors.md` - current troubleshooting playbook.
 - `howto/README.md` - short task runbooks.
 - `CODE_LAYOUT.md` - active code, experimental code, generated code, and inactive code boundaries.
+- `DATA_ROUTING.md` - logical data routes, topic ledgers, context packs, and corruption-defense checks.
 - `SOP_MODEL_INTEGRATION.md` - current model integration procedure.
-- `MIRL_V1.md` - current MIRL reference.
+- `MIRL_V1.md` - current MIRL reference and readable lossless compression contract.
 - `RETRIEVAL_EVAL_V1.md` - current retrieval evaluation reference.
 - `SYMBOL_NURSERY.md` - current symbol staging notes.
 
@@ -26,3 +27,4 @@ This folder is the active operator and engineering documentation surface.
 - Durable coding history lives in `../HISTORY.md` and `../HISTORY_INDEX.md`.
 - Stable repo decisions live in `../REPO_LEDGER.md`.
 - Current code layout lives in `CODE_LAYOUT.md`.
+- Current data routing and topic-ledger policy lives in `DATA_ROUTING.md`.

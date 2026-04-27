@@ -197,13 +197,15 @@ SEAM now has a `PgVectorAdapter` scaffold in:
 Runtime example:
 
 ```python
+import os
+
 from seam import SeamRuntime, OpenAICompatibleEmbeddingModel
 
 model = OpenAICompatibleEmbeddingModel(model="text-embedding-3-small")
 runtime = SeamRuntime(
     "seam.db",
     embedding_model=model,
-    pgvector_dsn="postgresql://user:pass@localhost:5432/seam",
+    pgvector_dsn=os.environ["SEAM_PGVECTOR_DSN"],
 )
 ```
 

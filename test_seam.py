@@ -28,7 +28,14 @@ from seam_runtime.installer import (
     render_windows_cmd_shim,
     write_shims,
 )
-from seam_runtime.lossless import benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
+from seam_runtime.lossless import (
+    benchmark_text_lossless,
+    compress_text_lossless,
+    compress_text_readable,
+    decompress_text_lossless,
+    decompress_text_readable,
+    query_readable_compressed,
+)
 from seam_runtime.models import (
     HashEmbeddingModel,
     OpenAICompatibleEmbeddingModel,
@@ -446,6 +453,46 @@ claim c2:
         result = benchmark_text_lossless(text, min_token_savings=0.30, tokenizer="char4_approx")
         self.assertEqual(result.artifact.token_estimator, "char4_approx")
 
+    def test_readable_compression_queries_exact_quote_without_rebuild(self) -> None:
+        text = (
+            'Project note: "SEAM compression must be directly readable by AI." '
+            "The artifact should preserve exact quotes, table cells, numbers, and source spans."
+        )
+        artifact = compress_text_readable(text, source_ref="unit://readable", tokenizer="char4_approx")
+        self.assertTrue(artifact.machine_text.startswith("SEAM-RC/1"))
+        self.assertIn("QUOTE|", artifact.machine_text)
+
+        result = query_readable_compressed(artifact.machine_text, '"SEAM compression must be directly readable by AI."')
+        self.assertTrue(result.hits)
+        self.assertEqual(result.hits[0].record_type, "QUOTE")
+        self.assertEqual(result.hits[0].text, '"SEAM compression must be directly readable by AI."')
+        self.assertEqual(decompress_text_readable(artifact.machine_text), text)
+
+    def test_cli_readable_compress_and_query_reads_compressed_language(self) -> None:
+        source_path = Path(f"readable_source_{uuid4().hex}.txt")
+        compressed_path = Path(f"readable_machine_{uuid4().hex}.seamrc")
+        try:
+            source_text = (
+                'Release note: "MIRL is the working compressed document." '
+                "SEAM reads the compressed language directly."
+            )
+            source_path.write_text(source_text, encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                run_cli(["readable-compress", str(source_path), "--output", str(compressed_path)])
+            self.assertTrue(compressed_path.exists())
+            self.assertTrue(compressed_path.read_text(encoding="utf-8").startswith("SEAM-RC/1"))
+
+            query_stream = StringIO()
+            with redirect_stdout(query_stream):
+                run_cli(["readable-query", str(compressed_path), '"MIRL is the working compressed document."'])
+            output = query_stream.getvalue()
+            self.assertIn("Readable query results", output)
+            self.assertIn('"MIRL is the working compressed document."', output)
+        finally:
+            for path in (source_path, compressed_path):
+                if path.exists():
+                    path.unlink()
+
     def test_cli_lossless_compress_and_decompress_roundtrip(self) -> None:
         source_path = Path(f"lossless_source_{uuid4().hex}.txt")
         compressed_path = Path(f"lossless_machine_{uuid4().hex}.seamlx")
@@ -530,7 +577,7 @@ claim c2:
         try:
             report = runtime.run_benchmark_suite(suite="all", persist=True, bundle_path=bundle_path)
             self.assertEqual(report["summary"]["status"], "PASS")
-            self.assertEqual(report["summary"]["family_count"], 6)
+            self.assertEqual(report["summary"]["family_count"], 7)
             self.assertTrue(bundle_path.exists())
 
             runs = runtime.list_benchmark_runs(limit=1)
@@ -546,6 +593,53 @@ claim c2:
         finally:
             if bundle_path.exists():
                 bundle_path.unlink()
+
+    def test_runtime_readable_benchmark_compares_rc1_to_source(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="readable", tokenizer="char4_approx")
+        self.assertEqual(report["summary"]["status"], "PASS")
+        family = report["families"]["readable"]
+        self.assertEqual(family["summary"]["direct_text_exact_rate"], 1.0)
+        self.assertEqual(family["summary"]["direct_read_equivalence_rate"], 1.0)
+        self.assertEqual(family["summary"]["direct_query_exactness_rate"], 1.0)
+        self.assertTrue(family["cases"])
+        for case in family["cases"]:
+            self.assertTrue(case["metrics"]["roundtrip_match"])
+            self.assertTrue(case["metrics"]["direct_text_match"])
+            self.assertTrue(case["metrics"]["direct_quote_match"])
+            self.assertTrue(case["metrics"]["direct_query_exactness"])
+            self.assertTrue(case["metrics"]["term_coverage"])
+            self.assertTrue(case["metrics"]["info_equivalent"])
+        recipe = next(case for case in family["cases"] if case["case_id"] == "rc1_recipe_exact_direct_read")
+        self.assertEqual(
+            recipe["trace"]["direct_read_text"],
+            "\n".join(
+                [
+                    "Recipe: Lemon Rice",
+                    "Yield: 2 servings",
+                    "Ingredients:",
+                    "- 1 cup cooked rice",
+                    "- 1 tablespoon lemon juice",
+                    "- 1 teaspoon olive oil",
+                    "- 1/4 teaspoon salt",
+                    "Steps:",
+                    "1. Warm the olive oil in a pan for 30 seconds.",
+                    "2. Stir in the cooked rice and salt.",
+                    "3. Turn off the heat and fold in the lemon juice.",
+                    'Note: "Serve immediately while warm."',
+                ]
+            ),
+        )
+
+    def test_cli_benchmark_readable_json_reports_direct_equivalence(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["benchmark", "run", "readable", "--tokenizer", "char4_approx", "--format", "json"])
+        payload = json.loads(stream.getvalue())
+        self.assertEqual(payload["summary"]["status"], "PASS")
+        self.assertEqual(payload["families"]["readable"]["summary"]["direct_text_exact_rate"], 1.0)
+        self.assertEqual(payload["families"]["readable"]["summary"]["direct_read_equivalence_rate"], 1.0)
+        self.assertEqual(payload["families"]["readable"]["summary"]["direct_query_exactness_rate"], 1.0)
 
     def test_runtime_benchmark_verifier_flags_tampered_bundle(self) -> None:
         runtime = SeamRuntime(self.db_path)
