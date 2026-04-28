@@ -1862,3 +1862,20 @@ Hardened the SEAM-RC/1 benchmark into a 100% recipe/direct-read gate.
 - Updated docs/MIRL_V1.md and docs/ledgers/runtime/compression.md to state RC/1 exactness cannot fall below 100% and that recipe text must be directly readable back from compressed language.
 - Verification: focused readable benchmark tests passed; python seam.py benchmark run readable --tokenizer char4_approx --format pretty passed with direct_text=100.0% and direct_read=100.0%; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 115 tests; compileall passed for touched benchmark/lossless/test files.
 ---END-ENTRY-#090---
+
+---BEGIN-ENTRY-#091---
+id: 091
+date: 2026-04-28T00:00:00Z
+agent: claude-sonnet-4-6
+status: done
+topics: textual, dashboard, tui, verify, history, snapshot
+commits: none
+refs: seam_runtime/lossless.py,HISTORY_INDEX.md
+supersedes: 090
+tokens: 95
+---
+Completed Textual/Dash migration: fixed tokenizer auto-fallback so all dashboard and benchmark tests pass in network-restricted environments.
+- Changed _resolve_token_counter in seam_runtime/lossless.py to catch Exception (not just RuntimeError) for the auto tokenizer path; this lets tiktoken HTTPError and other network failures fall back gracefully to char4_approx without crashing.
+- Rebuilt HISTORY_INDEX.md from current HISTORY.md to repair hash mismatches introduced when the index was regenerated from a different HISTORY.md state on this branch.
+- Verification: python3 -m pytest test_seam.py passed 102 tests; python3 -m tools.history.verify_integrity reported Integrity OK.
+---END-ENTRY-#091---
