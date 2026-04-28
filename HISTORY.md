@@ -1997,3 +1997,21 @@ Verification: `python -m py_compile seam_runtime\dashboard.py test_seam.py` pass
 
 Unresolved: changes are local on branch `codex/dashboard-reload-command`; unrelated untracked `ALPHA-0-ARG/` remains untouched.
 ---END-ENTRY-#097---
+
+---BEGIN-ENTRY-#098---
+id: 098
+date: 2026-04-28T12:24:27Z
+agent: codex
+status: done
+topics: dashboard, tui, command, verify, history, snapshot
+commits: c0039fa
+refs: seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 097
+tokens: 107
+---
+Committed the Textual dashboard reload migration locally as `c0039fa Add dashboard reload command` on `codex/dashboard-reload-command` after rerunning verification. The push scope intentionally included only dashboard reload code, tests, PROJECT_STATUS, and history/index artifacts; unrelated untracked `ALPHA-0-ARG/` content remained local and unstaged.
+
+Verification for the publish commit: `python -m py_compile seam_runtime\dashboard.py test_seam.py` passed; focused Textual reload pytest passed with 2 selected tests; candidate diff whitespace and secret-shaped scans passed; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 140 tests.
+
+Next step: push `codex/dashboard-reload-command` to origin.
+---END-ENTRY-#098---
