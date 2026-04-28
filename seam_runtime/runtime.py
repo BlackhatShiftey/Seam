@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from .benchmarks import diff_benchmark_runs, run_benchmark_suite, verify_benchmark_bundle
+from .benchmarks import diff_benchmark_runs, evaluate_benchmark_gate, run_benchmark_suite, verify_benchmark_bundle
 from .dsl import compile_dsl
 from .evals import run_retrieval_benchmark
 from .mirl import Artifact, IRBatch, Pack, PersistReport, ReconcileReport, SearchResult, TraceGraph, VerifyReport
@@ -153,6 +153,14 @@ class SeamRuntime:
 
     def diff_benchmark_runs(self, run_a: str | Path | dict[str, object], run_b: str | Path | dict[str, object]) -> dict[str, object]:
         return diff_benchmark_runs(run_a, run_b)
+
+    def evaluate_benchmark_gate(
+        self,
+        bundle: str | Path | dict[str, object],
+        baseline: str | Path | dict[str, object] | None = None,
+        policy: str | Path | dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return evaluate_benchmark_gate(bundle, baseline=baseline, policy=policy)
 
     def read_benchmark_run(self, run_id: str) -> dict[str, object]:
         return self.store.read_benchmark_run(run_id)

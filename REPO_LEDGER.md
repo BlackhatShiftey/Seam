@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-04-26
+Last updated: 2026-04-28
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -27,7 +27,7 @@ and `HISTORY_INDEX.md`.
 - Lossless claims require exact reconstruction and integrity checks.
 - SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
 - A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.
-- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, and separated from publish-only holdout runs.
+- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, pass the benchmark gate, and stay separated from publish-only holdout runs.
 - Compatibility CLI aliases are acceptable during naming transitions.
 - Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
 - Cross-file duplication is disallowed; use pointer cards (`see HISTORY#NNN`).
@@ -117,6 +117,7 @@ Published benchmark statements must include:
 - tokenizer/dependency state
 - git SHA
 - benchmark diff output comparing the claim run against its baseline
+- benchmark gate output from `seam benchmark gate <bundle> [--baseline <run-a>]`
 - holdout result bundle when the statement is an external or publication claim
 
 Holdout benchmark fixtures live under `benchmarks/fixtures/holdout/` and are ignored by git by default. They must be run only with `seam benchmark run --holdout --confirm-holdout`, and default holdout result bundles are written separately under `benchmarks/runs/holdout/`.

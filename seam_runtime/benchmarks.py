@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 BENCHMARK_VERSION = "SEAM-BENCH/1"
 BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_context", "persistence", "agent_tasks")
+BENCHMARK_GATE_VERSION = "SEAM-BENCH-GATE/1"
 
 BENCHMARK_ROOT = Path(__file__).resolve().parent.parent / "benchmarks"
 FIXTURE_ROOT = BENCHMARK_ROOT / "fixtures"
@@ -44,6 +45,61 @@ AGENT_TASK_FIXTURE_PATH = FIXTURE_ROOT / "agent_tasks.json"
 RETRIEVAL_FIXTURE_PATH = Path(__file__).resolve().parent.parent / "docs" / "retrieval_gold_fixtures.json"
 LOSSLESS_DEMO_PATH = Path(__file__).resolve().parent.parent / "tools" / "lossless_demo_input.txt"
 HOLDOUT_BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_context", "agent_tasks")
+DEFAULT_BENCHMARK_GATE_POLICY: dict[str, Any] = {
+    "version": BENCHMARK_GATE_VERSION,
+    "required_families": list(BENCHMARK_SUITES),
+    "summary": {
+        "status": {"equals": "PASS"},
+        "family_count": {"minimum": len(BENCHMARK_SUITES)},
+        "case_count": {"minimum": 19},
+        "exactness_rate": {"minimum": 1.0},
+    },
+    "families": {
+        "lossless": {
+            "pass_rate": {"minimum": 1.0},
+            "exactness_rate": {"minimum": 1.0},
+            "worst_case_savings": {"minimum": 0.30},
+        },
+        "readable": {
+            "pass_rate": {"minimum": 1.0},
+            "exactness_rate": {"minimum": 1.0},
+            "direct_text_exact_rate": {"minimum": 1.0},
+            "direct_read_equivalence_rate": {"minimum": 1.0},
+            "direct_query_exactness_rate": {"minimum": 1.0},
+        },
+        "retrieval": {
+            "pass_rate": {"minimum": 1.0},
+            "hybrid_recall_at_k": {"minimum": 1.0},
+            "machine_hybrid_recall_at_k": {"minimum": 1.0},
+            "exact_pack_reversible_rate": {"minimum": 1.0},
+        },
+        "embedding": {
+            "pass_rate": {"minimum": 1.0},
+            "top1_rate": {"minimum": 1.0},
+            "min_margin": {"minimum": 0.05},
+        },
+        "long_context": {
+            "pass_rate": {"minimum": 1.0},
+            "hit_rate": {"minimum": 1.0},
+            "prompt_contains_rate": {"minimum": 1.0},
+            "avg_prompt_token_savings_vs_records": {"minimum": 0.10},
+        },
+        "persistence": {
+            "pass_rate": {"minimum": 1.0},
+            "durability_rate": {"minimum": 1.0},
+        },
+        "agent_tasks": {
+            "pass_rate": {"minimum": 1.0},
+            "task_success_rate": {"minimum": 1.0},
+            "avg_prompt_token_savings_vs_records": {"minimum": 0.10},
+        },
+    },
+    "baseline": {
+        "status_regressions": {"maximum": 0},
+        "metric_regressions": {"maximum": 0},
+        "removed_cases": {"maximum": 0},
+    },
+}
 
 
 def run_benchmark_suite(
@@ -181,6 +237,114 @@ def verify_benchmark_bundle(bundle: str | Path | dict[str, Any]) -> dict[str, An
         "actual_bundle_hash": actual_bundle_hash,
         "case_checks": case_results,
     }
+
+
+def evaluate_benchmark_gate(
+    bundle: str | Path | dict[str, Any],
+    baseline: str | Path | dict[str, Any] | None = None,
+    policy: str | Path | dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = _load_benchmark_payload(bundle)
+    gate_policy = _load_gate_policy(policy)
+    verification = verify_benchmark_bundle(payload)
+    checks: list[dict[str, Any]] = [
+        _gate_check(
+            scope="bundle",
+            metric="integrity",
+            actual=verification["status"],
+            rule={"equals": "PASS"},
+            message="bundle hash and case hashes must verify",
+        )
+    ]
+
+    summary = payload.get("summary", {})
+    for metric, rule in gate_policy.get("summary", {}).items():
+        checks.append(_gate_check("summary", metric, summary.get(metric), rule))
+
+    families = payload.get("families", {})
+    for family_name in gate_policy.get("required_families", []):
+        checks.append(
+            _gate_check(
+                scope=f"family.{family_name}",
+                metric="present",
+                actual=family_name in families,
+                rule={"equals": True},
+                message=f"required benchmark family is missing: {family_name}",
+            )
+        )
+
+    for family_name, family_rules in gate_policy.get("families", {}).items():
+        family = families.get(family_name)
+        if not family:
+            continue
+        family_summary = family.get("summary", {})
+        for metric, rule in family_rules.items():
+            checks.append(_gate_check(f"family.{family_name}", metric, family_summary.get(metric), rule))
+
+    diff_payload = None
+    if baseline is not None:
+        diff_payload = diff_benchmark_runs(baseline, payload)
+        diff_summary = diff_payload.get("summary", {})
+        checks.append(
+            _gate_check(
+                scope="baseline",
+                metric="integrity",
+                actual=diff_summary.get("bundle_hash_ok_a") and diff_summary.get("bundle_hash_ok_b"),
+                rule={"equals": True},
+                message="baseline and candidate bundles must verify before comparing regressions",
+            )
+        )
+        for metric, rule in gate_policy.get("baseline", {}).items():
+            checks.append(_gate_check("baseline", metric, diff_summary.get(metric), rule))
+
+    failed = [check for check in checks if check["status"] != "PASS"]
+    return {
+        "version": BENCHMARK_GATE_VERSION,
+        "status": "PASS" if not failed else "FAIL",
+        "run": _run_ref(payload),
+        "policy": gate_policy,
+        "verification": verification,
+        "baseline_diff": diff_payload,
+        "summary": {
+            "checks": len(checks),
+            "passed": len(checks) - len(failed),
+            "failed": len(failed),
+        },
+        "checks": checks,
+    }
+
+
+def render_benchmark_gate_pretty(payload: dict[str, Any]) -> str:
+    summary = payload.get("summary", {})
+    run = payload.get("run", {})
+    lines = [
+        f"SEAM benchmark gate: {payload.get('status')}",
+        f"Run: {run.get('run_id')} ({run.get('bundle_hash')})",
+        f"Checks: {summary.get('passed')}/{summary.get('checks')} passed",
+        "",
+        "Failed checks:",
+    ]
+    failed = [check for check in payload.get("checks", []) if check.get("status") != "PASS"]
+    if not failed:
+        lines.append("- none")
+    for check in failed[:20]:
+        lines.append(
+            f"- {check.get('scope')}::{check.get('metric')} actual={check.get('actual')} "
+            f"rule={check.get('rule')} message={check.get('message')}"
+        )
+    if payload.get("baseline_diff"):
+        diff_summary = payload["baseline_diff"].get("summary", {})
+        lines.extend(
+            [
+                "",
+                "Baseline diff:",
+                f"- status={diff_summary.get('status')}",
+                f"- status_regressions={diff_summary.get('status_regressions')}",
+                f"- metric_regressions={diff_summary.get('metric_regressions')}",
+                f"- removed_cases={diff_summary.get('removed_cases')}",
+            ]
+        )
+    return "\n".join(lines)
 
 
 def diff_benchmark_runs(run_a: str | Path | dict[str, Any], run_b: str | Path | dict[str, Any]) -> dict[str, Any]:
@@ -1236,6 +1400,53 @@ def _load_benchmark_payload(source: str | Path | dict[str, Any]) -> dict[str, An
     if not path.exists():
         raise ValueError(f"Benchmark bundle not found: {source}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_gate_policy(source: str | Path | dict[str, Any] | None) -> dict[str, Any]:
+    if source is None:
+        return json.loads(json.dumps(DEFAULT_BENCHMARK_GATE_POLICY))
+    if isinstance(source, dict):
+        return json.loads(json.dumps(source))
+    path = Path(source)
+    if not path.exists():
+        raise ValueError(f"Benchmark gate policy not found: {source}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _gate_check(
+    scope: str,
+    metric: str,
+    actual: Any,
+    rule: dict[str, Any],
+    message: str | None = None,
+) -> dict[str, Any]:
+    passed = True
+    failure = message or "benchmark gate rule failed"
+    if "equals" in rule:
+        expected = rule["equals"]
+        passed = actual == expected
+        failure = message or f"expected {expected!r}"
+    elif "minimum" in rule:
+        actual_number = _numeric_metric(actual)
+        minimum = _numeric_metric(rule["minimum"])
+        passed = actual_number is not None and minimum is not None and actual_number >= minimum
+        failure = message or f"expected >= {rule['minimum']!r}"
+    elif "maximum" in rule:
+        actual_number = _numeric_metric(actual)
+        maximum = _numeric_metric(rule["maximum"])
+        passed = actual_number is not None and maximum is not None and actual_number <= maximum
+        failure = message or f"expected <= {rule['maximum']!r}"
+    else:
+        passed = False
+        failure = message or f"unsupported gate rule: {rule}"
+    return {
+        "status": "PASS" if passed else "FAIL",
+        "scope": scope,
+        "metric": metric,
+        "actual": actual,
+        "rule": dict(rule),
+        "message": "" if passed else failure,
+    }
 
 
 def _flatten_benchmark_cases(payload: dict[str, Any]) -> list[dict[str, Any]]:

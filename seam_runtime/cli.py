@@ -12,6 +12,7 @@ from experimental.retrieval_orchestrator import RetrievalOrchestrator
 from .benchmarks import (
     BENCHMARK_SUITES,
     render_benchmark_diff_pretty,
+    render_benchmark_gate_pretty,
     render_benchmark_pretty,
     render_benchmark_verification_pretty,
     write_holdout_benchmark_bundle,
@@ -135,6 +136,12 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_diff_parser.add_argument("run_a")
     benchmark_diff_parser.add_argument("run_b")
     benchmark_diff_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_gate_parser = benchmark_subparsers.add_parser("gate", help="Evaluate benchmark bundle pass/fail and baseline regression gates")
+    benchmark_gate_parser.add_argument("bundle")
+    benchmark_gate_parser.add_argument("--baseline", help="Baseline bundle path or persisted run id for regression gating")
+    benchmark_gate_parser.add_argument("--policy", help="JSON gate policy file")
+    benchmark_gate_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     compile_nl_parser = subparsers.add_parser("compile-nl", aliases=["remember"], help="Compile natural language into MIRL and persist (use --no-persist to skip storing)")
     compile_nl_parser.add_argument("text")
@@ -602,6 +609,17 @@ def run_cli(argv: list[str] | None = None) -> None:
                 print(json.dumps(payload, indent=2))
                 return
             print(render_benchmark_diff_pretty(payload))
+            return
+        if args.benchmark_command == "gate":
+            bundle = _resolve_benchmark_ref(runtime, args.bundle)
+            baseline = _resolve_benchmark_ref(runtime, args.baseline) if args.baseline else None
+            payload = runtime.evaluate_benchmark_gate(bundle, baseline=baseline, policy=args.policy)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+            else:
+                print(render_benchmark_gate_pretty(payload))
+            if payload.get("status") != "PASS":
+                raise SystemExit(1)
             return
 
         print(json.dumps(runtime.run_retrieval_benchmark(), indent=2))
