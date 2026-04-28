@@ -1961,3 +1961,19 @@ Verification: `python -m py_compile seam_runtime\benchmarks.py seam_runtime\cli.
 
 Failure recorded: the first real gate run failed because default policy required `agent_tasks.avg_exact_payload_lossless_savings >= 0.0` while current passing benchmark behavior reports a negative value. That rule was removed from the default blocking gate and left as an observable metric rather than a merge blocker. Next unresolved step: inspect/stage deliberately, run candidate secret scan plus `git diff --check --cached`, then commit/push/PR if requested.
 ---END-ENTRY-#095---
+
+---BEGIN-ENTRY-#096---
+id: 096
+date: 2026-04-28T09:07:41Z
+agent: codex
+status: done
+topics: benchmark, verify, command, history, snapshot
+commits: none
+refs: .github/workflows/ci.yml,HISTORY.md,HISTORY_INDEX.md
+supersedes: 095
+tokens: 98
+---
+Fixed the first PR CI failure for benchmark hardening. GitHub Actions failed before running tests because the fresh Windows Python 3.12 runner did not have `pytest` installed after `python -m pip install -e ".[server]"`. Updated `.github/workflows/ci.yml` to install `pytest` explicitly before the test step.
+
+Verification before commit: local staged checks from HISTORY#095 remained valid; this follow-up is workflow-only. Next step is to rerun staged checks, amend/push the benchmark-hardening branch, and wait for CI again before merge.
+---END-ENTRY-#096---
