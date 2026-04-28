@@ -1977,3 +1977,41 @@ Fixed the first PR CI failure for benchmark hardening. GitHub Actions failed bef
 
 Verification before commit: local staged checks from HISTORY#095 remained valid; this follow-up is workflow-only. Next step is to rerun staged checks, amend/push the benchmark-hardening branch, and wait for CI again before merge.
 ---END-ENTRY-#096---
+
+---BEGIN-ENTRY-#097---
+id: 097
+date: 2026-04-28T09:28:36Z
+agent: codex
+status: done
+topics: dashboard, tui, command, verify, status, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 096
+tokens: 195
+---
+Added a first-class dashboard reload command. `reload` and alias `refresh` now work in the Rich/script dashboard controller, bare Textual hybrid/SEAM mode, `!reload`, and `/reload` from the slash palette. The command rebuilds the dashboard retrieval orchestrator, recollects runtime metrics, refreshes explorer/overview/metrics/log/tab surfaces, repaints dashboard panel buffers, and returns a structured Reload payload with current counts, model/vector state, active tab, and refreshed timestamp.
+
+Updated the slash and bang command palettes, command help, and PROJECT_STATUS dashboard baseline. Added tests for scripted Rich reload output, slash palette coverage, `/reload` routing, and Textual panel refresh after an external runtime write.
+
+Verification: `python -m py_compile seam_runtime\dashboard.py test_seam.py` passed; focused reload/palette pytest passed with 4 selected tests; `cmd /c scripts\windows\launch_dashboard.bat --snapshot --no-clear` passed; `python seam.py dashboard --run reload --no-clear` passed and showed the Reload payload; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 140 tests.
+
+Unresolved: changes are local on branch `codex/dashboard-reload-command`; unrelated untracked `ALPHA-0-ARG/` remains untouched.
+---END-ENTRY-#097---
+
+---BEGIN-ENTRY-#098---
+id: 098
+date: 2026-04-28T12:24:27Z
+agent: codex
+status: done
+topics: dashboard, tui, command, verify, history, snapshot
+commits: c0039fa
+refs: seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 097
+tokens: 107
+---
+Committed the Textual dashboard reload migration locally as `c0039fa Add dashboard reload command` on `codex/dashboard-reload-command` after rerunning verification. The push scope intentionally included only dashboard reload code, tests, PROJECT_STATUS, and history/index artifacts; unrelated untracked `ALPHA-0-ARG/` content remained local and unstaged.
+
+Verification for the publish commit: `python -m py_compile seam_runtime\dashboard.py test_seam.py` passed; focused Textual reload pytest passed with 2 selected tests; candidate diff whitespace and secret-shaped scans passed; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 140 tests.
+
+Next step: push `codex/dashboard-reload-command` to origin.
+---END-ENTRY-#098---

@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 96
-total_tokens: ~10195
-latest_id: 096
+total_entries: 98
+total_tokens: ~10497
+latest_id: 098
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,12 +11,14 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
-| 096 | 2026-04-28 | done | efb0e297ffec1501 | benchmark,verify,command,history,+ | 095 |
-| 095 | 2026-04-28 | done | 0c54f0e917144e08 | benchmark,verify,command,history,+ | 094 |
-| 094 | 2026-04-27 | done | 0f4cfea48b01b34f | command,verify,readme,roadmap,+ | 093 |
-| 093 | 2026-04-27 | done | 30b7b2a19d5f5a7a | benchmark,diff,holdout,verify,+ | 092 |
-| 092 | 2026-04-27 | done | 33be794fc9cbb24a | benchmark,diff,holdout,fixture,+ | 091 |
-| 091 | 2026-04-27 | done | 003eb8d5ca34984e | dashboard,tui,command,compress,+ | 090 |
+| 098 | 2026-04-28 | done | 39c54d3fa7c0f833 | dashboard,tui,command,verify,+ | 097 |
+| 097 | 2026-04-28 | done | 0ed9bdd4fd672d88 | dashboard,tui,command,verify,+ | 096 |
+| 096 | 2026-04-28 | done | f2ee54df63995894 | benchmark,verify,command,history,+ | 095 |
+| 095 | 2026-04-28 | done | 6afa0a59a519140e | benchmark,verify,command,history,+ | 094 |
+| 094 | 2026-04-27 | done | 473de38c5dbd43e4 | command,verify,readme,roadmap,+ | 093 |
+| 093 | 2026-04-27 | done | f03839fb62483866 | benchmark,diff,holdout,verify,+ | 092 |
+| 092 | 2026-04-27 | done | f4de341bf92b9a2d | benchmark,diff,holdout,fixture,+ | 091 |
+| 091 | 2026-04-27 | done | ffaf0c7a218e6f75 | dashboard,tui,command,compress,+ | 090 |
 | 090 | 2026-04-26 | done | 7c87d396a5775e5b | benchmark,mirl,compress,verify,+ | 089 |
 | 089 | 2026-04-26 | done | 787c7369e015c98e | benchmark,mirl,compress,verify,+ | 088 |
 | 088 | 2026-04-26 | done | 8f71045411cf21b8 | mirl,compress,lx1,codec,+ | 087 |
@@ -119,10 +121,10 @@ compact: true
 - chroma: count=2 latest=#017, #001
 - classification: count=2 latest=#087, #086
 - codec: count=3 latest=#088, #018, #006
-- command: count=32 latest=#096, #095, #094, #091, #074
+- command: count=34 latest=#098, #097, #096, #095, #094
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=11 latest=#091, #090, #089, #088, #087
-- dashboard: count=37 latest=#091, #074, #073, #072, #071
+- dashboard: count=39 latest=#098, #097, #091, #074, #073
 - diff: count=3 latest=#093, #092, #037
 - docker: count=2 latest=#085, #084
 - doctor: count=3 latest=#019, #014, #013
@@ -131,7 +133,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=1 latest=#030
 - handoff: count=2 latest=#075, #025
-- history: count=50 latest=#096, #095, #094, #093, #092
+- history: count=52 latest=#098, #097, #096, #095, #094
 - holdout: count=3 latest=#093, #092, #036
 - installer: count=7 latest=#063, #035, #021, #020, #015
 - integrity: count=1 latest=#048
@@ -156,17 +158,17 @@ compact: true
 - sbert: count=3 latest=#023, #022, #011
 - search: count=11 latest=#088, #077, #047, #046, #041
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=48 latest=#096, #095, #094, #093, #092
-- status: count=22 latest=#094, #092, #080, #046, #045
+- snapshot: count=50 latest=#098, #097, #096, #095, #094
+- status: count=23 latest=#097, #094, #092, #080, #046
 - textual: count=15 latest=#063, #062, #061, #060, #059
-- tui: count=10 latest=#091, #070, #069, #061, #060
+- tui: count=12 latest=#098, #097, #091, #070, #069
 - vector: count=17 latest=#066, #044, #038, #034, #026
-- verify: count=41 latest=#096, #095, #094, #093, #092
+- verify: count=43 latest=#098, #097, #096, #095, #094
 - windows: count=10 latest=#091, #084, #083, #067, #066
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 76
+- done: 78
 - planned: 20

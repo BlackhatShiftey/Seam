@@ -1116,6 +1116,19 @@ claim c2:
             if source_path.exists():
                 source_path.unlink()
 
+    def test_dashboard_reload_refreshes_scripted_runtime_view(self) -> None:
+        if Console is None:
+            self.skipTest("rich is not installed")
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("SEAM reload should refresh dashboard runtime charts."))
+        stream = StringIO()
+        console = Console(file=stream, force_terminal=False, color_system=None, width=160)
+        run_dashboard(runtime, no_clear=True, console=console, commands=["reload"])
+        output = stream.getvalue()
+        self.assertIn("Reload", output)
+        self.assertIn("reloaded", output)
+        self.assertIn("Records", output)
+
     def test_textual_dashboard_mounts_core_panels(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
@@ -1162,6 +1175,7 @@ claim c2:
                 slash_commands = {item.command for item in app._palette_matches}
                 self.assertIn("compile", slash_commands)
                 self.assertIn("retrieve", slash_commands)
+                self.assertIn("reload", slash_commands)
                 self.assertIn("agent", slash_commands)
                 self.assertIn("shell", slash_commands)
                 self.assertIn("model", slash_commands)
@@ -1201,11 +1215,37 @@ claim c2:
                 await pilot.pause()
                 self.assertEqual(app.controller.result_title, "Stats")
 
+                app.process_command("/reload")
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Reload")
+
                 app._update_command_palette("/compile")
                 await pilot.pause()
                 app._accept_palette_selection(input_widget, submit=True)
                 await pilot.pause()
                 self.assertEqual(input_widget.value, "/compile ")
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_reload_refreshes_panels_after_runtime_change(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                runtime.persist_ir(runtime.compile_nl("Reload refreshes dashboard metrics after external writes."))
+                app.process_command("!reload")
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Reload")
+                self.assertIn('"status": "reloaded"', "\n".join(app.result_lines))
+                explorer = app.query_one("#explorer-panel")
+                overview = app.query_one("#overview-panel")
+                self.assertIn("memory", "\n".join(explorer._panel_lines))
+                self.assertIn("Total", "\n".join(overview._panel_lines))
+                self.assertTrue(any("Reload" in line for line in app.memory_lines))
 
         asyncio.run(_check())
 

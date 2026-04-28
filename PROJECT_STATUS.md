@@ -18,7 +18,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## What Is Stable
 
 - Core runtime paths (compile, verify, persist, search, context, benchmark)
-- Textual dashboard (interactive TUI, chat, slash palette, MIRL animation, independent pane scrolling)
+- Textual dashboard (interactive TUI, chat, slash palette, reload command, MIRL animation, independent pane scrolling)
 - Dashboard installers: `seam-dash` shim on Windows (`.cmd`) and POSIX; `seam-dash` entrypoint in `pyproject.toml`
 - Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `SEAM_LOCAL_ENV` or a private Documents `SEAM\local\.env`
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
@@ -43,7 +43,7 @@ SEAM is operating as a local machine-first memory runtime with:
 
 ## Operational Baseline
 
-- Use `scripts/windows/launch_dashboard.bat` (wraps `launch_dashboard.ps1`) to start the dashboard on Windows with pgvector configured.
+- Use `scripts/windows/launch_dashboard.bat` (wraps `launch_dashboard.ps1`) to start the dashboard on Windows with pgvector configured. Use `/reload` or `reload` inside the dashboard to rebuild dashboard panels, metrics, and chart state without restarting.
 - Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
 - Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
 - Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
