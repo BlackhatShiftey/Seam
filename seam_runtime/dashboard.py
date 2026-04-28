@@ -431,6 +431,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 "lossless-decompress",
                 "decompress-last",
                 "stats",
+                "reload",
+                "refresh",
             }
             self._palette_items = self._build_command_palette_items()
             self._palette_matches: list[CommandPaletteItem] = []
@@ -591,6 +593,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 CommandPaletteItem("/", "index", "/index ", "sync persisted records into vector indexes"),
                 CommandPaletteItem("/", "trace", "/trace ", "trace one MIRL record id"),
                 CommandPaletteItem("/", "stats", "/stats", "refresh runtime metrics"),
+                CommandPaletteItem("/", "reload", "/reload", "reload dashboard panels and charts"),
+                CommandPaletteItem("/", "refresh", "/refresh", "alias for dashboard reload"),
                 CommandPaletteItem("/", "benchmark", "/benchmark ", "run lossless/retrieval benchmark"),
                 CommandPaletteItem("/", "compress-doc", "/compress-doc ", "compress a source document"),
                 CommandPaletteItem("/", "readable-compress", "/readable-compress ", "build readable SEAM-RC/1 language"),
@@ -616,6 +620,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 CommandPaletteItem("!", "retrieve", "!retrieve ", "force a SEAM retrieval command"),
                 CommandPaletteItem("!", "context", "!context ", "force a SEAM context command"),
                 CommandPaletteItem("!", "stats", "!stats", "force dashboard stats command"),
+                CommandPaletteItem("!", "reload", "!reload", "force dashboard reload"),
+                CommandPaletteItem("!", "refresh", "!refresh", "force dashboard reload"),
                 CommandPaletteItem("!", "pwd", "!pwd", "print shell working directory"),
                 CommandPaletteItem("!", "cd", "!cd ", "change shell working directory"),
                 CommandPaletteItem("!", "dir", "!dir", "list files in PowerShell"),
@@ -801,6 +807,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
             title = self.controller.result_title
             body = self.controller.result_body
             self._route_command_output(command, title, body)
+            if command.split()[0].lower() in {"reload", "refresh"}:
+                self._reload_dashboard_surface()
             self._push_result(title, body)
             self._sync_side_panel()
             self._refresh_metrics()
@@ -1028,7 +1036,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
             except Exception:
                 tabs = None
 
-            if token in {"compile", "compile-nl", "compile-dsl", "dsl", "stats", "trace", "index"}:
+            if token in {"compile", "compile-nl", "compile-dsl", "dsl", "stats", "reload", "refresh", "trace", "index"}:
                 self.memory_lines.extend([f"{title}: {command}", body, ""])
                 self.query_one("#memory-panel", _TextualPanel).set_lines(self.memory_lines)
                 if tabs:
@@ -1070,6 +1078,29 @@ if App is not None and Static is not None and Input is not None and Log is not N
         def _push_result(self, title: str, body: str) -> None:
             self.result_lines.extend([f"{title}", body, ""])
             self.query_one("#result-panel", _TextualPanel).set_lines(self.result_lines)
+
+        def _reload_dashboard_surface(self) -> None:
+            self._hide_command_palette()
+            self._refresh_logo()
+            self._refresh_input_placeholder()
+            self._refresh_metrics()
+            self._refresh_explorer()
+            self._refresh_overview()
+            self._sync_side_panel()
+            self._refresh_tab_bar()
+            self.query_one("#memory-panel", _TextualPanel).set_lines(
+                self.memory_lines or ["Dashboard reloaded. Memory panel is ready for compile, stats, or trace."]
+            )
+            self.query_one("#retrieval-panel", _TextualPanel).set_lines(
+                self.retrieval_lines or ["Dashboard reloaded. Retrieval panel is ready for search, retrieve, context, or plan."]
+            )
+            self.query_one("#benchmark-panel", _TextualPanel).set_lines(
+                self.benchmark_lines or ["Dashboard reloaded. Benchmark panel is ready for benchmark or compression commands."]
+            )
+            if self.mirl_lines:
+                self.query_one("#mirl-panel", _TextualPanel).set_lines(self.mirl_lines)
+            elif not self._mirl_animation_running:
+                self.query_one("#mirl-panel", _TextualPanel).set_lines(self._anim_engine.tick_and_render())
 
         def _sync_side_panel(self) -> None:
             # Benchmark search-log goes into #benchmark-panel via _route_command_output.
@@ -1496,6 +1527,9 @@ class DashboardApp:
 
         stats_parser = subparsers.add_parser("stats", add_help=False)
         stats_parser.add_argument("rest", nargs="*")
+
+        reload_parser = subparsers.add_parser("reload", add_help=False, aliases=["refresh"])
+        reload_parser.add_argument("rest", nargs="*")
         return parser
 
     def run_script(self, commands: list[str], render_each: bool = False) -> None:
@@ -1718,6 +1752,38 @@ class DashboardApp:
                 }
                 self._succeed("Stats", payload, "Refreshed runtime metrics.")
                 return False
+
+            if args.command in {"reload", "refresh"}:
+                self.orchestrator = RetrievalOrchestrator(
+                    self.runtime,
+                    semantic_backend=self.vector_backend,
+                    chroma_path=self.vector_path,
+                    chroma_collection=self.vector_collection,
+                )
+                metrics = self._collect_metrics()
+                payload = {
+                    "status": "reloaded",
+                    "db_path": metrics.db_path,
+                    "db_size": metrics.db_size,
+                    "total_records": metrics.total_records,
+                    "vector_entries": metrics.vector_entries,
+                    "pack_entries": metrics.pack_entries,
+                    "provenance_entries": metrics.provenance_entries,
+                    "symbol_entries": metrics.symbol_entries,
+                    "raw_entries": metrics.raw_entries,
+                    "namespaces": metrics.namespaces,
+                    "scopes": metrics.scopes,
+                    "top_kinds": metrics.top_kinds,
+                    "model_name": metrics.model_name,
+                    "execution_mode": metrics.execution_mode,
+                    "vector_adapter": metrics.vector_adapter_name,
+                    "pgvector_configured": metrics.pgvector_configured,
+                    "vector_store_size": metrics.vector_store_size,
+                    "active_tab": self.active_tab,
+                    "refreshed_at": datetime.now().isoformat(timespec="seconds"),
+                }
+                self._succeed("Reload", payload, "Reloaded dashboard runtime state, metrics, and derived charts.")
+                return False
         except Exception as exc:  # pragma: no cover - error handling path is exercised through scripted smoke
             self._fail(type(exc).__name__, str(exc))
             return False
@@ -1868,6 +1934,7 @@ class DashboardApp:
             ("index", "[--scope S] [--namespace NS]"),
             ("trace", "<record-id>"),
             ("stats", ""),
+            ("reload / refresh", ""),
             ("help / quit", ""),
         ]
         table = Table.grid(expand=True, padding=(0, 1))
@@ -2019,6 +2086,7 @@ class DashboardApp:
             "index [--scope S] [--namespace NS]\n"
             "trace <record-id>\n"
             "stats\n"
+            "reload\n"
             "quit"
         )
 
