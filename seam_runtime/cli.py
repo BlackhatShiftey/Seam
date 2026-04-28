@@ -3,24 +3,38 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 from importlib.util import find_spec
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
-from .benchmarks import BENCHMARK_SUITES, render_benchmark_pretty, render_benchmark_verification_pretty
+from .benchmarks import (
+    BENCHMARK_SUITES,
+    render_benchmark_diff_pretty,
+    render_benchmark_gate_pretty,
+    render_benchmark_pretty,
+    render_benchmark_verification_pretty,
+    write_holdout_benchmark_bundle,
+)
 from .context_views import CONTEXT_VIEWS, build_context_payload, render_context_pretty
 from .dashboard import run_dashboard
 from .installer import default_runtime_db_path
 from .lossless import (
     LOSSLESS_CODECS,
     LOSSLESS_TRANSFORMS,
+    READABLE_GRANULARITIES,
     TOKENIZER_CHOICES,
     benchmark_text_lossless,
+    compress_text_readable,
     compress_text_lossless,
+    decompress_text_readable,
     decompress_text_lossless,
+    query_readable_compressed,
     render_lossless_benchmark_pretty,
 )
+from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
+from .agent_memory import render_memory_index, render_memory_records
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -32,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest_parser = subparsers.add_parser("ingest", help="Store raw text from a file or stdin")
     ingest_parser.add_argument("source")
+    ingest_parser.add_argument("--persist", action="store_true", help="Persist compiled memory records and index them")
+    ingest_parser.add_argument("--source-ref")
+    ingest_parser.add_argument("--ns", default="local.default")
+    ingest_parser.add_argument("--scope", default="thread")
+    ingest_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     lossless_compress_parser = subparsers.add_parser("lossless-compress", aliases=["compress-doc"], help="Losslessly compress a document into SEAM machine text")
     lossless_compress_parser.add_argument("source")
@@ -40,6 +59,32 @@ def build_parser() -> argparse.ArgumentParser:
     lossless_compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
     lossless_compress_parser.add_argument("--output")
     lossless_compress_parser.add_argument("--format", choices=["machine", "json"], default="machine")
+
+    readable_compress_parser = subparsers.add_parser(
+        "readable-compress",
+        aliases=["compress-readable"],
+        help="Compress text into directly readable SEAM-RC/1 machine language",
+    )
+    readable_compress_parser.add_argument("source")
+    readable_compress_parser.add_argument("--source-ref")
+    readable_compress_parser.add_argument("--granularity", choices=READABLE_GRANULARITIES, default="auto")
+    readable_compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+    readable_compress_parser.add_argument("--output")
+    readable_compress_parser.add_argument("--format", choices=["machine", "json"], default="machine")
+
+    readable_query_parser = subparsers.add_parser(
+        "readable-query",
+        aliases=["query-compressed"],
+        help="Ask a SEAM-RC/1 compressed document directly without rebuilding the source",
+    )
+    readable_query_parser.add_argument("source")
+    readable_query_parser.add_argument("query")
+    readable_query_parser.add_argument("--limit", type=int, default=5)
+    readable_query_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    readable_rebuild_parser = subparsers.add_parser("readable-rebuild", help="Verify and rebuild exact text from SEAM-RC/1")
+    readable_rebuild_parser.add_argument("source")
+    readable_rebuild_parser.add_argument("--output")
 
     lossless_decompress_parser = subparsers.add_parser("lossless-decompress", aliases=["decompress-doc"], help="Restore a SEAM lossless document back to exact text")
     lossless_decompress_parser.add_argument("source")
@@ -79,6 +124,9 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_run_parser.add_argument("--min-savings", type=float, default=0.30)
     benchmark_run_parser.add_argument("--persist", action="store_true")
     benchmark_run_parser.add_argument("--output")
+    benchmark_run_parser.add_argument("--holdout", action="store_true", help="Run publish-only holdout fixtures from benchmarks/fixtures/holdout")
+    benchmark_run_parser.add_argument("--confirm-holdout", action="store_true", help="Confirm intentional publish-only holdout execution")
+    benchmark_run_parser.add_argument("--holdout-output-dir", help="Directory for default holdout result bundles")
     benchmark_run_parser.add_argument("--include-machine-text", action="store_true")
     benchmark_run_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
@@ -90,15 +138,26 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_verify_parser.add_argument("bundle")
     benchmark_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
-    compile_nl_parser = subparsers.add_parser("compile-nl", help="Compile natural language into MIRL")
+    benchmark_diff_parser = benchmark_subparsers.add_parser("diff", help="Compare two benchmark bundles or persisted run ids")
+    benchmark_diff_parser.add_argument("run_a")
+    benchmark_diff_parser.add_argument("run_b")
+    benchmark_diff_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_gate_parser = benchmark_subparsers.add_parser("gate", help="Evaluate benchmark bundle pass/fail and baseline regression gates")
+    benchmark_gate_parser.add_argument("bundle")
+    benchmark_gate_parser.add_argument("--baseline", help="Baseline bundle path or persisted run id for regression gating")
+    benchmark_gate_parser.add_argument("--policy", help="JSON gate policy file")
+    benchmark_gate_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    compile_nl_parser = subparsers.add_parser("compile-nl", aliases=["remember"], help="Compile natural language into MIRL and persist (use --no-persist to skip storing)")
     compile_nl_parser.add_argument("text")
     compile_nl_parser.add_argument("--source-ref", default="local://input")
-    compile_nl_parser.add_argument("--persist", action="store_true")
+    compile_nl_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
     _add_rag_sync_args(compile_nl_parser)
 
-    compile_dsl_parser = subparsers.add_parser("compile-dsl", help="Compile SEAM DSL into MIRL")
+    compile_dsl_parser = subparsers.add_parser("compile-dsl", help="Compile SEAM DSL into MIRL and persist (use --no-persist to skip storing)")
     compile_dsl_parser.add_argument("file")
-    compile_dsl_parser.add_argument("--persist", action="store_true")
+    compile_dsl_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
     _add_rag_sync_args(compile_dsl_parser)
 
     verify_parser = subparsers.add_parser("verify", help="Verify MIRL from a text file")
@@ -120,6 +179,22 @@ def build_parser() -> argparse.ArgumentParser:
     retrieve_parser = subparsers.add_parser("retrieve", aliases=["hybrid-search"], help="Run retrieval and rank results")
     retrieve_parser.add_argument("query")
     _add_retrieval_common_args(retrieve_parser)
+
+    memory_parser = subparsers.add_parser("memory", help="Progressive-disclosure SEAM memory tools")
+    memory_subparsers = memory_parser.add_subparsers(dest="memory_command", required=True)
+    memory_search_parser = memory_subparsers.add_parser("search", help="Return compact memory index results")
+    memory_search_parser.add_argument("query")
+    memory_search_parser.add_argument("--scope")
+    memory_search_parser.add_argument("--budget", type=int, default=5)
+    memory_search_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
+    memory_get_parser = memory_subparsers.add_parser("get", help="Return full selected MIRL records")
+    memory_get_parser.add_argument("record_ids")
+    memory_get_parser.add_argument("--timeline", action="store_true")
+    memory_get_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    mcp_parser = subparsers.add_parser("mcp", help="Run SEAM agent integration bridges")
+    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", required=True)
+    mcp_subparsers.add_parser("serve", help="Serve a lightweight JSON-lines MCP-compatible bridge over stdio")
 
     compare_parser = subparsers.add_parser("compare", aliases=["hybrid-compare"], help="Compare basic search with retrieval ranking")
     compare_parser.add_argument("query")
@@ -144,6 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--view", choices=CONTEXT_VIEWS, default="pack")
     context_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     context_parser.add_argument("--trace", action="store_true")
+    context_parser.add_argument("--retrieval-mode", choices=["vector", "graph", "hybrid", "mix"], default="hybrid")
     context_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     context_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     context_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
@@ -155,6 +231,12 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     dashboard_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     dashboard_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
+
+    serve_parser = subparsers.add_parser("serve", help="Run the SEAM REST API server")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--reload", action="store_true")
+    serve_parser.add_argument("--workers", type=int, default=1)
 
     pack_parser = subparsers.add_parser("pack", help="Build a pack from persisted record ids")
     pack_parser.add_argument("record_ids")
@@ -190,6 +272,23 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser = subparsers.add_parser("doctor", help="Check SEAM install health and run a lightweight smoke test")
     doctor_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
+    lx1_encode_parser = subparsers.add_parser("lx1-encode", help="Encode MIRL records to LX/1 compact AI-readable notation")
+    lx1_encode_parser.add_argument("source", help="MIRL text file or - for stdin")
+    lx1_encode_parser.add_argument("--output", help="Write output to file instead of stdout")
+    lx1_encode_parser.add_argument("--ns", default="local.default")
+    lx1_encode_parser.add_argument("--scope", default="project")
+
+    lx1_decode_parser = subparsers.add_parser("lx1-decode", help="Decode LX/1 compact notation back to MIRL records")
+    lx1_decode_parser.add_argument("source", help="LX/1 file or - for stdin")
+    lx1_decode_parser.add_argument("--output", help="Write MIRL text to file instead of stdout")
+    lx1_decode_parser.add_argument("--persist", action="store_true", help="Persist decoded records to the database")
+
+    lx1_benchmark_parser = subparsers.add_parser("lx1-benchmark", help="Show token savings of LX/1 notation vs verbose MIRL")
+    lx1_benchmark_parser.add_argument("source", help="MIRL text file or - for stdin")
+    lx1_benchmark_parser.add_argument("--ns", default="local.default")
+    lx1_benchmark_parser.add_argument("--scope", default="project")
+    lx1_benchmark_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
 
@@ -206,7 +305,39 @@ def run_cli(argv: list[str] | None = None) -> None:
         if args.format == "json":
             print(json.dumps(artifact.to_dict(include_machine_text=True), indent=2))
             return
-        print(artifact.machine_text)
+        _print_text(artifact.machine_text)
+        return
+    if args.command in {"readable-compress", "compress-readable"}:
+        text = _read_text_source(args.source)
+        artifact = compress_text_readable(
+            text,
+            source_ref=args.source_ref or args.source,
+            granularity=args.granularity,
+            tokenizer=args.tokenizer,
+        )
+        if args.output:
+            _write_text_output(args.output, artifact.machine_text)
+        if args.format == "json":
+            print(json.dumps(artifact.to_dict(include_machine_text=True), indent=2))
+            return
+        _print_text(artifact.machine_text)
+        return
+    if args.command in {"readable-query", "query-compressed"}:
+        machine_text = _read_text_source(args.source)
+        result = query_readable_compressed(machine_text, args.query, limit=args.limit)
+        payload = result.to_dict()
+        if args.format == "json":
+            print(json.dumps(payload, indent=2))
+            return
+        _print_text(_render_readable_query_pretty(payload))
+        return
+    if args.command == "readable-rebuild":
+        text = decompress_text_readable(_read_text_source(args.source))
+        if args.output:
+            _write_text_output(args.output, text)
+            print(args.output)
+            return
+        _print_text(text)
         return
     if args.command in {"lossless-decompress", "decompress-doc"}:
         machine_text = _read_text_source(args.source)
@@ -215,7 +346,7 @@ def run_cli(argv: list[str] | None = None) -> None:
             _write_text_output(args.output, text)
             print(args.output)
             return
-        print(text)
+        _print_text(text)
         return
     if args.command in {"lossless-benchmark", "benchmark-doc"}:
         text = _read_text_source(args.source)
@@ -279,20 +410,67 @@ def run_cli(argv: list[str] | None = None) -> None:
         print(_render_lossless_demo_result(payload))
         return
 
+    if args.command == "lx1-encode":
+        batch = IRBatch.from_text(_read_text_source(args.source))
+        compact = lx1_encode(batch, ns=args.ns, scope=args.scope)
+        if args.output:
+            _write_text_output(args.output, compact)
+        else:
+            print(compact)
+        return
+    if args.command == "lx1-decode":
+        compact = _read_text_source(args.source)
+        batch = lx1_decode(compact)
+        mirl_text = batch.to_text()
+        if args.output:
+            _write_text_output(args.output, mirl_text)
+        else:
+            print(mirl_text)
+        if args.persist:
+            runtime = SeamRuntime(args.db)
+            runtime.persist_ir(batch)
+        return
+    if args.command == "lx1-benchmark":
+        mirl_text = _read_text_source(args.source)
+        batch = IRBatch.from_text(mirl_text)
+        compact = lx1_encode(batch, ns=args.ns, scope=args.scope)
+        report = token_savings_report(mirl_text, compact)
+        if args.format == "json":
+            print(json.dumps(report, indent=2))
+            return
+        print(_render_lx1_benchmark_pretty(report))
+        return
+
+    if args.command == "serve":
+        from .server import run_server
+
+        run_server(host=args.host, port=args.port, db=args.db, reload=args.reload, workers=args.workers)
+        return
+
     runtime = SeamRuntime(args.db)
 
     if args.command == "ingest":
         text = _read_text_source(args.source)
-        print(runtime.compile_nl(text, source_ref=args.source).to_text())
+        if args.persist:
+            report = runtime.ingest_text(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope, persist=True)
+            if args.format == "json":
+                print(json.dumps(report.to_dict(), indent=2))
+                return
+            print(_render_ingest_report(report.to_dict()))
+            return
+        print(runtime.compile_nl(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope).to_text())
         return
-    if args.command == "compile-nl":
+    if args.command in {"compile-nl", "remember"}:
         batch = runtime.compile_nl(args.text, source_ref=args.source_ref)
         if args.persist or args.sync_index:
             runtime.persist_ir(batch)
             if args.sync_index:
                 orchestrator = _build_retrieval_orchestrator(runtime, args)
                 orchestrator.sync_persistent_indexes(record_ids=[record.id for record in batch.records])
-        print(batch.to_text())
+        if args.persist:
+            print(f"Encoded {len(batch.records)} records → stored in {args.db}")
+        else:
+            print(batch.to_text())
         return
     if args.command == "compile-dsl":
         batch = runtime.compile_dsl(Path(args.file).read_text(encoding="utf-8"))
@@ -301,7 +479,10 @@ def run_cli(argv: list[str] | None = None) -> None:
             if args.sync_index:
                 orchestrator = _build_retrieval_orchestrator(runtime, args)
                 orchestrator.sync_persistent_indexes(record_ids=[record.id for record in batch.records])
-        print(batch.to_text())
+        if args.persist:
+            print(f"Encoded {len(batch.records)} records → stored in {args.db}")
+        else:
+            print(batch.to_text())
         return
     if args.command == "verify":
         batch = IRBatch.from_text(Path(args.file).read_text(encoding="utf-8"))
@@ -320,18 +501,35 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command in {"plan", "hybrid-plan"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        plan = orchestrator.plan(args.query, scope=args.scope, budget=args.budget)
+        plan = orchestrator.plan(args.query, scope=args.scope, budget=args.budget, mode=args.mode)
         _print_retrieval_output(plan.to_dict(), output_format=args.format, renderer=_render_plan_pretty)
         return
     if args.command in {"retrieve", "hybrid-search"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        result = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace)
+        result = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace, mode=args.mode)
         _print_retrieval_output(result.to_dict(), output_format=args.format, renderer=_render_search_pretty)
+        return
+    if args.command == "memory":
+        if args.memory_command == "search":
+            payload = runtime.memory_search(args.query, scope=args.scope, budget=args.budget)
+            _print_retrieval_output(payload, output_format=args.format, renderer=render_memory_index)
+            return
+        if args.memory_command == "get":
+            payload = runtime.memory_get(_split_ids(args.record_ids), include_timeline=args.timeline)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_memory_records(payload))
+            return
+    if args.command == "mcp" and args.mcp_command == "serve":
+        from .mcp import run_stdio_bridge
+
+        run_stdio_bridge(runtime)
         return
     if args.command in {"compare", "hybrid-compare"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
         search_result = runtime.search_ir(args.query, scope=args.scope, budget=args.budget).to_dict()
-        retrieved = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace).to_dict()
+        retrieved = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace, mode=args.mode).to_dict()
         _print_retrieval_output({"search": search_result, "retrieve": retrieved}, output_format=args.format, renderer=_render_compare_pretty)
         return
     if args.command in {"index", "rag-sync"}:
@@ -354,6 +552,7 @@ def run_cli(argv: list[str] | None = None) -> None:
                 lens=args.lens,
                 mode=args.mode,
                 include_trace=args.trace,
+                retrieval_mode=args.retrieval_mode,
             ).to_dict(),
             view=args.view,
         )
@@ -406,6 +605,8 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command == "benchmark":
         if args.benchmark_command == "run":
+            if args.holdout and not args.confirm_holdout:
+                _confirm_holdout_run()
             payload = runtime.run_benchmark_suite(
                 suite=args.suite,
                 tokenizer=args.tokenizer,
@@ -413,11 +614,17 @@ def run_cli(argv: list[str] | None = None) -> None:
                 persist=args.persist,
                 include_machine_text=args.include_machine_text,
                 bundle_path=args.output,
+                holdout=args.holdout,
             )
+            holdout_output = None
+            if args.holdout and args.output is None:
+                holdout_output = write_holdout_benchmark_bundle(payload, args.holdout_output_dir)
             if args.format == "json":
                 print(json.dumps(payload, indent=2))
                 return
             print(render_benchmark_pretty(payload))
+            if holdout_output is not None:
+                print(f"\nHoldout bundle: {holdout_output}")
             return
         if args.benchmark_command == "show":
             if args.run_id == "latest":
@@ -442,12 +649,62 @@ def run_cli(argv: list[str] | None = None) -> None:
                 return
             print(render_benchmark_verification_pretty(payload))
             return
+        if args.benchmark_command == "diff":
+            run_a = _resolve_benchmark_ref(runtime, args.run_a)
+            run_b = _resolve_benchmark_ref(runtime, args.run_b)
+            payload = runtime.diff_benchmark_runs(run_a, run_b)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_benchmark_diff_pretty(payload))
+            return
+        if args.benchmark_command == "gate":
+            bundle = _resolve_benchmark_ref(runtime, args.bundle)
+            baseline = _resolve_benchmark_ref(runtime, args.baseline) if args.baseline else None
+            payload = runtime.evaluate_benchmark_gate(bundle, baseline=baseline, policy=args.policy)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+            else:
+                print(render_benchmark_gate_pretty(payload))
+            if payload.get("status") != "PASS":
+                raise SystemExit(1)
+            return
 
         print(json.dumps(runtime.run_retrieval_benchmark(), indent=2))
 
 
 def _split_ids(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def _confirm_holdout_run() -> None:
+    message = (
+        "Holdout benchmark runs are publish-only and should not be used for routine tuning. "
+        "Type RUN HOLDOUT to continue: "
+    )
+    if not sys.stdin.isatty():
+        raise SystemExit("Holdout benchmark requires --confirm-holdout in non-interactive shells.")
+    try:
+        response = input(message).strip()
+    except EOFError as exc:
+        raise SystemExit("Holdout benchmark requires --confirm-holdout in non-interactive shells.") from exc
+    if response != "RUN HOLDOUT":
+        raise SystemExit("Holdout benchmark cancelled.")
+
+
+def _resolve_benchmark_ref(runtime: SeamRuntime, value: str) -> str | dict[str, object]:
+    if value == "latest":
+        runs = runtime.list_benchmark_runs(limit=1)
+        if not runs:
+            raise SystemExit("No benchmark runs have been persisted yet.")
+        value = str(runs[0]["run_id"])
+    path = Path(value)
+    if path.exists():
+        return value
+    payload = runtime.read_benchmark_run(value)
+    if not payload:
+        raise SystemExit(f"Benchmark bundle or persisted run not found: {value}")
+    return payload
 
 
 def _read_text_source(source: str) -> str:
@@ -458,9 +715,18 @@ def _read_text_source(source: str) -> str:
 
 def _write_text_output(target: str, text: str) -> None:
     if target == "-":
-        print(text)
+        _print_text(text)
         return
     Path(target).write_bytes(text.encode("utf-8"))
+
+
+def _print_text(text: str) -> None:
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:
+        print(text)
+        return
+    buffer.write(text.encode("utf-8"))
+    buffer.write(b"\n")
 
 
 def _render_lossless_demo_result(payload: dict[str, object]) -> str:
@@ -487,6 +753,59 @@ def _render_lossless_demo_result(payload: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _render_readable_query_pretty(payload: dict[str, object]) -> str:
+    lines = [
+        "Readable query results",
+        f"Source: {payload.get('source_ref')}",
+        f"SHA256: {payload.get('sha256')}",
+        f"Query: {payload.get('query')}",
+    ]
+    hits = payload.get("hits", [])
+    if not hits:
+        lines.append("No direct compressed-language hits.")
+        return "\n".join(lines)
+    for index, hit in enumerate(hits, start=1):
+        reasons = ", ".join(str(reason) for reason in hit.get("reasons", []))
+        span = ""
+        if hit.get("start") is not None and hit.get("end") is not None:
+            span = f" span={hit.get('start')}..{hit.get('end')}"
+        lines.append(
+            f"{index}. {hit.get('record_type')} {hit.get('record_id')} score={hit.get('score')}{span}"
+        )
+        if reasons:
+            lines.append(f"   reasons={reasons}")
+        lines.append(f"   {str(hit.get('text', '')).rstrip()}")
+    return "\n".join(lines)
+
+
+def _render_ingest_report(payload: dict[str, object]) -> str:
+    document = payload.get("document", {})
+    stored_ids = payload.get("stored_ids", [])
+    return "\n".join(
+        [
+            f"Ingested: {document.get('source_ref')}",
+            f"Document: {document.get('document_id')}",
+            f"Bytes: {document.get('byte_count')}",
+            f"Chunks: {document.get('chunk_count')}",
+            f"Extraction: {document.get('extraction_status')}",
+            f"Index: {document.get('indexed_status')}",
+            f"Stored ids: {', '.join(stored_ids) if stored_ids else '(none)'}",
+        ]
+    )
+
+
+def _check_pgvector(dsn: str | None) -> dict[str, object]:
+    if not dsn:
+        return {"configured": False}
+    try:
+        import psycopg
+        conn = psycopg.connect(dsn)
+        conn.close()
+        return {"configured": True, "reachable": True}
+    except Exception as exc:
+        return {"configured": True, "reachable": False, "error": str(exc)}
+
+
 def _build_doctor_report() -> dict[str, object]:
     runtime = SeamRuntime(":memory:")
     batch = runtime.compile_nl("SEAM doctor smoke test for durable local memory.")
@@ -495,8 +814,20 @@ def _build_doctor_report() -> dict[str, object]:
         "\n".join(["SEAM preserves exact context while compressing token usage for lossless recovery."] * 12),
         min_token_savings=0.30,
     )
+    pgvector_dsn = os.environ.get("SEAM_PGVECTOR_DSN")
+    dependencies = {
+        "rich": find_spec("rich") is not None,
+        "chromadb": find_spec("chromadb") is not None,
+        "tiktoken": find_spec("tiktoken") is not None,
+        "psycopg": find_spec("psycopg") is not None,
+        "sentence_transformers": find_spec("sentence_transformers") is not None,
+    }
+    required_dependencies = ["rich", "chromadb", "tiktoken"]
+    missing_required = [name for name in required_dependencies if not dependencies.get(name)]
+    deps_ok = not missing_required
+    status = "PASS" if smoke_ok and lossless_result.roundtrip_match and deps_ok else "FAIL"
     return {
-        "status": "PASS" if smoke_ok and lossless_result.roundtrip_match else "FAIL",
+        "status": status,
         "python": sys.version.split()[0],
         "db_mode": "in-memory",
         "default_db_path": default_runtime_db_path(),
@@ -509,11 +840,10 @@ def _build_doctor_report() -> dict[str, object]:
             "token_estimator": lossless_result.artifact.token_estimator,
             "token_savings_ratio": round(lossless_result.artifact.token_savings_ratio, 6),
         },
-        "dependencies": {
-            "rich": find_spec("rich") is not None,
-            "chromadb": find_spec("chromadb") is not None,
-            "tiktoken": find_spec("tiktoken") is not None,
-        },
+        "pgvector": _check_pgvector(pgvector_dsn),
+        "dependencies": dependencies,
+        "required_dependencies": required_dependencies,
+        "missing_required_dependencies": missing_required,
     }
 
 
@@ -522,6 +852,13 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
         f"- {name}: {'installed' if installed else 'missing'}"
         for name, installed in payload.get("dependencies", {}).items()
     ]
+    pgvector = payload.get("pgvector", {})
+    if pgvector.get("configured"):
+        pg_line = f"PgVector: {'reachable' if pgvector.get('reachable') else 'configured but unreachable'}"
+        if not pgvector.get("reachable") and pgvector.get("error"):
+            pg_line += f" ({pgvector['error']})"
+    else:
+        pg_line = "PgVector: not configured (set SEAM_PGVECTOR_DSN to enable)"
     return "\n".join(
         [
             f"SEAM doctor: {payload.get('status')}",
@@ -535,6 +872,12 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
                 f"({payload.get('lossless', {}).get('token_savings_ratio')} savings, "
                 f"estimator={payload.get('lossless', {}).get('token_estimator')})"
             ),
+            pg_line,
+            (
+                "Required deps: OK"
+                if not payload.get("missing_required_dependencies")
+                else f"Required deps: missing ({', '.join(payload.get('missing_required_dependencies', []))})"
+            ),
             "Dependencies:",
             *dependency_lines,
         ]
@@ -544,6 +887,7 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
 def _add_retrieval_common_args(parser: argparse.ArgumentParser, include_backend: bool = True) -> None:
     parser.add_argument("--scope")
     parser.add_argument("--budget", type=int, default=5)
+    parser.add_argument("--mode", choices=["vector", "graph", "hybrid", "mix"], default="hybrid")
     parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     parser.add_argument("--trace", action="store_true")
     if include_backend:
@@ -655,11 +999,26 @@ def _render_ids(payload: dict[str, object]) -> str:
         return "\n".join(candidate["record"]["id"] for candidate in payload.get("candidates", []))
     if "candidate_ids" in payload:
         return "\n".join(payload.get("candidate_ids", []))
+    if "results" in payload:
+        return "\n".join(str(item.get("id")) for item in payload.get("results", []))
     if "legs" in payload:
         return "\n".join(leg["name"] for leg in payload.get("legs", []))
     if "record_ids" in payload:
         return "\n".join(payload.get("record_ids", []))
     return ""
+
+
+def _render_lx1_benchmark_pretty(report: dict[str, object]) -> str:
+    return "\n".join([
+        "LX/1 notation benchmark",
+        f"Original MIRL tokens : {report.get('original_tokens')}",
+        f"LX/1 compact tokens  : {report.get('compact_tokens')}",
+        f"Token savings        : {float(report.get('token_savings_ratio', 0)):.1%}",
+        f"Intelligence/token   : {float(report.get('intelligence_per_token_gain', 0)):.2f}x",
+        f"Original chars       : {report.get('original_chars')}",
+        f"LX/1 chars           : {report.get('compact_chars')}",
+        f"Char savings         : {float(report.get('char_savings_ratio', 0)):.1%}",
+    ])
 
 
 def _record_signal(record: dict[str, object]) -> str:

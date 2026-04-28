@@ -1,0 +1,42 @@
+# SEAM Data Routing
+
+SEAM preserves complete history without loading complete history.
+
+## Layers
+
+- `HISTORY.md` is the append-only event stream.
+- `HISTORY_INDEX.md` is the compact route map derived from history.
+- `tools/history/routing_manifest.json` is the mutable classification map.
+- `REPO_LEDGER.md` stores stable repo-wide facts.
+- `PROJECT_STATUS.md` stores the current operating state.
+- `docs/ledgers/` stores durable topic ledgers for facts that should be easy to find without reading sessions.
+- `.seam/snapshots/` stores bounded handoff packs.
+
+## Routing Rule
+
+Classifications may change. Routes may be added, moved, retired, or recreated.
+The source event history must remain reconstructable.
+
+Do not erase the only record of a route decision. When a route changes:
+
+1. Update `tools/history/routing_manifest.json`.
+2. Leave old route continuity with `status`, `supersedes`, `moved_to`, or `retired_reason`.
+3. Update the matching topic ledger under `docs/ledgers/` when the change affects stable facts.
+4. Append `HISTORY.md`, rebuild `HISTORY_INDEX.md`, write a snapshot, and run continuity checks.
+
+## Query Examples
+
+```powershell
+python -m tools.history.build_context_pack --route maintenance/docker --token-budget 900
+python -m tools.history.build_context_pack --route protocol/context --latest 2 --token-budget 1200
+python -m tools.history.verify_routing
+python -m tools.history.verify_continuity
+```
+
+## Corruption Defense
+
+- `verify_integrity` checks history/index hashes.
+- `verify_continuity` checks latest snapshot coverage, supersedes links, and secret/session-link hygiene.
+- `verify_routing` checks the classification tree, parent links, route ledgers, route lifecycle fields, and referenced history entries.
+
+If a route is wrong, fix the route and record why. Do not rewrite old history to make the route look clean.

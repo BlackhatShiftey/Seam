@@ -1,142 +1,67 @@
-﻿# SEAM Project Status
+# SEAM Project Status
 
-This is the quick current-state tracker for the repo.
-Use this file for the shortest high-signal view of:
-
-- what has already been built
-- what is stable enough to use
-- what still needs work
-- what we should do next
-
-For a fuller running record of programming work, planning, upkeep, maintenance decisions,
-and milestone history, also read:
-
-- `REPO_LEDGER.md`
-
-Last updated: 2026-04-16
+Last updated: 2026-04-28
 
 ## Current State
 
-SEAM is a working machine-first memory compiler/runtime with:
+SEAM is operating as a local machine-first memory runtime with:
 
-- MIRL compilation from natural language and DSL
-- verification and persistence into SQLite
-- lexical/vector retrieval and trace output
-- symbol promotion and export
-- pack/context generation
-- optional Chroma-backed retrieval
-- a cleaned-up CLI with retrieval-oriented terminology
-- a runtime-connected terminal dashboard
-- a stronger SQLite retrieval leg with SQL-side filtering and ranking
-- richer `context` output views for prompt, evidence, summary, and exact-record workflows
-- a lossless `SEAM-LX/1` document machine-language benchmark with exact roundtrip verification
-- a six-family benchmark engine covering `lossless`, `retrieval`, `embedding`, `long_context`, `persistence`, and `agent_tasks`
-- benchmark bundles with case hashes, bundle hashes, fixture hashes, persisted run history, and improvement-loop output
-- machine-artifact, projection-index, benchmark-run, and benchmark-case persistence in SQLite
-- packaged terminal entrypoints for `seam` and `seam-benchmark`
-- a one-command `seam demo lossless` flow for compressing and rebuilding exact machine text
-- tokenizer-aware benchmark reporting with `tiktoken` support and fallback to `char4_approx`
-- repo-local bootstrap scripts plus Windows/Linux installer entrypoints for the installed `seam` command
-- cross-agent continuity files for Claude, Gemini, and Antigravity
+- MIRL compile/verify/persist/search/context flows in production use
+- Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, and independently scrollable panes
+- Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
+- lossless SEAM-LX/1 compression with integrity verification
+- benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
+- optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
+- PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
+- Competitive RAG/install polish in progress on `codex/competitive-rag-install-polish`: one-line private install docs, product-first README, document status tracking, progressive memory search/get, `retrieve --mode vector|graph|hybrid|mix`, stdio agent bridge, and vector stale-index reporting
+- Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
 
-The CLI and dashboard are usable now as operator glassboxes. The primary intended interface is still an AI agent running on-device with SEAM embedded underneath it.
+## What Is Stable
 
-## What Is Done
+- Core runtime paths (compile, verify, persist, search, context, benchmark)
+- Textual dashboard (interactive TUI, chat, slash palette, reload command, MIRL animation, independent pane scrolling)
+- Dashboard installers: `seam-dash` shim on Windows (`.cmd`) and POSIX; `seam-dash` entrypoint in `pyproject.toml`
+- Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `SEAM_LOCAL_ENV` or a private Documents `SEAM\local\.env`
+- pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
+- Dashboard snapshot/smoke-test behavior
+- Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
+- REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
+- RAG efficiency surface: `seam ingest <path> --persist`, `seam memory search`, `seam memory get`, `seam retrieve --mode mix`, document status rows, vector source-hash cache/stale checks, and `seam mcp serve` stdio bridge
+- Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
+- Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
+- Token-bounded context loading via history snapshots and `tools.history.build_context_pack`
+- Route-aware data classification through `tools/history/routing_manifest.json` and `docs/ledgers/`
 
-### Core runtime
+## Active Focus
 
-- `compile-nl` and `compile-dsl` produce MIRL
-- verification works
-- SQLite persistence works
-- vector indexing works
-- search, trace, pack, reconcile, transpile, and symbol export all work
+- Reduce startup context overhead by relying on compact index + surgical history reads
+- Preserve near-complete temporal history without loading all history into model context
+- Keep maintenance, security, context, and runtime facts logically routed for AI search without duplicating chronology
+- Make compression produce directly readable AI-native machine language, with opaque byte payloads used only as optional reconstruction/integrity backing layers
+- Keep roadmap execution tied to history entries and supersedes chains
+- Turn the competitive plan into shippable surfaces: finish README/install polish, graph/vector/mix retrieval hardening, agent bridge docs, and benchmark coverage without breaking existing CLI aliases
+- Continue feature delivery without reintroducing duplicated continuity text
+- Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
+- Roadmap planned items (#028–#047) are open except benchmark holdout suites (#036/C1), benchmark diff tooling (#037/C2), and REST API surface (#046/E3), which are implemented: dashboard animations, benchmark progress bars, sparkline graphs, command terminology audit, BEIR/MTEB benchmarks, Claude tool set, auto-compression pipeline, batch compile, PgVector migration helper, multi-tenant namespacing
 
-### Retrieval and context pipeline
+## Operational Baseline
 
-- retrieval planning exists
-- structured + vector retrieval legs exist
-- merged ranking exists
-- context/RAG pack generation exists
-- `context` can emit pack output plus prompt-ready, evidence/citation, summary, and exact-record views from the same retrieval result
-- the structured SQLite leg now pushes filters, lexical gating, and ranking into SQL
-- Chroma support exists as an optional semantic backend
-
-### Machine-language and benchmark system
-
-- `SEAM-LX/1` exists as an exact machine-text envelope for document compression
-- lossless compression/decompression uses SHA-256 integrity verification
-- the lossless loop searches known reversible transforms/codecs until no better candidate remains
-- fluctuation/regression logging exists for debugging and future rule design
-- the benchmark dashboard tab is wired into the runtime
-- the benchmark engine can run, persist, show, and verify benchmark suites
-- benchmark bundles are auditable rather than screenshot-only output
-
-### Install and operator surface
-
-- `seam` and `seam-benchmark` are packaged console commands
-- `seam doctor` provides a lightweight install-health and smoke-test path
-- Windows installer flow has been verified end to end with real command launch, persistence, lossless demo, and dashboard smoke checks
-- Linux installer support exists, but still needs a real-machine validation pass
-
-### Durable project memory
-
-- `PROJECT_STATUS.md` remains the short current snapshot
-- `REPO_LEDGER.md` remains the long-form engineering memory
-- `CLAUDE.md`, `GEMINI.md`, and `ANTIGRAVITY.md` now exist as agent-specific continuity guides that point back to the durable files above
-
-## What Still Needs Work
-
-### 1. Canonical machine projections in the main runtime path
-
-We now persist machine artifacts and projections, but we still need to decide how far to promote those projections into first-class runtime flows without compromising:
-
-- canonical SQLite truth
-- exact traceability
-- semantic retrieval quality
-- reversibility guarantees
-
-### 2. Retrieval evaluation before deeper machine integration
-
-We still need controlled evaluation of:
-
-- natural-text retrieval projections
-- machine-text retrieval projections
-- hybrid natural + machine projections
-
-The benchmark engine is now the place to prove those choices instead of making them by taste.
-
-### 3. Benchmark publication and holdout strategy
-
-The glassbox benchmark engine now exists, but publication rigor can still improve with:
-
-- holdout suites
-- benchmark diff tooling
-- publish helpers
-- stronger cross-machine reproducibility checks
-
-### 4. Cross-platform verification depth
-
-The installer path now exists for Windows and Linux, but our verification depth is uneven:
-
-- Windows has been run and verified end to end
-- Linux installer support is implemented, but still needs a real-machine validation pass
-
-### 5. Operator-surface polish
-
-The runtime-connected terminal dashboard and packaged CLI entrypoints now exist, but operator polish is still secondary to architecture and benchmark credibility.
-
-## Immediate Next Step
-
-Best next implementation task:
-
-Run tokenizer-backed retrieval experiments for natural, machine, and hybrid projections while keeping SQLite canonical, then validate the Linux installer path on a real machine.
+- Use `scripts/windows/launch_dashboard.bat` (wraps `launch_dashboard.ps1`) to start the dashboard on Windows with pgvector configured. Use `/reload` or `reload` inside the dashboard to rebuild dashboard panels, metrics, and chart state without restarting.
+- Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
+- Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
+- Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
+- Use `seam benchmark diff <run-a> <run-b>` before claiming a benchmark improvement, `seam benchmark gate <bundle> [--baseline <run-a>]` before merge/release, and `seam benchmark run --holdout --confirm-holdout` only for publish-time audits.
+- Use `python -m tools.history.build_context_pack --topics <tags> --latest <n> --token-budget <budget>` for bounded task context.
+- Use `python -m tools.history.verify_continuity` before ending a changed session.
+- Use `python -m tools.history.verify_routing` after changing data classifications or ledgers.
+- Default memory guardrails are `82%` warning and `90%` hard limit.
+- pgvector Docker Compose: `docker compose --env-file <private-env> up -d seam-pgvector`; port 55432; credentials stay outside the repo.
 
 ## Working Rule
 
-When resuming work in a new conversation:
+When resuming:
 
-1. Read this file first.
-2. Then read `REPO_LEDGER.md` for deeper project history and maintenance context.
-3. Read `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` if the task touches benchmarking, machine-language rollout, or evaluation policy.
-4. Use `CLAUDE.md`, `GEMINI.md`, or `ANTIGRAVITY.md` only as assistant-specific resume guides.
-5. Update this file whenever a major milestone or direction changes.
+1. Read `PROJECT_STATUS.md`.
+2. Read `AGENTS.md`.
+3. Read `HISTORY_INDEX.md`.
+4. Pull only required `HISTORY.md` entries by index offsets.

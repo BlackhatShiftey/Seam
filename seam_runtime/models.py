@@ -43,6 +43,34 @@ class HashEmbeddingModel:
 
 
 @dataclass
+class SentenceTransformerModel:
+    model_name: str = "all-MiniLM-L6-v2"
+    name: str = ""
+    dimension: int = 384
+    _model: Any = None
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            self.name = f"st:{self.model_name}"
+
+    def _load(self):
+        if self._model is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+            except ImportError as exc:
+                raise RuntimeError("sentence-transformers is not installed") from exc
+            self._model = SentenceTransformer(self.model_name)
+            getter = getattr(self._model, "get_embedding_dimension", None) or self._model.get_sentence_embedding_dimension
+            self.dimension = getter()
+        return self._model
+
+    def embed(self, text: str) -> list[float]:
+        model = self._load()
+        vector = model.encode(text, convert_to_numpy=True)
+        return _normalize(vector.tolist())
+
+
+@dataclass
 class OpenAICompatibleEmbeddingModel:
     model: str
     api_key_env: str = "OPENAI_API_KEY"
@@ -100,6 +128,8 @@ def default_embedding_model() -> EmbeddingModel:
     settings = embedding_settings_from_env()
     if settings.provider in {"hash", "local", "deterministic"}:
         return HashEmbeddingModel()
+    if settings.provider in {"sentence-transformers", "st", "sbert"}:
+        return SentenceTransformerModel(model_name=settings.model)
     if settings.provider in {"openai", "openai-compatible"}:
         return OpenAICompatibleEmbeddingModel(
             model=settings.model,

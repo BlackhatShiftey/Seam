@@ -14,8 +14,10 @@ from typing import Callable
 
 
 LOSSLESS_MAGIC = "SEAM-LX/1"
+READABLE_MAGIC = "SEAM-RC/1"
 LOSSLESS_CODECS = ("zlib", "bz2", "lzma")
 LOSSLESS_TRANSFORMS = ("identity", "line_table", "paragraph_table")
+READABLE_GRANULARITIES = ("auto", "line", "paragraph", "chunk")
 TOKEN_ESTIMATOR = "char4_approx"
 TOKENIZER_CHOICES = ("auto", TOKEN_ESTIMATOR, "cl100k_base", "o200k_base")
 
@@ -152,6 +154,93 @@ class LosslessBenchmarkResult:
         return payload
 
 
+@dataclass
+class ReadableCompressionArtifact:
+    machine_text: str
+    sha256: str
+    source_ref: str
+    granularity: str
+    original_bytes: int
+    machine_bytes: int
+    original_tokens: int
+    machine_tokens: int
+    unique_chunks: int
+    chunk_occurrences: int
+    quote_count: int
+    token_estimator: str = TOKEN_ESTIMATOR
+
+    @property
+    def token_savings_ratio(self) -> float:
+        if self.original_tokens <= 0:
+            return 0.0
+        return 1.0 - (self.machine_tokens / self.original_tokens)
+
+    @property
+    def intelligence_per_token_gain(self) -> float:
+        if self.machine_tokens <= 0:
+            return 0.0
+        return self.original_tokens / self.machine_tokens
+
+    def to_dict(self, include_machine_text: bool = True) -> dict[str, object]:
+        payload = {
+            "format": READABLE_MAGIC,
+            "sha256": self.sha256,
+            "source_ref": self.source_ref,
+            "granularity": self.granularity,
+            "original_bytes": self.original_bytes,
+            "machine_bytes": self.machine_bytes,
+            "original_tokens": self.original_tokens,
+            "machine_tokens": self.machine_tokens,
+            "token_savings_ratio": round(self.token_savings_ratio, 6),
+            "intelligence_per_token_gain": round(self.intelligence_per_token_gain, 6),
+            "unique_chunks": self.unique_chunks,
+            "chunk_occurrences": self.chunk_occurrences,
+            "quote_count": self.quote_count,
+            "token_estimator": self.token_estimator,
+        }
+        if include_machine_text:
+            payload["machine_text"] = self.machine_text
+        return payload
+
+
+@dataclass
+class ReadableQueryHit:
+    record_id: str
+    record_type: str
+    text: str
+    score: float
+    start: int | None = None
+    end: int | None = None
+    reasons: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "record_id": self.record_id,
+            "record_type": self.record_type,
+            "text": self.text,
+            "score": round(self.score, 6),
+            "start": self.start,
+            "end": self.end,
+            "reasons": list(self.reasons),
+        }
+
+
+@dataclass
+class ReadableQueryResult:
+    query: str
+    source_ref: str
+    sha256: str
+    hits: list[ReadableQueryHit]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "query": self.query,
+            "source_ref": self.source_ref,
+            "sha256": self.sha256,
+            "hits": [hit.to_dict() for hit in self.hits],
+        }
+
+
 def estimate_prompt_tokens(text: str, tokenizer: str = "auto") -> int:
     return count_prompt_tokens(text, tokenizer=tokenizer)[0]
 
@@ -172,6 +261,91 @@ def compress_text_lossless(
     return artifact
 
 
+def compress_text_readable(
+    text: str,
+    source_ref: str = "local://input",
+    granularity: str = "auto",
+    tokenizer: str = "auto",
+) -> ReadableCompressionArtifact:
+    if granularity not in READABLE_GRANULARITIES:
+        raise ValueError(f"Unsupported readable granularity: {granularity}")
+    raw_bytes = text.encode("utf-8")
+    sha256 = hashlib.sha256(raw_bytes).hexdigest()
+    parts = _split_readable_parts(text, granularity)
+    chunk_to_id: dict[str, str] = {}
+    chunks: list[dict[str, object]] = []
+    order: list[dict[str, object]] = []
+    offset = 0
+
+    for occurrence, part in enumerate(parts, start=1):
+        chunk_id = chunk_to_id.get(part)
+        if chunk_id is None:
+            chunk_id = f"c:{len(chunks) + 1}"
+            chunk_to_id[part] = chunk_id
+            chunks.append(
+                {
+                    "id": chunk_id,
+                    "text": part,
+                    "sha256": hashlib.sha256(part.encode("utf-8")).hexdigest(),
+                    "terms": _readable_terms(part),
+                }
+            )
+        end = offset + len(part)
+        order.append({"id": chunk_id, "occurrence": occurrence, "start": offset, "end": end})
+        offset = end
+
+    quotes = _extract_readable_quotes(text, order, {str(chunk["id"]): str(chunk["text"]) for chunk in chunks})
+    term_index = _build_readable_term_index(chunks)
+    meta = {
+        "format": READABLE_MAGIC,
+        "source_ref": source_ref,
+        "media_type": "text/plain",
+        "granularity": _resolved_readable_granularity(text, granularity),
+        "sha256": sha256,
+        "original_bytes": len(raw_bytes),
+        "unique_chunks": len(chunks),
+        "chunk_occurrences": len(order),
+        "quote_count": len(quotes),
+        "contract": "direct_read_lossless",
+    }
+    machine_lines = [
+        READABLE_MAGIC,
+        "META|" + json.dumps(meta, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+    ]
+    machine_lines.extend("CHUNK|" + json.dumps(chunk, ensure_ascii=False, sort_keys=True, separators=(",", ":")) for chunk in chunks)
+    machine_lines.append("ORDER|" + json.dumps({"items": order}, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    machine_lines.extend("QUOTE|" + json.dumps(quote, ensure_ascii=False, sort_keys=True, separators=(",", ":")) for quote in quotes)
+    machine_lines.append("INDEX|" + json.dumps({"terms": term_index}, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    machine_text = "\n".join(machine_lines)
+    original_tokens, estimator = count_prompt_tokens(text, tokenizer=tokenizer)
+    machine_tokens, _ = count_prompt_tokens(machine_text, tokenizer=tokenizer)
+    return ReadableCompressionArtifact(
+        machine_text=machine_text,
+        sha256=sha256,
+        source_ref=source_ref,
+        granularity=str(meta["granularity"]),
+        original_bytes=len(raw_bytes),
+        machine_bytes=len(machine_text.encode("utf-8")),
+        original_tokens=original_tokens,
+        machine_tokens=machine_tokens,
+        unique_chunks=len(chunks),
+        chunk_occurrences=len(order),
+        quote_count=len(quotes),
+        token_estimator=estimator,
+    )
+
+
+def decompress_text_readable(machine_text: str) -> str:
+    parsed = parse_readable_machine_text(machine_text)
+    chunks = {str(chunk["id"]): str(chunk["text"]) for chunk in parsed["chunks"]}
+    rebuilt = "".join(chunks[str(item["id"])] for item in parsed["order"])
+    actual_sha256 = hashlib.sha256(rebuilt.encode("utf-8")).hexdigest()
+    expected_sha256 = str(parsed["meta"]["sha256"])
+    if actual_sha256 != expected_sha256:
+        raise ValueError(f"Readable payload hash mismatch: expected {expected_sha256}, got {actual_sha256}")
+    return rebuilt
+
+
 def decompress_text_lossless(machine_text: str) -> str:
     codec, transform, sha256, payload = parse_lossless_machine_text(machine_text)
     compressed_bytes = base64.b85decode(payload.encode("ascii"))
@@ -182,6 +356,59 @@ def decompress_text_lossless(machine_text: str) -> str:
     if actual_sha256 != sha256:
         raise ValueError(f"Lossless payload hash mismatch: expected {sha256}, got {actual_sha256}")
     return raw_text
+
+
+def query_readable_compressed(machine_text: str, query: str, limit: int = 5) -> ReadableQueryResult:
+    parsed = parse_readable_machine_text(machine_text)
+    query_terms = set(_readable_terms(query))
+    exact_phrases = _quoted_phrases(query)
+    if not exact_phrases and len(query.strip()) >= 3:
+        exact_phrases = [query.strip()]
+    hits: list[ReadableQueryHit] = []
+
+    for quote in parsed["quotes"]:
+        text = str(quote["text"])
+        score, reasons = _readable_match_score(text, query_terms, exact_phrases, prefix="quote")
+        if score <= 0:
+            continue
+        hits.append(
+            ReadableQueryHit(
+                record_id=str(quote["id"]),
+                record_type="QUOTE",
+                text=text,
+                score=score + 0.25,
+                start=int(quote["start"]),
+                end=int(quote["end"]),
+                reasons=reasons,
+            )
+        )
+
+    chunk_occurrences = _chunk_occurrence_lookup(parsed["order"])
+    for chunk in parsed["chunks"]:
+        text = str(chunk["text"])
+        score, reasons = _readable_match_score(text, query_terms, exact_phrases, prefix="chunk")
+        if score <= 0:
+            continue
+        first_occurrence = chunk_occurrences.get(str(chunk["id"]), [{}])[0]
+        hits.append(
+            ReadableQueryHit(
+                record_id=str(chunk["id"]),
+                record_type="CHUNK",
+                text=text,
+                score=score,
+                start=int(first_occurrence["start"]) if "start" in first_occurrence else None,
+                end=int(first_occurrence["end"]) if "end" in first_occurrence else None,
+                reasons=reasons,
+            )
+        )
+
+    hits = sorted(hits, key=lambda hit: (hit.score, -(hit.start or 0)), reverse=True)[:limit]
+    return ReadableQueryResult(
+        query=query,
+        source_ref=str(parsed["meta"].get("source_ref", "")),
+        sha256=str(parsed["meta"]["sha256"]),
+        hits=hits,
+    )
 
 
 def benchmark_text_lossless(
@@ -271,6 +498,43 @@ def parse_lossless_machine_text(machine_text: str) -> tuple[str, str, str, str]:
     if not sha256 or not payload:
         raise ValueError("Lossless machine text is missing required fields")
     return codec, transform, sha256, payload
+
+
+def parse_readable_machine_text(machine_text: str) -> dict[str, object]:
+    lines = [line.rstrip("\n") for line in machine_text.splitlines() if line.strip()]
+    if not lines or lines[0] != READABLE_MAGIC:
+        raise ValueError(f"Expected {READABLE_MAGIC} header")
+    meta: dict[str, object] | None = None
+    chunks: list[dict[str, object]] = []
+    order: list[dict[str, object]] = []
+    quotes: list[dict[str, object]] = []
+    index: dict[str, object] = {}
+    for line in lines[1:]:
+        if "|" not in line:
+            raise ValueError(f"Invalid readable payload line: {line}")
+        kind, payload = line.split("|", 1)
+        data = json.loads(payload)
+        if kind == "META":
+            meta = dict(data)
+        elif kind == "CHUNK":
+            chunks.append(dict(data))
+        elif kind == "ORDER":
+            order = [dict(item) for item in data.get("items", [])]
+        elif kind == "QUOTE":
+            quotes.append(dict(data))
+        elif kind == "INDEX":
+            index = dict(data)
+        else:
+            raise ValueError(f"Unsupported readable payload record: {kind}")
+    if meta is None:
+        raise ValueError("Readable machine text is missing META")
+    if not chunks:
+        raise ValueError("Readable machine text is missing CHUNK records")
+    if not order:
+        raise ValueError("Readable machine text is missing ORDER records")
+    if not meta.get("sha256"):
+        raise ValueError("Readable machine text is missing source hash")
+    return {"meta": meta, "chunks": chunks, "order": order, "quotes": quotes, "index": index}
 
 
 def lossless_benchmark_json(
@@ -515,3 +779,114 @@ def _build_table_payload(parts: list[str]) -> dict[str, object]:
 def _split_paragraph_blocks(text: str) -> list[str]:
     parts = re.split(r"(\n\s*\n)", text)
     return [part for part in parts if part]
+
+
+def _resolved_readable_granularity(text: str, granularity: str) -> str:
+    if granularity != "auto":
+        return granularity
+    if "\n\n" in text:
+        return "paragraph"
+    if "\n" in text:
+        return "line"
+    return "chunk"
+
+
+def _split_readable_parts(text: str, granularity: str) -> list[str]:
+    resolved = _resolved_readable_granularity(text, granularity)
+    if resolved == "line":
+        return text.splitlines(keepends=True) or [""]
+    if resolved == "paragraph":
+        return _split_paragraph_blocks(text) or [""]
+    return _split_fixed_readable_chunks(text)
+
+
+def _split_fixed_readable_chunks(text: str, target_chars: int = 320) -> list[str]:
+    if not text:
+        return [""]
+    chunks: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(len(text), start + target_chars)
+        if end < len(text):
+            boundary = max(text.rfind(". ", start, end), text.rfind("\n", start, end), text.rfind(" ", start, end))
+            if boundary > start + max(80, target_chars // 3):
+                end = boundary + (2 if text[boundary : boundary + 2] == ". " else 1)
+        chunks.append(text[start:end])
+        start = end
+    return chunks
+
+
+def _readable_terms(text: str) -> list[str]:
+    terms: list[str] = []
+    for token in re.findall(r"[a-z0-9_:-]+", text.lower()):
+        terms.append(token)
+        stripped = token.strip(":-")
+        if stripped and stripped != token:
+            terms.append(stripped)
+    return terms
+
+
+def _extract_readable_quotes(text: str, order: list[dict[str, object]], chunk_text_by_id: dict[str, str]) -> list[dict[str, object]]:
+    quotes: list[dict[str, object]] = []
+    for match in re.finditer(r'"([^"]*)"', text):
+        quote_start, quote_end = match.span()
+        chunk_id = _chunk_id_for_span(quote_start, order)
+        quotes.append(
+            {
+                "id": f"q:{len(quotes) + 1}",
+                "text": match.group(0),
+                "value": match.group(1),
+                "start": quote_start,
+                "end": quote_end,
+                "chunk": chunk_id,
+                "chunk_text_sha256": hashlib.sha256(chunk_text_by_id.get(chunk_id, "").encode("utf-8")).hexdigest() if chunk_id else None,
+            }
+        )
+    return quotes
+
+
+def _chunk_id_for_span(start: int, order: list[dict[str, object]]) -> str | None:
+    for item in order:
+        if int(item["start"]) <= start < int(item["end"]):
+            return str(item["id"])
+    return None
+
+
+def _build_readable_term_index(chunks: list[dict[str, object]]) -> dict[str, list[str]]:
+    index: dict[str, list[str]] = {}
+    for chunk in chunks:
+        chunk_id = str(chunk["id"])
+        for term in chunk.get("terms", []):
+            postings = index.setdefault(str(term), [])
+            if chunk_id not in postings:
+                postings.append(chunk_id)
+    return index
+
+
+def _quoted_phrases(query: str) -> list[str]:
+    return [match.group(1) for match in re.finditer(r'"([^"]+)"', query)]
+
+
+def _readable_match_score(text: str, query_terms: set[str], exact_phrases: list[str], prefix: str) -> tuple[float, list[str]]:
+    lowered = text.lower()
+    reasons: list[str] = []
+    score = 0.0
+    for phrase in exact_phrases:
+        phrase = phrase.strip()
+        if phrase and phrase.lower() in lowered:
+            score += 1.0
+            reasons.append(f"{prefix}_exact_phrase")
+    terms = set(_readable_terms(text))
+    if query_terms and terms:
+        overlap = query_terms & terms
+        if overlap:
+            score += len(overlap) / max(len(query_terms), 1)
+            reasons.append(f"{prefix}_term_overlap={len(overlap)}")
+    return score, reasons
+
+
+def _chunk_occurrence_lookup(order: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+    lookup: dict[str, list[dict[str, object]]] = {}
+    for item in order:
+        lookup.setdefault(str(item["id"]), []).append(item)
+    return lookup

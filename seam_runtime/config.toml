@@ -1,0 +1,89 @@
+# Codex project profile for SEAM.
+#
+# Purpose:
+# - Keep this project loaded with high-quality reasoning.
+# - Preserve local skills and memory.
+# - Avoid paying token/context cost for large capability packs until a task asks
+#   for them.
+#
+# Standby policy for Codex:
+# - Read AGENTS.md first, then PROJECT_STATUS.md, REPO_LEDGER.md, and
+#   HISTORY_INDEX.md.
+# - Do not bulk-read HISTORY.md; use indexed entries or snapshots.
+# - Treat skills as lazy tools: read a skill's SKILL.md only when the user names
+#   it or the task clearly needs it.
+# - Treat plugins/connectors as standby capability packs. Use them when a user
+#   asks for that domain, but keep normal SEAM coding turns file/local-first.
+
+model = "gpt-5.5"
+model_reasoning_effort = "high"
+personality = "pragmatic"
+sandbox_mode = "workspace-write"
+
+[windows]
+sandbox = "unelevated"
+
+[features]
+memories = true
+
+[memories]
+no_memories_if_mcp_or_web_search = true
+
+[projects.'C:\Users\iwana\OneDrive\Documents\Codex']
+trust_level = "trusted"
+
+[projects.'C:\Users\iwana\OneDrive\Documents\Codex\seam_runtime']
+trust_level = "trusted"
+
+# Keep plugin declarations explicit but disabled in this project profile. This
+# leaves them installed and available globally while making the SEAM default
+# loadout local, skill-first, and token-frugal.
+[plugins."browser-use@openai-bundled"]
+enabled = false
+
+[plugins."github@openai-curated"]
+enabled = false
+
+[plugins."build-web-apps@openai-curated"]
+enabled = false
+
+[plugins."vercel@openai-curated"]
+enabled = false
+
+[plugins."cloudflare@openai-curated"]
+enabled = false
+
+[plugins."netlify@openai-curated"]
+enabled = false
+
+[plugins."hugging-face@openai-curated"]
+enabled = false
+
+[plugins."google-drive@openai-curated"]
+enabled = false
+
+[plugins."slack@openai-curated"]
+enabled = false
+
+[plugins."documents@openai-primary-runtime"]
+enabled = false
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = false
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = false
+
+[plugins."game-studio@openai-curated"]
+enabled = false
+
+[plugins."test-android-apps@openai-curated"]
+enabled = false
+
+[marketplaces.openai-bundled]
+source_type = "local"
+source = '\\?\C:\Users\iwana\.codex\.tmp\bundled-marketplaces\openai-bundled'
+
+[marketplaces.openai-primary-runtime]
+source_type = "local"
+source = '\\?\C:\Users\iwana\.cache\codex-runtimes\codex-primary-runtime\plugins\openai-primary-runtime'

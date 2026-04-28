@@ -1,0 +1,74 @@
+{
+  "_meta": {
+    "project": "SEAM",
+    "phase": "mature",
+    "date": "2026-04-20",
+    "source": "seam_runtime/ui/theme.py",
+    "replaces": "conception-phase amber/phosphor palette"
+  },
+
+  "base": {
+    "BG_DEEP":    "#050b1e",
+    "BG_PANEL":   "#08132a",
+    "BG_SUNK":    "#020613",
+    "BLUE_DEEP":  "#2f63ff",
+    "BLUE":       "#4f8cfb",
+    "BLUE_SOFT":  "#66b8ff",
+    "BLUE_FOG":   "#5fc8ff",
+    "ICE":        "#a6fcff",
+    "ICE_PALE":   "#bfefff",
+    "CYAN":       "#7fe0ff",
+    "CYAN_BRIGHT":"#8df6ff"
+  },
+
+  "accents": {
+    "MINT":       "#7efdb9",
+    "MINT_DIM":   "#4bc08a",
+    "GOLD":       "#f4d676",
+    "GOLD_DIM":   "#b9a04a",
+    "BLOOM":      "#d391ff",
+    "VIOLET":     "#9b6cff",
+    "VIOLET_DIM": "#5a3fb3",
+    "RED":        "#ff6b6b",
+    "RED_DIM":    "#a83a3a"
+  },
+
+  "grid": {
+    "GRID_DIM":   "#1a2540",
+    "GRID_MID":   "#274063"
+  },
+
+  "semantic": {
+    "ACCENT":      "#7fe0ff",
+    "SIGNAL":      "#a6fcff",
+    "SIGNAL_DIM":  "#bfefff",
+    "FRAME":       "#4f8cfb",
+    "FRAME_DIM":   "#2f63ff",
+    "LABEL":       "#5fc8ff",
+    "VALUE":       "#bfefff",
+    "STATUS_OK":   "#7efdb9",
+    "STATUS_WARN": "#f4d676",
+    "STATUS_ERR":  "#ff6b6b",
+    "STATUS_IDLE": "#274063"
+  },
+
+  "logo": {
+    "S_MARK_TOP":    "#7fe0ff",
+    "S_MARK_BOTTOM": "#9b6cff",
+    "WORDMARK":      "#8df6ff",
+    "BG":            "#050b1e",
+    "BORDER":        "#4f8cfb"
+  },
+
+  "ir_tags": {
+    "@": "#a6fcff",
+    "#": "#7fe0ff",
+    "!": "#f4d676",
+    ">": "#9b6cff",
+    "~": "#7efdb9",
+    "^": "#d391ff",
+    "%": "#66b8ff",
+    "+": "#b9a04a",
+    "=": "#8df6ff"
+  }
+}

@@ -10,13 +10,24 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "chromadb==1.5.7",
-  "rich==13.9.4",
+  "rich>=14.2,<16",
   "tiktoken>=0.8.0",
 ]
+
+[project.optional-dependencies]
+dash = ["textual>=0.50"]
+pgvector = ["psycopg[binary]>=3.0"]
+sbert = ["sentence-transformers>=2.0"]
+server = ["fastapi>=0.100", "uvicorn[standard]>=0.23", "python-multipart>=0.0.6"]
+agent = []
+rerank = ["sentence-transformers>=2.0"]
+all-extras = ["textual>=0.50", "psycopg[binary]>=3.0", "sentence-transformers>=2.0", "fastapi>=0.100", "uvicorn[standard]>=0.23", "python-multipart>=0.0.6"]
 
 [project.scripts]
 seam = "seam:main"
 seam-benchmark = "seam:benchmark_main"
+seam-dash = "seam_runtime.dashboard:main"
+seam-server = "seam_runtime.server:main"
 
 [tool.setuptools]
 py-modules = ["seam"]

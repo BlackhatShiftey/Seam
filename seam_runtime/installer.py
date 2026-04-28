@@ -20,6 +20,7 @@ class InstallLayout:
     bin_dir: Path
     seam_entry: Path
     benchmark_entry: Path
+    dashboard_entry: Path
     persistent_db_path: Path
     is_windows: bool
 
@@ -34,6 +35,7 @@ def detect_layout(repo_root: str | Path | None = None) -> InstallLayout:
         bin_dir = install_root / "bin"
         seam_entry = venv_dir / "Scripts" / "seam.exe"
         benchmark_entry = venv_dir / "Scripts" / "seam-benchmark.exe"
+        dashboard_entry = venv_dir / "Scripts" / "seam-dash.exe"
         persistent_db_path = install_root / "state" / "seam.db"
     else:
         install_root = Path.home() / ".local" / "share" / "seam"
@@ -41,6 +43,7 @@ def detect_layout(repo_root: str | Path | None = None) -> InstallLayout:
         bin_dir = Path.home() / ".local" / "bin"
         seam_entry = venv_dir / "bin" / "seam"
         benchmark_entry = venv_dir / "bin" / "seam-benchmark"
+        dashboard_entry = venv_dir / "bin" / "seam-dash"
         persistent_db_path = install_root / "state" / "seam.db"
     return InstallLayout(
         repo_root=root,
@@ -49,6 +52,7 @@ def detect_layout(repo_root: str | Path | None = None) -> InstallLayout:
         bin_dir=bin_dir,
         seam_entry=seam_entry,
         benchmark_entry=benchmark_entry,
+        dashboard_entry=dashboard_entry,
         persistent_db_path=persistent_db_path,
         is_windows=is_windows,
     )
@@ -64,11 +68,20 @@ def ensure_virtualenv(layout: InstallLayout, python_executable: str | None = Non
     return layout.venv_dir
 
 
-def install_repo(layout: InstallLayout, upgrade_pip: bool = True) -> None:
+def install_repo(layout: InstallLayout, upgrade_pip: bool = True, include_dashboard: bool = True) -> None:
     python_bin = layout.venv_dir / ("Scripts/python.exe" if layout.is_windows else "bin/python")
+    requirements_path = layout.repo_root / "requirements.txt"
+    package_spec = str(layout.repo_root)
+    if include_dashboard:
+        package_spec = f"{package_spec}[dash]"
     if upgrade_pip:
         subprocess.run([str(python_bin), "-m", "pip", "install", "--upgrade", "pip"], check=True)
-    subprocess.run([str(python_bin), "-m", "pip", "install", str(layout.repo_root)], check=True)
+    if requirements_path.exists():
+        subprocess.run([str(python_bin), "-m", "pip", "install", "-r", str(requirements_path)], check=True)
+        # Install the repo after base deps so the dashboard extra can pull in textual.
+        subprocess.run([str(python_bin), "-m", "pip", "install", package_spec], check=True)
+    else:
+        subprocess.run([str(python_bin), "-m", "pip", "install", package_spec], check=True)
     ensure_persistence(layout)
 
 
@@ -112,13 +125,14 @@ def render_posix_shim(target_executable: Path, repo_root: Path, bootstrap_hint: 
     )
 
 
-def write_shims(layout: InstallLayout) -> tuple[Path, Path]:
+def write_shims(layout: InstallLayout) -> tuple[Path, Path, Path]:
     layout.bin_dir.mkdir(parents=True, exist_ok=True)
     ensure_persistence(layout)
     if layout.is_windows:
         bootstrap_hint = f'powershell -ExecutionPolicy Bypass -File "{layout.repo_root / "installers" / "install_seam_windows.ps1"}"'
         seam_shim = layout.bin_dir / "seam.cmd"
         benchmark_shim = layout.bin_dir / "seam-benchmark.cmd"
+        dashboard_shim = layout.bin_dir / "seam-dash.cmd"
         seam_shim.write_text(
             render_windows_cmd_shim(layout.seam_entry, layout.repo_root, bootstrap_hint, layout.persistent_db_path),
             encoding="ascii",
@@ -127,10 +141,15 @@ def write_shims(layout: InstallLayout) -> tuple[Path, Path]:
             render_windows_cmd_shim(layout.benchmark_entry, layout.repo_root, bootstrap_hint, layout.persistent_db_path),
             encoding="ascii",
         )
+        dashboard_shim.write_text(
+            render_windows_cmd_shim(layout.dashboard_entry, layout.repo_root, bootstrap_hint, layout.persistent_db_path),
+            encoding="ascii",
+        )
     else:
         bootstrap_hint = f'"{layout.repo_root / "installers" / "install_seam_linux.sh"}"'
         seam_shim = layout.bin_dir / "seam"
         benchmark_shim = layout.bin_dir / "seam-benchmark"
+        dashboard_shim = layout.bin_dir / "seam-dash"
         seam_shim.write_text(
             render_posix_shim(layout.seam_entry, layout.repo_root, bootstrap_hint, layout.persistent_db_path),
             encoding="utf-8",
@@ -139,9 +158,14 @@ def write_shims(layout: InstallLayout) -> tuple[Path, Path]:
             render_posix_shim(layout.benchmark_entry, layout.repo_root, bootstrap_hint, layout.persistent_db_path),
             encoding="utf-8",
         )
+        dashboard_shim.write_text(
+            render_posix_shim(layout.dashboard_entry, layout.repo_root, bootstrap_hint, layout.persistent_db_path),
+            encoding="utf-8",
+        )
         seam_shim.chmod(0o755)
         benchmark_shim.chmod(0o755)
-    return seam_shim, benchmark_shim
+        dashboard_shim.chmod(0o755)
+    return seam_shim, benchmark_shim, dashboard_shim
 
 
 def ensure_path_access(layout: InstallLayout) -> list[Path]:

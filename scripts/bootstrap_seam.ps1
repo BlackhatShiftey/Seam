@@ -12,6 +12,7 @@ $venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
 $venvActivate = Join-Path $repoRoot ".venv\\Scripts\\Activate.ps1"
 $venvSeam = Join-Path $repoRoot ".venv\\Scripts\\seam.exe"
 $venvBenchmark = Join-Path $repoRoot ".venv\\Scripts\\seam-benchmark.exe"
+$venvDashboard = Join-Path $repoRoot ".venv\\Scripts\\seam-dash.exe"
 
 if (-not (Test-Path $venvPython)) {
     Write-Host "Creating virtual environment at .venv"
@@ -22,7 +23,8 @@ if (-not $SkipPipUpgrade) {
     & $venvPython -m pip install --upgrade pip
 }
 
-& $venvPython -m pip install -e .
+& $venvPython -m pip install -r (Join-Path $repoRoot "requirements.txt")
+& $venvPython -m pip install -e ".[dash]"
 
 if (-not (Test-Path $venvSeam)) {
     throw "Expected seam.exe to exist at $venvSeam after install."
@@ -30,6 +32,10 @@ if (-not (Test-Path $venvSeam)) {
 
 if (-not (Test-Path $venvBenchmark)) {
     throw "Expected seam-benchmark.exe to exist at $venvBenchmark after install."
+}
+
+if (-not (Test-Path $venvDashboard)) {
+    throw "Expected seam-dash.exe to exist at $venvDashboard after install."
 }
 
 if (-not $SkipGlobalShimInstall) {

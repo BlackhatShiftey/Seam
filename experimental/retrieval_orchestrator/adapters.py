@@ -7,13 +7,16 @@ from contextlib import closing
 from dataclasses import dataclass
 from typing import Protocol
 
-from seam_runtime.mirl import IRBatch, MIRLRecord, iter_textual_fields
+from seam_runtime.mirl import IRBatch, MIRLRecord, RecordKind, iter_textual_fields
 from seam_runtime.models import EmbeddingModel
 from seam_runtime.storage import SQLiteStore
 from seam_runtime.vector import INDEXABLE_KINDS, SQLiteVectorIndex
 from seam_runtime.vector_adapters import VectorAdapter
 
 from .types import LegHit, RetrievalPlan
+
+
+GRAPH_RETURN_KINDS = {RecordKind.ENT, *INDEXABLE_KINDS}
 
 
 class SQLAdapter(Protocol):
@@ -71,6 +74,58 @@ class SeamVectorSearchAdapter:
             if plan.filters.active():
                 raw_score += 0.05 * _matched_filter_count(record, plan)
             hits.append(LegHit(leg="vector", record=record, score=raw_score, reasons=[f"semantic={raw_score:.2f}"]))
+        return sorted(hits, key=lambda item: item.score, reverse=True)[:limit]
+
+
+class SQLiteGraphAdapter:
+    def __init__(self, store: SQLiteStore) -> None:
+        self.store = store
+
+    def search(self, plan: RetrievalPlan, limit: int) -> list[LegHit]:
+        query_text = plan.normalized_query or plan.query
+        tokens = _unique_tokens(_tokens(query_text))
+        if not tokens and not plan.filters.active():
+            return []
+        batch = self.store.load_ir(scope=plan.filters.scope)
+        by_id = batch.by_id()
+        graph: dict[str, set[str]] = {}
+        with closing(self.store._connect()) as connection:
+            rows = connection.execute("select src_id, edge_type, dst_id from ir_edges").fetchall()
+        for row in rows:
+            src = str(row["src_id"])
+            dst = str(row["dst_id"])
+            edge_type = str(row["edge_type"])
+            graph.setdefault(src, set()).add(dst)
+            graph.setdefault(dst, set()).add(src)
+            graph.setdefault(edge_type, set()).update([src, dst])
+
+        seed_ids: set[str] = set()
+        for record in batch.records:
+            if not plan.filters.matches(record):
+                continue
+            haystack = " ".join([record.id, record.kind.value, *iter_textual_fields(record)]).lower()
+            if not tokens or any(token in haystack for token in tokens):
+                seed_ids.add(record.id)
+                seed_ids.update(graph.get(record.id, set()))
+        hits: list[LegHit] = []
+        for record_id in seed_ids:
+            record = by_id.get(record_id)
+            if record is None or record.kind not in GRAPH_RETURN_KINDS or not plan.filters.matches(record):
+                continue
+            lexical = _lexical_score(record, tokens)
+            neighbor_bonus = min(0.6, len(graph.get(record_id, set())) * 0.1)
+            seed_bonus = 0.5 if record_id in seed_ids else 0.0
+            score = lexical + neighbor_bonus + seed_bonus
+            if score <= 0:
+                score = neighbor_bonus
+            hits.append(
+                LegHit(
+                    leg="graph",
+                    record=record,
+                    score=score,
+                    reasons=[f"graph_neighbors={len(graph.get(record_id, set()))}", f"lexical={lexical:.2f}"],
+                )
+            )
         return sorted(hits, key=lambda item: item.score, reverse=True)[:limit]
 
 

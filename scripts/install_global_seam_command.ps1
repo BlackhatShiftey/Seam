@@ -29,6 +29,7 @@ if (-not $preferredTarget) {
 
 $seamExe = Join-Path $repoRoot ".venv\\Scripts\\seam.exe"
 $benchmarkExe = Join-Path $repoRoot ".venv\\Scripts\\seam-benchmark.exe"
+$dashboardExe = Join-Path $repoRoot ".venv\\Scripts\\seam-dash.exe"
 $bootstrapScript = Join-Path $repoRoot "scripts\\bootstrap_seam.ps1"
 
 $seamShim = @"
@@ -55,10 +56,24 @@ if not exist "%SEAM_BENCHMARK_EXE%" (
 exit /b %ERRORLEVEL%
 "@
 
+$dashboardShim = @"
+@echo off
+set "SEAM_DASH_EXE=$dashboardExe"
+if not exist "%SEAM_DASH_EXE%" (
+  echo SEAM dashboard is not bootstrapped in $repoRoot
+  echo Run: powershell -ExecutionPolicy Bypass -File "$bootstrapScript"
+  exit /b 1
+)
+"%SEAM_DASH_EXE%" %*
+exit /b %ERRORLEVEL%
+"@
+
 Set-Content -Path (Join-Path $preferredTarget "seam.cmd") -Value $seamShim -Encoding ASCII
 Set-Content -Path (Join-Path $preferredTarget "seam-benchmark.cmd") -Value $benchmarkShim -Encoding ASCII
+Set-Content -Path (Join-Path $preferredTarget "seam-dash.cmd") -Value $dashboardShim -Encoding ASCII
 
 Write-Host "Installed SEAM shims to $preferredTarget"
 Write-Host "You can now open a new shell and run:"
 Write-Host "  seam doctor"
 Write-Host "  seam --help"
+Write-Host "  seam-dash --help"

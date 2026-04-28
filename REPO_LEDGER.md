@@ -1,349 +1,127 @@
 # SEAM Repo Ledger
 
-This file is the long-lived engineering ledger for the repository.
-It exists to preserve useful project memory across conversations and work sessions.
-It should be treated as the assistant-readable persistent repo memory for engineering context.
+Last updated: 2026-04-28
 
-Use it to track:
+This ledger is the stable engineering memory for repo-level decisions only.
+Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
+and `HISTORY_INDEX.md`.
 
-- programming milestones
-- architecture and naming decisions
-- repo upkeep and maintenance notes
-- documentation cleanup decisions
-- environment and tooling assumptions
-- active and future plans
-- current work state and step number
-- handoff policy
+## Startup Read Order
 
-Last updated: 2026-04-17
-
-## How To Use This File
-
-When resuming work:
-
-1. Read `PROJECT_STATUS.md` for the short current snapshot.
-2. Read this file for project history, operating context, and maintenance notes.
-3. Read `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` if the task touches benchmark design, bundle publication, or machine-language evaluation.
-4. Add a new dated entry when major implementation, cleanup, or planning work is completed.
-5. Prefer updating this file over creating temporary handoff notes.
-
-## Current Working Context
-
-### Active branch
-
-- working branch: `feature/hybrid-orchestrator-v2`
-- handoff branch: `handoff/archive`
-
-### Current phase
-
-- phase: benchmark-system buildout, machine-projection planning, installer hardening, and cross-agent continuity
-
-### Current step
-
-- step 1 was retrieval/CLI terminology cleanup
-- step 2 was Chroma-backed retrieval/context support
-- step 3 was retrieval package rename and compatibility cleanup
-- step 4 was repo hygiene and durable project memory
-- step 5 was runtime-connected dashboard integration and stabilization
-- step 6 was strengthening the structured SQLite retrieval leg
-- step 7 was richer context output for generation and operator workflows
-- step 8 was lossless document compression benchmarking and demo support
-- step 9 was iterative lossless optimization logging and benchmark dashboard integration
-- step 10 was packaging, installed entrypoints, and one-command lossless demo flows
-- step 11 is the six-family glassbox benchmark engine, benchmark persistence, and cross-agent continuity docs
-- next implementation step is tokenizer-backed retrieval evaluation for natural, machine, and hybrid projections, plus real-machine Linux installer validation
-
-### Immediate objective
-
-- keep the repo clean
-- preserve stable project memory in-repo
-- make benchmark claims auditable
-- keep SQLite canonical while exploring machine-efficient derived projections
-- ensure other assistants can resume work without inventing a parallel project model
-
-## Assistant Memory Rule
-
-Use this ledger as persistent engineering memory for:
-
-- what the project is
-- what we already changed
-- what decisions were made and why
-- what the next step is
-- what maintenance rules the repo should follow
-
-Do not use temporary handoff files as the main memory mechanism unless there is a specific reason.
-If a handoff is created, summarize the lasting parts back into this ledger.
+1. `PROJECT_STATUS.md` (current state)
+2. `AGENTS.md` (cross-agent protocol)
+3. `HISTORY_INDEX.md` (history map)
+4. `HISTORY.md` only by surgical read using indexed line/byte ranges
 
 ## Project Identity
 
-### Naming
-
-- `SEAM` is the platform/runtime/tool identity.
-- `MIRL` is the memory IR used inside SEAM.
-- `PACK` is the derived prompt-time or context-time representation.
-- `SEAM-LX/1` is the exact machine-text envelope for lossless document compression and token-efficiency benchmarks.
-
-### Current CLI vocabulary
-
-Primary user-facing commands:
-
-- `compile-nl`
-- `compile-dsl`
-- `search`
-- `plan`
-- `retrieve`
-- `index`
-- `context`
-- `compare`
-- `benchmark`
-- `demo lossless`
-- `export-symbols`
-
-Compatibility aliases retained for older stage-language wording:
-
-- `hybrid-plan`
-- `hybrid-search`
-- `hybrid-compare`
-- `rag-sync`
-- `rag-search`
-
-### Current retrieval package naming
-
-Canonical package:
-
-- `experimental.retrieval_orchestrator`
-
-Compatibility path:
-
-- `experimental.hybrid_orchestrator`
-
-Rule:
-
-- new code should import the canonical retrieval-oriented package name
-- compatibility names may stay until there is an explicit cleanup pass
-
-## Architecture Snapshot
-
-### Core runtime
-
-Main runtime capabilities currently implemented:
-
-- compile MIRL from natural language
-- compile MIRL from DSL
-- verify MIRL structure and invariants
-- persist MIRL records into SQLite
-- index records for lexical/vector retrieval
-- pack/decompile/reconcile/transpile/export symbols
-- persist machine artifacts, projection indexes, and benchmark results into SQLite
-
-### Retrieval stack
-
-Current retrieval stack includes:
-
-- query planning
-- inline filter parsing
-- structured SQLite retrieval leg
-- vector retrieval leg
-- merged ranking
-- optional trace output
-- context pack generation for downstream generation
-- richer context views for prompt, evidence, summary, and exact-record workflows
-- optional Chroma-backed vector retrieval
-
-### Benchmark stack
-
-Current benchmark stack includes:
-
-- six benchmark families: `lossless`, `retrieval`, `embedding`, `long_context`, `persistence`, `agent_tasks`
-- per-case raw traces
-- bundle hashes and case hashes
-- fixture hashes in the manifest
-- persisted benchmark runs and case rows in SQLite
-- improvement-loop action aggregation
-- bundle verification for tamper detection
-- CLI flows for `benchmark run`, `benchmark show`, and `benchmark verify`
-- dashboard visibility for benchmark results and search logs
-
-### Persistence model
-
-Canonical persistence:
-
-- SQLite is the canonical store of record truth
-
-Derived stores:
-
-- vector indexes
-- pack output
-- symbol export artifacts
-- machine artifact projections
-- benchmark bundles and case traces
-- optional Chroma vector store
+- `SEAM`: runtime/tool identity
+- `MIRL`: canonical memory IR
+- `PACK`: derived prompt-time context representation
+- `SEAM-LX/1`: exact machine-text envelope for lossless workflows
 
 ## Stable Decisions
 
-### Decisions we should preserve
+- SQLite is canonical source of truth.
+- Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
+- Document ingest status is canonical SQLite metadata. Source refs, source hashes, extraction status, index status, and deletion state belong in `document_status`, not only in derived vector stores.
+- Agent-facing retrieval should use progressive disclosure where possible: compact search/index results first, then full MIRL records by selected IDs.
+- Default agent RAG should prefer `mix` retrieval only after benchmark validation; the supported retrieval modes are `vector`, `graph`, `hybrid`, and `mix`.
+- Agent ecosystem integrations should be thin wrappers over SEAM CLI/REST/stdio bridge surfaces. Do not rewrite the Python runtime into Node just to fit Claude Code-style plugin ecosystems.
+- Lossless claims require exact reconstruction and integrity checks.
+- SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
+- A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.
+- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, pass the benchmark gate, and stay separated from publish-only holdout runs.
+- Compatibility CLI aliases are acceptable during naming transitions.
+- Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
+- Cross-file duplication is disallowed; use pointer cards (`see HISTORY#NNN`).
 
-- CLI language should describe what the command does, not internal experimental stage names.
-- SQLite remains the canonical source of truth.
-- Chroma is optional and should support persistence/retrieval, not replace the canonical record store.
-- machine-compressed views may be used as derived retrieval/operator artifacts, but they do not replace canonical SQLite records.
-- benchmark claims must ship with auditable raw data, not just aggregate screenshots.
-- Experimental retrieval work can evolve, but should not break the stable core runtime unnecessarily.
-- Compatibility aliases are acceptable when they reduce churn during terminology cleanup.
-- `PROJECT_STATUS.md` and `REPO_LEDGER.md` remain the canonical durable memory files for the repo.
+## AI-Native Compression Policy
 
-## Cross-Agent Continuity
-
-Agent-specific continuity guides now exist at the repo root:
-
-- `CLAUDE.md`
-- `GEMINI.md`
-- `ANTIGRAVITY.md`
-
-Rule:
-
-- these files are resume guides, not independent truth stores
-- they should point back to `PROJECT_STATUS.md`, `REPO_LEDGER.md`, and benchmark docs
-- if any assistant-specific guide drifts from the durable memory files, update the guide and keep the durable memory canonical
+- The compressed language is the working document for AI question answering.
+- Direct readability is mandatory for documents, text, images, audio, and video: quotes, table cells, OCR spans, image regions, timestamps, transcript spans, and provenance must be represented in machine-readable records.
+- Opaque payload formats such as SEAM-LX/1 may be retained for exact rebuilds and hash checks, but they must not be the only artifact used for semantic read/query workflows.
+- Future compression interpreters and codecs must optimize intelligence per token while preserving exact detail access through MIRL or a successor SEAM machine language.
 
 ## Handoff Policy
 
-### Branch
+- Default: record state via `HISTORY.md` entries + `HISTORY_INDEX.md`.
+- Session close writes one validated snapshot in `.seam/snapshots/`.
+- `HISTORY_INDEX.md` and snapshots are derived artifacts; `HISTORY.md` is authoritative.
+- The `handoff/archive` branch is reserved for PDF and handoff artifact publication, not primary runtime/source work.
 
-- reserved handoff branch: `handoff/archive`
+## Temporal Continuity Policy
 
-### Intended use
+- Every material repo change must produce an append-only `HISTORY.md` entry, rebuilt `HISTORY_INDEX.md`, verified integrity, and one validated snapshot.
+- History entries must preserve the temporal chain: previous state, new state, `supersedes` link when applicable, successes, failures, skipped verification, changed files, and unresolved next steps.
+- Stable repo facts live here in `REPO_LEDGER.md`; detailed session chronology lives in `HISTORY.md`. Do not duplicate long prose across both files.
+- Agents must update this ledger when changing stable repo policy, architecture, active/archive routing, runtime safety rules, durable operator workflows, benchmark publication rules, or cross-agent protocol.
+- Agents must update `PROJECT_STATUS.md` when the current operating state or active focus changes.
+- Model-specific guides such as `CLAUDE.md`, `GEMINI.md`, and `ANTIGRAVITY.md` must route back to `AGENTS.md` and must not create a competing protocol.
 
-- store handoff-only docs there when a separate handoff artifact is truly needed
-- keep the main working branch focused on product/runtime/docs that belong with the code
-- prefer updating this ledger instead of creating handoff docs by default
+## Context Budget Policy
+
+- Full continuity is preserved in append-only history, but normal startup must not load full history.
+- `HISTORY_INDEX.md` is the compact route map; `.seam/snapshots/` are bounded handoff packs; `tools.history.build_context_pack` builds topic/latest/supersedes packs under an explicit token budget.
+- `tools.history.verify_continuity` is the quality gate for history/index/snapshot freshness, supersedes validity, and session-link/secret hygiene.
+- Prefer task-specific context packs over broad scans. If a pack is insufficient, add targeted topics, explicit entries, or refs instead of reading all of `HISTORY.md`.
+
+## Data Routing Policy
+
+- `tools/history/routing_manifest.json` defines logical branches for AI-searchable history such as `maintenance/docker`, `maintenance/pgvector`, `protocol/context`, and `protocol/security`.
+- Route classifications are mutable, but route mutations must remain reconstructable through `HISTORY.md`, manifest lifecycle fields, and stable topic ledgers under `docs/ledgers/`.
+- `tools.history.verify_routing` checks route tree integrity, parent links, route lifecycle fields, ledger paths, and referenced history entries.
+- Deleting a classification means removing it from active use through `status=retired` or `status=moved`; the audit trail must remain.
+
+## Documentation Separation Policy
+
+- Active operator and engineering docs live in `docs/` and are indexed by `docs/README.md`.
+- Inactive docs, old handoffs, superseded setup notes, and historical coding artifacts live under `docs/archive/`.
+- Archived docs are traceability records, not current instructions.
+- When old prose is useful, rewrite the current part into an active doc and point to `HISTORY#NNN`; do not duplicate stale context across active docs.
+
+## Code Separation Policy
+
+- Active runtime code lives in `seam_runtime/` and `seam.py`.
+- Active operator/dev tooling lives in `tools/`, `scripts/`, and `installers/`.
+- `experimental/` is active prototype code: less stable than runtime code, but still importable and testable.
+- Inactive or retired code lives under `archive/code/` and must not be imported, packaged, or used as current behavior.
+- Generated build copies live in ignored paths (`build/` or `archive/code/generated-build*/`) and should not guide implementation decisions.
+- The current code map is `docs/CODE_LAYOUT.md`.
+
+## Runtime Service Safety Policy
+
+- External services for real-adapter tests (for example Docker pgvector) must be started only for the active test window.
+- Every service started for a test run must be explicitly stopped and removed at the end of that run.
+- Prefer non-conflicting ports for temporary services and verify they are released after cleanup.
+- Keep resource monitoring lightweight during runs (snapshot checks or low-frequency polling) to avoid adding load.
+- If a run fails or exits early, perform the same shutdown/cleanup sequence before continuing.
+- Default guardrail for local runs: warn around `82%` RAM usage and treat `90%` RAM as hard limit unless explicitly overridden for a task.
+- Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_guarded.ps1` for heavy commands so CPU/RAM/disk are watched during execution.
+- Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_real_adapters_guarded.ps1` for end-to-end real-adapter validation; it starts pgvector, runs guarded checks, and cleans up containers/artifacts on exit.
+- Archive benchmarks with `C:\Users\iwana\OneDrive\Documents\Codex\scripts\store_benchmark.ps1` to keep publication-required hashes and reproducibility metadata in Documents; outputs are sequence+time indexed and blocked from writing inside the git repo by default.
+
+## REST API Policy
+
+- The REST API is optional and installed with the `server` extra.
+- `seam serve` and `seam-server` run the FastAPI/Uvicorn surface against the configured SQLite database.
+- Protected endpoints require `Authorization: Bearer <token>` when `SEAM_API_TOKEN` is set; leave that variable unset only for trusted local development.
+- `/health` is unauthenticated for local service checks but still participates in the same rate limiter.
+- Rate limiting is configured by `SEAM_API_RATE_LIMIT_PER_MINUTE` or `SEAM_API_RATE_LIMIT`; `0` or unset disables the limiter.
+- API handlers must use existing `SeamRuntime` behavior and public report `to_dict()` methods rather than inventing parallel response fields.
 
 ## Benchmark Publication Policy
 
-When publishing benchmark results, include:
+Published benchmark statements must include:
 
-- the saved JSON bundle
-- the bundle hash reported by SEAM
-- per-case hashes from the bundle
-- fixture hashes from the manifest
-- git SHA from the manifest
-- tokenizer and dependency state used during measurement
-- the exact CLI command used to produce the run
+- command used
+- bundle hash
+- per-case hashes
+- fixture hashes
+- tokenizer/dependency state
+- git SHA
+- benchmark diff output comparing the claim run against its baseline
+- benchmark gate output from `seam benchmark gate <bundle> [--baseline <run-a>]`
+- holdout result bundle when the statement is an external or publication claim
 
-We do not claim machine-efficiency wins without exact reconstruction and reproducible bundle verification.
-
-## Milestone Log
-
-### 2026-04-15
-
-#### Retrieval and CLI work
-
-- built and validated an experimental retrieval orchestrator
-- added SQL + vector retrieval legs
-- added result merging and ranking
-- added context/RAG pack generation
-- added optional Chroma semantic backend support
-- cleaned up user-facing CLI terminology toward retrieval-oriented language
-
-#### Retrieval naming cleanup
-
-- moved the canonical experimental package to `experimental.retrieval_orchestrator`
-- preserved `experimental.hybrid_orchestrator` as a compatibility import layer
-- renamed canonical class/result types to retrieval-oriented names while keeping legacy aliases
-
-#### Runtime-connected dashboard work
-
-- added a real `dashboard` CLI command backed by the live SEAM runtime
-- connected dashboard actions to compile, search, plan, retrieve, context, index, trace, and stats operations
-- added scripted dashboard execution so the terminal surface can be smoke-tested automatically
-- verified that a bad dashboard command path stays contained in the UI instead of crashing the process
-
-#### Structured retrieval upgrade
-
-- moved the SQLite retrieval leg away from a weak in-memory scan
-- pushed explicit filters for `id`, `kind`, `ns`, `scope`, `predicate`, `subject`, and `object` into SQL
-- added SQL-side lexical gating so broad filters do not pull in irrelevant records with zero text match
-- added SQL-side ordering using structured score, lexical score, and record freshness/confidence
-- added table indexes to support the stronger structured path
-
-#### Richer context output
-
-- added reusable context view formatting for `pack`, `prompt`, `evidence`, `summary`, and `records`
-- kept pack generation as the canonical retrieval/context path while exposing richer operator-facing views on top
-- extended the RAG result shape to include ranked candidates and exact record payloads so downstream renderers do not have to reconstruct retrieval state
-- wired the new context views into both the CLI and the runtime-connected dashboard
-
-#### Lossless machine-language benchmark
-
-- added a dedicated `SEAM-LX/1` lossless machine-text format separate from MIRL compilation
-- implemented reversible document compression using standard-library codecs with automatic best-codec selection
-- added exact decompression with SHA-256 integrity checking so any mismatch fails loudly
-- added benchmark reporting for token savings, byte savings, and intelligence-per-token gain using a deterministic prompt-token estimator
-- added CLI commands for `lossless-compress`, `lossless-decompress`, and `lossless-benchmark`
-- added a demo input file and regression coverage for exact roundtrips and high-savings benchmark passes
-
-### 2026-04-16
-
-#### Packaging, installer, and operator bootstrap
-
-- added `pyproject.toml` so the repo can be installed editable
-- exposed `seam` as the main console script and `seam-benchmark` as a focused benchmark shortcut
-- added `seam demo lossless <source> <output>` and `--rebuild` for exact prove-it flows
-- added tokenizer-aware benchmark reporting with `tiktoken` fallback behavior
-- added `scripts/bootstrap_seam.ps1`, `scripts/enter_seam.ps1`, and `scripts/install_global_seam_command.ps1`
-- added `seam doctor` as a lightweight install-health and smoke-test command
-- added Windows and Linux installers with a dedicated runtime and persistent default database
-- verified the Windows installer flow end to end
-
-#### Glassbox benchmark engine
-
-- added `seam_runtime/benchmarks.py` as the six-family benchmark engine
-- added benchmark bundle manifests, bundle hashes, case hashes, fixture hashes, and improvement-loop aggregation
-- added benchmark persistence tables and read/write helpers in SQLite for machine artifacts, projections, runs, and cases
-- added CLI flows for `benchmark run`, `benchmark show`, and `benchmark verify`
-- added benchmark fixtures under `benchmarks/fixtures/`
-- verified `benchmark verify` catches tampered bundles
-- verified `benchmark show latest` works against persisted runs
-
-#### Cross-agent continuity and benchmark blueprint
-
-- refreshed `CLAUDE.md` so it matches the current repo instead of stale architecture assumptions
-- added `GEMINI.md` and `ANTIGRAVITY.md` as assistant-specific resume guides
-- added `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` to hold the phase rollout and benchmark publication blueprint
-- updated the repo-owned READMEs and durable memory files so terminology, benchmark policy, and next-step priorities are aligned
-
-## Repo Maintenance Notes
-
-### Files we should generally avoid committing
-
-- temporary exports
-- one-off benchmark output bundles unless they are intentionally checked in as reference artifacts
-- ephemeral local databases
-- generated caches and virtual environments
-
-### Maintenance expectations
-
-- keep the repo clean before and after major changes
-- run tests after meaningful runtime changes
-- keep `PROJECT_STATUS.md` and `REPO_LEDGER.md` current whenever the direction changes
-- prefer auditable benchmark bundles over ad hoc claims in chat or commit messages
-## 2026-04-17
-
-### Repo wiring recovery and local setup hardening
-
-- confirmed the intended SEAM repo root is `C:\Users\iwana\OneDrive\Documents\Codex`
-- reattached the local repo at that folder to `origin=https://github.com/BlackhatShiftey/Seam.git`
-- identified the earlier confusion source: git root drift happened after deletion of a different repo, which made the local project appear detached and briefly encouraged inspection from the wrong higher-level root
-- restored the repo-owned `.gitignore` rules after it had been reduced to only `.env`, which caused local SQLite databases and cache folders to appear as untracked noise
-- preserved this incident in the ledger instead of removing it so future sessions can recognize the failure mode quickly
-
-### Local pgvector/bootstrap work now present in the repo tree
-
-- added repo-local pgvector bootstrap files including `compose.yaml`, `docker/initdb/01-vector.sql`, `scripts/pgvector-up.ps1`, `scripts/setup-seam.ps1`, and `.env.example`
-- kept password handling local-only through `.env` and passwordless session DSNs so secrets do not need to appear in chat or shell history
-- verified the local setup path can bring up pgvector-backed Postgres and run the SEAM test suite after configuration
-
-### Working rule going forward
-
-- treat `C:\Users\iwana\OneDrive\Documents\Codex` as the canonical repo root for git operations
-- if repo state looks wrong again, check `git rev-parse --show-toplevel` in this folder before assuming the project or remote is missing
+Holdout benchmark fixtures live under `benchmarks/fixtures/holdout/` and are ignored by git by default. They must be run only with `seam benchmark run --holdout --confirm-holdout`, and default holdout result bundles are written separately under `benchmarks/runs/holdout/`.

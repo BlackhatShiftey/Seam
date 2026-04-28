@@ -1,58 +1,23 @@
-﻿# CLAUDE.md - SEAM Continuity Guide
+# CLAUDE.md
 
-This file is the Claude-facing resume guide for the SEAM repo.
-It is not the canonical project ledger.
+This model-specific guide is intentionally minimal.
+Canonical protocol: `AGENTS.md`.
+Current state snapshot: `PROJECT_STATUS.md`.
+Historical continuity: `HISTORY_INDEX.md` and surgical reads from `HISTORY.md`.
 
-## Read Order
+Claude must follow the SEAM temporal chain:
+- Read `AGENTS.md`, `PROJECT_STATUS.md`, `REPO_LEDGER.md`, `HISTORY_INDEX.md`, and `docs/CODE_LAYOUT.md` before changing repo state.
+- Read `docs/DATA_ROUTING.md` when the task touches history, ledgers, maintenance records, routing, context budget, or auditability.
+- Use `python -m tools.history.build_context_pack --route <route>` for task-specific history instead of loading all of `HISTORY.md` when a route exists.
+- After any repo state change, append a `HISTORY.md` entry with the exact files changed, success/failure facts, verification performed, and unresolved next step if any.
+- Rebuild `HISTORY_INDEX.md`, verify integrity, write a snapshot, and run `python -m tools.history.verify_continuity`.
+- Run `python -m tools.history.verify_routing` after changing route classifications, route ledgers, or route-aware context behavior.
+- Update `REPO_LEDGER.md` when the change affects stable repo policy, architecture, active/archive routing, runtime safety rules, durable operator workflows, or multi-agent protocol.
+- Update `PROJECT_STATUS.md` when the current operating state or active focus changes.
+- Preserve temporal chaining with `supersedes`; never edit old history to hide a failed attempt or collapse the timeline.
 
-1. `PROJECT_STATUS.md`
-2. `REPO_LEDGER.md`
-3. `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md` if the task touches benchmarking, machine language, or evaluation policy
-4. `benchmarks/README.md` for operator-facing benchmark commands
-5. `experimental/retrieval_orchestrator/README.md` if the task touches retrieval planning
-
-## Repo Model
-
-- `SEAM` is the machine-first runtime and operator glassbox
-- `MIRL` is the canonical memory IR
-- `PACK` is the derived prompt-time context view
-- `SEAM-LX/1` is the exact machine-text envelope for lossless document compression
-- SQLite is canonical truth
-- Chroma and vector stores are derived retrieval layers
-
-## Current Working Surface
-
-Working branch: `feature/hybrid-orchestrator-v2`
-
-Stable runtime surfaces:
-
-- compile, verify, persist, search, trace, pack, reconcile, transpile, export symbols
-- retrieval/context views: `pack`, `prompt`, `evidence`, `summary`, `records`
-- benchmark engine: `benchmark run`, `benchmark show`, `benchmark verify`
-- exact document demo: `demo lossless ...` and `--rebuild`
-- installed terminal commands: `seam`, `seam-benchmark`
-
-## Commands Worth Remembering
-
-```text
-seam doctor
-seam benchmark run all --persist --output seam-benchmark-report.json
-seam benchmark show latest
-seam benchmark verify seam-benchmark-report.json
-seam demo lossless <source> <output> --min-savings 0.75
-seam demo lossless <machine> <output> --rebuild
-```
-
-## Important Rules
-
-- do not make Chroma canonical
-- do not accept lossy compression
-- do not claim benchmark wins without bundle verification
-- keep `PROJECT_STATUS.md` and `REPO_LEDGER.md` updated when the direction changes
-- treat this file as a resume guide only; durable memory lives elsewhere
-
-## Next Useful Work
-
-- benchmark natural vs machine vs hybrid retrieval projections
-- validate the Linux installer on a real machine
-- deepen canonical machine-projection workflows without weakening traceability
+Claude-specific hard rule:
+- Do not write Claude session links, share links, transcript links, provider URLs for private chats, API keys, passwords, tokens, or local `.env` values into commits, `HISTORY.md`, snapshots, handoffs, docs, or comments.
+- If a secret, credential-bearing DSN, private key, or private session URL is found in the working tree, delete the local file or redact the value immediately. Do not preserve it elsewhere.
+- When recording work, summarize the result and cite repo files only. If private session context matters, rewrite it as neutral operational state with no URL or credential.
+- If a secret or private session URL is found in tracked history, stop and request explicit cleanup/rotation instructions instead of preserving or re-quoting it.

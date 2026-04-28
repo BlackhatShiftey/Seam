@@ -1,74 +1,136 @@
-﻿# SEAM Installers
+# SEAM Installers
 
-This folder is the direct "download and run" install surface for SEAM.
+This folder is the direct install surface for SEAM.
 
-The goal is:
+## One-Line Private Repo Install
 
-1. clone or download the repo
-2. run the installer for your platform
-3. open a new terminal
-4. type `seam`
+Run `gh auth login` first for private repo access.
 
-## Windows
+Windows PowerShell:
 
-From the repo root:
+```powershell
+gh repo clone BlackhatShiftey/Seam Seam; cd Seam; powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
+```
+
+Linux / WSL2:
+
+```bash
+gh repo clone BlackhatShiftey/Seam Seam && cd Seam && sh ./installers/install_seam_linux.sh
+```
+
+Open a new terminal after install:
+
+```text
+seam doctor
+seam --help
+seam dashboard --snapshot --no-clear
+```
+
+## Platform Entrypoints
+
+From an existing checkout:
+
+Windows:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
 ```
 
-## Linux
-
-From the repo root:
+Linux / WSL2:
 
 ```bash
 sh ./installers/install_seam_linux.sh
 ```
 
-## Shared behavior
+If Debian/Ubuntu is missing Python `venv`:
 
-Both platform installers call the same Python installer core in `install_seam.py`.
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-venv
+```
 
-That installer:
+## What The Installer Does
 
 - creates a dedicated SEAM runtime under the user home directory
-- installs SEAM into that runtime
-- creates `seam` and `seam-benchmark` command shims
-- sets up a persistent default database for the installed runtime
-- updates PATH or shell profile state as needed
+- installs SEAM into that runtime with `[dash]`
+- creates global `seam`, `seam-benchmark`, and `seam-dash` shims
+- configures a persistent default database
+- updates PATH or shell profile state
 - runs `seam doctor`
-
-After install, open a new terminal and run:
-
-```text
-seam doctor
-seam --help
-```
 
 Default persistent database paths:
 
 - Windows: `%LOCALAPPDATA%\SEAM\state\seam.db`
-- Linux: `~/.local/share/seam/state/seam.db`
+- Linux / WSL2: `~/.local/share/seam/state/seam.db`
 
-## Prove-It Flow After Install
-
-Health check:
+## First Memory Check
 
 ```text
+seam ingest README.md --persist
+seam memory search "persistent memory"
+seam retrieve "persistent memory" --mode mix --budget 5
+seam dashboard
+```
+
+Use `reload` inside the dashboard to refresh runtime panels, metrics, and chart
+state without restarting.
+
+## Optional Extras
+
+Base install includes required runtime packages from `requirements.txt`,
+including `rich`, `chromadb`, and `tiktoken`.
+
+| Extra | Package installed | When you need it |
+|---|---|---|
+| `dash` | `textual>=0.50` | Textual dashboard |
+| `server` | `fastapi`, `uvicorn` | REST API |
+| `pgvector` | `psycopg[binary]>=3.0` | PostgreSQL PgVector backend |
+| `sbert` | `sentence-transformers>=2.0` | Local neural embeddings |
+| `agent` | none yet | Reserved MCP-style agent bridge wrapper extra |
+| `rerank` | `sentence-transformers>=2.0` | Optional reranker experiments |
+| `all-extras` | all of the above | Full local setup |
+
+Install an extra into the managed runtime:
+
+Windows:
+
+```powershell
+%LOCALAPPDATA%\SEAM\runtime\Scripts\python.exe -m pip install -e "C:\path\to\Seam[all-extras]"
+```
+
+Linux / WSL2:
+
+```bash
+~/.local/share/seam/runtime/bin/python -m pip install -e "/path/to/Seam[all-extras]"
+```
+
+## PgVector
+
+PgVector is optional. Keep credentials in a local env file outside git.
+
+```bash
+mkdir -p "$HOME/.config/seam"
+cp .env.example "$HOME/.config/seam/.env"
+docker compose --env-file "$HOME/.config/seam/.env" up -d seam-pgvector
+set -a
+. "$HOME/.config/seam/.env"
+set +a
 seam doctor
 ```
 
-Full benchmark glassbox run:
+Set `SEAM_PGVECTOR_DSN` in your local shell/profile from those local env values
+before running SEAM with PgVector. Do not write the DSN into repo files.
 
-```text
-seam benchmark run all --persist --output seam-benchmark-report.json
-seam benchmark show latest
-seam benchmark verify seam-benchmark-report.json
+## Public Release Installer Shape
+
+These are not active private-repo commands yet:
+
+```powershell
+irm https://example.com/seam/install.ps1 | iex
 ```
 
-Exact machine-language demo:
-
-```text
-seam demo lossless /path/to/document.txt /path/to/document.seamlx --min-savings 0.75
-seam demo lossless /path/to/document.seamlx /path/to/rebuilt.txt --rebuild
+```bash
+curl -fsSL https://example.com/seam/install.sh | sh
 ```
+
+Use them only after a public installer host exists.

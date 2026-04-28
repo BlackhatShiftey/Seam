@@ -1,0 +1,51 @@
+SEAM — Mature Terminal Identity
+================================
+Phase: mature (2026-04-20)
+Replaces: conception-phase retro/phosphor palette (assets/retro-preview-*)
+
+─────────────────────────────────────────────────────────────────────────────
+S MARK  (4 rows, box-drawing, cyan/violet alternating)
+─────────────────────────────────────────────────────────────────────────────
+
+   ╭──────╮
+╭──╯ ╭──╮ ╰──╮
+╰──╮ ╰──╯ ╭──╯
+   ╰──────╯
+
+Colors:
+  Row 0 (top arc)     → CYAN    #7fe0ff
+  Row 1 (upper body)  → VIOLET  #9b6cff
+  Row 2 (lower body)  → CYAN    #7fe0ff
+  Row 3 (bottom arc)  → VIOLET  #9b6cff
+
+─────────────────────────────────────────────────────────────────────────────
+SEAM WORDMARK  (6 rows figlet, CYAN_BRIGHT #8df6ff — first 4 rows in header)
+─────────────────────────────────────────────────────────────────────────────
+
+███████╗███████╗ █████╗ ███╗   ███╗
+██╔════╝██╔════╝██╔══██╗████╗ ████║
+███████╗█████╗  ███████║██╔████╔██║
+╚════██║██╔══╝  ██╔══██║██║╚██╔╝██║
+███████║███████╗██║  ██║██║ ╚═╝ ██║
+╚══════╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝
+
+─────────────────────────────────────────────────────────────────────────────
+DASHBOARD HEADER LAYOUT  (4 content rows, height: 6 in Textual CSS)
+─────────────────────────────────────────────────────────────────────────────
+
+   ╭──────╮    ███████╗███████╗ █████╗ ███╗   ███╗   :: SEAM :: v0.1.0 :: MIRL Interpreter & Persistence Engine ::
+╭──╯ ╭──╮ ╰──╮ ██╔════╝██╔════╝██╔══██╗████╗ ████║   Launched from: <launch_dir>
+╰──╮ ╰──╯ ╭──╯ ███████╗█████╗  ███████║██╔████╔██║   Shell cwd:     <shell_cwd>
+   ╰──────╯    ╚════██║██╔══╝  ██╔══██║██║╚██╔╝██║   Model: <model> (<status>)   Mode: <mode>
+
+─────────────────────────────────────────────────────────────────────────────
+NOTES
+─────────────────────────────────────────────────────────────────────────────
+
+• Implemented in: seam_runtime/ui/logo.py → _BOX_LOGO / _BOX_SEAM / render_header()
+• Wired into:     seam_runtime/dashboard.py → _refresh_logo() → #logo-header Static
+• Preview:        python -m seam_runtime.ui.logo --header  (requires UTF-8 terminal)
+• Background:     BG_DEEP #050b1e (dashboard chrome)
+• Border:         round #4f8cfb (BLUE)
+• The conception-phase retro/amber-phosphor palette is retired.
+  Those assets remain in branding/assets/ for historical reference.

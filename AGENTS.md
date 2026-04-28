@@ -1,49 +1,79 @@
-﻿# AGENTS
+# AGENTS.md
 
-Shared operating notes for any coding agent working in the SEAM project.
+Canonical multi-agent protocol for this repo. All models use the same rules.
 
-## Scope
+## Session Start
 
-- Repository root: `C:\Users\iwana\OneDrive\Documents\Codex`
-- Runtime package: `C:\Users\iwana\OneDrive\Documents\Codex\seam_runtime`
-- CLI entrypoint: `C:\Users\iwana\OneDrive\Documents\Codex\seam.py`
-- Primary test file: `C:\Users\iwana\OneDrive\Documents\Codex\test_seam.py`
+Read in order:
+1. `PROJECT_STATUS.md`
+2. `REPO_LEDGER.md`
+3. `HISTORY_INDEX.md`
+4. `docs/CODE_LAYOUT.md`
+5. `docs/DATA_ROUTING.md` when the task touches history, ledgers, maintenance records, routing, context budget, or auditability.
 
-## Read This First
+Then:
+- Prefer latest valid snapshot in `.seam/snapshots/`.
+- If snapshot verification fails, fall back to index-first reads.
+- Use `python -m tools.history.build_context_pack` to load only the latest, route-relevant, topic-relevant, or supersedes-chain entries needed for the task.
+- Never read all of `HISTORY.md`; pull only needed entries by indexed line/byte ranges.
+- Treat `archive/code/`, `docs/archive/`, `build/`, `.venv/`, and generated/cache paths as inactive unless the user explicitly asks for historical or retired material.
+- For normal code search, stay in active paths: `seam_runtime/`, `seam.py`, `experimental/`, `tools/`, `scripts/`, `installers/`, `docs/`, tests, and root status files.
 
-1. Read `README.md` for the project-level intent and quick-start commands.
-2. Read `docs/PROJECT_MAP.md` for file responsibilities before editing.
-3. Read `docs/COMMANDS.md` before running tests or CLI flows.
-4. Read `docs/CONVENTIONS.md` before changing public behavior, schemas, or prompts.
+## Session End
 
-## Working Agreements
+If state changed:
+1. Append one entry to `HISTORY.md`.
+2. Rebuild `HISTORY_INDEX.md`.
+3. Write one snapshot JSON.
+4. Run `python -m tools.history.verify_continuity`.
 
-- Treat `MIRL`, `PACK`, `SEAM`, symbol promotion, and retrieval semantics as first-class concepts. Preserve those names unless the task explicitly asks for a rename.
-- Prefer small, surgical edits over broad refactors.
-- Keep CLI verbs stable unless a task explicitly calls for a breaking change.
-- Avoid editing `.db` artifacts in the repo unless the user explicitly asks.
-- Favor focused verification over broad reruns.
-- Optimize for more useful retrieval with fewer tokens. Prefer changes that improve information density, deduplicate noisy results, and preserve exact/lossless behavior where SEAM claims reversibility.
-- Do not act like a yes-man. If an assumption is weak or contradicted by the code, docs, or tests, call it out, explain why, and support the correction with local evidence.
-- For retrieval and model work, inspect the current adapter path, run the smallest relevant test or benchmark, and update the corresponding docs when behavior changes.
+Use `tools/history/*` scripts for entry writes, index rebuild, integrity verification, and snapshot creation.
 
-## Task Routing
+## Temporal Chain
 
-- CLI or command behavior: inspect `seam.py` and `seam_runtime/cli.py`
-- Runtime orchestration: inspect `seam_runtime/runtime.py`
-- MIRL or schema behavior: inspect `seam_runtime/mirl.py`, `docs/MIRL_V1.md`
-- Retrieval or ranking behavior: inspect `seam_runtime/retrieval.py`, `vector.py`, `vector_adapters.py`, `docs/RETRIEVAL_EVAL_V1.md`
-- Symbol work: inspect `seam_runtime/symbols.py`, `docs/SYMBOL_NURSERY.md`
-- Model integration: inspect `seam_runtime/models.py`, `docs/SOP_MODEL_INTEGRATION.md`
-- Storage or persistence: inspect `seam_runtime/storage.py`
-- Parallel work lanes:
-  - vector backend lane: `vector.py`, `vector_adapters.py`, backend-specific tests
-  - retrieval and eval lane: `retrieval.py`, `evals.py`, `docs/RETRIEVAL_EVAL_V1.md`
-  - runtime and docs lane: `runtime.py`, `README.md`, `docs/SOP_MODEL_INTEGRATION.md`, `AGENTS.md`
+- Every material change must preserve a clear chain from previous state to new state. Record what changed, why, verification performed, failures or partial work, and the next unresolved step when one exists.
+- Use `supersedes` to link follow-up work to the latest relevant entry. Do not overwrite or rewrite older history entries to make the timeline look cleaner.
+- Update `REPO_LEDGER.md` when a change affects stable repo policy, architecture, active/archive routing, runtime safety rules, durable operator workflows, or cross-agent protocol. Routine implementation details belong in `HISTORY.md` with pointer cards from docs when needed.
+- Update `PROJECT_STATUS.md` when the current operating state or active focus changes. Do not leave status files stale after changing what future agents should believe.
+- Use concise refs to changed files, tests, commands, and snapshots. Record failures as failures, skipped verification as skipped, and assumptions as assumptions.
+- Keep context packs bounded. Prefer `build_context_pack --topics <tags> --latest <n> --token-budget <budget>` over broad history reads.
+- Use route-aware packs for durable areas: `build_context_pack --route maintenance/docker`, `--route protocol/context`, or another route from `tools/history/routing_manifest.json`.
 
-## Verification
+## Classification Routing
 
-- Default test pass: `python -m unittest test_seam.py`
-- CLI help: `python seam.py --help`
-- When changing one subsystem, run the smallest relevant command or test that proves the behavior.
-- Retrieval changes should verify both relevance and token efficiency. Check expected hits, duplicate suppression, and whether exact pack round-trip behavior remains intact.
+- `tools/history/routing_manifest.json` is the mutable classification map for logical branches such as `maintenance/docker` and `protocol/context`.
+- Classifications may be added, moved, retired, or recreated, but route decisions must remain auditable through `HISTORY.md` and manifest lifecycle fields.
+- Delete a classification from active use by marking it `retired` or `moved`; do not erase the only record of why the route existed.
+- Store stable route facts under `docs/ledgers/` when they are useful for future search. Keep chronology in `HISTORY.md`.
+- Run `python -m tools.history.verify_routing` after changing classifications, ledgers, or route-aware context behavior.
+
+## Security Rules
+
+- Never commit API keys, passwords, tokens, private keys, local `.env` values, provider session links, chat/share links, thread links, or local agent transcript links.
+- Do not put Claude/Codex/ChatGPT session URLs or generated conversation links in commit messages, `HISTORY.md`, snapshots, handoffs, docs, or comments. Summarize the useful state and point to repo files instead.
+- Use placeholders such as `<local-password>` only in examples; real values must live in ignored local files or the operator environment.
+- If a secret, credential-bearing DSN, private key, or private session URL is found in the working tree, delete the local file or redact the value immediately. Do not preserve it in another file, history entry, snapshot, commit message, or chat response.
+- Before staging, scan tracked and untracked candidate files for secret-shaped strings and provider session URLs. If a secret or private session URL was committed, stop and ask for history-rewrite/rotation handling instead of copying it into another artifact.
+
+## Invariants
+
+- `HISTORY.md` is append-only.
+- `HISTORY_INDEX.md` is derived state.
+- Snapshot integrity must be verified before use.
+- Status updates never edit old entries; use `supersedes`.
+- Use pointer cards across docs (`see HISTORY#NNN`), not duplicated prose.
+- Active docs/code and archived docs/code must stay separated; do not copy stale archive prose or code back into active paths without rewriting and verifying it.
+
+## Entry Schema
+
+Required fields per entry:
+`id`, `date`, `agent`, `status`, `topics`, `commits`, `refs`, `supersedes`, `tokens`, and body.
+
+Valid status values:
+`planned`, `in-progress`, `done`, `changed`, `deferred`, `abandoned`.
+
+## Topic Vocabulary
+
+Only use tags from this controlled set:
+
+`compile, mirl, persist, verify, retrieval, search, rank, vector, sbert, chroma, pgvector, docker, lexical, compress, lx1, roundtrip, codec, benchmark, holdout, bundle, fixture, diff, gold-standard, dashboard, tui, textual, animation, graph, chat, installer, windows, linux, wsl2, pyproject, extras, command, doctor, demo, naming, alias, readme, ledger, roadmap, plan, status, history, session, handoff, snapshot, mcp, multi-agent, protocol, integrity, classification, audit`

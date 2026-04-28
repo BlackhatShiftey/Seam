@@ -1,12 +1,14 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-from .benchmarks import run_benchmark_suite, verify_benchmark_bundle
+from .agent_memory import IngestReport, compact_memory_index, full_memory_records, namespace_ingest_batch, neighbor_timeline, source_hash, stable_document_id
+from .benchmarks import diff_benchmark_runs, evaluate_benchmark_gate, run_benchmark_suite, verify_benchmark_bundle
 from .dsl import compile_dsl
 from .evals import run_retrieval_benchmark
-from .mirl import Artifact, IRBatch, Pack, PersistReport, ReconcileReport, SearchResult, TraceGraph, VerifyReport
+from .mirl import Artifact, IRBatch, Pack, PersistReport, ReconcileReport, RecordKind, SearchResult, TraceGraph, VerifyReport
 from .models import EmbeddingModel, default_embedding_model
 from .nl import compile_nl
 from .pack import pack_record, pack_records
@@ -29,10 +31,11 @@ class SeamRuntime:
     ) -> None:
         self.store = SQLiteStore(store_path)
         self.embedding_model = embedding_model or default_embedding_model()
+        resolved_dsn = pgvector_dsn or os.environ.get("SEAM_PGVECTOR_DSN")
         if vector_adapter is not None:
             self.vector_adapter = vector_adapter
-        elif pgvector_dsn:
-            self.vector_adapter = PgVectorAdapter(pgvector_dsn, self.embedding_model)
+        elif resolved_dsn:
+            self.vector_adapter = PgVectorAdapter(resolved_dsn, self.embedding_model)
         else:
             self.vector_adapter = SQLiteVectorAdapter(str(store_path), self.embedding_model)
 
@@ -41,6 +44,36 @@ class SeamRuntime:
 
     def compile_dsl(self, dsl_text: str, ns: str = "local.default", scope: str = "project") -> IRBatch:
         return compile_dsl(dsl_text, ns=ns, scope=scope)
+
+    def ingest_text(
+        self,
+        text: str,
+        source_ref: str = "local://input",
+        ns: str = "local.default",
+        scope: str = "thread",
+        persist: bool = True,
+    ) -> IngestReport:
+        document_id = stable_document_id(source_ref, text)
+        batch = namespace_ingest_batch(self.compile_nl(text, source_ref=source_ref, ns=ns, scope=scope), document_id)
+        stored_ids: list[str] = []
+        if persist:
+            stored_ids = self.persist_ir(batch).stored_ids
+        document = self.store.upsert_document_status(
+            document_id=document_id,
+            ns=ns,
+            scope=scope,
+            source_ref=source_ref,
+            source_hash=source_hash(text),
+            byte_count=len(text.encode("utf-8")),
+            chunk_count=max(1, len(batch.kind(RecordKind.SPAN))),
+            extraction_status="compiled",
+            indexed_status="indexed" if persist else "not_indexed",
+            metadata={
+                "record_count": len(batch.records),
+                "indexable_count": len([record for record in batch.records if record.kind in {RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL}]),
+            },
+        )
+        return IngestReport(document=document, stored_ids=stored_ids)
 
     def verify_ir(self, ir_batch: IRBatch) -> VerifyReport:
         return verify_ir(ir_batch)
@@ -62,6 +95,18 @@ class SeamRuntime:
         vector_scores = self.vector_adapter.search(query, limit=max(budget * 3, 10))
         namespace = batch.records[0].ns if batch.records else None
         return search_batch(batch, query=query, scope=scope, limit=budget, vector_scores=vector_scores, namespace=namespace)
+
+    def memory_search(self, query: str, scope: str | None = None, budget: int = 5) -> dict[str, object]:
+        result = self.search_ir(query, scope=scope, budget=budget)
+        scores = {candidate.record.id: candidate.score for candidate in result.candidates}
+        return compact_memory_index([candidate.record for candidate in result.candidates], query=query, scores=scores)
+
+    def memory_get(self, record_ids: list[str], include_timeline: bool = False) -> dict[str, object]:
+        batch = self.store.load_ir(ids=record_ids)
+        payload = full_memory_records(batch.records)
+        if include_timeline:
+            payload["context"] = neighbor_timeline(self.store.load_ir(), record_ids)
+        return payload
 
     def pack_ir(self, record_ids: list[str] | None = None, lens: str = "general", budget: int = 512, profile: str = "default", mode: str = "context") -> Pack:
         batch = self.store.load_ir(ids=record_ids) if record_ids else self.store.load_ir()
@@ -133,6 +178,7 @@ class SeamRuntime:
         persist: bool = False,
         include_machine_text: bool = False,
         bundle_path: str | Path | None = None,
+        holdout: bool = False,
     ) -> dict[str, object]:
         return run_benchmark_suite(
             self,
@@ -142,10 +188,22 @@ class SeamRuntime:
             persist=persist,
             include_machine_text=include_machine_text,
             bundle_path=bundle_path,
+            holdout=holdout,
         )
 
     def verify_benchmark_bundle(self, bundle: str | Path | dict[str, object]) -> dict[str, object]:
         return verify_benchmark_bundle(bundle)
+
+    def diff_benchmark_runs(self, run_a: str | Path | dict[str, object], run_b: str | Path | dict[str, object]) -> dict[str, object]:
+        return diff_benchmark_runs(run_a, run_b)
+
+    def evaluate_benchmark_gate(
+        self,
+        bundle: str | Path | dict[str, object],
+        baseline: str | Path | dict[str, object] | None = None,
+        policy: str | Path | dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        return evaluate_benchmark_gate(bundle, baseline=baseline, policy=policy)
 
     def read_benchmark_run(self, run_id: str) -> dict[str, object]:
         return self.store.read_benchmark_run(run_id)
@@ -155,9 +213,14 @@ class SeamRuntime:
 
     def reindex_vectors(self, record_ids: list[str] | None = None) -> dict[str, object]:
         batch = self.store.load_ir(ids=record_ids) if record_ids else self.store.load_ir()
+        stale = []
+        inspector = getattr(self.vector_adapter, "stale_records", None)
+        if inspector is not None:
+            stale = inspector(batch.records)
         self.vector_adapter.index_records(batch.records)
         return {
             "indexed_ids": [record.id for record in batch.records],
             "model": self.embedding_model.name,
             "adapter": getattr(self.vector_adapter, "name", "unknown"),
+            "stale_before": stale,
         }
