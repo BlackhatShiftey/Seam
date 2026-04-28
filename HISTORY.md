@@ -2067,3 +2067,19 @@ Repaired post-merge continuity metadata after PR #10. After the competitive RAG/
 
 Verification target: rerun `python -m tools.history.verify_continuity` after rebuilding index/snapshot; no runtime code changes in this repair.
 ---END-ENTRY-#101---
+
+---BEGIN-ENTRY-#102---
+id: 102
+date: 2026-04-28T13:17:22Z
+agent: codex
+status: done
+topics: history, integrity, verify, snapshot
+commits: 2bc3e3c
+refs: HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 101
+tokens: 110
+---
+Post-merge repair after PR #11 landed on main. The merge completed and targeted tests passed, but `python -m tools.history.verify_continuity` reported that HISTORY#101's computed hash changed from the pre-merge snapshot/index value to the current checked-out value. Rebuilt continuity metadata from the current main checkout and wrote a fresh snapshot so future agents start from verified main state.
+
+Verification before this repair: PR #11 merge succeeded at 2bc3e3c; `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 143 tests. Verification target: rerun continuity and targeted tests after rebuilding index/snapshot.
+---END-ENTRY-#102---
