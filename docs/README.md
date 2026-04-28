@@ -10,6 +10,7 @@ This folder is the active operator and engineering documentation surface.
 - `CODE_LAYOUT.md` - active code, experimental code, generated code, and inactive code boundaries.
 - `DATA_ROUTING.md` - logical data routes, topic ledgers, context packs, and corruption-defense checks.
 - `SOP_MODEL_INTEGRATION.md` - current model integration procedure.
+- `RAG_ARCHITECTURE.md` - current graph/vector/mix retrieval and agent bridge architecture.
 - `MIRL_V1.md` - current MIRL reference and readable lossless compression contract.
 - `RETRIEVAL_EVAL_V1.md` - current retrieval evaluation reference.
 - `SYMBOL_NURSERY.md` - current symbol staging notes.

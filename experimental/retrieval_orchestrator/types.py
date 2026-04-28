@@ -11,6 +11,8 @@ class QueryIntent(str, Enum):
     STRUCTURED = "structured"
     SEMANTIC = "semantic"
     HYBRID = "hybrid"
+    GRAPH = "graph"
+    MIX = "mix"
 
 
 @dataclass
@@ -84,12 +86,14 @@ class RetrievalPlan:
     intent: QueryIntent
     filters: QueryFilters
     legs: list[RetrievalLeg]
+    mode: str = "hybrid"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "query": self.query,
             "normalized_query": self.normalized_query,
             "intent": self.intent.value,
+            "mode": self.mode,
             "filters": self.filters.to_dict(),
             "legs": [leg.to_dict() for leg in self.legs],
         }

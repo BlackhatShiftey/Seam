@@ -34,6 +34,7 @@ from .lossless import (
     render_lossless_benchmark_pretty,
 )
 from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
+from .agent_memory import render_memory_index, render_memory_records
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -45,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest_parser = subparsers.add_parser("ingest", help="Store raw text from a file or stdin")
     ingest_parser.add_argument("source")
+    ingest_parser.add_argument("--persist", action="store_true", help="Persist compiled memory records and index them")
+    ingest_parser.add_argument("--source-ref")
+    ingest_parser.add_argument("--ns", default="local.default")
+    ingest_parser.add_argument("--scope", default="thread")
+    ingest_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     lossless_compress_parser = subparsers.add_parser("lossless-compress", aliases=["compress-doc"], help="Losslessly compress a document into SEAM machine text")
     lossless_compress_parser.add_argument("source")
@@ -174,6 +180,22 @@ def build_parser() -> argparse.ArgumentParser:
     retrieve_parser.add_argument("query")
     _add_retrieval_common_args(retrieve_parser)
 
+    memory_parser = subparsers.add_parser("memory", help="Progressive-disclosure SEAM memory tools")
+    memory_subparsers = memory_parser.add_subparsers(dest="memory_command", required=True)
+    memory_search_parser = memory_subparsers.add_parser("search", help="Return compact memory index results")
+    memory_search_parser.add_argument("query")
+    memory_search_parser.add_argument("--scope")
+    memory_search_parser.add_argument("--budget", type=int, default=5)
+    memory_search_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
+    memory_get_parser = memory_subparsers.add_parser("get", help="Return full selected MIRL records")
+    memory_get_parser.add_argument("record_ids")
+    memory_get_parser.add_argument("--timeline", action="store_true")
+    memory_get_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    mcp_parser = subparsers.add_parser("mcp", help="Run SEAM agent integration bridges")
+    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", required=True)
+    mcp_subparsers.add_parser("serve", help="Serve a lightweight JSON-lines MCP-compatible bridge over stdio")
+
     compare_parser = subparsers.add_parser("compare", aliases=["hybrid-compare"], help="Compare basic search with retrieval ranking")
     compare_parser.add_argument("query")
     _add_retrieval_common_args(compare_parser)
@@ -197,6 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--view", choices=CONTEXT_VIEWS, default="pack")
     context_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     context_parser.add_argument("--trace", action="store_true")
+    context_parser.add_argument("--retrieval-mode", choices=["vector", "graph", "hybrid", "mix"], default="hybrid")
     context_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     context_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     context_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
@@ -428,7 +451,14 @@ def run_cli(argv: list[str] | None = None) -> None:
 
     if args.command == "ingest":
         text = _read_text_source(args.source)
-        print(runtime.compile_nl(text, source_ref=args.source).to_text())
+        if args.persist:
+            report = runtime.ingest_text(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope, persist=True)
+            if args.format == "json":
+                print(json.dumps(report.to_dict(), indent=2))
+                return
+            print(_render_ingest_report(report.to_dict()))
+            return
+        print(runtime.compile_nl(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope).to_text())
         return
     if args.command in {"compile-nl", "remember"}:
         batch = runtime.compile_nl(args.text, source_ref=args.source_ref)
@@ -471,18 +501,35 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command in {"plan", "hybrid-plan"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        plan = orchestrator.plan(args.query, scope=args.scope, budget=args.budget)
+        plan = orchestrator.plan(args.query, scope=args.scope, budget=args.budget, mode=args.mode)
         _print_retrieval_output(plan.to_dict(), output_format=args.format, renderer=_render_plan_pretty)
         return
     if args.command in {"retrieve", "hybrid-search"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        result = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace)
+        result = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace, mode=args.mode)
         _print_retrieval_output(result.to_dict(), output_format=args.format, renderer=_render_search_pretty)
+        return
+    if args.command == "memory":
+        if args.memory_command == "search":
+            payload = runtime.memory_search(args.query, scope=args.scope, budget=args.budget)
+            _print_retrieval_output(payload, output_format=args.format, renderer=render_memory_index)
+            return
+        if args.memory_command == "get":
+            payload = runtime.memory_get(_split_ids(args.record_ids), include_timeline=args.timeline)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_memory_records(payload))
+            return
+    if args.command == "mcp" and args.mcp_command == "serve":
+        from .mcp import run_stdio_bridge
+
+        run_stdio_bridge(runtime)
         return
     if args.command in {"compare", "hybrid-compare"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
         search_result = runtime.search_ir(args.query, scope=args.scope, budget=args.budget).to_dict()
-        retrieved = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace).to_dict()
+        retrieved = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace, mode=args.mode).to_dict()
         _print_retrieval_output({"search": search_result, "retrieve": retrieved}, output_format=args.format, renderer=_render_compare_pretty)
         return
     if args.command in {"index", "rag-sync"}:
@@ -505,6 +552,7 @@ def run_cli(argv: list[str] | None = None) -> None:
                 lens=args.lens,
                 mode=args.mode,
                 include_trace=args.trace,
+                retrieval_mode=args.retrieval_mode,
             ).to_dict(),
             view=args.view,
         )
@@ -730,6 +778,22 @@ def _render_readable_query_pretty(payload: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _render_ingest_report(payload: dict[str, object]) -> str:
+    document = payload.get("document", {})
+    stored_ids = payload.get("stored_ids", [])
+    return "\n".join(
+        [
+            f"Ingested: {document.get('source_ref')}",
+            f"Document: {document.get('document_id')}",
+            f"Bytes: {document.get('byte_count')}",
+            f"Chunks: {document.get('chunk_count')}",
+            f"Extraction: {document.get('extraction_status')}",
+            f"Index: {document.get('indexed_status')}",
+            f"Stored ids: {', '.join(stored_ids) if stored_ids else '(none)'}",
+        ]
+    )
+
+
 def _check_pgvector(dsn: str | None) -> dict[str, object]:
     if not dsn:
         return {"configured": False}
@@ -823,6 +887,7 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
 def _add_retrieval_common_args(parser: argparse.ArgumentParser, include_backend: bool = True) -> None:
     parser.add_argument("--scope")
     parser.add_argument("--budget", type=int, default=5)
+    parser.add_argument("--mode", choices=["vector", "graph", "hybrid", "mix"], default="hybrid")
     parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     parser.add_argument("--trace", action="store_true")
     if include_backend:
@@ -934,6 +999,8 @@ def _render_ids(payload: dict[str, object]) -> str:
         return "\n".join(candidate["record"]["id"] for candidate in payload.get("candidates", []))
     if "candidate_ids" in payload:
         return "\n".join(payload.get("candidate_ids", []))
+    if "results" in payload:
+        return "\n".join(str(item.get("id")) for item in payload.get("results", []))
     if "legs" in payload:
         return "\n".join(leg["name"] for leg in payload.get("legs", []))
     if "record_ids" in payload:

@@ -1,286 +1,137 @@
-﻿# SEAM
+# SEAM
 
-SEAM is an on-device memory runtime for AI agents.
+Give your local AI agent persistent memory in one command.
 
-Its core use is machine-first: you hand an agent this repo with a prompt like "configure SEAM for persistent memory, reduce token usage, compress stored data into machine language, and use SEAM as the agent's memory substrate," and SEAM becomes the local system the agent uses to persist, retrieve, trace, benchmark, and compress its own working data.
+SEAM is a local memory runtime for agents. It stores durable MIRL records in
+SQLite, retrieves compact context with lexical, graph, temporal, and vector
+signals, tracks provenance, exposes a dashboard/API, and gates benchmark claims
+before they are treated as real progress.
 
-Its main job is not to be a human-facing app. Its main job is to give an agent a durable memory/runtime substrate it can compile into, retrieve from, trace, verify, compress, and reason over locally.
+## Install
 
-The CLI and terminal dashboard are the glassbox around that system:
+Private repo install requires an authenticated GitHub CLI session.
 
-- inspect what the runtime stored
-- run tests and six-family benchmarks
-- investigate retrieval behavior
-- trace provenance and exact records
-- watch the system do AI work without hiding the internals
-
-If you are looking for the product surface, think agent first and machine first. If you are looking for the operator surface, think CLI and dashboard.
-
-## Why This Repo Exists
-
-SEAM is split into a few distinct layers:
-
-- `SEAM`: the runtime, CLI, dashboard, adapters, benchmark engine, and Python surface
-- `MIRL`: the canonical memory IR inside SEAM
-- `PACK`: derived prompt-time context views
-- `SEAM-LX/1`: an exact lossless machine-text envelope for document compression demos and token-efficiency benchmarks
-
-Design stance:
-
-- SQLite is the canonical source of truth
-- vectors and Chroma are derived retrieval layers, not canonical storage
-- the benchmark engine is a glassbox proof surface, not marketing-only output
-- the dashboard is a glassbox operator surface, not the primary interface
-- the highest-value use case is an AI agent running on a device with SEAM embedded underneath it
-- stored and retrieved data should trend toward machine-efficient representations when SEAM can do so without violating exactness or canonical storage guarantees
-
-## Core Use
-
-The central SEAM workflow is:
-
-1. hand an agent this repo and a task prompt
-2. let the agent configure SEAM as its persistent local memory system
-3. let the agent store canonical records in SQLite
-4. let the agent derive compact machine-facing views for retrieval, prompting, benchmarking, and exact document compression
-5. let the agent search its own database using those reduced-token views while preserving traceability back to canonical records
-
-In other words, SEAM is meant to help an agent use fewer tokens against its own memory without losing the ability to recover exact source state.
-
-## Current Capabilities
-
-- compile natural language into MIRL
-- compile a narrow DSL into MIRL
-- verify MIRL schema and exact-pack reversibility
-- persist MIRL, provenance, raw evidence, packs, machine artifacts, projections, and benchmark reports into SQLite
-- search, trace, pack, reconcile, transpile, and export symbols
-- run hybrid retrieval over SQL, lexical, graph, temporal, and optional vector signals
-- render `context` output as `pack`, `prompt`, `evidence`, `summary`, or exact `records`
-- run a six-family benchmark engine covering `lossless`, `retrieval`, `embedding`, `long_context`, `persistence`, and `agent_tasks`
-- record bundle hashes, case hashes, fixture hashes, improvement-loop actions, and persisted benchmark history
-- run a lossless `SEAM-LX/1` benchmark that only passes on exact reconstruction
-- show runtime state and benchmark loops in a terminal dashboard
-- expose compile, search, context, stats, and health checks through an optional REST API
-
-## Bare Checkout Setup
-
-SEAM now treats `rich`, `chromadb`, and `tiktoken` as required base dependencies.
-If you want the installed terminal commands so you can type `seam` directly, use the installer path below.
-
-Recommended baseline:
+Windows PowerShell:
 
 ```powershell
-git clone <your-fork-or-repo-url>
-cd Seam
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m pip install -e ".[dash]"
+gh repo clone BlackhatShiftey/Seam Seam; cd Seam; powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
 ```
 
-Run the core test suite:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest -v
-```
-
-Notes:
-
-- `seam doctor` reports `FAIL` if required deps (`rich`, `chromadb`, `tiktoken`) are missing
-- optional extras are only for additional backends/features beyond base runtime
-- `.[dash]` installs `textual` so `seam-dash` and Textual dashboard tests run without skips
-
-## Setup and Troubleshooting Docs
-
-- Docs index and active/archive split: `docs/README.md`
-- Active/inactive code layout: `docs/CODE_LAYOUT.md`
-- Setup commands: `docs/setup.md`
-- Documented errors and fixes: `docs/errors.md`
-- Task runbooks: `docs/howto/README.md`
-
-## Guarded Real-Adapter Validation
-
-Use guarded runners to avoid resource spikes and enforce cleanup.
-
-Resource guard defaults:
-
-- RAM warning at `82%`
-- RAM hard limit at `90%`
-- CPU warning/hard limit at `75%` / `85%`
-- Disk warning/hard limit at `85%` / `92%`
-
-Run full real-adapter validation (SQLite vector + Chroma + PgVector) with automatic start/cleanup:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_real_adapters_guarded.ps1
-```
-
-Run only smoke checks (skip full pytest):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_real_adapters_guarded.ps1 -SkipPytest
-```
-
-Run any heavy command behind the standalone guard:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_guarded.ps1 -Command "python -m pytest -q" -StopOnLimit
-```
-
-Store benchmark runs to your Documents folder with publication-ready metadata:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\store_benchmark.ps1 -Suite all
-```
-
-Default storage path:
-
-- `%USERPROFILE%\Documents\SEAM\benchmarks\<suite>\<YYYY-MM-DD>\<seq>_<timestamp>_<run_id>\`
-
-Each run folder includes:
-
-- `benchmark_report.json` (raw report)
-- `publication_manifest.json` (bundle/case/fixture hashes + git/tokenizer/dependency state)
-- `case_hashes.json`
-- `command.txt`
-- `research_notes.md`
-- `environment_snapshot.json`
-- includes canonical `daily_run_sequence` for same-day ordering
-
-Day-level index:
-
-- `_index.json` in each date folder tracks sequence, run id, status, hashes, and folder path.
-
-Safety rule:
-
-- `store_benchmark.ps1` rejects output paths inside the git repo by default so benchmark artifacts stay local and out of commits.
-
-## Installer Flow
-
-If you want the "download installer, run installer, type `seam`" path, use the installer entrypoint for your platform.
-
-Windows:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\installers\install_seam_windows.ps1
-```
-
-Linux:
+Linux / WSL2:
 
 ```bash
-sh ./installers/install_seam_linux.sh
+gh repo clone BlackhatShiftey/Seam Seam && cd Seam && sh ./installers/install_seam_linux.sh
 ```
 
-What the installer does:
+Public release installer shape, for later release packaging:
 
-- creates a dedicated SEAM runtime under your home directory instead of relying on a repo-local venv
-- installs SEAM into that dedicated runtime with the `[dash]` extra so the Textual dashboard works out of the box
-- creates global `seam`, `seam-benchmark`, and `seam-dash` shims
-- configures a persistent default database in the SEAM install state directory
-- updates a user PATH location or shell profile as needed
-- runs `seam doctor`
+```powershell
+irm https://example.com/seam/install.ps1 | iex
+```
 
-After the installer finishes, open a new terminal and type:
+```bash
+curl -fsSL https://example.com/seam/install.sh | sh
+```
 
-```text
+Those public URLs are placeholders until SEAM has a published installer host.
+Use the private `gh repo clone` commands above for this repo today.
+
+## 60-Second Demo
+
+After install, open a new terminal:
+
+```powershell
 seam doctor
-seam --help
-seam-dash --help
+seam ingest README.md --persist
+seam memory search "persistent agent memory"
+seam retrieve "persistent agent memory" --mode mix --budget 5
+seam context "persistent agent memory" --retrieval-mode mix --view prompt
+seam dashboard --snapshot --no-clear
 ```
 
-Default persistence paths:
+Inside the dashboard, use `reload` or `/reload` to refresh the visible runtime
+state, metrics, panels, and chart surfaces without restarting.
+
+## Why SEAM
+
+- Persistent local memory: SQLite is the canonical source of truth.
+- Efficient RAG: `vector`, `graph`, `hybrid`, and `mix` retrieval modes.
+- Progressive disclosure: `seam memory search` gives compact IDs first; `seam memory get <ids>` fetches full records only when needed.
+- Agent bridge: `seam mcp serve` exposes JSON-lines tool calls for MCP-style wrappers.
+- Provenance: records keep refs, evidence, trace edges, and source document status.
+- Benchmark discipline: benchmark bundles are hash-verified, diffed, gated, and separated from holdout publication runs.
+- Operator surface: CLI, Textual dashboard, REST API, and installer shims all use the same runtime.
+
+## Core Commands
+
+```powershell
+seam ingest path\to\file.txt --persist
+seam remember "SEAM stores durable memory for agents."
+seam memory search "durable memory"
+seam memory get clm:1,sta:ent:project:seam --timeline
+seam retrieve "durable memory" --mode mix --trace
+seam context "durable memory" --retrieval-mode mix --view evidence
+seam index
+seam reindex
+seam dashboard
+seam serve --host 127.0.0.1 --port 8765
+seam benchmark run all --persist
+seam benchmark gate seam-benchmark-report.json
+```
+
+## RAG Architecture
+
+SEAM takes the useful parts of graph RAG systems while keeping canonical memory
+inside MIRL:
+
+1. ingest text or files
+2. compile semantic records into MIRL
+3. persist canonical records and document status in SQLite
+4. derive vector indexes and graph edges from record IDs
+5. retrieve with `vector`, `graph`, `hybrid`, or `mix`
+6. build a token-bounded PACK for the agent
+
+Vector stores are acceleration layers, not source of truth. PgVector and the
+SQLite vector table can be rebuilt from MIRL records.
+
+See [docs/RAG_ARCHITECTURE.md](docs/RAG_ARCHITECTURE.md) for the LightRAG and
+claude-mem comparison, retrieval mode details, and agent bridge notes.
+
+## Setup Details
+
+- Command cookbook: [docs/setup.md](docs/setup.md)
+- Installer reference: [installers/README.md](installers/README.md)
+- Troubleshooting: [docs/errors.md](docs/errors.md)
+- Task runbooks: [docs/howto/README.md](docs/howto/README.md)
+- Active/inactive code layout: [docs/CODE_LAYOUT.md](docs/CODE_LAYOUT.md)
+
+Default persistent database paths:
 
 - Windows: `%LOCALAPPDATA%\SEAM\state\seam.db`
-- Linux: `~/.local/share/seam/state/seam.db`
+- Linux / WSL2: `~/.local/share/seam/state/seam.db`
 
-## Repo-Local Development Install
-
-If you want `seam` and `seam-benchmark` as real terminal commands just for the current checkout:
+## Optional Extras
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e .
+python -m pip install -e ".[dash]"
+python -m pip install -e ".[server]"
+python -m pip install -e ".[pgvector]"
+python -m pip install -e ".[sbert]"
+python -m pip install -e ".[agent]"
+python -m pip install -e ".[rerank]"
+python -m pip install -e ".[all-extras]"
 ```
 
-Fastest repo-local development path:
+Extras keep the base install focused:
 
-```powershell
-.\scripts\bootstrap_seam.ps1
-```
+- `dash`: Textual dashboard
+- `server`: FastAPI/Uvicorn REST API
+- `pgvector`: PostgreSQL PgVector adapter
+- `sbert`: local sentence-transformer embeddings
+- `agent`: reserved agent bridge extra; current stdio bridge has no extra dependency
+- `rerank`: reranker model dependencies
 
-That script will:
-
-- create `.venv` if needed
-- install SEAM in editable mode with the `[dash]` extra
-- install global `seam`, `seam-benchmark`, and `seam-dash` shims into a user PATH location
-- verify `seam.exe`, `seam-benchmark.exe`, and `seam-dash.exe`
-- run `seam doctor`
-
-To drop into a shell where you can type `seam` directly:
-
-```powershell
-. .\scripts\enter_seam.ps1
-```
-
-Windows repo-local dashboard launcher:
-
-```powershell
-.\scripts\windows\launch_dashboard.bat
-```
-
-Optional extras:
-
-- `pgvector` for PostgreSQL pgvector backend
-- `sbert` for sentence-transformer embeddings
-- `server` for the FastAPI/Uvicorn REST API
-- `all-extras` for dashboard, pgvector, sbert, and server extras
-
-## Quick Start
-
-### 1. Compile and Persist Memory
-
-If you installed SEAM through the platform installer, `seam` already points at the persistent default database in the SEAM state directory. You only need `--db` when you want to override that default for an experiment or test.
-
-```powershell
-seam compile-nl "We need durable memory for AI systems." --persist
-seam index
-seam search "durable memory" --budget 5
-```
-
-### 2. Retrieve Agent Context
-
-```powershell
-seam retrieve "translator natural language" --budget 5 --trace
-seam context "translator natural language" --view prompt
-seam context "translator natural language" --view evidence --format json
-seam context "translator natural language" --view records
-```
-
-### 3. Launch the Glassbox Dashboard
-
-Requires `rich`:
-
-```powershell
-seam dashboard
-```
-
-On Windows, a repo-local launcher is also available when you want to run the checkout dashboard against the persistent installed database if it exists:
-
-```powershell
-.\scripts\windows\launch_dashboard.bat
-```
-
-Useful non-interactive snapshots:
-
-```powershell
-seam dashboard --snapshot --no-clear
-seam dashboard --run "tab benchmark" --run "benchmark tools/lossless_demo_input.txt --min-savings 0.75" --run "decompress-last" --no-clear
-```
-
-Dashboard chat can use OpenRouter or any OpenAI-compatible backend through
-`SEAM_CHAT_BASE_URL`, `SEAM_CHAT_API_KEY`, `SEAM_CHAT_MODEL`, and
-`SEAM_CHAT_MODELS`. Copy/paste setup and model switching commands for Windows
-and Linux/WSL2 live in `docs/setup.md`.
-
-### 4. Run the REST API
+## REST API
 
 Install the server extra:
 
@@ -288,119 +139,48 @@ Install the server extra:
 python -m pip install -e ".[server]"
 ```
 
-Start the local API:
+Run locally:
 
 ```powershell
-python seam.py serve --host 127.0.0.1 --port 8765
+seam serve --host 127.0.0.1 --port 8765
 ```
 
 Useful endpoints:
 
-- `GET /health` - unauthenticated health check, still subject to rate limiting
-- `GET /stats` - SQLite runtime counts
-- `POST /compile` - compile natural language, optionally persist with `"persist": true`
-- `POST /compile-dsl` - compile SEAM DSL, optionally persist
-- `GET /search?query=durable+memory&budget=5` - search persisted MIRL
-- `POST /context` - search and return a PACK for agent context
-- `POST /lossless-compress` - run lossless benchmark compression and return the report
-- `POST /persist` - persist MIRL records
+- `GET /health`
+- `GET /stats`
+- `POST /compile`
+- `POST /compile-dsl`
+- `GET /search?query=durable+memory&budget=5`
+- `POST /context`
+- `POST /lossless-compress`
+- `POST /persist`
 
-Protected endpoints use `SEAM_API_TOKEN` when it is set:
-
-```powershell
-$env:SEAM_API_TOKEN = "<local-token>"
-$env:SEAM_API_RATE_LIMIT_PER_MINUTE = "120"
-```
-
-Send protected requests with `Authorization: Bearer <local-token>`. Leave
-`SEAM_API_TOKEN` unset only for trusted local development.
+Set `SEAM_API_TOKEN` to require `Authorization: Bearer <local-token>` for
+protected endpoints.
 
 ## Benchmark Glassbox
 
-SEAM now ships with a six-family benchmark engine that records raw per-case traces, persisted run history, bundle hashes, case hashes, fixture hashes, and improvement-loop actions.
-
-Benchmark families:
-
-- `lossless`
-- `retrieval`
-- `embedding`
-- `long_context`
-- `persistence`
-- `agent_tasks`
-
-Run the full suite and persist the result:
-
 ```powershell
 seam benchmark run all --persist --output seam-benchmark-report.json
-```
-
-Inspect the latest persisted run:
-
-```powershell
 seam benchmark show latest
-```
-
-Verify that a saved bundle has not been tampered with:
-
-```powershell
 seam benchmark verify seam-benchmark-report.json
+seam benchmark gate seam-benchmark-report.json
 ```
 
-Run only the lossless family with an explicit tokenizer:
+Publication claims must include bundle hash, case hashes, fixture hashes, git
+SHA, diff output, gate output, and holdout output when the claim is external.
 
-```powershell
-seam benchmark run lossless --tokenizer cl100k_base --include-machine-text
-```
+## Machine-First Layer
 
-The benchmark blueprint and contributor-facing methodology live here:
+The product entrypoint is simple: install SEAM, persist memory, retrieve
+context. Under that surface, SEAM is still machine-first:
 
-- `benchmarks/README.md`
-- `benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md`
+- `MIRL`: canonical memory IR
+- `PACK`: prompt-time context view
+- `SEAM-LX/1`: exact machine-text envelope for lossless workflows
+- `SEAM-RC/1`: directly readable compressed machine language
 
-## Lossless Machine-Language Demo
-
-`SEAM-LX/1` is an exact machine-text envelope. It is not a summary and it is not allowed to drop information.
-
-The workflow is:
-
-1. feed SEAM a document
-2. get back a compressed machine-text version plus compression stats
-3. feed the machine text back in
-4. rebuild the original document exactly
-
-The benchmark only passes if the roundtrip is lossless and the compressed form meets the requested token-savings threshold.
-
-```powershell
-seam demo lossless C:\path\to\document.txt C:\path\to\document.seamlx --min-savings 0.75
-seam demo lossless C:\path\to\document.seamlx C:\path\to\rebuilt.txt --rebuild
-cmd /c fc /b C:\path\to\document.txt C:\path\to\rebuilt.txt
-```
-
-Focus on exactness first. If a document does not hit the savings target, the benchmark should fail rather than pretend the compression is good enough.
-
-## Cross-Agent Continuity
-
-The durable project memory lives in:
-
-- `PROJECT_STATUS.md`
-- `REPO_LEDGER.md`
-
-Agent-specific continuity files now exist so other assistants can resume work quickly without inventing their own repo model:
-
-- `CLAUDE.md`
-- `GEMINI.md`
-- `ANTIGRAVITY.md`
-
-These are resume guides, not alternate sources of truth. The canonical project memory is still `PROJECT_STATUS.md` plus `REPO_LEDGER.md`.
-
-## Agent Integration Use
-
-If you are using SEAM the intended way, the main interface is not the dashboard. The main interface is the AI agent that runs on the device and uses SEAM underneath it.
-
-A practical handoff prompt looks like:
-
-```text
-Configure SEAM for persistent memory, keep SQLite canonical, reduce token usage through machine-efficient derived views, benchmark every major change, and do not accept any lossy compression path.
-```
-
-That is the core of the project: not a mystery box UI, but a machine-first local runtime that gives an agent durable memory, exact recovery, and measurable token-efficiency gains.
+The design stance is unchanged: SQLite is canonical, derived indexes are
+rebuildable, lossless claims require exact reconstruction, and compressed
+artifacts must remain useful to an agent without hiding provenance.

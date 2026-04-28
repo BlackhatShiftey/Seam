@@ -42,6 +42,21 @@ class SQLiteStore:
                     span_text text,
                     created_at text not null
                 );
+                create table if not exists document_status (
+                    document_id text primary key,
+                    ns text not null,
+                    scope text not null,
+                    source_ref text not null,
+                    source_hash text not null,
+                    byte_count integer not null,
+                    chunk_count integer not null,
+                    extraction_status text not null,
+                    indexed_status text not null,
+                    deleted_at text,
+                    metadata_json text not null,
+                    created_at text not null,
+                    updated_at text not null
+                );
                 create table if not exists ir_records (
                     id text primary key,
                     kind text not null,
@@ -146,6 +161,8 @@ class SQLiteStore:
                 );
                 create index if not exists idx_ir_records_kind on ir_records (kind);
                 create index if not exists idx_ir_records_ns_scope on ir_records (ns, scope);
+                create index if not exists idx_document_status_source on document_status (source_ref);
+                create index if not exists idx_document_status_hash on document_status (source_hash);
                 create index if not exists idx_ir_edges_src on ir_edges (src_id);
                 create index if not exists idx_ir_edges_dst on ir_edges (dst_id);
                 create index if not exists idx_machine_artifacts_source on machine_artifacts (source_type, source_id);
@@ -190,6 +207,66 @@ class SQLiteStore:
                 self._persist_edges(connection, record)
             connection.commit()
         return PersistReport(stored_ids=[record.id for record in batch.records], store_path=self.path)
+
+    def upsert_document_status(
+        self,
+        *,
+        document_id: str,
+        ns: str,
+        scope: str,
+        source_ref: str,
+        source_hash: str,
+        byte_count: int,
+        chunk_count: int,
+        extraction_status: str,
+        indexed_status: str,
+        metadata: dict[str, object] | None = None,
+        deleted_at: str | None = None,
+    ) -> dict[str, object]:
+        now = utc_now()
+        with closing(self._connect()) as connection:
+            existing = connection.execute("select created_at from document_status where document_id = ?", (document_id,)).fetchone()
+            created_at = existing["created_at"] if existing else now
+            connection.execute(
+                """
+                insert or replace into document_status
+                (document_id, ns, scope, source_ref, source_hash, byte_count, chunk_count,
+                 extraction_status, indexed_status, deleted_at, metadata_json, created_at, updated_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    document_id,
+                    ns,
+                    scope,
+                    source_ref,
+                    source_hash,
+                    int(byte_count),
+                    int(chunk_count),
+                    extraction_status,
+                    indexed_status,
+                    deleted_at,
+                    json.dumps(metadata or {}, sort_keys=True, separators=(",", ":")),
+                    created_at,
+                    now,
+                ),
+            )
+            connection.commit()
+        return self.read_document_status(document_id)
+
+    def read_document_status(self, document_id: str) -> dict[str, object]:
+        with closing(self._connect()) as connection:
+            row = connection.execute("select * from document_status where document_id = ?", (document_id,)).fetchone()
+        if row is None:
+            raise KeyError(document_id)
+        return _document_status_row(row)
+
+    def list_document_status(self, limit: int = 20) -> list[dict[str, object]]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "select * from document_status order by updated_at desc limit ?",
+                (limit,),
+            ).fetchall()
+        return [_document_status_row(row) for row in rows]
 
     def _persist_specialized(self, connection: sqlite3.Connection, record: MIRLRecord) -> None:
         attrs = record.attrs
@@ -485,4 +562,22 @@ class SQLiteStore:
             }
             for row in rows
         ]
+
+
+def _document_status_row(row: sqlite3.Row) -> dict[str, object]:
+    return {
+        "document_id": row["document_id"],
+        "ns": row["ns"],
+        "scope": row["scope"],
+        "source_ref": row["source_ref"],
+        "source_hash": row["source_hash"],
+        "byte_count": row["byte_count"],
+        "chunk_count": row["chunk_count"],
+        "extraction_status": row["extraction_status"],
+        "indexed_status": row["indexed_status"],
+        "deleted_at": row["deleted_at"],
+        "metadata": json.loads(row["metadata_json"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
 

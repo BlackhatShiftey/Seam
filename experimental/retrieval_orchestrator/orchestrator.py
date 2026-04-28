@@ -4,7 +4,7 @@ from seam_runtime.mirl import IRBatch
 from seam_runtime.pack import pack_records
 from seam_runtime.runtime import SeamRuntime
 
-from .adapters import ChromaSemanticAdapter, SQLAdapter, SQLiteIRAdapter, SeamVectorSearchAdapter, SemanticAdapter
+from .adapters import ChromaSemanticAdapter, SQLAdapter, SQLiteGraphAdapter, SQLiteIRAdapter, SeamVectorSearchAdapter, SemanticAdapter
 from .merger import merge_hits
 from .planner import build_plan
 from .types import RAGResult, RetrievalPlan, RetrievalSearchResult
@@ -23,6 +23,7 @@ class RetrievalOrchestrator:
         self.runtime = runtime
         self.semantic_backend = semantic_backend
         self.sql_adapter = sql_adapter or SQLiteIRAdapter(runtime.store)
+        self.graph_adapter = SQLiteGraphAdapter(runtime.store)
         if semantic_adapter is not None:
             self.semantic_adapter = semantic_adapter
         elif semantic_backend == "chroma":
@@ -35,11 +36,11 @@ class RetrievalOrchestrator:
         else:
             self.semantic_adapter = SeamVectorSearchAdapter(runtime.store, runtime.vector_adapter)
 
-    def plan(self, query: str, scope: str | None = None, budget: int = 5) -> RetrievalPlan:
-        return build_plan(query=query, scope=scope, budget=budget)
+    def plan(self, query: str, scope: str | None = None, budget: int = 5, mode: str = "hybrid") -> RetrievalPlan:
+        return build_plan(query=query, scope=scope, budget=budget, mode=mode)
 
-    def search(self, query: str, scope: str | None = None, budget: int = 5, include_trace: bool = False) -> RetrievalSearchResult:
-        plan = self.plan(query=query, scope=scope, budget=budget)
+    def search(self, query: str, scope: str | None = None, budget: int = 5, include_trace: bool = False, mode: str = "hybrid") -> RetrievalSearchResult:
+        plan = self.plan(query=query, scope=scope, budget=budget, mode=mode)
         leg_hits: dict[str, list] = {}
 
         for leg in plan.legs:
@@ -47,6 +48,8 @@ class RetrievalOrchestrator:
                 leg_hits["sql"] = self.sql_adapter.search(plan, limit=leg.limit)
             elif leg.name == "vector":
                 leg_hits["vector"] = self.semantic_adapter.search(plan, limit=leg.limit)
+            elif leg.name == "graph":
+                leg_hits["graph"] = self.graph_adapter.search(plan, limit=leg.limit)
 
         candidates = merge_hits([hits for hits in leg_hits.values()], limit=budget)
         trace = None
@@ -90,8 +93,9 @@ class RetrievalOrchestrator:
         lens: str = "rag",
         mode: str = "context",
         include_trace: bool = False,
+        retrieval_mode: str = "hybrid",
     ) -> RAGResult:
-        search_result = self.search(query=query, scope=scope, budget=budget, include_trace=include_trace)
+        search_result = self.search(query=query, scope=scope, budget=budget, include_trace=include_trace, mode=retrieval_mode)
         records = [candidate.record for candidate in search_result.candidates]
         namespace = records[0].ns if records else None
         pack = pack_records(records, lens=lens, budget=pack_budget, mode=mode, namespace=namespace)
@@ -103,7 +107,7 @@ class RetrievalOrchestrator:
             }
         return RAGResult(
             query=query,
-            backend=self.semantic_backend,
+            backend=f"{retrieval_mode}:{self.semantic_backend}",
             candidate_ids=[record.id for record in records],
             candidates=[candidate.to_dict() for candidate in search_result.candidates],
             records=[record.to_dict() for record in records],
