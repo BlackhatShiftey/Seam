@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 102
-total_tokens: ~11037
-latest_id: 102
+total_entries: 103
+total_tokens: ~11168
+latest_id: 103
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,7 +11,8 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
-| 102 | 2026-04-28 | done | 3ef207e5e049a09b | history,integrity,verify,snapshot | 101 |
+| 103 | 2026-04-28 | done | 3198f3912aab1542 | history,integrity,verify,snapshot | 102 |
+| 102 | 2026-04-28 | done | ef8d5efb988a4bb1 | history,integrity,verify,snapshot | 101 |
 | 101 | 2026-04-28 | done | d00543434688c854 | history,integrity,verify,snapshot | 100 |
 | 100 | 2026-04-28 | done | 4cea600d28dd2930 | installer,readme,security,verify,+ | 099 |
 | 099 | 2026-04-28 | done | d758fd27a426beab | readme,installer,retrieval,vector,+ | 098 |
@@ -138,10 +139,10 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
 - handoff: count=2 latest=#075, #025
-- history: count=56 latest=#102, #101, #100, #099, #098
+- history: count=57 latest=#103, #102, #101, #100, #099
 - holdout: count=3 latest=#093, #092, #036
 - installer: count=9 latest=#100, #099, #063, #035, #021
-- integrity: count=3 latest=#102, #101, #048
+- integrity: count=4 latest=#103, #102, #101, #048
 - ledger: count=12 latest=#094, #092, #087, #086, #080
 - lexical: count=1 latest=#004
 - linux: count=2 latest=#021, #014
@@ -164,17 +165,17 @@ compact: true
 - search: count=11 latest=#088, #077, #047, #046, #041
 - security: count=1 latest=#100
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=54 latest=#102, #101, #100, #099, #098
+- snapshot: count=55 latest=#103, #102, #101, #100, #099
 - status: count=23 latest=#097, #094, #092, #080, #046
 - textual: count=15 latest=#063, #062, #061, #060, #059
 - tui: count=12 latest=#098, #097, #091, #070, #069
 - vector: count=18 latest=#099, #066, #044, #038, #034
-- verify: count=46 latest=#102, #101, #100, #098, #097
+- verify: count=47 latest=#103, #102, #101, #100, #098
 - windows: count=10 latest=#091, #084, #083, #067, #066
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 82
+- done: 83
 - planned: 20

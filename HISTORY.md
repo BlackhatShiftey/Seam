@@ -2083,3 +2083,19 @@ Post-merge repair after PR #11 landed on main. The merge completed and targeted 
 
 Verification before this repair: PR #11 merge succeeded at 2bc3e3c; `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 143 tests. Verification target: rerun continuity and targeted tests after rebuilding index/snapshot.
 ---END-ENTRY-#102---
+
+---BEGIN-ENTRY-#103---
+id: 103
+date: 2026-04-28T14:58:49Z
+agent: codex
+status: done
+topics: history, integrity, verify, snapshot
+commits: none
+refs: HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,_imports
+supersedes: 102
+tokens: 131
+---
+Repaired current `main` after checking branch/snapshot state. The backup branch update wrote a newer ignored snapshot for HISTORY#103 while `main` still ended at HISTORY#102, so `python -m tools.history.verify_continuity` selected a snapshot from the backup branch and failed. Rebuilt `main` continuity metadata from the current checkout and wrote a fresh newer main snapshot so continuity resolves against the active branch again.
+
+State check also found `_imports/awesome-design-md` as an empty leftover directory from branch switching; it contains no file data and can be removed from the `main` checkout without losing repo content. Verification target: rerun continuity, targeted tests, and git status after cleanup.
+---END-ENTRY-#103---
