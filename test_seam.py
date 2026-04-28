@@ -715,6 +715,51 @@ claim c2:
         savings_delta = [item for item in changed[0]["metric_deltas"] if item["metric"] == "token_savings_ratio"][0]
         self.assertEqual(savings_delta["indicator"], "green")
 
+    def test_benchmark_gate_passes_custom_lossless_policy(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx")
+        policy = {
+            "version": benchmark_module.BENCHMARK_GATE_VERSION,
+            "required_families": ["lossless"],
+            "summary": {
+                "status": {"equals": "PASS"},
+                "family_count": {"minimum": 1},
+                "case_count": {"minimum": 2},
+            },
+            "families": {
+                "lossless": {
+                    "pass_rate": {"minimum": 1.0},
+                    "exactness_rate": {"minimum": 1.0},
+                }
+            },
+            "baseline": {
+                "status_regressions": {"maximum": 0},
+                "metric_regressions": {"maximum": 0},
+                "removed_cases": {"maximum": 0},
+            },
+        }
+
+        gate = runtime.evaluate_benchmark_gate(report, policy=policy)
+        self.assertEqual(gate["status"], "PASS")
+        self.assertEqual(gate["summary"]["failed"], 0)
+        self.assertTrue(all(check["status"] == "PASS" for check in gate["checks"]))
+
+    def test_benchmark_gate_flags_threshold_failure(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx")
+        policy = {
+            "version": benchmark_module.BENCHMARK_GATE_VERSION,
+            "required_families": ["lossless"],
+            "summary": {"status": {"equals": "PASS"}},
+            "families": {"lossless": {"worst_case_savings": {"minimum": 1.0}}},
+            "baseline": {},
+        }
+
+        gate = runtime.evaluate_benchmark_gate(report, policy=policy)
+        self.assertEqual(gate["status"], "FAIL")
+        failed = [check for check in gate["checks"] if check["status"] == "FAIL"]
+        self.assertTrue(any(check["metric"] == "worst_case_savings" for check in failed))
+
     def test_cli_benchmark_diff_json_accepts_bundle_paths(self) -> None:
         runtime = SeamRuntime(self.db_path)
         first_path = Path(f"benchmark_diff_a_{uuid4().hex}.json")
@@ -736,6 +781,59 @@ claim c2:
             self.assertEqual(payload["summary"]["status"], "REGRESSED")
         finally:
             for path in (first_path, second_path):
+                if path.exists():
+                    path.unlink()
+
+    def test_cli_benchmark_gate_exits_nonzero_on_baseline_regression(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        baseline_path = Path(f"benchmark_gate_a_{uuid4().hex}.json")
+        candidate_path = Path(f"benchmark_gate_b_{uuid4().hex}.json")
+        policy_path = Path(f"benchmark_gate_policy_{uuid4().hex}.json")
+        try:
+            baseline = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx", bundle_path=baseline_path)
+            candidate = json.loads(json.dumps(baseline))
+            candidate["families"]["lossless"]["cases"][0]["status"] = "FAIL"
+            candidate["families"]["lossless"]["cases"][0] = benchmark_module._stamp_case_hash(candidate["families"]["lossless"]["cases"][0])
+            candidate["summary"] = benchmark_module._build_suite_summary(candidate["families"])
+            candidate["bundle_hash"] = benchmark_module._hash_payload(candidate, "bundle_hash")
+            candidate_path.write_text(json.dumps(candidate, indent=2), encoding="utf-8")
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "version": benchmark_module.BENCHMARK_GATE_VERSION,
+                        "required_families": ["lossless"],
+                        "summary": {},
+                        "families": {},
+                        "baseline": {"status_regressions": {"maximum": 0}},
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            stream = StringIO()
+            with redirect_stdout(stream), self.assertRaises(SystemExit) as raised:
+                run_cli(
+                    [
+                        "--db",
+                        str(self.db_path),
+                        "benchmark",
+                        "gate",
+                        str(candidate_path),
+                        "--baseline",
+                        str(baseline_path),
+                        "--policy",
+                        str(policy_path),
+                        "--format",
+                        "json",
+                    ]
+                )
+            self.assertEqual(raised.exception.code, 1)
+            payload = json.loads(stream.getvalue())
+            self.assertEqual(payload["status"], "FAIL")
+            self.assertEqual(payload["baseline_diff"]["summary"]["status_regressions"], 1)
+        finally:
+            for path in (baseline_path, candidate_path, policy_path):
                 if path.exists():
                     path.unlink()
 

@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-04-27
+Last updated: 2026-04-28
 
 ## Current State
 
@@ -10,7 +10,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, and independently scrollable panes
 - Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - lossless SEAM-LX/1 compression with integrity verification
-- benchmark diff tooling plus publish-only holdout fixture routing
+- benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
 - optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
 - PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
@@ -23,7 +23,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `SEAM_LOCAL_ENV` or a private Documents `SEAM\local\.env`
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
 - Dashboard snapshot/smoke-test behavior
-- Benchmark bundle verification, diff, and holdout workflow
+- Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
 - Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
@@ -47,7 +47,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
 - Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
 - Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
-- Use `seam benchmark diff <run-a> <run-b>` before claiming a benchmark improvement, and `seam benchmark run --holdout --confirm-holdout` only for publish-time audits.
+- Use `seam benchmark diff <run-a> <run-b>` before claiming a benchmark improvement, `seam benchmark gate <bundle> [--baseline <run-a>]` before merge/release, and `seam benchmark run --holdout --confirm-holdout` only for publish-time audits.
 - Use `python -m tools.history.build_context_pack --topics <tags> --latest <n> --token-budget <budget>` for bounded task context.
 - Use `python -m tools.history.verify_continuity` before ending a changed session.
 - Use `python -m tools.history.verify_routing` after changing data classifications or ledgers.
