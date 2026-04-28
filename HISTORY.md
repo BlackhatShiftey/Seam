@@ -1862,3 +1862,82 @@ Hardened the SEAM-RC/1 benchmark into a 100% recipe/direct-read gate.
 - Updated docs/MIRL_V1.md and docs/ledgers/runtime/compression.md to state RC/1 exactness cannot fall below 100% and that recipe text must be directly readable back from compressed language.
 - Verification: focused readable benchmark tests passed; python seam.py benchmark run readable --tokenizer char4_approx --format pretty passed with direct_text=100.0% and direct_read=100.0%; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 115 tests; compileall passed for touched benchmark/lossless/test files.
 ---END-ENTRY-#090---
+
+---BEGIN-ENTRY-#091---
+id: 091
+date: 2026-04-27T04:14:02Z
+agent: codex-gpt-5
+status: done
+topics: dashboard, tui, command, compress, windows, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 090
+tokens: 217
+---
+Wired the dashboard to the new SEAM-RC/1 readable compression runtime and fixed Windows command parsing.
+- Added readable-compress/compress-readable, readable-query/query-compressed, and readable-rebuild to the Textual dashboard command set, slash palette, command help, parser, result routing, and benchmark/compression panel routing.
+- Dashboard readable-compress now calls compress_text_readable, stores the latest SEAM-RC/1 machine text, and updates token counters from original_tokens/machine_tokens.
+- Dashboard readable-query asks SEAM-RC/1 artifacts directly through query_readable_compressed without rebuilding source text; readable-rebuild verifies and restores exact text through decompress_text_readable.
+- Fixed DashboardApp command splitting on Windows so unquoted paths such as C:\Users\... keep backslashes instead of being mangled by POSIX shlex parsing.
+- Tightened compact Rich table padding so snapshot/launcher panes no longer run key/value text together.
+- Added a Textual dashboard regression that runs readable-compress, readable-query, and readable-rebuild through resolved Windows paths.
+- Verification: focused dashboard/textual tests passed (24 selected); full python -m pytest test_seam.py tools/history/test_history_tools.py passed 129 tests; compileall passed for dashboard/test files; cmd /c scripts\windows\launch_dashboard.bat --snapshot --no-clear and --help passed and showed the RC/1 dashboard commands.
+---END-ENTRY-#091---
+
+---BEGIN-ENTRY-#092---
+id: 092
+date: 2026-04-27T06:01:51Z
+agent: codex-gpt-5
+status: done
+topics: benchmark, diff, holdout, fixture, verify, roadmap, readme, ledger, status, history, snapshot
+commits: none
+refs: seam_runtime/benchmarks.py,seam_runtime/cli.py,seam_runtime/runtime.py,seam.py,test_seam.py,benchmarks/README.md,benchmarks/fixtures/holdout/README.md,benchmarks/runs/holdout/README.md,.gitignore,ROADMAP.md,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 091
+tokens: 202
+---
+Implemented benchmark diff tooling and publish-only holdout benchmark routing.
+- Added runtime/API support for diff_benchmark_runs plus CLI support for seam benchmark diff <run-a> <run-b>, accepting bundle paths or persisted run ids.
+- Diff verification checks both bundles, joins exact unchanged cases by case_hash, falls back to family::case_id for changed hashes, and reports per-case metric deltas with green/red/gray indicators plus added/removed/status summaries.
+- Added --holdout, --confirm-holdout, and --holdout-output-dir to benchmark run. Holdout runs are marked fixture_scope=holdout and publish_only=true, use only benchmarks/fixtures/holdout fixtures, and write default result bundles under benchmarks/runs/holdout.
+- Added ignored holdout fixture/result directories with README policy docs so private holdout JSON does not become routine development input.
+- Updated benchmark docs, ROADMAP C1/C2 status, PROJECT_STATUS, and REPO_LEDGER benchmark publication policy.
+- Verification: compileall passed for touched Python files; focused benchmark diff/holdout tests passed; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 133 tests; seam benchmark diff --help passed; unconfirmed holdout smoke fails closed and requires --confirm-holdout.
+---END-ENTRY-#092---
+
+---BEGIN-ENTRY-#093---
+id: 093
+date: 2026-04-27T06:03:41Z
+agent: codex-gpt-5
+status: done
+topics: benchmark, diff, holdout, verify, history, snapshot
+commits: none
+refs: seam_runtime/benchmarks.py,seam_runtime/cli.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 092
+tokens: 100
+---
+Closed the post-history benchmark export gap found during final verification.
+- Final full pytest pass after HISTORY#092 initially failed because seam_runtime.cli imported write_holdout_benchmark_bundle but seam_runtime.benchmarks did not expose the function in the current file state.
+- Restored write_holdout_benchmark_bundle in seam_runtime/benchmarks.py so holdout CLI default output writing resolves correctly.
+- Verification after the fix: compileall passed for seam.py, seam_runtime/benchmarks.py, seam_runtime/cli.py, seam_runtime/runtime.py, and test_seam.py; python seam.py benchmark diff --help passed; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 133 tests.
+---END-ENTRY-#093---
+
+---BEGIN-ENTRY-#094---
+id: 094
+date: 2026-04-27T09:26:17Z
+agent: codex-gpt-5
+status: done
+topics: command, verify, readme, roadmap, status, history, snapshot, pyproject, ledger
+commits: none
+refs: seam_runtime/server.py,seam_runtime/cli.py,seam_runtime/storage.py,test_seam.py,pyproject.toml,README.md,ROADMAP.md,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 093
+tokens: 232
+---
+Implemented the optional REST API surface and installed the server extra in the active Python environment.
+- Added seam_runtime/server.py with guarded FastAPI/Uvicorn imports, create_app(runtime=None), run_server(...), and main(argv=None); importing the module remains safe before the optional server extra is installed.
+- Added seam serve CLI wiring and the seam-server script entrypoint path; CLI args are passed directly to run_server instead of being re-parsed by a nested argparse flow.
+- Exposed /health, /stats, /compile, /compile-dsl, /search, /context, /lossless-compress, and /persist. Protected endpoints honor SEAM_API_TOKEN bearer auth; /health stays unauthenticated but rate-limited. Rate limiting is configured with SEAM_API_RATE_LIMIT_PER_MINUTE or SEAM_API_RATE_LIMIT.
+- Kept endpoint response shapes on existing runtime/report APIs: SearchResult.candidates, IRBatch.to_json(), PersistReport.to_dict(), Pack.to_dict(), and lossless benchmark to_dict().
+- Installed python -m pip install -e ".[server]" successfully; pip warned that generated scripts under C:\Users\iwana\AppData\Roaming\Python\Python314\Scripts are not on PATH.
+- Updated README REST setup/endpoint docs, ROADMAP E3 status, PROJECT_STATUS current/stable state, and REPO_LEDGER REST API policy.
+- Verification: compileall passed for seam_runtime/server.py, seam_runtime/cli.py, seam_runtime/storage.py, and test_seam.py; python seam.py serve --help passed; focused REST tests passed; full python -m pytest test_seam.py tools/history/test_history_tools.py passed 135 tests.
+---END-ENTRY-#094---

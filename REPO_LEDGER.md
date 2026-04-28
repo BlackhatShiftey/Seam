@@ -27,7 +27,7 @@ and `HISTORY_INDEX.md`.
 - Lossless claims require exact reconstruction and integrity checks.
 - SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
 - A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.
-- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA).
+- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, and separated from publish-only holdout runs.
 - Compatibility CLI aliases are acceptable during naming transitions.
 - Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
 - Cross-file duplication is disallowed; use pointer cards (`see HISTORY#NNN`).
@@ -97,6 +97,15 @@ and `HISTORY_INDEX.md`.
 - Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_real_adapters_guarded.ps1` for end-to-end real-adapter validation; it starts pgvector, runs guarded checks, and cleans up containers/artifacts on exit.
 - Archive benchmarks with `C:\Users\iwana\OneDrive\Documents\Codex\scripts\store_benchmark.ps1` to keep publication-required hashes and reproducibility metadata in Documents; outputs are sequence+time indexed and blocked from writing inside the git repo by default.
 
+## REST API Policy
+
+- The REST API is optional and installed with the `server` extra.
+- `seam serve` and `seam-server` run the FastAPI/Uvicorn surface against the configured SQLite database.
+- Protected endpoints require `Authorization: Bearer <token>` when `SEAM_API_TOKEN` is set; leave that variable unset only for trusted local development.
+- `/health` is unauthenticated for local service checks but still participates in the same rate limiter.
+- Rate limiting is configured by `SEAM_API_RATE_LIMIT_PER_MINUTE` or `SEAM_API_RATE_LIMIT`; `0` or unset disables the limiter.
+- API handlers must use existing `SeamRuntime` behavior and public report `to_dict()` methods rather than inventing parallel response fields.
+
 ## Benchmark Publication Policy
 
 Published benchmark statements must include:
@@ -107,3 +116,7 @@ Published benchmark statements must include:
 - fixture hashes
 - tokenizer/dependency state
 - git SHA
+- benchmark diff output comparing the claim run against its baseline
+- holdout result bundle when the statement is an external or publication claim
+
+Holdout benchmark fixtures live under `benchmarks/fixtures/holdout/` and are ignored by git by default. They must be run only with `seam benchmark run --holdout --confirm-holdout`, and default holdout result bundles are written separately under `benchmarks/runs/holdout/`.

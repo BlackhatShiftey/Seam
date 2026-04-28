@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from .benchmarks import run_benchmark_suite, verify_benchmark_bundle
+from .benchmarks import diff_benchmark_runs, run_benchmark_suite, verify_benchmark_bundle
 from .dsl import compile_dsl
 from .evals import run_retrieval_benchmark
 from .mirl import Artifact, IRBatch, Pack, PersistReport, ReconcileReport, SearchResult, TraceGraph, VerifyReport
@@ -135,6 +135,7 @@ class SeamRuntime:
         persist: bool = False,
         include_machine_text: bool = False,
         bundle_path: str | Path | None = None,
+        holdout: bool = False,
     ) -> dict[str, object]:
         return run_benchmark_suite(
             self,
@@ -144,10 +145,14 @@ class SeamRuntime:
             persist=persist,
             include_machine_text=include_machine_text,
             bundle_path=bundle_path,
+            holdout=holdout,
         )
 
     def verify_benchmark_bundle(self, bundle: str | Path | dict[str, object]) -> dict[str, object]:
         return verify_benchmark_bundle(bundle)
+
+    def diff_benchmark_runs(self, run_a: str | Path | dict[str, object], run_b: str | Path | dict[str, object]) -> dict[str, object]:
+        return diff_benchmark_runs(run_a, run_b)
 
     def read_benchmark_run(self, run_id: str) -> dict[str, object]:
         return self.store.read_benchmark_run(run_id)

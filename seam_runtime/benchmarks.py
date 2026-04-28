@@ -35,12 +35,15 @@ BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_cont
 
 BENCHMARK_ROOT = Path(__file__).resolve().parent.parent / "benchmarks"
 FIXTURE_ROOT = BENCHMARK_ROOT / "fixtures"
+HOLDOUT_FIXTURE_ROOT = FIXTURE_ROOT / "holdout"
+HOLDOUT_RUN_ROOT = BENCHMARK_ROOT / "runs" / "holdout"
 LOSSLESS_FIXTURE_PATH = FIXTURE_ROOT / "lossless_cases.json"
 READABLE_FIXTURE_PATH = FIXTURE_ROOT / "readable_cases.json"
 LONG_CONTEXT_FIXTURE_PATH = FIXTURE_ROOT / "long_context_cases.json"
 AGENT_TASK_FIXTURE_PATH = FIXTURE_ROOT / "agent_tasks.json"
 RETRIEVAL_FIXTURE_PATH = Path(__file__).resolve().parent.parent / "docs" / "retrieval_gold_fixtures.json"
 LOSSLESS_DEMO_PATH = Path(__file__).resolve().parent.parent / "tools" / "lossless_demo_input.txt"
+HOLDOUT_BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_context", "agent_tasks")
 
 
 def run_benchmark_suite(
@@ -51,9 +54,10 @@ def run_benchmark_suite(
     persist: bool = False,
     include_machine_text: bool = False,
     bundle_path: str | Path | None = None,
+    holdout: bool = False,
 ) -> dict[str, Any]:
-    selected_suites = list(BENCHMARK_SUITES) if suite == "all" else [_validate_suite_name(suite)]
-    run_id = f"bench:{uuid4().hex[:12]}"
+    selected_suites = _selected_suites(suite, holdout=holdout)
+    run_id = f"{'bench-holdout' if holdout else 'bench'}:{uuid4().hex[:12]}"
     family_reports: dict[str, dict[str, Any]] = {}
 
     for family in selected_suites:
@@ -64,6 +68,8 @@ def run_benchmark_suite(
                 min_token_savings=min_token_savings,
                 persist=persist,
                 include_machine_text=include_machine_text,
+                fixture_path=_holdout_fixture_path(LOSSLESS_FIXTURE_PATH) if holdout else LOSSLESS_FIXTURE_PATH,
+                require_fixture=holdout,
             )
             continue
         if family == "readable":
@@ -72,22 +78,42 @@ def run_benchmark_suite(
                 tokenizer=tokenizer,
                 persist=persist,
                 include_machine_text=include_machine_text,
+                fixture_path=_holdout_fixture_path(READABLE_FIXTURE_PATH) if holdout else READABLE_FIXTURE_PATH,
+                require_fixture=holdout,
             )
             continue
         if family == "retrieval":
-            family_reports[family] = _run_retrieval_family(runtime)
+            family_reports[family] = _run_retrieval_family(
+                runtime,
+                fixture_path=_holdout_fixture_path(RETRIEVAL_FIXTURE_PATH) if holdout else RETRIEVAL_FIXTURE_PATH,
+            )
             continue
         if family == "embedding":
-            family_reports[family] = _run_embedding_family(runtime)
+            family_reports[family] = _run_embedding_family(
+                runtime,
+                fixture_path=_holdout_fixture_path(RETRIEVAL_FIXTURE_PATH) if holdout else RETRIEVAL_FIXTURE_PATH,
+            )
             continue
         if family == "long_context":
-            family_reports[family] = _run_long_context_family(runtime, tokenizer=tokenizer, persist=persist)
+            family_reports[family] = _run_long_context_family(
+                runtime,
+                tokenizer=tokenizer,
+                persist=persist,
+                fixture_path=_holdout_fixture_path(LONG_CONTEXT_FIXTURE_PATH) if holdout else LONG_CONTEXT_FIXTURE_PATH,
+                require_fixture=holdout,
+            )
             continue
         if family == "persistence":
             family_reports[family] = _run_persistence_family(runtime, tokenizer=tokenizer)
             continue
         if family == "agent_tasks":
-            family_reports[family] = _run_agent_task_family(runtime, tokenizer=tokenizer, persist=persist)
+            family_reports[family] = _run_agent_task_family(
+                runtime,
+                tokenizer=tokenizer,
+                persist=persist,
+                fixture_path=_holdout_fixture_path(AGENT_TASK_FIXTURE_PATH) if holdout else AGENT_TASK_FIXTURE_PATH,
+                require_fixture=holdout,
+            )
             continue
 
     manifest = {
@@ -95,6 +121,8 @@ def run_benchmark_suite(
         "run_id": run_id,
         "requested_suite": suite,
         "executed_suites": selected_suites,
+        "fixture_scope": "holdout" if holdout else "public",
+        "publish_only": holdout,
         "created_at": _utc_now(),
         "git_sha": _git_sha(),
         "python": sys.version.split()[0],
@@ -107,7 +135,7 @@ def run_benchmark_suite(
             "chromadb": find_spec("chromadb") is not None,
             "tiktoken": find_spec("tiktoken") is not None,
         },
-        "dataset_hashes": _dataset_manifest(),
+        "dataset_hashes": _dataset_manifest(holdout=holdout),
     }
     summary = _build_suite_summary(family_reports)
     report = {
@@ -153,6 +181,119 @@ def verify_benchmark_bundle(bundle: str | Path | dict[str, Any]) -> dict[str, An
         "actual_bundle_hash": actual_bundle_hash,
         "case_checks": case_results,
     }
+
+
+def diff_benchmark_runs(run_a: str | Path | dict[str, Any], run_b: str | Path | dict[str, Any]) -> dict[str, Any]:
+    payload_a = _load_benchmark_payload(run_a)
+    payload_b = _load_benchmark_payload(run_b)
+    verification_a = verify_benchmark_bundle(payload_a)
+    verification_b = verify_benchmark_bundle(payload_b)
+    cases_a = _flatten_benchmark_cases(payload_a)
+    cases_b = _flatten_benchmark_cases(payload_b)
+
+    by_hash_a = {case["case_hash"]: case for case in cases_a if case.get("case_hash")}
+    by_hash_b = {case["case_hash"]: case for case in cases_b if case.get("case_hash")}
+    matched_hashes = sorted(set(by_hash_a) & set(by_hash_b))
+    compared: list[dict[str, Any]] = []
+    used_a: set[str] = set()
+    used_b: set[str] = set()
+
+    for case_hash in matched_hashes:
+        left = by_hash_a[case_hash]
+        right = by_hash_b[case_hash]
+        compared.append(_diff_case(left, right, join_key=case_hash, join_type="case_hash"))
+        used_a.add(left["identity"])
+        used_b.add(right["identity"])
+
+    identity_a = {case["identity"]: case for case in cases_a if case["identity"] not in used_a}
+    identity_b = {case["identity"]: case for case in cases_b if case["identity"] not in used_b}
+    for identity in sorted(set(identity_a) & set(identity_b)):
+        compared.append(_diff_case(identity_a[identity], identity_b[identity], join_key=identity, join_type="case_id"))
+        used_a.add(identity)
+        used_b.add(identity)
+
+    added = [case for case in cases_b if case["identity"] not in used_b]
+    removed = [case for case in cases_a if case["identity"] not in used_a]
+    metric_deltas = [delta for case in compared for delta in case["metric_deltas"]]
+    status_improvements = sum(1 for case in compared if case["status_delta"] == "improved")
+    status_regressions = sum(1 for case in compared if case["status_delta"] == "regressed")
+    metric_improvements = sum(1 for delta in metric_deltas if delta["indicator"] == "green")
+    metric_regressions = sum(1 for delta in metric_deltas if delta["indicator"] == "red")
+    summary = {
+        "status": "REGRESSED" if status_regressions or metric_regressions else "IMPROVED" if status_improvements or metric_improvements else "UNCHANGED",
+        "cases_a": len(cases_a),
+        "cases_b": len(cases_b),
+        "cases_compared": len(compared),
+        "exact_case_hash_matches": sum(1 for case in compared if case["join_type"] == "case_hash"),
+        "changed_case_matches": sum(1 for case in compared if case["join_type"] == "case_id"),
+        "added_cases": len(added),
+        "removed_cases": len(removed),
+        "status_improvements": status_improvements,
+        "status_regressions": status_regressions,
+        "metric_improvements": metric_improvements,
+        "metric_regressions": metric_regressions,
+        "bundle_hash_ok_a": verification_a["status"] == "PASS",
+        "bundle_hash_ok_b": verification_b["status"] == "PASS",
+    }
+    return {
+        "version": "SEAM-BENCH-DIFF/1",
+        "run_a": _run_ref(payload_a),
+        "run_b": _run_ref(payload_b),
+        "summary": summary,
+        "cases": compared,
+        "added_cases": [_case_ref(case) for case in added],
+        "removed_cases": [_case_ref(case) for case in removed],
+        "verification": {"run_a": verification_a, "run_b": verification_b},
+    }
+
+
+def render_benchmark_diff_pretty(payload: dict[str, Any]) -> str:
+    summary = payload.get("summary", {})
+    run_a = payload.get("run_a", {})
+    run_b = payload.get("run_b", {})
+    lines = [
+        f"SEAM benchmark diff: {summary.get('status')}",
+        f"Run A: {run_a.get('run_id')} ({run_a.get('bundle_hash')})",
+        f"Run B: {run_b.get('run_id')} ({run_b.get('bundle_hash')})",
+        f"Compared: {summary.get('cases_compared')} cases "
+        f"({summary.get('exact_case_hash_matches')} hash matches, {summary.get('changed_case_matches')} changed matches)",
+        f"Added/removed: {summary.get('added_cases')}/{summary.get('removed_cases')}",
+        f"Status: {summary.get('status_improvements')} improved, {summary.get('status_regressions')} regressed",
+        f"Metrics: {summary.get('metric_improvements')} green, {summary.get('metric_regressions')} red",
+        "",
+        "Case deltas:",
+    ]
+    for case in payload.get("cases", [])[:20]:
+        marker = _status_marker(case.get("status_delta"))
+        lines.append(
+            f"- {marker} {case.get('family')}::{case.get('case_id')} "
+            f"status={case.get('status_a')}->{case.get('status_b')} join={case.get('join_type')}"
+        )
+        for delta in case.get("metric_deltas", [])[:6]:
+            lines.append(
+                f"  [{delta['indicator']}] {delta['metric']}: {delta['a']} -> {delta['b']} "
+                f"({delta['delta']:+.6g})"
+            )
+    for case in payload.get("added_cases", [])[:10]:
+        lines.append(f"- [green] ADDED {case.get('family')}::{case.get('case_id')}")
+    for case in payload.get("removed_cases", [])[:10]:
+        lines.append(f"- [red] REMOVED {case.get('family')}::{case.get('case_id')}")
+    if len(lines) == 9:
+        lines.append("- no per-case deltas")
+    return "\n".join(lines)
+
+
+def write_holdout_benchmark_bundle(payload: dict[str, Any], output_dir: str | Path | None = None) -> Path:
+    manifest = payload.get("manifest", {})
+    if manifest.get("fixture_scope") != "holdout":
+        raise ValueError("write_holdout_benchmark_bundle only accepts holdout benchmark payloads")
+    run_id = str(manifest.get("run_id", f"bench-holdout:{uuid4().hex[:12]}")).replace(":", "_")
+    created = str(manifest.get("created_at", _utc_now())).replace(":", "").replace("-", "").replace("Z", "Z")
+    directory = Path(output_dir) if output_dir is not None else HOLDOUT_RUN_ROOT
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{created}_{run_id}.json"
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return path
 
 
 def render_benchmark_pretty(payload: dict[str, Any]) -> str:
@@ -206,9 +347,11 @@ def _run_lossless_family(
     min_token_savings: float,
     persist: bool,
     include_machine_text: bool,
+    fixture_path: Path = LOSSLESS_FIXTURE_PATH,
+    require_fixture: bool = False,
 ) -> dict[str, Any]:
     cases: list[dict[str, Any]] = []
-    for config in _load_json_fixture(LOSSLESS_FIXTURE_PATH, _default_lossless_cases()):
+    for config in _load_json_fixture(fixture_path, _default_lossless_cases(), require_exists=require_fixture):
         text = _resolve_lossless_text(config)
         result = benchmark_text_lossless(
             text,
@@ -265,9 +408,11 @@ def _run_readable_family(
     tokenizer: str,
     persist: bool,
     include_machine_text: bool,
+    fixture_path: Path = READABLE_FIXTURE_PATH,
+    require_fixture: bool = False,
 ) -> dict[str, Any]:
     cases: list[dict[str, Any]] = []
-    for config in _load_json_fixture(READABLE_FIXTURE_PATH, _default_readable_cases()):
+    for config in _load_json_fixture(fixture_path, _default_readable_cases(), require_exists=require_fixture):
         text = _resolve_lossless_text(config)
         artifact = compress_text_readable(
             text,
@@ -356,8 +501,11 @@ def _run_readable_family(
     }
 
 
-def _run_retrieval_family(runtime: "SeamRuntime") -> dict[str, Any]:
-    benchmark = run_retrieval_benchmark(embedding_model=runtime.embedding_model)
+def _run_retrieval_family(runtime: "SeamRuntime", fixture_path: Path = RETRIEVAL_FIXTURE_PATH) -> dict[str, Any]:
+    benchmark = run_retrieval_benchmark(
+        fixtures=default_retrieval_fixtures(fixture_path),
+        embedding_model=runtime.embedding_model,
+    )
     cases: list[dict[str, Any]] = []
     ndcg_scores: list[float] = []
     for fixture in benchmark["fixtures"]:
@@ -416,12 +564,12 @@ def _run_retrieval_family(runtime: "SeamRuntime") -> dict[str, Any]:
     }
 
 
-def _run_embedding_family(runtime: "SeamRuntime") -> dict[str, Any]:
+def _run_embedding_family(runtime: "SeamRuntime", fixture_path: Path = RETRIEVAL_FIXTURE_PATH) -> dict[str, Any]:
     model = runtime.embedding_model or HashEmbeddingModel()
     cases: list[dict[str, Any]] = []
     margins: list[float] = []
 
-    for fixture in default_retrieval_fixtures():
+    for fixture in default_retrieval_fixtures(fixture_path):
         batch = compile_dsl(fixture.source, scope="project")
         query_vector = model.embed(fixture.query)
         scores: dict[str, float] = {}
@@ -472,11 +620,17 @@ def _run_embedding_family(runtime: "SeamRuntime") -> dict[str, Any]:
         "improvement_loop": _unique_actions(case["improvement_loop"] for case in cases),
     }
 
-def _run_long_context_family(runtime: "SeamRuntime", tokenizer: str, persist: bool) -> dict[str, Any]:
+def _run_long_context_family(
+    runtime: "SeamRuntime",
+    tokenizer: str,
+    persist: bool,
+    fixture_path: Path = LONG_CONTEXT_FIXTURE_PATH,
+    require_fixture: bool = False,
+) -> dict[str, Any]:
     from experimental.retrieval_orchestrator import RetrievalOrchestrator
 
     cases: list[dict[str, Any]] = []
-    for config in _load_json_fixture(LONG_CONTEXT_FIXTURE_PATH, _default_long_context_cases()):
+    for config in _load_json_fixture(fixture_path, _default_long_context_cases(), require_exists=require_fixture):
         temp_runtime = runtime.__class__(Path(tempfile.gettempdir()) / f"seam-bench-long-{uuid4().hex}.db")
         batch = compile_dsl(_build_long_context_dsl(config), scope="project")
         temp_runtime.persist_ir(batch)
@@ -670,11 +824,17 @@ claim c2:
     }
 
 
-def _run_agent_task_family(runtime: "SeamRuntime", tokenizer: str, persist: bool) -> dict[str, Any]:
+def _run_agent_task_family(
+    runtime: "SeamRuntime",
+    tokenizer: str,
+    persist: bool,
+    fixture_path: Path = AGENT_TASK_FIXTURE_PATH,
+    require_fixture: bool = False,
+) -> dict[str, Any]:
     from experimental.retrieval_orchestrator import RetrievalOrchestrator
 
     cases: list[dict[str, Any]] = []
-    for config in _load_json_fixture(AGENT_TASK_FIXTURE_PATH, _default_agent_task_cases()):
+    for config in _load_json_fixture(fixture_path, _default_agent_task_cases(), require_exists=require_fixture):
         temp_runtime = runtime.__class__(Path(tempfile.gettempdir()) / f"seam-bench-agent-{uuid4().hex}.db")
         batch = compile_dsl(config["dsl"], scope="project")
         temp_runtime.persist_ir(batch)
@@ -812,8 +972,10 @@ def _aggregate_family_actions(family_reports: dict[str, dict[str, Any]]) -> list
     return actions
 
 
-def _load_json_fixture(path: Path, fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _load_json_fixture(path: Path, fallback: list[dict[str, Any]], require_exists: bool = False) -> list[dict[str, Any]]:
     if not path.exists():
+        if require_exists:
+            raise ValueError(f"Required benchmark fixture is missing: {path}")
         return fallback
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
@@ -996,12 +1158,57 @@ def _build_long_context_dsl(config: dict[str, Any]) -> str:
     return "\n".join(['entity project "SEAM" as p1', *claim_blocks])
 
 
-def _dataset_manifest() -> list[dict[str, str]]:
+def _dataset_manifest(holdout: bool = False) -> list[dict[str, str]]:
     items = []
-    for path in [LOSSLESS_FIXTURE_PATH, READABLE_FIXTURE_PATH, LONG_CONTEXT_FIXTURE_PATH, AGENT_TASK_FIXTURE_PATH, RETRIEVAL_FIXTURE_PATH, LOSSLESS_DEMO_PATH]:
+    paths = [LOSSLESS_FIXTURE_PATH, READABLE_FIXTURE_PATH, LONG_CONTEXT_FIXTURE_PATH, AGENT_TASK_FIXTURE_PATH, RETRIEVAL_FIXTURE_PATH, LOSSLESS_DEMO_PATH]
+    if holdout:
+        paths.extend(
+            [
+                _holdout_fixture_path(LOSSLESS_FIXTURE_PATH),
+                _holdout_fixture_path(READABLE_FIXTURE_PATH),
+                _holdout_fixture_path(LONG_CONTEXT_FIXTURE_PATH),
+                _holdout_fixture_path(AGENT_TASK_FIXTURE_PATH),
+                _holdout_fixture_path(RETRIEVAL_FIXTURE_PATH),
+            ]
+        )
+    for path in paths:
         if path.exists():
-            items.append({"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+            items.append({"path": str(path), "scope": "holdout" if HOLDOUT_FIXTURE_ROOT in path.parents else "public", "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     return items
+
+
+def _selected_suites(suite: str, holdout: bool) -> list[str]:
+    if not holdout:
+        return list(BENCHMARK_SUITES) if suite == "all" else [_validate_suite_name(suite)]
+    if suite != "all":
+        selected = _validate_suite_name(suite)
+        if selected not in HOLDOUT_BENCHMARK_SUITES:
+            raise ValueError(f"Benchmark suite does not have holdout fixtures: {selected}")
+        fixture = _fixture_for_family(selected, holdout=True)
+        if not fixture.exists():
+            raise ValueError(f"Holdout fixture not found for {selected}: {fixture}")
+        return [selected]
+    available = [family for family in HOLDOUT_BENCHMARK_SUITES if _fixture_for_family(family, holdout=True).exists()]
+    if not available:
+        raise ValueError(f"No holdout fixtures found under {HOLDOUT_FIXTURE_ROOT}")
+    return available
+
+
+def _fixture_for_family(family: str, holdout: bool) -> Path:
+    public_paths = {
+        "lossless": LOSSLESS_FIXTURE_PATH,
+        "readable": READABLE_FIXTURE_PATH,
+        "retrieval": RETRIEVAL_FIXTURE_PATH,
+        "embedding": RETRIEVAL_FIXTURE_PATH,
+        "long_context": LONG_CONTEXT_FIXTURE_PATH,
+        "agent_tasks": AGENT_TASK_FIXTURE_PATH,
+    }
+    path = public_paths[family]
+    return _holdout_fixture_path(path) if holdout else path
+
+
+def _holdout_fixture_path(public_path: Path) -> Path:
+    return HOLDOUT_FIXTURE_ROOT / public_path.name
 
 
 def _validate_suite_name(suite: str) -> str:
@@ -1020,6 +1227,131 @@ def _hash_payload(payload: dict[str, Any], ignore_key: str) -> str:
     normalized = {key: value for key, value in payload.items() if key != ignore_key}
     encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _load_benchmark_payload(source: str | Path | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(source, dict):
+        return dict(source)
+    path = Path(source)
+    if not path.exists():
+        raise ValueError(f"Benchmark bundle not found: {source}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _flatten_benchmark_cases(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    flattened: list[dict[str, Any]] = []
+    for family_name, family in payload.get("families", {}).items():
+        for case in family.get("cases", []):
+            case_id = str(case.get("case_id", "unknown"))
+            flattened.append(
+                {
+                    "identity": f"{family_name}::{case_id}",
+                    "family": family_name,
+                    "case_id": case_id,
+                    "case_hash": case.get("case_hash"),
+                    "status": case.get("status"),
+                    "metrics": dict(case.get("metrics", {})),
+                }
+            )
+    return flattened
+
+
+def _diff_case(left: dict[str, Any], right: dict[str, Any], join_key: str, join_type: str) -> dict[str, Any]:
+    metric_deltas = []
+    left_metrics = left.get("metrics", {})
+    right_metrics = right.get("metrics", {})
+    for metric in sorted(set(left_metrics) | set(right_metrics)):
+        if metric not in left_metrics or metric not in right_metrics:
+            continue
+        delta = _metric_delta(metric, left_metrics[metric], right_metrics[metric])
+        if delta is not None:
+            metric_deltas.append(delta)
+    return {
+        "family": right["family"],
+        "case_id": right["case_id"],
+        "join_key": join_key,
+        "join_type": join_type,
+        "case_hash_a": left.get("case_hash"),
+        "case_hash_b": right.get("case_hash"),
+        "case_hash_changed": left.get("case_hash") != right.get("case_hash"),
+        "status_a": left.get("status"),
+        "status_b": right.get("status"),
+        "status_delta": _status_delta(left.get("status"), right.get("status")),
+        "metric_deltas": metric_deltas,
+    }
+
+
+def _metric_delta(metric: str, left: Any, right: Any) -> dict[str, Any] | None:
+    left_number = _numeric_metric(left)
+    right_number = _numeric_metric(right)
+    if left_number is None or right_number is None:
+        return None
+    delta = right_number - left_number
+    if delta == 0:
+        indicator = "gray"
+    elif _lower_is_better(metric):
+        indicator = "green" if delta < 0 else "red"
+    else:
+        indicator = "green" if delta > 0 else "red"
+    return {
+        "metric": metric,
+        "a": left,
+        "b": right,
+        "delta": round(delta, 6),
+        "indicator": indicator,
+    }
+
+
+def _numeric_metric(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _lower_is_better(metric: str) -> bool:
+    lowered = metric.lower()
+    return any(term in lowered for term in ("error", "failure", "latency", "cost", "tokens", "bytes", "regression"))
+
+
+def _status_delta(left: Any, right: Any) -> str:
+    if left == right:
+        return "unchanged"
+    if left != "PASS" and right == "PASS":
+        return "improved"
+    if left == "PASS" and right != "PASS":
+        return "regressed"
+    return "changed"
+
+
+def _status_marker(status_delta: Any) -> str:
+    return {
+        "improved": "[green]",
+        "regressed": "[red]",
+        "changed": "[yellow]",
+        "unchanged": "[gray]",
+    }.get(str(status_delta), "[gray]")
+
+
+def _case_ref(case: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "family": case.get("family"),
+        "case_id": case.get("case_id"),
+        "case_hash": case.get("case_hash"),
+        "status": case.get("status"),
+    }
+
+
+def _run_ref(payload: dict[str, Any]) -> dict[str, Any]:
+    manifest = payload.get("manifest", {})
+    return {
+        "run_id": manifest.get("run_id"),
+        "created_at": manifest.get("created_at"),
+        "fixture_scope": manifest.get("fixture_scope", "public"),
+        "executed_suites": manifest.get("executed_suites", []),
+        "bundle_hash": payload.get("bundle_hash"),
+    }
 
 
 def _lossless_actions(result, case_id: str) -> list[str]:

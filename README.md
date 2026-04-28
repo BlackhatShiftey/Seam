@@ -59,6 +59,7 @@ In other words, SEAM is meant to help an agent use fewer tokens against its own 
 - record bundle hashes, case hashes, fixture hashes, improvement-loop actions, and persisted benchmark history
 - run a lossless `SEAM-LX/1` benchmark that only passes on exact reconstruction
 - show runtime state and benchmark loops in a terminal dashboard
+- expose compile, search, context, stats, and health checks through an optional REST API
 
 ## Bare Checkout Setup
 
@@ -229,7 +230,8 @@ Optional extras:
 
 - `pgvector` for PostgreSQL pgvector backend
 - `sbert` for sentence-transformer embeddings
-- `all-extras` for both
+- `server` for the FastAPI/Uvicorn REST API
+- `all-extras` for dashboard, pgvector, sbert, and server extras
 
 ## Quick Start
 
@@ -277,6 +279,41 @@ Dashboard chat can use OpenRouter or any OpenAI-compatible backend through
 `SEAM_CHAT_BASE_URL`, `SEAM_CHAT_API_KEY`, `SEAM_CHAT_MODEL`, and
 `SEAM_CHAT_MODELS`. Copy/paste setup and model switching commands for Windows
 and Linux/WSL2 live in `docs/setup.md`.
+
+### 4. Run the REST API
+
+Install the server extra:
+
+```powershell
+python -m pip install -e ".[server]"
+```
+
+Start the local API:
+
+```powershell
+python seam.py serve --host 127.0.0.1 --port 8765
+```
+
+Useful endpoints:
+
+- `GET /health` - unauthenticated health check, still subject to rate limiting
+- `GET /stats` - SQLite runtime counts
+- `POST /compile` - compile natural language, optionally persist with `"persist": true`
+- `POST /compile-dsl` - compile SEAM DSL, optionally persist
+- `GET /search?query=durable+memory&budget=5` - search persisted MIRL
+- `POST /context` - search and return a PACK for agent context
+- `POST /lossless-compress` - run lossless benchmark compression and return the report
+- `POST /persist` - persist MIRL records
+
+Protected endpoints use `SEAM_API_TOKEN` when it is set:
+
+```powershell
+$env:SEAM_API_TOKEN = "<local-token>"
+$env:SEAM_API_RATE_LIMIT_PER_MINUTE = "120"
+```
+
+Send protected requests with `Authorization: Bearer <local-token>`. Leave
+`SEAM_API_TOKEN` unset only for trusted local development.
 
 ## Benchmark Glassbox
 

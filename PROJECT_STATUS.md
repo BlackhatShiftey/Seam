@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-04-26
+Last updated: 2026-04-27
 
 ## Current State
 
@@ -10,6 +10,8 @@ SEAM is operating as a local machine-first memory runtime with:
 - Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, and independently scrollable panes
 - Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - lossless SEAM-LX/1 compression with integrity verification
+- benchmark diff tooling plus publish-only holdout fixture routing
+- optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
 - PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
 
@@ -21,7 +23,8 @@ SEAM is operating as a local machine-first memory runtime with:
 - Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `SEAM_LOCAL_ENV` or a private Documents `SEAM\local\.env`
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
 - Dashboard snapshot/smoke-test behavior
-- Benchmark bundle verification workflow
+- Benchmark bundle verification, diff, and holdout workflow
+- REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
 - Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
 - Token-bounded context loading via history snapshots and `tools.history.build_context_pack`
@@ -36,7 +39,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Keep roadmap execution tied to history entries and supersedes chains
 - Continue feature delivery without reintroducing duplicated continuity text
 - Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
-- Roadmap planned items (#028–#047) are open: dashboard animations, benchmark progress bars, sparkline graphs, command terminology audit, holdout suites, benchmark diff, BEIR/MTEB benchmarks, Claude tool set, auto-compression pipeline, batch compile, PgVector migration helper, multi-tenant namespacing, REST API surface
+- Roadmap planned items (#028–#047) are open except benchmark holdout suites (#036/C1), benchmark diff tooling (#037/C2), and REST API surface (#046/E3), which are implemented: dashboard animations, benchmark progress bars, sparkline graphs, command terminology audit, BEIR/MTEB benchmarks, Claude tool set, auto-compression pipeline, batch compile, PgVector migration helper, multi-tenant namespacing
 
 ## Operational Baseline
 
@@ -44,6 +47,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Use `scripts/run_real_adapters_guarded.ps1` for end-to-end real adapter checks.
 - Use `scripts/run_guarded.ps1` for heavy local commands where CPU/RAM/disk guardrails are needed.
 - Use `scripts/store_benchmark.ps1` to archive benchmark runs under Documents with sequence+time folders, run index, and publication metadata/hashes.
+- Use `seam benchmark diff <run-a> <run-b>` before claiming a benchmark improvement, and `seam benchmark run --holdout --confirm-holdout` only for publish-time audits.
 - Use `python -m tools.history.build_context_pack --topics <tags> --latest <n> --token-budget <budget>` for bounded task context.
 - Use `python -m tools.history.verify_continuity` before ending a changed session.
 - Use `python -m tools.history.verify_routing` after changing data classifications or ledgers.

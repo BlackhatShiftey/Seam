@@ -9,7 +9,13 @@ from importlib.util import find_spec
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
-from .benchmarks import BENCHMARK_SUITES, render_benchmark_pretty, render_benchmark_verification_pretty
+from .benchmarks import (
+    BENCHMARK_SUITES,
+    render_benchmark_diff_pretty,
+    render_benchmark_pretty,
+    render_benchmark_verification_pretty,
+    write_holdout_benchmark_bundle,
+)
 from .context_views import CONTEXT_VIEWS, build_context_payload, render_context_pretty
 from .dashboard import run_dashboard
 from .installer import default_runtime_db_path
@@ -111,6 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_run_parser.add_argument("--min-savings", type=float, default=0.30)
     benchmark_run_parser.add_argument("--persist", action="store_true")
     benchmark_run_parser.add_argument("--output")
+    benchmark_run_parser.add_argument("--holdout", action="store_true", help="Run publish-only holdout fixtures from benchmarks/fixtures/holdout")
+    benchmark_run_parser.add_argument("--confirm-holdout", action="store_true", help="Confirm intentional publish-only holdout execution")
+    benchmark_run_parser.add_argument("--holdout-output-dir", help="Directory for default holdout result bundles")
     benchmark_run_parser.add_argument("--include-machine-text", action="store_true")
     benchmark_run_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
@@ -121,6 +130,11 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_verify_parser = benchmark_subparsers.add_parser("verify", help="Verify a benchmark bundle hash and case hashes")
     benchmark_verify_parser.add_argument("bundle")
     benchmark_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_diff_parser = benchmark_subparsers.add_parser("diff", help="Compare two benchmark bundles or persisted run ids")
+    benchmark_diff_parser.add_argument("run_a")
+    benchmark_diff_parser.add_argument("run_b")
+    benchmark_diff_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     compile_nl_parser = subparsers.add_parser("compile-nl", aliases=["remember"], help="Compile natural language into MIRL and persist (use --no-persist to skip storing)")
     compile_nl_parser.add_argument("text")
@@ -187,6 +201,12 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     dashboard_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     dashboard_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
+
+    serve_parser = subparsers.add_parser("serve", help="Run the SEAM REST API server")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--reload", action="store_true")
+    serve_parser.add_argument("--workers", type=int, default=1)
 
     pack_parser = subparsers.add_parser("pack", help="Build a pack from persisted record ids")
     pack_parser.add_argument("record_ids")
@@ -391,6 +411,12 @@ def run_cli(argv: list[str] | None = None) -> None:
         print(_render_lx1_benchmark_pretty(report))
         return
 
+    if args.command == "serve":
+        from .server import run_server
+
+        run_server(host=args.host, port=args.port, db=args.db, reload=args.reload, workers=args.workers)
+        return
+
     runtime = SeamRuntime(args.db)
 
     if args.command == "ingest":
@@ -524,6 +550,8 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command == "benchmark":
         if args.benchmark_command == "run":
+            if args.holdout and not args.confirm_holdout:
+                _confirm_holdout_run()
             payload = runtime.run_benchmark_suite(
                 suite=args.suite,
                 tokenizer=args.tokenizer,
@@ -531,11 +559,17 @@ def run_cli(argv: list[str] | None = None) -> None:
                 persist=args.persist,
                 include_machine_text=args.include_machine_text,
                 bundle_path=args.output,
+                holdout=args.holdout,
             )
+            holdout_output = None
+            if args.holdout and args.output is None:
+                holdout_output = write_holdout_benchmark_bundle(payload, args.holdout_output_dir)
             if args.format == "json":
                 print(json.dumps(payload, indent=2))
                 return
             print(render_benchmark_pretty(payload))
+            if holdout_output is not None:
+                print(f"\nHoldout bundle: {holdout_output}")
             return
         if args.benchmark_command == "show":
             if args.run_id == "latest":
@@ -560,12 +594,51 @@ def run_cli(argv: list[str] | None = None) -> None:
                 return
             print(render_benchmark_verification_pretty(payload))
             return
+        if args.benchmark_command == "diff":
+            run_a = _resolve_benchmark_ref(runtime, args.run_a)
+            run_b = _resolve_benchmark_ref(runtime, args.run_b)
+            payload = runtime.diff_benchmark_runs(run_a, run_b)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_benchmark_diff_pretty(payload))
+            return
 
         print(json.dumps(runtime.run_retrieval_benchmark(), indent=2))
 
 
 def _split_ids(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def _confirm_holdout_run() -> None:
+    message = (
+        "Holdout benchmark runs are publish-only and should not be used for routine tuning. "
+        "Type RUN HOLDOUT to continue: "
+    )
+    if not sys.stdin.isatty():
+        raise SystemExit("Holdout benchmark requires --confirm-holdout in non-interactive shells.")
+    try:
+        response = input(message).strip()
+    except EOFError as exc:
+        raise SystemExit("Holdout benchmark requires --confirm-holdout in non-interactive shells.") from exc
+    if response != "RUN HOLDOUT":
+        raise SystemExit("Holdout benchmark cancelled.")
+
+
+def _resolve_benchmark_ref(runtime: SeamRuntime, value: str) -> str | dict[str, object]:
+    if value == "latest":
+        runs = runtime.list_benchmark_runs(limit=1)
+        if not runs:
+            raise SystemExit("No benchmark runs have been persisted yet.")
+        value = str(runs[0]["run_id"])
+    path = Path(value)
+    if path.exists():
+        return value
+    payload = runtime.read_benchmark_run(value)
+    if not payload:
+        raise SystemExit(f"Benchmark bundle or persisted run not found: {value}")
+    return payload
 
 
 def _read_text_source(source: str) -> str:

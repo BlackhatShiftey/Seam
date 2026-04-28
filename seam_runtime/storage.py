@@ -155,6 +155,25 @@ class SQLiteStore:
             )
             connection.commit()
 
+    def get_stats(self) -> dict[str, object]:
+        with closing(self._connect()) as connection:
+            total_records = connection.execute("select count(*) from ir_records").fetchone()[0]
+            vector_entries = connection.execute("select count(*) from vector_index").fetchone()[0]
+            pack_entries = connection.execute("select count(*) from pack_store").fetchone()[0]
+            namespaces = connection.execute("select count(distinct ns) from ir_records").fetchone()[0]
+            scopes = connection.execute("select count(distinct scope) from ir_records").fetchone()[0]
+            benchmark_runs = connection.execute("select count(*) from benchmark_runs").fetchone()[0]
+            machine_artifacts = connection.execute("select count(*) from machine_artifacts").fetchone()[0]
+        return {
+            "total_records": total_records,
+            "vector_entries": vector_entries,
+            "pack_entries": pack_entries,
+            "namespaces": namespaces,
+            "scopes": scopes,
+            "benchmark_runs": benchmark_runs,
+            "machine_artifacts": machine_artifacts,
+        }
+
     def persist_ir(self, batch: IRBatch) -> PersistReport:
         with closing(self._connect()) as connection:
             for record in batch.records:

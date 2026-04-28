@@ -14,6 +14,7 @@ from experimental.retrieval_orchestrator import ChromaSemanticAdapter, QueryInte
 from experimental.retrieval_orchestrator.adapters import SQLiteIRAdapter
 from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
+from seam_runtime import benchmarks as benchmark_module
 from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import DEFAULT_CHAT_MODELS, SeamChatClient, TextualDashboardApp, run_dashboard
 from seam_runtime.installer import (
@@ -53,6 +54,11 @@ try:
     from rich.console import Console
 except ImportError:  # pragma: no cover - optional at import time
     Console = None
+
+try:
+    from fastapi.testclient import TestClient
+except ImportError:  # pragma: no cover - optional server extra
+    TestClient = None
 
 
 class SeamTests(unittest.TestCase):
@@ -111,6 +117,56 @@ claim c1:
         node_ids = {node.id for node in trace.nodes}
         self.assertIn("prov:compile:1", node_ids)
         self.assertIn("span:1", node_ids)
+
+    @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
+    def test_rest_api_compile_search_context_stats_and_auth(self) -> None:
+        from seam_runtime.server import create_app
+
+        runtime = SeamRuntime(self.db_path)
+        with patch.dict(os.environ, {"SEAM_API_TOKEN": "test-token"}, clear=False):
+            client = TestClient(create_app(runtime))
+
+        self.assertEqual(client.get("/health").json()["status"], "ok")
+        self.assertEqual(client.get("/stats").status_code, 401)
+
+        headers = {"Authorization": "Bearer test-token"}
+        compile_response = client.post(
+            "/compile",
+            json={"text": "SEAM stores durable memory for agent retrieval.", "persist": True},
+            headers=headers,
+        )
+        self.assertEqual(compile_response.status_code, 200)
+        self.assertTrue(compile_response.json()["records"])
+        self.assertTrue(compile_response.json()["persist"]["stored_ids"])
+
+        search_response = client.get("/search", params={"query": "durable memory", "budget": 3}, headers=headers)
+        self.assertEqual(search_response.status_code, 200)
+        self.assertTrue(search_response.json()["candidates"])
+
+        context_response = client.post("/context", json={"query": "agent retrieval", "budget": 3}, headers=headers)
+        self.assertEqual(context_response.status_code, 200)
+        self.assertIn("pack", context_response.json())
+
+        stats_response = client.get("/stats", headers=headers)
+        self.assertEqual(stats_response.status_code, 200)
+        self.assertGreater(stats_response.json()["total_records"], 0)
+
+    @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
+    def test_rest_api_rate_limits_health_and_protected_endpoints(self) -> None:
+        from seam_runtime.server import create_app
+
+        runtime = SeamRuntime(self.db_path)
+        with patch.dict(os.environ, {"SEAM_API_TOKEN": "test-token", "SEAM_API_RATE_LIMIT_PER_MINUTE": "1"}, clear=False):
+            client = TestClient(create_app(runtime))
+
+        first = client.get("/health")
+        second = client.get("/health")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+
+        headers = {"Authorization": "Bearer another-test-token"}
+        limited = client.get("/stats", headers=headers)
+        self.assertEqual(limited.status_code, 401)
 
     def test_vector_index_reindex_and_search(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -640,6 +696,84 @@ claim c2:
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_text_exact_rate"], 1.0)
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_read_equivalence_rate"], 1.0)
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_query_exactness_rate"], 1.0)
+
+    def test_benchmark_diff_compares_case_deltas(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        before = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx")
+        after = json.loads(json.dumps(before))
+        case = after["families"]["lossless"]["cases"][0]
+        case["metrics"]["token_savings_ratio"] = round(case["metrics"]["token_savings_ratio"] + 0.05, 6)
+        after["families"]["lossless"]["cases"][0] = benchmark_module._stamp_case_hash(case)
+        after["summary"] = benchmark_module._build_suite_summary(after["families"])
+        after["bundle_hash"] = benchmark_module._hash_payload(after, "bundle_hash")
+
+        diff = runtime.diff_benchmark_runs(before, after)
+        self.assertEqual(diff["summary"]["cases_compared"], before["summary"]["case_count"])
+        self.assertEqual(diff["summary"]["changed_case_matches"], 1)
+        changed = [item for item in diff["cases"] if item["case_hash_changed"]]
+        self.assertEqual(len(changed), 1)
+        savings_delta = [item for item in changed[0]["metric_deltas"] if item["metric"] == "token_savings_ratio"][0]
+        self.assertEqual(savings_delta["indicator"], "green")
+
+    def test_cli_benchmark_diff_json_accepts_bundle_paths(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        first_path = Path(f"benchmark_diff_a_{uuid4().hex}.json")
+        second_path = Path(f"benchmark_diff_b_{uuid4().hex}.json")
+        try:
+            first = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx", bundle_path=first_path)
+            second = json.loads(json.dumps(first))
+            second["families"]["lossless"]["cases"][0]["status"] = "FAIL"
+            second["families"]["lossless"]["cases"][0] = benchmark_module._stamp_case_hash(second["families"]["lossless"]["cases"][0])
+            second["summary"] = benchmark_module._build_suite_summary(second["families"])
+            second["bundle_hash"] = benchmark_module._hash_payload(second, "bundle_hash")
+            second_path.write_text(json.dumps(second, indent=2), encoding="utf-8")
+
+            stream = StringIO()
+            with redirect_stdout(stream):
+                run_cli(["--db", str(self.db_path), "benchmark", "diff", str(first_path), str(second_path), "--format", "json"])
+            payload = json.loads(stream.getvalue())
+            self.assertEqual(payload["summary"]["status_regressions"], 1)
+            self.assertEqual(payload["summary"]["status"], "REGRESSED")
+        finally:
+            for path in (first_path, second_path):
+                if path.exists():
+                    path.unlink()
+
+    def test_cli_benchmark_holdout_requires_confirmation(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            run_cli(["benchmark", "run", "lossless", "--holdout", "--format", "json"])
+        self.assertIn("--confirm-holdout", str(raised.exception))
+
+    def test_cli_benchmark_holdout_uses_private_fixture_and_separate_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="seam-holdout-fixtures-") as fixture_dir, tempfile.TemporaryDirectory(
+            prefix="seam-holdout-runs-"
+        ) as run_dir:
+            fixture_root = Path(fixture_dir)
+            run_root = Path(run_dir)
+            (fixture_root / "lossless_cases.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "name": "private_lossless_repeat",
+                            "text": "Holdout compression phrase stays hidden during tuning.\n" * 24,
+                            "min_token_savings": 0.30,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with patch.object(benchmark_module, "HOLDOUT_FIXTURE_ROOT", fixture_root), patch.object(
+                benchmark_module, "HOLDOUT_RUN_ROOT", run_root
+            ):
+                stream = StringIO()
+                with redirect_stdout(stream):
+                    run_cli(["benchmark", "run", "lossless", "--holdout", "--confirm-holdout", "--tokenizer", "char4_approx", "--format", "json"])
+                payload = json.loads(stream.getvalue())
+                self.assertEqual(payload["manifest"]["fixture_scope"], "holdout")
+                self.assertTrue(payload["manifest"]["publish_only"])
+                self.assertEqual(payload["manifest"]["executed_suites"], ["lossless"])
+                self.assertEqual(payload["families"]["lossless"]["cases"][0]["case_id"], "private_lossless_repeat")
+                self.assertTrue(list(run_root.glob("*.json")))
 
     def test_runtime_benchmark_verifier_flags_tampered_bundle(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -1276,6 +1410,44 @@ claim c2:
                 self.assertRegex(history, r"\(\d+ms\)|\(\d+\.\d+s\)")
 
         asyncio.run(_check())
+
+    def test_textual_dashboard_routes_readable_rc1_commands(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        source_path = Path(f"dashboard_readable_{uuid4().hex}.txt")
+        rc_path = Path(f"dashboard_readable_{uuid4().hex}.seamrc")
+        try:
+            source_path.write_text(
+                'Recipe: Lemon Rice\nYield: 2 bowls\nNote: "Toast the rice before adding broth."\n',
+                encoding="utf-8",
+            )
+            runtime = SeamRuntime(self.db_path)
+            app = TextualDashboardApp(runtime)
+
+            async def _check() -> None:
+                async with app.run_test() as pilot:
+                    await pilot.pause()
+                    app.process_command(f"!readable-compress {source_path.resolve()} --granularity line")
+                    await pilot.pause()
+                    self.assertEqual(app.controller.result_title, "Readable Compress")
+                    rc_path.write_text(str(app.controller.last_machine_text), encoding="utf-8")
+
+                    app.process_command(f"!readable-query {rc_path.resolve()} Toast rice --limit 3")
+                    await pilot.pause()
+                    self.assertEqual(app.controller.result_title, "Readable Query")
+                    self.assertIn("Toast the rice", "\n".join(app.benchmark_lines))
+
+                    app.process_command(f"!readable-rebuild {rc_path.resolve()}")
+                    await pilot.pause()
+                    self.assertEqual(app.controller.result_title, "Readable Rebuild")
+                    self.assertIn("Recipe: Lemon Rice", "\n".join(app.benchmark_lines))
+
+            asyncio.run(_check())
+        finally:
+            if source_path.exists():
+                source_path.unlink()
+            if rc_path.exists():
+                rc_path.unlink()
 
 class InstallerLinuxTests(unittest.TestCase):
     def test_posix_shim_has_valid_sh_structure(self) -> None:

@@ -103,13 +103,13 @@ def main() -> None:
 
 def benchmark_main() -> None:
     argv = sys.argv[1:]
-    if argv and argv[0] not in {"run", "show", "verify", "-h", "--help"} and Path(argv[0]).exists():
+    if argv and argv[0] not in {"run", "show", "verify", "diff", "-h", "--help"} and Path(argv[0]).exists():
         run_cli(["lossless-benchmark", *argv])
         return
     if not argv:
         run_cli(["benchmark", "run"])
         return
-    if argv[0] in {"run", "show", "verify"}:
+    if argv[0] in {"run", "show", "verify", "diff"}:
         run_cli(["benchmark", *argv])
         return
     run_cli(["benchmark", "run", *argv])

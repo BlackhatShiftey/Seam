@@ -43,7 +43,18 @@ except ImportError as exc:  # pragma: no cover - optional dashboard path
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
 
 from .context_views import CONTEXT_VIEWS, build_context_payload
-from .lossless import LOSSLESS_CODECS, LOSSLESS_TRANSFORMS, TOKENIZER_CHOICES, benchmark_text_lossless, compress_text_lossless, decompress_text_lossless
+from .lossless import (
+    LOSSLESS_CODECS,
+    LOSSLESS_TRANSFORMS,
+    READABLE_GRANULARITIES,
+    TOKENIZER_CHOICES,
+    benchmark_text_lossless,
+    compress_text_lossless,
+    compress_text_readable,
+    decompress_text_lossless,
+    decompress_text_readable,
+    query_readable_compressed,
+)
 from .mirl import IRBatch
 from .models import HashEmbeddingModel
 from .runtime import SeamRuntime
@@ -411,6 +422,11 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 "benchmark",
                 "compress-doc",
                 "lossless-compress",
+                "readable-compress",
+                "compress-readable",
+                "readable-query",
+                "query-compressed",
+                "readable-rebuild",
                 "decompress-doc",
                 "lossless-decompress",
                 "decompress-last",
@@ -577,6 +593,9 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 CommandPaletteItem("/", "stats", "/stats", "refresh runtime metrics"),
                 CommandPaletteItem("/", "benchmark", "/benchmark ", "run lossless/retrieval benchmark"),
                 CommandPaletteItem("/", "compress-doc", "/compress-doc ", "compress a source document"),
+                CommandPaletteItem("/", "readable-compress", "/readable-compress ", "build readable SEAM-RC/1 language"),
+                CommandPaletteItem("/", "readable-query", "/readable-query ", "query SEAM-RC/1 without rebuilding source"),
+                CommandPaletteItem("/", "readable-rebuild", "/readable-rebuild ", "verify and rebuild SEAM-RC/1 text"),
                 CommandPaletteItem("/", "decompress-doc", "/decompress-doc ", "decompress a source artifact"),
                 CommandPaletteItem("/", "decompress-last", "/decompress-last", "decompress last compressed artifact"),
                 CommandPaletteItem("/", "tab runtime", "/tab runtime", "switch to runtime view"),
@@ -1023,12 +1042,24 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 if tabs:
                     tabs.active = "tab-retrieval"
                 return
-            if token in {"benchmark", "compress-doc", "lossless-compress", "decompress-doc", "lossless-decompress", "decompress-last"}:
+            if token in {
+                "benchmark",
+                "compress-doc",
+                "lossless-compress",
+                "readable-compress",
+                "compress-readable",
+                "readable-query",
+                "query-compressed",
+                "readable-rebuild",
+                "decompress-doc",
+                "lossless-decompress",
+                "decompress-last",
+            }:
                 self.benchmark_lines.extend([f"{title}: {command}", body, ""])
                 self.query_one("#benchmark-panel", _TextualPanel).set_lines(self.benchmark_lines)
                 if tabs:
                     tabs.active = "tab-benchmarks"
-                if token in {"benchmark", "compress-doc", "lossless-compress"}:
+                if token in {"benchmark", "compress-doc", "lossless-compress", "readable-compress", "compress-readable"}:
                     self._trigger_mirl_animation(token, body)
             if token == "tab":
                 self._record_command("state", f"active tab => {self.controller.active_tab}")
@@ -1282,10 +1313,10 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 artifact = self.controller.last_benchmark_payload.get("artifact", {})
                 source_tokens = int(artifact.get("source_tokens", 0) or 0)
                 machine_tokens = int(artifact.get("machine_tokens", 0) or 0)
-            elif token in {"compress-doc", "lossless-compress"}:
+            elif token in {"compress-doc", "lossless-compress", "readable-compress", "compress-readable"}:
                 try:
                     payload = json.loads(self.controller.result_body)
-                    source_tokens = int(payload.get("source_tokens", 0) or 0)
+                    source_tokens = int(payload.get("source_tokens", payload.get("original_tokens", 0)) or 0)
                     machine_tokens = int(payload.get("machine_tokens", 0) or 0)
                 except Exception:
                     pass
@@ -1444,6 +1475,20 @@ class DashboardApp:
         compress_parser.add_argument("--transform", choices=["auto", *LOSSLESS_TRANSFORMS], default="auto")
         compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
 
+        readable_compress_parser = subparsers.add_parser("readable-compress", add_help=False, aliases=["compress-readable"])
+        readable_compress_parser.add_argument("source")
+        readable_compress_parser.add_argument("--source-ref")
+        readable_compress_parser.add_argument("--granularity", choices=READABLE_GRANULARITIES, default="auto")
+        readable_compress_parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, default="auto")
+
+        readable_query_parser = subparsers.add_parser("readable-query", add_help=False, aliases=["query-compressed"])
+        readable_query_parser.add_argument("source")
+        readable_query_parser.add_argument("query", nargs="+")
+        readable_query_parser.add_argument("--limit", type=int, default=5)
+
+        readable_rebuild_parser = subparsers.add_parser("readable-rebuild", add_help=False)
+        readable_rebuild_parser.add_argument("source")
+
         decompress_parser = subparsers.add_parser("decompress-doc", add_help=False, aliases=["lossless-decompress"])
         decompress_parser.add_argument("source")
 
@@ -1482,7 +1527,7 @@ class DashboardApp:
 
         self.last_command = command
         try:
-            args = self.command_parser.parse_args(shlex.split(command))
+            args = self.command_parser.parse_args(self._split_command(command))
         except ValueError as exc:
             self._fail("Command Error", str(exc))
             return False
@@ -1609,6 +1654,34 @@ class DashboardApp:
                 self._succeed("Compress Doc", artifact, "Built lossless machine text.")
                 return False
 
+            if args.command in {"readable-compress", "compress-readable"}:
+                artifact = compress_text_readable(
+                    self._read_text_source(args.source),
+                    source_ref=args.source_ref or str(args.source),
+                    granularity=args.granularity,
+                    tokenizer=args.tokenizer,
+                ).to_dict(include_machine_text=True)
+                self.last_machine_text = str(artifact.get("machine_text", ""))
+                self.active_tab = "benchmark"
+                self._succeed("Readable Compress", artifact, "Built directly readable SEAM-RC/1 machine language.")
+                return False
+
+            if args.command in {"readable-query", "query-compressed"}:
+                result = query_readable_compressed(
+                    self._read_text_source(args.source),
+                    " ".join(args.query),
+                    limit=args.limit,
+                ).to_dict()
+                self.active_tab = "benchmark"
+                self._succeed("Readable Query", result, "Queried SEAM-RC/1 without rebuilding source text.")
+                return False
+
+            if args.command == "readable-rebuild":
+                text = decompress_text_readable(self._read_text_source(args.source))
+                self.active_tab = "benchmark"
+                self._succeed("Readable Rebuild", text, "Verified and rebuilt exact text from SEAM-RC/1.")
+                return False
+
             if args.command in {"decompress-doc", "lossless-decompress"}:
                 text = decompress_text_lossless(self._read_text_source(args.source))
                 self.active_tab = "benchmark"
@@ -1676,15 +1749,15 @@ class DashboardApp:
 
     def _build_runtime_panels(self, metrics: DashboardMetrics):
         pgvector_status = "[green]configured[/green]" if metrics.pgvector_configured else "[dim]not set[/dim]"
-        runtime_table = Table.grid(expand=True)
-        runtime_table.add_column(ratio=1)
+        runtime_table = Table.grid(expand=True, padding=(0, 1))
+        runtime_table.add_column(no_wrap=True)
         runtime_table.add_column(ratio=1)
         runtime_table.add_row("Execution Mode", metrics.execution_mode)
         runtime_table.add_row("Embedding Model", metrics.model_name)
         runtime_table.add_row("Vector Adapter", metrics.vector_adapter_name)
         runtime_table.add_row("PgVector DSN", pgvector_status)
 
-        storage_table = Table.grid(expand=True)
+        storage_table = Table.grid(expand=True, padding=(0, 1))
         storage_table.add_column(ratio=1)
         storage_table.add_column(justify="right")
         storage_table.add_row("DB Size", metrics.db_size)
@@ -1697,7 +1770,7 @@ class DashboardApp:
         storage_table.add_row("Raw Docs", str(metrics.raw_entries))
         storage_table.add_row("Namespaces / Scopes", f"{metrics.namespaces} / {metrics.scopes}")
 
-        kinds_table = Table.grid(expand=True)
+        kinds_table = Table.grid(expand=True, padding=(0, 1))
         kinds_table.add_column(ratio=1)
         kinds_table.add_column(justify="right")
         for kind, count in metrics.top_kinds:
@@ -1749,7 +1822,7 @@ class DashboardApp:
 
     def _build_result_body(self):
         lines = self.result_body.splitlines() or ["(no output)"]
-        table = Table.grid(expand=True)
+        table = Table.grid(expand=True, padding=(0, 1))
         table.add_column(ratio=1)
         for line in lines[:28]:
             table.add_row(Text(line))
@@ -1758,7 +1831,7 @@ class DashboardApp:
         return table
 
     def _build_log_table(self):
-        table = Table.grid(expand=True)
+        table = Table.grid(expand=True, padding=(0, 1))
         table.add_column(width=8, style="dim")
         table.add_column(width=10)
         table.add_column(ratio=1)
@@ -1788,13 +1861,16 @@ class DashboardApp:
             ("context", "<query> [--view pack|prompt|evidence|summary]"),
             ("benchmark", "<file> [--min-savings N] [--tokenizer auto|...]"),
             ("compress-doc", "<file>"),
+            ("readable-compress", "<file>"),
+            ("readable-query", "<file> <query>"),
+            ("readable-rebuild", "<file>"),
             ("decompress-doc / decompress-last", ""),
             ("index", "[--scope S] [--namespace NS]"),
             ("trace", "<record-id>"),
             ("stats", ""),
             ("help / quit", ""),
         ]
-        table = Table.grid(expand=True)
+        table = Table.grid(expand=True, padding=(0, 1))
         table.add_column(style="cyan", no_wrap=True)
         table.add_column(style="dim white")
         for cmd, args in help_lines:
@@ -1828,12 +1904,12 @@ class DashboardApp:
         return json.dumps(payload, indent=2, sort_keys=True)
 
     def _build_benchmark_summary_table(self):
-        table = Table.grid(expand=True)
+        table = Table.grid(expand=True, padding=(0, 1))
         table.add_column(ratio=1)
         table.add_column(justify="right")
         payload = self.last_benchmark_payload
         if not payload:
-            table.add_row("Status", "No benchmark yet")
+            table.add_row("State", "No benchmark yet")
             table.add_row("Run", "benchmark <file>")
             return table
         artifact = payload.get("artifact", {})
@@ -1935,6 +2011,9 @@ class DashboardApp:
             "context <query> [--budget N] [--pack-budget N] [--view pack|prompt|evidence|summary|records]\n"
             "benchmark <file> [--min-savings N] [--tokenizer auto|char4_approx|cl100k_base|o200k_base]\n"
             "compress-doc <file> [--tokenizer auto|char4_approx|cl100k_base|o200k_base]\n"
+            "readable-compress <file> [--granularity auto|line|paragraph|chunk]\n"
+            "readable-query <file> <query> [--limit N]\n"
+            "readable-rebuild <file>\n"
             "decompress-doc <file>\n"
             "decompress-last\n"
             "index [--scope S] [--namespace NS]\n"
@@ -1947,6 +2026,16 @@ class DashboardApp:
     def _split_ids(text: str) -> list[str] | None:
         parts = [part.strip() for part in text.split(",") if part.strip()]
         return parts or None
+
+    @staticmethod
+    def _split_command(command: str) -> list[str]:
+        parts = shlex.split(command, posix=os.name != "nt")
+        if os.name == "nt":
+            return [
+                part[1:-1] if len(part) >= 2 and part[0] == part[-1] and part[0] in {"'", '"'} else part
+                for part in parts
+            ]
+        return parts
 
     @staticmethod
     def _read_text_source(source: str) -> str:
