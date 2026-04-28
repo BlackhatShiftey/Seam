@@ -3,6 +3,23 @@
 **Last updated:** 2026-04-20
 **Status:** Active planning document. This is the living roadmap for SEAM development beyond the stable v1 core.
 
+## 2026-04-28 Competitive Integration Update
+
+The current competitive plan moves README/install/RAG work ahead of older
+presentation polish:
+
+- Product-first README and private-repo one-line install commands are now part
+  of the active install track.
+- RAG modes are `vector`, `graph`, `hybrid`, and `mix`, with `mix` intended as
+  the agent default after benchmark validation.
+- Progressive disclosure is a first-class agent memory pattern:
+  `seam memory search` for compact results, then `seam memory get` for selected
+  full records.
+- Agent ecosystem compatibility should use thin CLI/REST/stdio wrappers over
+  the Python runtime, not a runtime rewrite.
+- LightRAG-style document status, graph expansion, vector cache/stale metadata,
+  and future reranking belong in the RAG/scalability track.
+
 ---
 
 ## Track A0 — True Interactive TUI (foundation for all UI work)

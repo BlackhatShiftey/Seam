@@ -43,6 +43,7 @@ from seam_runtime.models import (
     cosine,
     default_embedding_model,
 )
+from seam_runtime.mcp import dispatch_tool
 from seam_runtime.pack import score_pack, unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
 from seam_runtime.ui.animations import AnimationEngine
@@ -171,12 +172,62 @@ claim c1:
     def test_vector_index_reindex_and_search(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
-        runtime.persist_ir(batch)
+        runtime.store.persist_ir(batch)
         reindex_report = runtime.reindex_vectors()
         self.assertIn("clm:2", reindex_report["indexed_ids"])
+        self.assertTrue(reindex_report["stale_before"])
+        second_reindex = runtime.reindex_vectors()
+        self.assertEqual(second_reindex["stale_before"], [])
         result = runtime.search_ir("translator natural language", budget=3)
         top_ids = [candidate.record.id for candidate in result.candidates]
         self.assertIn("clm:2", top_ids)
+
+    def test_ingest_persists_document_status_and_memory_search_get(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.ingest_text(
+            "SEAM gives agents persistent local memory with graph and vector retrieval.",
+            source_ref="unit://competitive-plan",
+            persist=True,
+        )
+        payload = report.to_dict()
+        self.assertEqual(payload["document"]["extraction_status"], "compiled")
+        self.assertEqual(payload["document"]["indexed_status"], "indexed")
+        self.assertTrue(payload["stored_ids"])
+
+        listed = runtime.store.list_document_status()
+        self.assertEqual(listed[0]["source_ref"], "unit://competitive-plan")
+        index = runtime.memory_search("persistent local memory", budget=3)
+        self.assertTrue(index["results"])
+        full = runtime.memory_get([index["results"][0]["id"]], include_timeline=True)
+        self.assertTrue(full["records"])
+        self.assertIn("context", full)
+
+    def test_retrieval_modes_include_vector_graph_hybrid_mix(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("SEAM stores graph edges and vector embeddings for agent memory retrieval."))
+        orchestrator = RetrievalOrchestrator(runtime)
+        for mode in ("vector", "graph", "hybrid", "mix"):
+            result = orchestrator.search("agent memory retrieval", budget=3, mode=mode, include_trace=True).to_dict()
+            self.assertEqual(result["trace"]["plan"]["mode"], mode)
+            self.assertTrue(result["trace"]["plan"]["legs"])
+        mix_legs = [leg["name"] for leg in orchestrator.plan("agent memory retrieval", mode="mix").to_dict()["legs"]]
+        self.assertEqual(mix_legs, ["sql", "vector", "graph"])
+
+    def test_mcp_bridge_dispatches_memory_tools(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        ingest = dispatch_tool(
+            runtime,
+            {
+                "tool": "seam_ingest",
+                "arguments": {"text": "SEAM MCP exposes persistent memory search.", "source_ref": "unit://mcp"},
+            },
+        )
+        self.assertEqual(ingest["type"], "result")
+        search = dispatch_tool(runtime, {"tool": "seam_memory_search", "arguments": {"query": "persistent memory"}})
+        self.assertTrue(search["result"]["results"])
+        record_id = search["result"]["results"][0]["id"]
+        full = dispatch_tool(runtime, {"tool": "seam_memory_get", "arguments": {"ids": [record_id], "timeline": True}})
+        self.assertTrue(full["result"]["records"])
 
     def test_symbol_promotion_and_pack_compaction(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -1894,10 +1945,18 @@ class _FakePgCursor:
         self._sql_log.append(sql.strip())
         sql_lower = sql.strip().lower()
         if sql_lower.startswith("insert") and params:
-            record_id, model_name, dimension, source_text, vec_literal, updated_at = params
+            record_id, model_name, dimension, source_text, source_hash, vec_literal, updated_at = params
             vec = [float(x) for x in vec_literal.strip("[]").split(",")]
-            self._store[record_id] = {"model": model_name, "dim": dimension, "vec": vec}
+            self._store[record_id] = {"model": model_name, "dim": dimension, "vec": vec, "source_hash": source_hash}
         elif sql_lower.startswith("select") and params:
+            if "information_schema.columns" in sql_lower:
+                self._rows = [("source_hash",)]
+                return
+            if "source_hash, dimension" in sql_lower:
+                record_id, model_name = params
+                entry = self._store.get(record_id)
+                self._rows = [(entry["source_hash"], entry["dim"])] if entry and entry["model"] == model_name else []
+                return
             vec_literal, model_name, dimension, _, limit = params
             query_vec = [float(x) for x in vec_literal.strip("[]").split(",")]
             scored = []
@@ -1912,6 +1971,9 @@ class _FakePgCursor:
 
     def fetchall(self):
         return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
 
 
 class _FakePgConnection:

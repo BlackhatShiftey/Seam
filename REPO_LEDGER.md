@@ -24,6 +24,10 @@ and `HISTORY_INDEX.md`.
 
 - SQLite is canonical source of truth.
 - Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
+- Document ingest status is canonical SQLite metadata. Source refs, source hashes, extraction status, index status, and deletion state belong in `document_status`, not only in derived vector stores.
+- Agent-facing retrieval should use progressive disclosure where possible: compact search/index results first, then full MIRL records by selected IDs.
+- Default agent RAG should prefer `mix` retrieval only after benchmark validation; the supported retrieval modes are `vector`, `graph`, `hybrid`, and `mix`.
+- Agent ecosystem integrations should be thin wrappers over SEAM CLI/REST/stdio bridge surfaces. Do not rewrite the Python runtime into Node just to fit Claude Code-style plugin ecosystems.
 - Lossless claims require exact reconstruction and integrity checks.
 - SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
 - A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.

@@ -13,6 +13,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
 - optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
 - PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
+- Competitive RAG/install polish in progress on `codex/competitive-rag-install-polish`: one-line private install docs, product-first README, document status tracking, progressive memory search/get, `retrieve --mode vector|graph|hybrid|mix`, stdio agent bridge, and vector stale-index reporting
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
 
 ## What Is Stable
@@ -25,6 +26,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Dashboard snapshot/smoke-test behavior
 - Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
+- RAG efficiency surface: `seam ingest <path> --persist`, `seam memory search`, `seam memory get`, `seam retrieve --mode mix`, document status rows, vector source-hash cache/stale checks, and `seam mcp serve` stdio bridge
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
 - Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
 - Token-bounded context loading via history snapshots and `tools.history.build_context_pack`
@@ -37,6 +39,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Keep maintenance, security, context, and runtime facts logically routed for AI search without duplicating chronology
 - Make compression produce directly readable AI-native machine language, with opaque byte payloads used only as optional reconstruction/integrity backing layers
 - Keep roadmap execution tied to history entries and supersedes chains
+- Turn the competitive plan into shippable surfaces: finish README/install polish, graph/vector/mix retrieval hardening, agent bridge docs, and benchmark coverage without breaking existing CLI aliases
 - Continue feature delivery without reintroducing duplicated continuity text
 - Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
 - Roadmap planned items (#028–#047) are open except benchmark holdout suites (#036/C1), benchmark diff tooling (#037/C2), and REST API surface (#046/E3), which are implemented: dashboard animations, benchmark progress bars, sparkline graphs, command terminology audit, BEIR/MTEB benchmarks, Claude tool set, auto-compression pipeline, batch compile, PgVector migration helper, multi-tenant namespacing
