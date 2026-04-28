@@ -2051,3 +2051,19 @@ Follow-up cleanup for the competitive integration branch: tightened installers/R
 
 Verification: candidate secret/session scan across intended staged files returned no findings after this cleanup. Full test and dashboard checks from HISTORY#099 remain valid for runtime behavior.
 ---END-ENTRY-#100---
+
+---BEGIN-ENTRY-#101---
+id: 101
+date: 2026-04-28T13:09:02Z
+agent: codex
+status: done
+topics: history, integrity, verify, snapshot
+commits: none
+refs: HISTORY.md,HISTORY_INDEX.md
+supersedes: 100
+tokens: 84
+---
+Repaired post-merge continuity metadata after PR #10. After the competitive RAG/install branch merged, `python -m tools.history.verify_continuity` reported derived hash mismatches for HISTORY#099 and HISTORY#100 in HISTORY_INDEX.md and the latest snapshot. Rebuilt the index from the current checked-out HISTORY.md contents and wrote a fresh snapshot that includes this repair entry.
+
+Verification target: rerun `python -m tools.history.verify_continuity` after rebuilding index/snapshot; no runtime code changes in this repair.
+---END-ENTRY-#101---
