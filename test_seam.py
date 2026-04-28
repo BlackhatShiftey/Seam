@@ -900,11 +900,12 @@ claim c2:
                 self.assertIsNotNone(app.query_one("#overview-panel"))
                 self.assertIsNotNone(app.query_one("#mirl-panel"))
                 self.assertIsNotNone(app.query_one("#prov-panel"))
-                self.assertIsNotNone(app.query_one("#explorer-panel"))
+                self.assertIsNotNone(app.query_one("#explorer-tree"))
                 self.assertIsNotNone(app.query_one("#ide-layout"))
                 self.assertIsNotNone(app.query_one("#right-col"))
                 self.assertIsNotNone(app.query_one("#chat-panel"))
                 self.assertIsNotNone(app.query_one("#result-panel"))
+                self.assertIsNotNone(app.query_one("#status-bar"))
                 self.assertIsNotNone(app.query_one("#command-palette"))
                 self.assertIsNotNone(app.query_one("#command-input"))
 

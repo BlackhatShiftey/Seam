@@ -32,12 +32,12 @@ try:
     from textual import on
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, Vertical
-    from textual.widgets import Input, Log, Static, TabbedContent, TabPane
+    from textual.widgets import Input, Log, Static, TabbedContent, TabPane, Tree
 
     _TEXTUAL_IMPORT_ERROR = None
 except ImportError as exc:  # pragma: no cover - optional dashboard path
     on = App = ComposeResult = Horizontal = Vertical = Input = Log = Static = None  # type: ignore[assignment]
-    TabbedContent = TabPane = None  # type: ignore[assignment]
+    TabbedContent = TabPane = Tree = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
@@ -245,6 +245,68 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self.app.query_one("#command-input", Input).focus()
 
 
+    class ExplorerTree(Tree):
+        """Interactive explorer sidebar showing ns → scope → kind hierarchy."""
+
+        BINDINGS = [
+            ("r", "refresh_tree", "Refresh"),
+            ("escape", "focus_input", "Back to input"),
+        ]
+
+        def __init__(self, store_path: str) -> None:
+            super().__init__("seam://", id="explorer-tree")
+            self._store_path = store_path
+
+        def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.border_title = "Explorer"
+            self.border_subtitle = "r=refresh  Enter=open"
+            self.root.expand()
+            self._populate()
+
+        def _populate(self) -> None:
+            self.clear()
+            self.root.expand()
+            try:
+                with sqlite3.connect(self._store_path) as conn:
+                    ns_rows = conn.execute(
+                        "SELECT ns, COUNT(*) FROM ir_records GROUP BY ns ORDER BY ns"
+                    ).fetchall()
+                    if not ns_rows:
+                        self.root.add_leaf("(no records yet)")
+                        return
+                    for ns, ns_count in ns_rows:
+                        ns_node = self.root.add(
+                            f"\U0001f4c2 {ns}  [{ns_count}]",
+                            data={"type": "ns", "ns": ns},
+                        )
+                        scope_rows = conn.execute(
+                            "SELECT scope, COUNT(*) FROM ir_records WHERE ns=? GROUP BY scope ORDER BY scope",
+                            (ns,),
+                        ).fetchall()
+                        for scope, scope_count in scope_rows:
+                            scope_node = ns_node.add(
+                                f"\U0001f4c4 {scope}  [{scope_count}]",
+                                data={"type": "scope", "ns": ns, "scope": scope},
+                            )
+                            kind_rows = conn.execute(
+                                "SELECT kind, COUNT(*) FROM ir_records WHERE ns=? AND scope=? GROUP BY kind ORDER BY COUNT(*) DESC",
+                                (ns, scope),
+                            ).fetchall()
+                            for kind, count in kind_rows:
+                                scope_node.add_leaf(
+                                    f"  {kind:<6} {count}",
+                                    data={"type": "kind", "ns": ns, "scope": scope, "kind": kind},
+                                )
+            except Exception as exc:
+                self.root.add_leaf(f"(error: {exc})")
+
+        def action_refresh_tree(self) -> None:  # pragma: no cover - textual runtime behavior
+            self._populate()
+
+        def action_focus_input(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.app.query_one("#command-input", Input).focus()
+
+
     class TextualDashboardApp(App[None]):
         CSS = """
         Screen {
@@ -272,15 +334,12 @@ if App is not None and Static is not None and Input is not None and Log is not N
         }
 
         /* Explorer sidebar */
-        #explorer-panel {
-            width: 26;
+        #explorer-tree {
+            width: 30;
             border: round #4f8cfb;
-            padding: 0 1;
-            overflow-y: auto;
-            overflow-x: auto;
             background: #050b1e;
         }
-        #explorer-panel:focus {
+        #explorer-tree:focus {
             border: heavy #7efbff;
         }
 
@@ -356,6 +415,15 @@ if App is not None and Static is not None and Input is not None and Log is not N
             display: none;
         }
 
+        /* ── Status bar above input ──────────────────────────────── */
+        #status-bar {
+            dock: bottom;
+            height: 1;
+            background: #1a2a4a;
+            color: #8df6ff;
+            padding: 0 1;
+        }
+
         /* ── Input bar docked to bottom ──────────────────────────── */
         #command-input {
             dock: bottom;
@@ -363,7 +431,15 @@ if App is not None and Static is not None and Input is not None and Log is not N
         }
         """
 
-        BINDINGS = [("ctrl+c", "quit", "Quit"), ("ctrl+d", "quit", "Quit")]
+        BINDINGS = [
+            ("ctrl+c", "quit", "Quit"),
+            ("ctrl+d", "quit", "Quit"),
+            ("ctrl+b", "toggle_sidebar", "Toggle Explorer"),
+            ("[", "sidebar_shrink", "Shrink Explorer"),
+            ("]", "sidebar_grow", "Grow Explorer"),
+            ("{", "rightcol_shrink", "Shrink Chat"),
+            ("}", "rightcol_grow", "Grow Chat"),
+        ]
 
         def __init__(
             self,
@@ -433,6 +509,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
             # compile/compress/benchmark triggers.
             self._anim_engine = _ui_animations.AnimationEngine(height=6)
             self._mirl_animation_running = False
+            self._sidebar_width = 30
+            self._rightcol_width = 34
 
         def compose(self) -> ComposeResult:
             # ── Header: logo + slim metrics bar (always visible) ──────
@@ -440,8 +518,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
             yield Static("", id="metrics")
             # ── IDE body ──────────────────────────────────────────────
             with Horizontal(id="ide-layout"):
-                # Left: file-explorer sidebar
-                yield _TextualPanel("Explorer", "explorer-panel")
+                # Left: interactive explorer sidebar
+                yield ExplorerTree(self.controller.runtime.store.path)
                 # Centre: tabbed workspace
                 with TabbedContent(id="main-tabs"):
                     with TabPane("Overview", id="tab-overview"):
@@ -466,6 +544,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     yield _TextualPanel("Results", "result-panel")
             # ── Overlay: command palette + input bar ──────────────────
             yield Static("", id="command-palette")
+            yield Static("", id="status-bar")
             yield Input(placeholder="", id="command-input")
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
@@ -473,7 +552,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._refresh_metrics()
             self._refresh_input_placeholder()
             self._sync_side_panel()
-            self._refresh_explorer()
             self._refresh_overview()
             self.query_one("#benchmark-panel", _TextualPanel).set_lines(["Run `benchmark <file>` to populate benchmark results."])
             self.query_one("#retrieval-panel", _TextualPanel).set_lines(["Run search/retrieve/context/plan to populate this panel."])
@@ -791,6 +869,40 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._capture_token_metrics_from_command(command)
             if should_exit:
                 self.exit()
+
+        @on(Tree.NodeSelected, "#explorer-tree")
+        def _on_explorer_node_selected(self, event: Tree.NodeSelected) -> None:  # pragma: no cover - textual runtime behavior
+            data = event.node.data
+            if not data:
+                return
+            ns = data.get("ns")
+            scope = data.get("scope")
+            kind = data.get("kind")
+            try:
+                batch = self.controller.runtime.store.load_ir(
+                    ns=ns,
+                    scope=scope if scope else None,
+                )
+                if kind:
+                    records = [r for r in batch.records if r.kind.value == kind]
+                else:
+                    records = batch.records
+                if not records:
+                    lines = [f"No records for {ns}/{scope or '*'}/{kind or '*'}"]
+                else:
+                    lines = []
+                    for rec in records[:200]:
+                        lines.append(f"[{rec.kind.value}] {rec.id}")
+                        if hasattr(rec, 'body') and rec.body:
+                            preview = str(rec.body)[:120].replace('\n', ' ')
+                            lines.append(f"  {preview}")
+                        lines.append("")
+                self.query_one("#memory-panel", _TextualPanel).set_lines(lines)
+                tabs = self.query_one("#main-tabs", TabbedContent)
+                tabs.active = "tab-memory"
+                self._update_status(f"Explorer: {ns}/{scope or '*'}")
+            except Exception as exc:
+                self._update_status(f"Explorer error: {exc}")
 
         def _handle_shortcut(self, raw: str) -> None:
             prefix = raw[:1]
@@ -1197,33 +1309,9 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             try:
                 self._refresh_metrics()
-                self._refresh_explorer()
                 self._refresh_overview()
+                self._update_status()
             except Exception:  # pragma: no cover - timer can fire during teardown
-                return
-
-        def _refresh_explorer(self) -> None:
-            try:
-                metrics = self.controller._collect_metrics()
-                lines = [
-                    "seam/",
-                    f"  ├─ .seam.db   [{metrics.db_size}]",
-                    f"  ├─ memory     {metrics.total_records}",
-                    f"  ├─ vectors    {metrics.vector_entries}",
-                    f"  ├─ packs      {metrics.pack_entries}",
-                    f"  ├─ prov       {metrics.provenance_entries}",
-                    f"  ├─ symbols    {metrics.symbol_entries}",
-                    f"  └─ raw        {metrics.raw_entries}",
-                    "",
-                    f"namespaces  ({metrics.namespaces})",
-                    f"scopes      ({metrics.scopes})",
-                    "",
-                    f"model:    {metrics.model_name}",
-                    f"adapter:  {metrics.vector_adapter_name}",
-                    f"mode:     {metrics.execution_mode}",
-                ]
-                self.query_one("#explorer-panel", _TextualPanel).set_lines(lines)
-            except Exception:
                 return
 
         def _refresh_overview(self) -> None:
@@ -1334,6 +1422,57 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     handle.write(json.dumps(row, sort_keys=True))
                     handle.write("\n")
             return destination.resolve(), len(self.chat_history)
+
+        def _update_status(self, message: str = "") -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                metrics = self.controller._collect_metrics()
+                mode_str = f"mode:{self.input_mode}"
+                rec_str = f"records:{metrics.total_records}"
+                right = f"{mode_str}  {rec_str}  {metrics.db_path}"
+                text = f" {message}{'  ' if message else ''}{right}"
+                self.query_one("#status-bar", Static).update(text)
+            except Exception:
+                return
+
+        def action_toggle_sidebar(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                tree = self.query_one("#explorer-tree", ExplorerTree)
+                tree.display = not tree.display
+            except Exception:
+                return
+
+        def action_sidebar_grow(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                tree = self.query_one("#explorer-tree", ExplorerTree)
+                self._sidebar_width = min(self._sidebar_width + 4, 60)
+                tree.styles.width = self._sidebar_width
+            except Exception:
+                return
+
+        def action_sidebar_shrink(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                tree = self.query_one("#explorer-tree", ExplorerTree)
+                self._sidebar_width = max(self._sidebar_width - 4, 14)
+                tree.styles.width = self._sidebar_width
+            except Exception:
+                return
+
+        def action_rightcol_grow(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                col = self.query_one("#right-col", Vertical)
+                self._rightcol_width = min(self._rightcol_width + 4, 80)
+                col.styles.width = self._rightcol_width
+            except Exception:
+                return
+
+        def action_rightcol_shrink(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                col = self.query_one("#right-col", Vertical)
+                self._rightcol_width = max(self._rightcol_width - 4, 20)
+                col.styles.width = self._rightcol_width
+            except Exception:
+                return
+
 else:
     class TextualDashboardApp:  # pragma: no cover - exercised when textual is missing
         def __init__(self, *args: Any, **kwargs: Any) -> None:
