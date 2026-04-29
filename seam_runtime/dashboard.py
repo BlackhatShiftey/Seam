@@ -31,13 +31,14 @@ except ImportError as exc:  # pragma: no cover - user-facing guard
 try:
     from textual import on
     from textual.app import App, ComposeResult
-    from textual.containers import Horizontal, Vertical
-    from textual.widgets import Input, Log, Static, TabbedContent, TabPane, Tree
+    from textual.containers import Horizontal, ScrollableContainer, Vertical
+    from textual.widgets import Button, Input, Label, Log, RichLog, Static, TabbedContent, TabPane, Tree
 
     _TEXTUAL_IMPORT_ERROR = None
 except ImportError as exc:  # pragma: no cover - optional dashboard path
-    on = App = ComposeResult = Horizontal = Vertical = Input = Log = Static = None  # type: ignore[assignment]
-    TabbedContent = TabPane = Tree = None  # type: ignore[assignment]
+    on = App = ComposeResult = Horizontal = Vertical = Input = Log = RichLog = Static = None  # type: ignore[assignment]
+    TabbedContent = TabPane = Tree = Button = Label = None  # type: ignore[assignment]
+    ScrollableContainer = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
@@ -195,7 +196,16 @@ class SeamChatClient:
             return f"Chat request failed: {exc}"
 
 
-if App is not None and Static is not None and Input is not None and Log is not None:
+if (
+    App is not None
+    and Static is not None
+    and Input is not None
+    and Log is not None
+    and RichLog is not None
+    and Button is not None
+    and Label is not None
+    and ScrollableContainer is not None
+):
     class _TextualPanel(Log):
         can_focus = True
         BINDINGS = [
@@ -212,10 +222,11 @@ if App is not None and Static is not None and Input is not None and Log is not N
             ("escape", "focus_input", "Back to input"),
         ]
 
-        def __init__(self, title: str, panel_id: str) -> None:
-            super().__init__(highlight=False, max_lines=2000, auto_scroll=True, id=panel_id)
+        def __init__(self, title: str, panel_id: str, *, auto_scroll_mode: bool = False) -> None:
+            super().__init__(highlight=False, max_lines=2000, auto_scroll=False, id=panel_id)
             self._title = title
             self._panel_lines: list[str] = []
+            self._auto_scroll_mode = auto_scroll_mode
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
             self.border_title = self._title
@@ -233,7 +244,8 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 self.write_lines(self._panel_lines)
             else:
                 self.write_line("(empty)")
-            self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
+            if self._auto_scroll_mode:
+                self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
 
         def _refresh_content(self) -> None:
             self.clear()
@@ -241,7 +253,56 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 self.write_lines(self._panel_lines)
             else:
                 self.write_line("(empty)")
-            self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
+            if self._auto_scroll_mode:
+                self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
+
+        def on_mouse_down(self, event: Any) -> None:  # pragma: no cover - textual runtime behavior
+            self.focus()
+
+        def action_page_up(self) -> None:
+            self.scroll_page_up(animate=False, force=True)
+
+        def action_page_down(self) -> None:
+            self.scroll_page_down(animate=False, force=True)
+
+        def action_focus_input(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.app.query_one("#command-input", Input).focus()
+
+
+    class _TextualMarkupPanel(RichLog):
+        """Markup-rendering scrollable panel for dashboard-authored lines."""
+
+        can_focus = True
+        BINDINGS = _TextualPanel.BINDINGS
+
+        def __init__(self, title: str, panel_id: str, *, auto_scroll_mode: bool = False) -> None:
+            super().__init__(highlight=False, markup=True, max_lines=2000, id=panel_id)
+            self._title = title
+            self._panel_lines: list[str] = []
+            self._auto_scroll_mode = auto_scroll_mode
+
+        def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.border_title = self._title
+            self.border_subtitle = "Tab/S+Tab · Esc→input"
+            self._refresh_content()
+
+        def set_title(self, title: str) -> None:
+            self._title = title
+            self.border_title = title
+
+        def set_lines(self, lines: list[str]) -> None:
+            self._panel_lines = lines[-2000:]
+            self._refresh_content()
+
+        def _refresh_content(self) -> None:
+            self.clear()
+            if self._panel_lines:
+                for line in self._panel_lines:
+                    self.write(line)
+            else:
+                self.write("(empty)")
+            if self._auto_scroll_mode:
+                self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
 
         def on_mouse_down(self, event: Any) -> None:  # pragma: no cover - textual runtime behavior
             self.focus()
@@ -426,6 +487,47 @@ if App is not None and Static is not None and Input is not None and Log is not N
             display: none;
         }
 
+        /* ── Settings tab ─────────────────────────────────────────── */
+        #settings-scroll {
+            width: 1fr;
+            height: 1fr;
+        }
+        #settings-panel {
+            padding: 1 2;
+        }
+        .settings-section {
+            color: #7fe0ff;
+            text-style: bold;
+            margin-top: 1;
+        }
+        .settings-label {
+            color: #5fc8ff;
+            margin-top: 1;
+        }
+        .settings-input {
+            border: round #4f8cfb;
+            background: #08132a;
+            margin-bottom: 0;
+        }
+        .settings-input:focus {
+            border: round #7fe0ff;
+        }
+        .settings-btn {
+            background: #1a2540;
+            border: round #4f8cfb;
+            color: #7fe0ff;
+            margin-top: 1;
+            width: auto;
+        }
+        .settings-btn:hover {
+            background: #274063;
+            border: round #7fe0ff;
+        }
+        .settings-btn-danger {
+            border: round #9b6cff;
+            color: #d391ff;
+        }
+
         /* ── Status bar above input ──────────────────────────────── */
         #status-bar {
             dock: bottom;
@@ -541,7 +643,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 # Centre: tabbed workspace
                 with TabbedContent(id="main-tabs"):
                     with TabPane("Overview", id="tab-overview"):
-                        yield _TextualPanel("Overview", "overview-panel")
+                        yield _TextualMarkupPanel("Overview", "overview-panel")
                     with TabPane("Memory", id="tab-memory"):
                         yield _TextualPanel("Memory Records", "memory-panel")
                     with TabPane("Retrieval", id="tab-retrieval"):
@@ -549,17 +651,39 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     with TabPane("Benchmarks", id="tab-benchmarks"):
                         yield _TextualPanel("Benchmark", "benchmark-panel")
                     with TabPane("Compression", id="tab-compression"):
-                        yield _TextualPanel("MIRL Compression", "mirl-panel")
+                        yield _TextualMarkupPanel("MIRL Compression", "mirl-panel")
                     with TabPane("Live", id="tab-live"):
                         with Horizontal(id="live-row"):
-                            yield _TextualPanel("Runtime Log", "runtime-log-panel")
-                            yield _TextualPanel("Command History", "command-history-panel")
+                            yield _TextualMarkupPanel("Runtime Log", "runtime-log-panel", auto_scroll_mode=True)
+                            yield _TextualPanel("Command History", "command-history-panel", auto_scroll_mode=True)
                     with TabPane("Provenance", id="tab-prov"):
                         yield _TextualPanel("Provenance Graph", "prov-panel")
+                    with TabPane("Settings", id="tab-settings"):
+                        with ScrollableContainer(id="settings-scroll"):
+                            with Vertical(id="settings-panel"):
+                                yield Static("── Chat / AI ──────────────────────────────", classes="settings-section")
+                                yield Label("Chat API Key  (SEAM_CHAT_API_KEY / OPENAI_API_KEY)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_CHAT_API_KEY", ""), placeholder="sk-…  or  or-…", password=True, id="cfg-api-key", classes="settings-input")
+                                yield Label("Base URL  (SEAM_CHAT_BASE_URL)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_CHAT_BASE_URL", "https://api.openai.com/v1"), placeholder="https://api.openai.com/v1", id="cfg-base-url", classes="settings-input")
+                                yield Label("Model  (SEAM_CHAT_MODEL)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini"), placeholder="gpt-4o-mini", id="cfg-model", classes="settings-input")
+                                yield Button("Apply API Settings", id="btn-apply-api", classes="settings-btn")
+                                yield Static("── Database ────────────────────────────────", classes="settings-section")
+                                yield Label("DB Path  (SEAM_DB_PATH)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_DB_PATH", ""), placeholder="(default: ~/.seam/seam.db)", id="cfg-db-path", classes="settings-input")
+                                yield Static("── pgvector ────────────────────────────────", classes="settings-section")
+                                yield Label("pgvector DSN  (SEAM_PGVECTOR_DSN)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_PGVECTOR_DSN", ""), placeholder="Set SEAM_PGVECTOR_DSN in local env", password=True, id="cfg-pgvector-dsn", classes="settings-input")
+                                yield Button("Apply DB / pgvector Settings", id="btn-apply-db", classes="settings-btn")
+                                yield Static("── Config Files ────────────────────────────", classes="settings-section")
+                                yield Button("Open .env in explorer", id="btn-open-env", classes="settings-btn")
+                                yield Button("Open seam config dir", id="btn-open-config-dir", classes="settings-btn")
+                                yield Button("Reload env from disk", id="btn-reload-env", classes="settings-btn settings-btn-danger")
                 # Right: chat + results (always visible alongside tabs)
                 with Vertical(id="right-col"):
-                    yield _TextualPanel("Chat", "chat-panel")
-                    yield _TextualPanel("Results", "result-panel")
+                    yield _TextualPanel("Chat", "chat-panel", auto_scroll_mode=True)
+                    yield _TextualPanel("Results", "result-panel", auto_scroll_mode=True)
             # ── Overlay: command palette + input bar ──────────────────
             yield Static("", id="command-palette")
             yield Static("", id="status-bar")
@@ -590,7 +714,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 ]
             )
             self.query_one("#command-history-panel", _TextualPanel).set_lines(["No commands yet."])
-            self.query_one("#mirl-panel", _TextualPanel).set_lines(
+            self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(
                 [
                     "SEAM-LX/1 Compression Engine",
                     "",
@@ -1191,6 +1315,102 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self.result_lines.extend([f"{title}", body, ""])
             self.query_one("#result-panel", _TextualPanel).set_lines(self.result_lines)
 
+        @on(Button.Pressed, "#btn-apply-api")
+        def _on_btn_apply_api(self, event: Button.Pressed) -> None:  # pragma: no cover
+            api_key = self.query_one("#cfg-api-key", Input).value.strip()
+            base_url = self.query_one("#cfg-base-url", Input).value.strip()
+            model = self.query_one("#cfg-model", Input).value.strip()
+            changed: list[str] = []
+            if api_key:
+                os.environ["SEAM_CHAT_API_KEY"] = api_key
+                self.chat_client.api_key = api_key
+                changed.append("SEAM_CHAT_API_KEY")
+            if base_url:
+                os.environ["SEAM_CHAT_BASE_URL"] = base_url
+                self.chat_client.base_url = base_url.rstrip("/")
+                changed.append("SEAM_CHAT_BASE_URL")
+            if model:
+                os.environ["SEAM_CHAT_MODEL"] = model
+                self.chat_client.model = model
+                changed.append("SEAM_CHAT_MODEL")
+            msg = f"Applied: {', '.join(changed)}" if changed else "Nothing to apply — all fields empty."
+            self._push_result("Settings", msg)
+            self._append_chat_activity("harness", f"settings -> {msg}")
+            self._refresh_logo()
+
+        @on(Button.Pressed, "#btn-apply-db")
+        def _on_btn_apply_db(self, event: Button.Pressed) -> None:  # pragma: no cover
+            db_path = self.query_one("#cfg-db-path", Input).value.strip()
+            dsn = self.query_one("#cfg-pgvector-dsn", Input).value.strip()
+            changed: list[str] = []
+            if db_path:
+                os.environ["SEAM_DB_PATH"] = db_path
+                changed.append("SEAM_DB_PATH")
+            if dsn:
+                os.environ["SEAM_PGVECTOR_DSN"] = dsn
+                changed.append("SEAM_PGVECTOR_DSN")
+            msg = (
+                f"Updated for this session: {', '.join(changed)}. Restart required for new runtime connections."
+                if changed else
+                "DB and pgvector fields empty — nothing changed."
+            )
+            self._push_result("Settings", msg)
+
+        @on(Button.Pressed, "#btn-open-env")
+        def _on_btn_open_env(self, event: Button.Pressed) -> None:  # pragma: no cover
+            env_candidates = [
+                Path(os.environ.get("SEAM_LOCAL_ENV", "")).expanduser(),
+                Path.home() / "Documents" / "SEAM" / "local" / ".env",
+                Path(".env"),
+            ]
+            found = next((path for path in env_candidates if str(path) and path.exists()), None)
+            if found is None:
+                self._push_result("Settings", f"No .env found. Checked: {[str(p) for p in env_candidates]}")
+            else:
+                self._push_result("Settings", f".env found: {found}\nSize: {found.stat().st_size} bytes")
+
+        @on(Button.Pressed, "#btn-open-config-dir")
+        def _on_btn_open_config_dir(self, event: Button.Pressed) -> None:  # pragma: no cover
+            config_dir = Path.home() / "Documents" / "SEAM"
+            if config_dir.exists():
+                self._push_result("Settings", f"Config dir found: {config_dir}")
+                self._update_status(f"Config dir: {config_dir}")
+            else:
+                self._push_result("Settings", f"Config dir not found: {config_dir}")
+
+        @on(Button.Pressed, "#btn-reload-env")
+        def _on_btn_reload_env(self, event: Button.Pressed) -> None:  # pragma: no cover
+            env_path = next(
+                (
+                    path for path in [
+                        Path(os.environ.get("SEAM_LOCAL_ENV", "")).expanduser(),
+                        Path.home() / "Documents" / "SEAM" / "local" / ".env",
+                        Path(".env"),
+                    ]
+                    if str(path) and path.exists()
+                ),
+                None,
+            )
+            if env_path is None:
+                self._push_result("Settings", "No .env file found to reload.")
+                return
+            loaded: list[str] = []
+            try:
+                for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    if key.startswith("SEAM_") or key in {"OPENAI_API_KEY"}:
+                        os.environ[key] = value.strip().strip('"').strip("'")
+                        loaded.append(key)
+                self.chat_client = SeamChatClient()
+                self._refresh_logo()
+                self._push_result("Settings", f"Reloaded {len(loaded)} vars from {env_path}: {', '.join(loaded[:8])}")
+            except Exception as exc:
+                self._push_result("Settings", f"Failed to reload .env: {exc}")
+
         def _reload_dashboard_surface(self) -> None:
             self._hide_command_palette()
             self._refresh_logo()
@@ -1209,16 +1429,32 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 self.benchmark_lines or ["Dashboard reloaded. Benchmark panel is ready for benchmark or compression commands."]
             )
             if self.mirl_lines:
-                self.query_one("#mirl-panel", _TextualPanel).set_lines(self.mirl_lines)
+                self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(self.mirl_lines)
             elif not self._mirl_animation_running:
-                self.query_one("#mirl-panel", _TextualPanel).set_lines(self._anim_engine.tick_and_render())
+                self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(self._anim_engine.tick_and_render())
 
         def _sync_side_panel(self) -> None:
             # Benchmark search-log goes into #benchmark-panel via _route_command_output.
             # This panel always shows the live runtime event stream.
-            panel = self.query_one("#runtime-log-panel", _TextualPanel)
-            lines = [f"{event.timestamp} {event.kind}: {event.message}" for event in list(self.controller.events)]
-            panel.set_title("Runtime Log")
+            panel = self.query_one("#runtime-log-panel", _TextualMarkupPanel)
+            _kind_color: dict[str, str] = {
+                "store": "#7efdb9",
+                "index": "#d391ff",
+                "query": "#7fe0ff",
+                "pack": "#7efdb9",
+                "agent": "#f4d676",
+                "trace": "#9b6cff",
+                "reload": "#7fe0ff",
+                "shell": "#f4d676",
+                "system": "#9fd4ff",
+            }
+            lines = [
+                f"[dim]{event.timestamp}[/]  "
+                f"[bold {_kind_color.get(event.kind, '#7fe0ff')}]{event.kind.upper():<8}[/]  "
+                f"{event.message}"
+                for event in list(self.controller.events)
+            ]
+            panel.set_title("[#7fe0ff]Runtime Log[/]")
             self.side_lines = lines
             panel.set_lines(lines)
 
@@ -1357,7 +1593,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             self._animation_phase = (self._animation_phase + 1) % 8
             try:
-                panel = self.query_one("#mirl-panel", _TextualPanel)
+                panel = self.query_one("#mirl-panel", _TextualMarkupPanel)
             except Exception:  # pragma: no cover - timer can fire during teardown
                 return
             lines = self._anim_engine.tick_and_render()
@@ -1419,7 +1655,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     "  /benchmark <file>   lossless compression benchmark",
                     "  /stats              refresh all metrics",
                 ]
-                self.query_one("#overview-panel", _TextualPanel).set_lines(lines)
+                self.query_one("#overview-panel", _TextualMarkupPanel).set_lines(lines)
             except Exception:
                 return
 

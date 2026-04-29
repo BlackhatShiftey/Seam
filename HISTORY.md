@@ -2133,3 +2133,21 @@ Post-merge bookkeeping after PR #7 merged the Textual/Dash migration into main. 
 
 Verification target after this entry: rerun `python -m tools.history.verify_continuity`, full `python -m pytest test_seam.py tools/history/test_history_tools.py`, and dashboard reload smoke from current main before starting new feature work.
 ---END-ENTRY-#105---
+
+---BEGIN-ENTRY-#106---
+id: 106
+date: 2026-04-29T23:38:09Z
+agent: codex
+status: done
+topics: dashboard, tui, textual, verify, status, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,seam_runtime/storage.py,seam_runtime/lossless.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 105
+tokens: 144
+---
+Rebased the SEAM-CC dashboard P0 polish onto current `origin/main` after the branch diverged from the merged Textual/Dash migration. Resolved the merge by keeping main's newer IDE-style `#explorer-tree` and status-bar dashboard architecture, then reapplied the P0 polish: RichLog-backed colored Overview/MIRL/Runtime panels, Settings tab controls, Settings API apply handling, store list helpers, and Textual tests for Settings and explorer namespace visibility.
+
+Verification during conflict resolution: `python -m py_compile seam_runtime\dashboard.py seam_runtime\storage.py seam_runtime\lossless.py test_seam.py` passed; focused Textual pytest for mount/reload/settings/explorer passed with 4 selected tests; `python seam.py dashboard --run reload --no-clear` rendered the reload dashboard.
+
+Next verification target: rebuild HISTORY_INDEX.md, write a snapshot, run continuity/integrity, full pytest, then complete the merge commit and PR path.
+---END-ENTRY-#106---
