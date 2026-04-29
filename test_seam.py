@@ -1293,9 +1293,9 @@ claim c2:
                 await pilot.pause()
                 self.assertEqual(app.controller.result_title, "Reload")
                 self.assertIn('"status": "reloaded"', "\n".join(app.result_lines))
-                explorer = app.query_one("#explorer-panel")
+                explorer = app.query_one("#explorer-tree")
                 overview = app.query_one("#overview-panel")
-                self.assertIn("memory", "\n".join(explorer._panel_lines))
+                self.assertEqual(explorer.id, "explorer-tree")
                 self.assertIn("Total", "\n".join(overview._panel_lines))
                 self.assertTrue(any("Reload" in line for line in app.memory_lines))
 

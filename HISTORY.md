@@ -2099,3 +2099,21 @@ Repaired current `main` after checking branch/snapshot state. The backup branch 
 
 State check also found `_imports/awesome-design-md` as an empty leftover directory from branch switching; it contains no file data and can be removed from the `main` checkout without losing repo content. Verification target: rerun continuity, targeted tests, and git status after cleanup.
 ---END-ENTRY-#103---
+
+---BEGIN-ENTRY-#104---
+id: 104
+date: 2026-04-29T15:35:06Z
+agent: codex
+status: done
+topics: dashboard, tui, command, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 103
+tokens: 184
+---
+Fixed the Textual/Dash migration reload blocker on the active PR branch. The migration replaced the old static explorer panel with the interactive `ExplorerTree` widget, but `_reload_dashboard_surface()` still called the removed `_refresh_explorer()` method. Removed that reload call and updated the reload regression to assert the mounted `#explorer-tree` widget instead of the deleted `#explorer-panel` compatibility surface.
+
+Verification: `python -m py_compile seam_runtime\dashboard.py seam_runtime\lossless.py test_seam.py` passed; `git diff --check` passed with only LF-to-CRLF warnings; reload-focused pytest passed with 2 selected tests; dashboard pytest passed with 26 selected tests; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 143 tests; `python seam.py dashboard --run reload --no-clear` rendered the Reload payload.
+
+Continuity note: before this entry, `python -m tools.history.verify_continuity` on the PR worktree reported stale HISTORY_INDEX metadata for HISTORY#103 and no latest snapshot after the branch merge. This entry rebuilds the index and is followed by a fresh snapshot.
+---END-ENTRY-#104---

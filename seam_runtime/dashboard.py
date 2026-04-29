@@ -1196,7 +1196,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._refresh_logo()
             self._refresh_input_placeholder()
             self._refresh_metrics()
-            self._refresh_explorer()
             self._refresh_overview()
             self._sync_side_panel()
             self._refresh_tab_bar()
