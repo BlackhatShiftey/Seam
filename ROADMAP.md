@@ -3,6 +3,23 @@
 **Last updated:** 2026-04-20
 **Status:** Active planning document. This is the living roadmap for SEAM development beyond the stable v1 core.
 
+## 2026-04-28 Competitive Integration Update
+
+The current competitive plan moves README/install/RAG work ahead of older
+presentation polish:
+
+- Product-first README and private-repo one-line install commands are now part
+  of the active install track.
+- RAG modes are `vector`, `graph`, `hybrid`, and `mix`, with `mix` intended as
+  the agent default after benchmark validation.
+- Progressive disclosure is a first-class agent memory pattern:
+  `seam memory search` for compact results, then `seam memory get` for selected
+  full records.
+- Agent ecosystem compatibility should use thin CLI/REST/stdio wrappers over
+  the Python runtime, not a runtime rewrite.
+- LightRAG-style document status, graph expansion, vector cache/stale metadata,
+  and future reranking belong in the RAG/scalability track.
+
 ---
 
 ## Track A0 — True Interactive TUI (foundation for all UI work)
@@ -243,11 +260,13 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 
 **What:** Cases that were never used during development and are only run at publish time. Results from holdout suites are the only ones that count as external claims.
 
+**Status:** Implemented 2026-04-27. See `HISTORY#092`.
+
 **SOP:**
-1. Create `benchmarks/fixtures/holdout/` — these files are never imported during dev runs
-2. Add a `--holdout` flag to `seam benchmark run` that only loads from that directory
-3. Gate runs with `--holdout` behind a confirmation prompt — these are publish-only
-4. Store holdout results in a separate `benchmark_holdout_runs` table
+1. `benchmarks/fixtures/holdout/` exists and local JSON files are ignored by git
+2. `seam benchmark run --holdout` only loads fixtures from that directory
+3. `--holdout` requires an interactive confirmation or `--confirm-holdout`
+4. Default holdout JSON bundles are stored separately under `benchmarks/runs/holdout/`
 
 ---
 
@@ -255,11 +274,13 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 
 **What:** `seam benchmark diff <run-a.json> <run-b.json>` — shows a structured delta between two runs: which cases improved, which regressed, by how much.
 
+**Status:** Implemented 2026-04-27. See `HISTORY#092`.
+
 **SOP:**
-1. Add `diff` subcommand to `benchmark` CLI parser
-2. Load both bundles, verify both, then join on case hash
-3. Compute per-case delta for every metric
-4. Output: rich table with green/red delta columns + summary line
+1. Use `seam benchmark diff <run-a> <run-b>` with bundle paths or persisted run ids
+2. The diff verifies both bundles, joins exact matches on case hash, and falls back to `family::case_id` when the case hash changed
+3. Numeric and boolean metrics get per-case deltas with green/red/gray indicators
+4. JSON and pretty output include summary counts for improvements, regressions, added cases, and removed cases
 
 ---
 
@@ -385,12 +406,14 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 **What:** Expose SEAM operations as a lightweight HTTP API so external systems can compile, search, and retrieve without running a full Python process.
 
+**Status:** Implemented 2026-04-27. See `HISTORY#094`.
+
 **SOP:**
-1. Add `seam serve` command using `fastapi` + `uvicorn` (new optional extra: `server`)
-2. Endpoints: `POST /compile`, `GET /search`, `POST /context`, `GET /stats`, `GET /health`
-3. Auth: Bearer token (env var `SEAM_API_TOKEN`)
-4. Rate limiting: configurable via env var
-5. Test: integration tests using `httpx` test client
+1. `seam serve` runs FastAPI/Uvicorn through the optional `server` extra.
+2. Endpoints: `POST /compile`, `POST /compile-dsl`, `GET /search`, `POST /context`, `POST /lossless-compress`, `POST /persist`, `GET /stats`, `GET /health`.
+3. Auth: Bearer token through `SEAM_API_TOKEN` for protected endpoints.
+4. Rate limiting: `SEAM_API_RATE_LIMIT_PER_MINUTE` or `SEAM_API_RATE_LIMIT`; `/health` is unauthenticated but still rate-limited.
+5. Tests: FastAPI `TestClient` coverage for auth, compile/search/context/stats, and rate limiting.
 
 ---
 
@@ -456,7 +479,7 @@ Work these in sequence. Each track has a clear gate before moving on.
 Phase 1 (Now — foundational polish)
 ├── B1: Command naming audit + aliases
 ├── B3: README consolidation
-└── C2: Benchmark diff tooling (quick win, high value)
+└── C2: Benchmark diff tooling (done; see HISTORY#092)
 
 Phase 2 (Dashboard enhancement)
 ├── A2: Benchmark progress bar
@@ -465,7 +488,7 @@ Phase 2 (Dashboard enhancement)
 └── A6: Presentation mode
 
 Phase 3 (Benchmark credibility)
-├── C1: Holdout suites
+├── C1: Holdout suites (done; see HISTORY#092)
 ├── C5: Cross-machine reproducibility
 ├── C4: Adversarial testing
 └── C3: Gold standard benchmarks (BEIR/MTEB)
@@ -509,4 +532,4 @@ These rules apply to every piece of work on this repo, regardless of track.
 
 9. **Doctor must pass.** After any install-path change, `seam doctor` must return PASS. If it doesn't, that's a blocker.
 
-10. **Benchmark diff before claiming improvement.** Use `seam benchmark diff` (once built) before publishing any improvement claim. Numbers alone are not enough — show the delta.
+10. **Benchmark diff before claiming improvement.** Use `seam benchmark diff` before publishing any improvement claim. Numbers alone are not enough — show the delta.

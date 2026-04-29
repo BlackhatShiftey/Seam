@@ -36,3 +36,8 @@ seam_runtime/_handoff_20260419/
 
 # Derived snapshot payloads (keep directory marker only)
 .seam/snapshots/*.json
+
+# Publish-only benchmark material stays local unless intentionally released
+benchmarks/fixtures/holdout/*.json
+!benchmarks/fixtures/holdout/*.example.json
+benchmarks/runs/holdout/*.json

@@ -8,17 +8,25 @@ from .types import QueryFilters, QueryIntent, RetrievalLeg, RetrievalPlan
 FILTER_PATTERN = re.compile(r"\b(?P<key>id|kind|ns|scope|predicate|subject|object):(?P<value>[^\s]+)")
 
 
-def build_plan(query: str, scope: str | None = None, budget: int = 5) -> RetrievalPlan:
+RETRIEVAL_MODES = {"vector", "graph", "hybrid", "mix"}
+
+
+def build_plan(query: str, scope: str | None = None, budget: int = 5, mode: str = "hybrid") -> RetrievalPlan:
+    mode = mode.lower().strip() or "hybrid"
+    if mode not in RETRIEVAL_MODES:
+        raise ValueError(f"Unsupported retrieval mode: {mode}")
     filters = _extract_filters(query, scope=scope)
     normalized_query = _strip_filters(query)
-    intent = _classify_intent(filters, normalized_query)
-    leg_limit = max(budget * 2, 5) if intent == QueryIntent.HYBRID else max(budget, 5)
+    intent = _classify_intent(filters, normalized_query, mode)
+    leg_limit = max(budget * 2, 5) if mode in {"hybrid", "mix"} else max(budget, 5)
     legs: list[RetrievalLeg] = []
 
-    if intent in {QueryIntent.STRUCTURED, QueryIntent.HYBRID}:
+    if mode in {"hybrid", "mix"} or intent == QueryIntent.STRUCTURED:
         legs.append(RetrievalLeg(name="sql", limit=leg_limit, rationale="Apply explicit field filters and lexical matching"))
-    if intent in {QueryIntent.SEMANTIC, QueryIntent.HYBRID}:
+    if mode in {"vector", "hybrid", "mix"}:
         legs.append(RetrievalLeg(name="vector", limit=leg_limit, rationale="Use embedding similarity for semantic recall"))
+    if mode in {"graph", "mix"}:
+        legs.append(RetrievalLeg(name="graph", limit=leg_limit, rationale="Expand through MIRL entity/relation/provenance edges"))
 
     return RetrievalPlan(
         query=query,
@@ -26,6 +34,7 @@ def build_plan(query: str, scope: str | None = None, budget: int = 5) -> Retriev
         intent=intent,
         filters=filters,
         legs=legs,
+        mode=mode,
     )
 
 
@@ -56,7 +65,11 @@ def _strip_filters(query: str) -> str:
     return " ".join(part for part in stripped.split() if part)
 
 
-def _classify_intent(filters: QueryFilters, normalized_query: str) -> QueryIntent:
+def _classify_intent(filters: QueryFilters, normalized_query: str, mode: str) -> QueryIntent:
+    if mode == "graph":
+        return QueryIntent.GRAPH
+    if mode == "mix":
+        return QueryIntent.MIX
     has_filters = filters.active()
     semantic_terms = len(normalized_query.split())
     if has_filters and semantic_terms:

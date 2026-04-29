@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-04-26
+Last updated: 2026-04-28
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -24,10 +24,14 @@ and `HISTORY_INDEX.md`.
 
 - SQLite is canonical source of truth.
 - Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
+- Document ingest status is canonical SQLite metadata. Source refs, source hashes, extraction status, index status, and deletion state belong in `document_status`, not only in derived vector stores.
+- Agent-facing retrieval should use progressive disclosure where possible: compact search/index results first, then full MIRL records by selected IDs.
+- Default agent RAG should prefer `mix` retrieval only after benchmark validation; the supported retrieval modes are `vector`, `graph`, `hybrid`, and `mix`.
+- Agent ecosystem integrations should be thin wrappers over SEAM CLI/REST/stdio bridge surfaces. Do not rewrite the Python runtime into Node just to fit Claude Code-style plugin ecosystems.
 - Lossless claims require exact reconstruction and integrity checks.
 - SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
 - A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.
-- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA).
+- Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, pass the benchmark gate, and stay separated from publish-only holdout runs.
 - Compatibility CLI aliases are acceptable during naming transitions.
 - Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
 - Cross-file duplication is disallowed; use pointer cards (`see HISTORY#NNN`).
@@ -97,6 +101,15 @@ and `HISTORY_INDEX.md`.
 - Use `C:\Users\iwana\OneDrive\Documents\Codex\scripts\run_real_adapters_guarded.ps1` for end-to-end real-adapter validation; it starts pgvector, runs guarded checks, and cleans up containers/artifacts on exit.
 - Archive benchmarks with `C:\Users\iwana\OneDrive\Documents\Codex\scripts\store_benchmark.ps1` to keep publication-required hashes and reproducibility metadata in Documents; outputs are sequence+time indexed and blocked from writing inside the git repo by default.
 
+## REST API Policy
+
+- The REST API is optional and installed with the `server` extra.
+- `seam serve` and `seam-server` run the FastAPI/Uvicorn surface against the configured SQLite database.
+- Protected endpoints require `Authorization: Bearer <token>` when `SEAM_API_TOKEN` is set; leave that variable unset only for trusted local development.
+- `/health` is unauthenticated for local service checks but still participates in the same rate limiter.
+- Rate limiting is configured by `SEAM_API_RATE_LIMIT_PER_MINUTE` or `SEAM_API_RATE_LIMIT`; `0` or unset disables the limiter.
+- API handlers must use existing `SeamRuntime` behavior and public report `to_dict()` methods rather than inventing parallel response fields.
+
 ## Benchmark Publication Policy
 
 Published benchmark statements must include:
@@ -107,3 +120,8 @@ Published benchmark statements must include:
 - fixture hashes
 - tokenizer/dependency state
 - git SHA
+- benchmark diff output comparing the claim run against its baseline
+- benchmark gate output from `seam benchmark gate <bundle> [--baseline <run-a>]`
+- holdout result bundle when the statement is an external or publication claim
+
+Holdout benchmark fixtures live under `benchmarks/fixtures/holdout/` and are ignored by git by default. They must be run only with `seam benchmark run --holdout --confirm-holdout`, and default holdout result bundles are written separately under `benchmarks/runs/holdout/`.

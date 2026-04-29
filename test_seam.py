@@ -14,6 +14,7 @@ from experimental.retrieval_orchestrator import ChromaSemanticAdapter, QueryInte
 from experimental.retrieval_orchestrator.adapters import SQLiteIRAdapter
 from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
+from seam_runtime import benchmarks as benchmark_module
 from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import DEFAULT_CHAT_MODELS, SeamChatClient, TextualDashboardApp, run_dashboard
 from seam_runtime.installer import (
@@ -42,6 +43,7 @@ from seam_runtime.models import (
     cosine,
     default_embedding_model,
 )
+from seam_runtime.mcp import dispatch_tool
 from seam_runtime.pack import score_pack, unpack_exact_pack
 from seam_runtime.symbols import build_symbol_maps, namespace_chain
 from seam_runtime.ui.animations import AnimationEngine
@@ -53,6 +55,11 @@ try:
     from rich.console import Console
 except ImportError:  # pragma: no cover - optional at import time
     Console = None
+
+try:
+    from fastapi.testclient import TestClient
+except ImportError:  # pragma: no cover - optional server extra
+    TestClient = None
 
 
 class SeamTests(unittest.TestCase):
@@ -112,15 +119,115 @@ claim c1:
         self.assertIn("prov:compile:1", node_ids)
         self.assertIn("span:1", node_ids)
 
+    @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
+    def test_rest_api_compile_search_context_stats_and_auth(self) -> None:
+        from seam_runtime.server import create_app
+
+        runtime = SeamRuntime(self.db_path)
+        with patch.dict(os.environ, {"SEAM_API_TOKEN": "test-token"}, clear=False):
+            client = TestClient(create_app(runtime))
+
+        self.assertEqual(client.get("/health").json()["status"], "ok")
+        self.assertEqual(client.get("/stats").status_code, 401)
+
+        headers = {"Authorization": "Bearer test-token"}
+        compile_response = client.post(
+            "/compile",
+            json={"text": "SEAM stores durable memory for agent retrieval.", "persist": True},
+            headers=headers,
+        )
+        self.assertEqual(compile_response.status_code, 200)
+        self.assertTrue(compile_response.json()["records"])
+        self.assertTrue(compile_response.json()["persist"]["stored_ids"])
+
+        search_response = client.get("/search", params={"query": "durable memory", "budget": 3}, headers=headers)
+        self.assertEqual(search_response.status_code, 200)
+        self.assertTrue(search_response.json()["candidates"])
+
+        context_response = client.post("/context", json={"query": "agent retrieval", "budget": 3}, headers=headers)
+        self.assertEqual(context_response.status_code, 200)
+        self.assertIn("pack", context_response.json())
+
+        stats_response = client.get("/stats", headers=headers)
+        self.assertEqual(stats_response.status_code, 200)
+        self.assertGreater(stats_response.json()["total_records"], 0)
+
+    @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
+    def test_rest_api_rate_limits_health_and_protected_endpoints(self) -> None:
+        from seam_runtime.server import create_app
+
+        runtime = SeamRuntime(self.db_path)
+        with patch.dict(os.environ, {"SEAM_API_TOKEN": "test-token", "SEAM_API_RATE_LIMIT_PER_MINUTE": "1"}, clear=False):
+            client = TestClient(create_app(runtime))
+
+        first = client.get("/health")
+        second = client.get("/health")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+
+        headers = {"Authorization": "Bearer another-test-token"}
+        limited = client.get("/stats", headers=headers)
+        self.assertEqual(limited.status_code, 401)
+
     def test_vector_index_reindex_and_search(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
-        runtime.persist_ir(batch)
+        runtime.store.persist_ir(batch)
         reindex_report = runtime.reindex_vectors()
         self.assertIn("clm:2", reindex_report["indexed_ids"])
+        self.assertTrue(reindex_report["stale_before"])
+        second_reindex = runtime.reindex_vectors()
+        self.assertEqual(second_reindex["stale_before"], [])
         result = runtime.search_ir("translator natural language", budget=3)
         top_ids = [candidate.record.id for candidate in result.candidates]
         self.assertIn("clm:2", top_ids)
+
+    def test_ingest_persists_document_status_and_memory_search_get(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.ingest_text(
+            "SEAM gives agents persistent local memory with graph and vector retrieval.",
+            source_ref="unit://competitive-plan",
+            persist=True,
+        )
+        payload = report.to_dict()
+        self.assertEqual(payload["document"]["extraction_status"], "compiled")
+        self.assertEqual(payload["document"]["indexed_status"], "indexed")
+        self.assertTrue(payload["stored_ids"])
+
+        listed = runtime.store.list_document_status()
+        self.assertEqual(listed[0]["source_ref"], "unit://competitive-plan")
+        index = runtime.memory_search("persistent local memory", budget=3)
+        self.assertTrue(index["results"])
+        full = runtime.memory_get([index["results"][0]["id"]], include_timeline=True)
+        self.assertTrue(full["records"])
+        self.assertIn("context", full)
+
+    def test_retrieval_modes_include_vector_graph_hybrid_mix(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("SEAM stores graph edges and vector embeddings for agent memory retrieval."))
+        orchestrator = RetrievalOrchestrator(runtime)
+        for mode in ("vector", "graph", "hybrid", "mix"):
+            result = orchestrator.search("agent memory retrieval", budget=3, mode=mode, include_trace=True).to_dict()
+            self.assertEqual(result["trace"]["plan"]["mode"], mode)
+            self.assertTrue(result["trace"]["plan"]["legs"])
+        mix_legs = [leg["name"] for leg in orchestrator.plan("agent memory retrieval", mode="mix").to_dict()["legs"]]
+        self.assertEqual(mix_legs, ["sql", "vector", "graph"])
+
+    def test_mcp_bridge_dispatches_memory_tools(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        ingest = dispatch_tool(
+            runtime,
+            {
+                "tool": "seam_ingest",
+                "arguments": {"text": "SEAM MCP exposes persistent memory search.", "source_ref": "unit://mcp"},
+            },
+        )
+        self.assertEqual(ingest["type"], "result")
+        search = dispatch_tool(runtime, {"tool": "seam_memory_search", "arguments": {"query": "persistent memory"}})
+        self.assertTrue(search["result"]["results"])
+        record_id = search["result"]["results"][0]["id"]
+        full = dispatch_tool(runtime, {"tool": "seam_memory_get", "arguments": {"ids": [record_id], "timeline": True}})
+        self.assertTrue(full["result"]["records"])
 
     def test_symbol_promotion_and_pack_compaction(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -641,6 +748,182 @@ claim c2:
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_read_equivalence_rate"], 1.0)
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_query_exactness_rate"], 1.0)
 
+    def test_benchmark_diff_compares_case_deltas(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        before = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx")
+        after = json.loads(json.dumps(before))
+        case = after["families"]["lossless"]["cases"][0]
+        case["metrics"]["token_savings_ratio"] = round(case["metrics"]["token_savings_ratio"] + 0.05, 6)
+        after["families"]["lossless"]["cases"][0] = benchmark_module._stamp_case_hash(case)
+        after["summary"] = benchmark_module._build_suite_summary(after["families"])
+        after["bundle_hash"] = benchmark_module._hash_payload(after, "bundle_hash")
+
+        diff = runtime.diff_benchmark_runs(before, after)
+        self.assertEqual(diff["summary"]["cases_compared"], before["summary"]["case_count"])
+        self.assertEqual(diff["summary"]["changed_case_matches"], 1)
+        changed = [item for item in diff["cases"] if item["case_hash_changed"]]
+        self.assertEqual(len(changed), 1)
+        savings_delta = [item for item in changed[0]["metric_deltas"] if item["metric"] == "token_savings_ratio"][0]
+        self.assertEqual(savings_delta["indicator"], "green")
+
+    def test_benchmark_gate_passes_custom_lossless_policy(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx")
+        policy = {
+            "version": benchmark_module.BENCHMARK_GATE_VERSION,
+            "required_families": ["lossless"],
+            "summary": {
+                "status": {"equals": "PASS"},
+                "family_count": {"minimum": 1},
+                "case_count": {"minimum": 2},
+            },
+            "families": {
+                "lossless": {
+                    "pass_rate": {"minimum": 1.0},
+                    "exactness_rate": {"minimum": 1.0},
+                }
+            },
+            "baseline": {
+                "status_regressions": {"maximum": 0},
+                "metric_regressions": {"maximum": 0},
+                "removed_cases": {"maximum": 0},
+            },
+        }
+
+        gate = runtime.evaluate_benchmark_gate(report, policy=policy)
+        self.assertEqual(gate["status"], "PASS")
+        self.assertEqual(gate["summary"]["failed"], 0)
+        self.assertTrue(all(check["status"] == "PASS" for check in gate["checks"]))
+
+    def test_benchmark_gate_flags_threshold_failure(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx")
+        policy = {
+            "version": benchmark_module.BENCHMARK_GATE_VERSION,
+            "required_families": ["lossless"],
+            "summary": {"status": {"equals": "PASS"}},
+            "families": {"lossless": {"worst_case_savings": {"minimum": 1.0}}},
+            "baseline": {},
+        }
+
+        gate = runtime.evaluate_benchmark_gate(report, policy=policy)
+        self.assertEqual(gate["status"], "FAIL")
+        failed = [check for check in gate["checks"] if check["status"] == "FAIL"]
+        self.assertTrue(any(check["metric"] == "worst_case_savings" for check in failed))
+
+    def test_cli_benchmark_diff_json_accepts_bundle_paths(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        first_path = Path(f"benchmark_diff_a_{uuid4().hex}.json")
+        second_path = Path(f"benchmark_diff_b_{uuid4().hex}.json")
+        try:
+            first = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx", bundle_path=first_path)
+            second = json.loads(json.dumps(first))
+            second["families"]["lossless"]["cases"][0]["status"] = "FAIL"
+            second["families"]["lossless"]["cases"][0] = benchmark_module._stamp_case_hash(second["families"]["lossless"]["cases"][0])
+            second["summary"] = benchmark_module._build_suite_summary(second["families"])
+            second["bundle_hash"] = benchmark_module._hash_payload(second, "bundle_hash")
+            second_path.write_text(json.dumps(second, indent=2), encoding="utf-8")
+
+            stream = StringIO()
+            with redirect_stdout(stream):
+                run_cli(["--db", str(self.db_path), "benchmark", "diff", str(first_path), str(second_path), "--format", "json"])
+            payload = json.loads(stream.getvalue())
+            self.assertEqual(payload["summary"]["status_regressions"], 1)
+            self.assertEqual(payload["summary"]["status"], "REGRESSED")
+        finally:
+            for path in (first_path, second_path):
+                if path.exists():
+                    path.unlink()
+
+    def test_cli_benchmark_gate_exits_nonzero_on_baseline_regression(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        baseline_path = Path(f"benchmark_gate_a_{uuid4().hex}.json")
+        candidate_path = Path(f"benchmark_gate_b_{uuid4().hex}.json")
+        policy_path = Path(f"benchmark_gate_policy_{uuid4().hex}.json")
+        try:
+            baseline = runtime.run_benchmark_suite(suite="lossless", tokenizer="char4_approx", bundle_path=baseline_path)
+            candidate = json.loads(json.dumps(baseline))
+            candidate["families"]["lossless"]["cases"][0]["status"] = "FAIL"
+            candidate["families"]["lossless"]["cases"][0] = benchmark_module._stamp_case_hash(candidate["families"]["lossless"]["cases"][0])
+            candidate["summary"] = benchmark_module._build_suite_summary(candidate["families"])
+            candidate["bundle_hash"] = benchmark_module._hash_payload(candidate, "bundle_hash")
+            candidate_path.write_text(json.dumps(candidate, indent=2), encoding="utf-8")
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "version": benchmark_module.BENCHMARK_GATE_VERSION,
+                        "required_families": ["lossless"],
+                        "summary": {},
+                        "families": {},
+                        "baseline": {"status_regressions": {"maximum": 0}},
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            stream = StringIO()
+            with redirect_stdout(stream), self.assertRaises(SystemExit) as raised:
+                run_cli(
+                    [
+                        "--db",
+                        str(self.db_path),
+                        "benchmark",
+                        "gate",
+                        str(candidate_path),
+                        "--baseline",
+                        str(baseline_path),
+                        "--policy",
+                        str(policy_path),
+                        "--format",
+                        "json",
+                    ]
+                )
+            self.assertEqual(raised.exception.code, 1)
+            payload = json.loads(stream.getvalue())
+            self.assertEqual(payload["status"], "FAIL")
+            self.assertEqual(payload["baseline_diff"]["summary"]["status_regressions"], 1)
+        finally:
+            for path in (baseline_path, candidate_path, policy_path):
+                if path.exists():
+                    path.unlink()
+
+    def test_cli_benchmark_holdout_requires_confirmation(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            run_cli(["benchmark", "run", "lossless", "--holdout", "--format", "json"])
+        self.assertIn("--confirm-holdout", str(raised.exception))
+
+    def test_cli_benchmark_holdout_uses_private_fixture_and_separate_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="seam-holdout-fixtures-") as fixture_dir, tempfile.TemporaryDirectory(
+            prefix="seam-holdout-runs-"
+        ) as run_dir:
+            fixture_root = Path(fixture_dir)
+            run_root = Path(run_dir)
+            (fixture_root / "lossless_cases.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "name": "private_lossless_repeat",
+                            "text": "Holdout compression phrase stays hidden during tuning.\n" * 24,
+                            "min_token_savings": 0.30,
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            with patch.object(benchmark_module, "HOLDOUT_FIXTURE_ROOT", fixture_root), patch.object(
+                benchmark_module, "HOLDOUT_RUN_ROOT", run_root
+            ):
+                stream = StringIO()
+                with redirect_stdout(stream):
+                    run_cli(["benchmark", "run", "lossless", "--holdout", "--confirm-holdout", "--tokenizer", "char4_approx", "--format", "json"])
+                payload = json.loads(stream.getvalue())
+                self.assertEqual(payload["manifest"]["fixture_scope"], "holdout")
+                self.assertTrue(payload["manifest"]["publish_only"])
+                self.assertEqual(payload["manifest"]["executed_suites"], ["lossless"])
+                self.assertEqual(payload["families"]["lossless"]["cases"][0]["case_id"], "private_lossless_repeat")
+                self.assertTrue(list(run_root.glob("*.json")))
+
     def test_runtime_benchmark_verifier_flags_tampered_bundle(self) -> None:
         runtime = SeamRuntime(self.db_path)
         bundle_path = Path(f"benchmark_bundle_{uuid4().hex}.json")
@@ -884,6 +1167,19 @@ claim c2:
             if source_path.exists():
                 source_path.unlink()
 
+    def test_dashboard_reload_refreshes_scripted_runtime_view(self) -> None:
+        if Console is None:
+            self.skipTest("rich is not installed")
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl("SEAM reload should refresh dashboard runtime charts."))
+        stream = StringIO()
+        console = Console(file=stream, force_terminal=False, color_system=None, width=160)
+        run_dashboard(runtime, no_clear=True, console=console, commands=["reload"])
+        output = stream.getvalue()
+        self.assertIn("Reload", output)
+        self.assertIn("reloaded", output)
+        self.assertIn("Records", output)
+
     def test_textual_dashboard_mounts_core_panels(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
@@ -931,6 +1227,7 @@ claim c2:
                 slash_commands = {item.command for item in app._palette_matches}
                 self.assertIn("compile", slash_commands)
                 self.assertIn("retrieve", slash_commands)
+                self.assertIn("reload", slash_commands)
                 self.assertIn("agent", slash_commands)
                 self.assertIn("shell", slash_commands)
                 self.assertIn("model", slash_commands)
@@ -970,11 +1267,37 @@ claim c2:
                 await pilot.pause()
                 self.assertEqual(app.controller.result_title, "Stats")
 
+                app.process_command("/reload")
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Reload")
+
                 app._update_command_palette("/compile")
                 await pilot.pause()
                 app._accept_palette_selection(input_widget, submit=True)
                 await pilot.pause()
                 self.assertEqual(input_widget.value, "/compile ")
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_reload_refreshes_panels_after_runtime_change(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                runtime.persist_ir(runtime.compile_nl("Reload refreshes dashboard metrics after external writes."))
+                app.process_command("!reload")
+                await pilot.pause()
+                self.assertEqual(app.controller.result_title, "Reload")
+                self.assertIn('"status": "reloaded"', "\n".join(app.result_lines))
+                explorer = app.query_one("#explorer-panel")
+                overview = app.query_one("#overview-panel")
+                self.assertIn("memory", "\n".join(explorer._panel_lines))
+                self.assertIn("Total", "\n".join(overview._panel_lines))
+                self.assertTrue(any("Reload" in line for line in app.memory_lines))
 
         asyncio.run(_check())
 
@@ -1277,6 +1600,44 @@ claim c2:
                 self.assertRegex(history, r"\(\d+ms\)|\(\d+\.\d+s\)")
 
         asyncio.run(_check())
+
+    def test_textual_dashboard_routes_readable_rc1_commands(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        source_path = Path(f"dashboard_readable_{uuid4().hex}.txt")
+        rc_path = Path(f"dashboard_readable_{uuid4().hex}.seamrc")
+        try:
+            source_path.write_text(
+                'Recipe: Lemon Rice\nYield: 2 bowls\nNote: "Toast the rice before adding broth."\n',
+                encoding="utf-8",
+            )
+            runtime = SeamRuntime(self.db_path)
+            app = TextualDashboardApp(runtime)
+
+            async def _check() -> None:
+                async with app.run_test() as pilot:
+                    await pilot.pause()
+                    app.process_command(f"!readable-compress {source_path.resolve()} --granularity line")
+                    await pilot.pause()
+                    self.assertEqual(app.controller.result_title, "Readable Compress")
+                    rc_path.write_text(str(app.controller.last_machine_text), encoding="utf-8")
+
+                    app.process_command(f"!readable-query {rc_path.resolve()} Toast rice --limit 3")
+                    await pilot.pause()
+                    self.assertEqual(app.controller.result_title, "Readable Query")
+                    self.assertIn("Toast the rice", "\n".join(app.benchmark_lines))
+
+                    app.process_command(f"!readable-rebuild {rc_path.resolve()}")
+                    await pilot.pause()
+                    self.assertEqual(app.controller.result_title, "Readable Rebuild")
+                    self.assertIn("Recipe: Lemon Rice", "\n".join(app.benchmark_lines))
+
+            asyncio.run(_check())
+        finally:
+            if source_path.exists():
+                source_path.unlink()
+            if rc_path.exists():
+                rc_path.unlink()
 
 class InstallerLinuxTests(unittest.TestCase):
     def test_posix_shim_has_valid_sh_structure(self) -> None:
@@ -1585,10 +1946,18 @@ class _FakePgCursor:
         self._sql_log.append(sql.strip())
         sql_lower = sql.strip().lower()
         if sql_lower.startswith("insert") and params:
-            record_id, model_name, dimension, source_text, vec_literal, updated_at = params
+            record_id, model_name, dimension, source_text, source_hash, vec_literal, updated_at = params
             vec = [float(x) for x in vec_literal.strip("[]").split(",")]
-            self._store[record_id] = {"model": model_name, "dim": dimension, "vec": vec}
+            self._store[record_id] = {"model": model_name, "dim": dimension, "vec": vec, "source_hash": source_hash}
         elif sql_lower.startswith("select") and params:
+            if "information_schema.columns" in sql_lower:
+                self._rows = [("source_hash",)]
+                return
+            if "source_hash, dimension" in sql_lower:
+                record_id, model_name = params
+                entry = self._store.get(record_id)
+                self._rows = [(entry["source_hash"], entry["dim"])] if entry and entry["model"] == model_name else []
+                return
             vec_literal, model_name, dimension, _, limit = params
             query_vec = [float(x) for x in vec_literal.strip("[]").split(",")]
             scored = []
@@ -1603,6 +1972,9 @@ class _FakePgCursor:
 
     def fetchall(self):
         return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
 
 
 class _FakePgConnection:

@@ -9,7 +9,14 @@ from importlib.util import find_spec
 from pathlib import Path
 
 from experimental.retrieval_orchestrator import RetrievalOrchestrator
-from .benchmarks import BENCHMARK_SUITES, render_benchmark_pretty, render_benchmark_verification_pretty
+from .benchmarks import (
+    BENCHMARK_SUITES,
+    render_benchmark_diff_pretty,
+    render_benchmark_gate_pretty,
+    render_benchmark_pretty,
+    render_benchmark_verification_pretty,
+    write_holdout_benchmark_bundle,
+)
 from .context_views import CONTEXT_VIEWS, build_context_payload, render_context_pretty
 from .dashboard import run_dashboard
 from .installer import default_runtime_db_path
@@ -27,6 +34,7 @@ from .lossless import (
     render_lossless_benchmark_pretty,
 )
 from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
+from .agent_memory import render_memory_index, render_memory_records
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 
@@ -38,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest_parser = subparsers.add_parser("ingest", help="Store raw text from a file or stdin")
     ingest_parser.add_argument("source")
+    ingest_parser.add_argument("--persist", action="store_true", help="Persist compiled memory records and index them")
+    ingest_parser.add_argument("--source-ref")
+    ingest_parser.add_argument("--ns", default="local.default")
+    ingest_parser.add_argument("--scope", default="thread")
+    ingest_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     lossless_compress_parser = subparsers.add_parser("lossless-compress", aliases=["compress-doc"], help="Losslessly compress a document into SEAM machine text")
     lossless_compress_parser.add_argument("source")
@@ -111,6 +124,9 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_run_parser.add_argument("--min-savings", type=float, default=0.30)
     benchmark_run_parser.add_argument("--persist", action="store_true")
     benchmark_run_parser.add_argument("--output")
+    benchmark_run_parser.add_argument("--holdout", action="store_true", help="Run publish-only holdout fixtures from benchmarks/fixtures/holdout")
+    benchmark_run_parser.add_argument("--confirm-holdout", action="store_true", help="Confirm intentional publish-only holdout execution")
+    benchmark_run_parser.add_argument("--holdout-output-dir", help="Directory for default holdout result bundles")
     benchmark_run_parser.add_argument("--include-machine-text", action="store_true")
     benchmark_run_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
@@ -121,6 +137,17 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_verify_parser = benchmark_subparsers.add_parser("verify", help="Verify a benchmark bundle hash and case hashes")
     benchmark_verify_parser.add_argument("bundle")
     benchmark_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_diff_parser = benchmark_subparsers.add_parser("diff", help="Compare two benchmark bundles or persisted run ids")
+    benchmark_diff_parser.add_argument("run_a")
+    benchmark_diff_parser.add_argument("run_b")
+    benchmark_diff_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    benchmark_gate_parser = benchmark_subparsers.add_parser("gate", help="Evaluate benchmark bundle pass/fail and baseline regression gates")
+    benchmark_gate_parser.add_argument("bundle")
+    benchmark_gate_parser.add_argument("--baseline", help="Baseline bundle path or persisted run id for regression gating")
+    benchmark_gate_parser.add_argument("--policy", help="JSON gate policy file")
+    benchmark_gate_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     compile_nl_parser = subparsers.add_parser("compile-nl", aliases=["remember"], help="Compile natural language into MIRL and persist (use --no-persist to skip storing)")
     compile_nl_parser.add_argument("text")
@@ -153,6 +180,22 @@ def build_parser() -> argparse.ArgumentParser:
     retrieve_parser.add_argument("query")
     _add_retrieval_common_args(retrieve_parser)
 
+    memory_parser = subparsers.add_parser("memory", help="Progressive-disclosure SEAM memory tools")
+    memory_subparsers = memory_parser.add_subparsers(dest="memory_command", required=True)
+    memory_search_parser = memory_subparsers.add_parser("search", help="Return compact memory index results")
+    memory_search_parser.add_argument("query")
+    memory_search_parser.add_argument("--scope")
+    memory_search_parser.add_argument("--budget", type=int, default=5)
+    memory_search_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
+    memory_get_parser = memory_subparsers.add_parser("get", help="Return full selected MIRL records")
+    memory_get_parser.add_argument("record_ids")
+    memory_get_parser.add_argument("--timeline", action="store_true")
+    memory_get_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    mcp_parser = subparsers.add_parser("mcp", help="Run SEAM agent integration bridges")
+    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", required=True)
+    mcp_subparsers.add_parser("serve", help="Serve a lightweight JSON-lines MCP-compatible bridge over stdio")
+
     compare_parser = subparsers.add_parser("compare", aliases=["hybrid-compare"], help="Compare basic search with retrieval ranking")
     compare_parser.add_argument("query")
     _add_retrieval_common_args(compare_parser)
@@ -176,6 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--view", choices=CONTEXT_VIEWS, default="pack")
     context_parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     context_parser.add_argument("--trace", action="store_true")
+    context_parser.add_argument("--retrieval-mode", choices=["vector", "graph", "hybrid", "mix"], default="hybrid")
     context_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     context_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     context_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
@@ -187,6 +231,12 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser.add_argument("--vector-backend", "--semantic-backend", dest="vector_backend", choices=["seam", "chroma"], default="seam")
     dashboard_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     dashboard_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
+
+    serve_parser = subparsers.add_parser("serve", help="Run the SEAM REST API server")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--reload", action="store_true")
+    serve_parser.add_argument("--workers", type=int, default=1)
 
     pack_parser = subparsers.add_parser("pack", help="Build a pack from persisted record ids")
     pack_parser.add_argument("record_ids")
@@ -391,11 +441,24 @@ def run_cli(argv: list[str] | None = None) -> None:
         print(_render_lx1_benchmark_pretty(report))
         return
 
+    if args.command == "serve":
+        from .server import run_server
+
+        run_server(host=args.host, port=args.port, db=args.db, reload=args.reload, workers=args.workers)
+        return
+
     runtime = SeamRuntime(args.db)
 
     if args.command == "ingest":
         text = _read_text_source(args.source)
-        print(runtime.compile_nl(text, source_ref=args.source).to_text())
+        if args.persist:
+            report = runtime.ingest_text(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope, persist=True)
+            if args.format == "json":
+                print(json.dumps(report.to_dict(), indent=2))
+                return
+            print(_render_ingest_report(report.to_dict()))
+            return
+        print(runtime.compile_nl(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope).to_text())
         return
     if args.command in {"compile-nl", "remember"}:
         batch = runtime.compile_nl(args.text, source_ref=args.source_ref)
@@ -438,18 +501,35 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command in {"plan", "hybrid-plan"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        plan = orchestrator.plan(args.query, scope=args.scope, budget=args.budget)
+        plan = orchestrator.plan(args.query, scope=args.scope, budget=args.budget, mode=args.mode)
         _print_retrieval_output(plan.to_dict(), output_format=args.format, renderer=_render_plan_pretty)
         return
     if args.command in {"retrieve", "hybrid-search"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
-        result = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace)
+        result = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace, mode=args.mode)
         _print_retrieval_output(result.to_dict(), output_format=args.format, renderer=_render_search_pretty)
+        return
+    if args.command == "memory":
+        if args.memory_command == "search":
+            payload = runtime.memory_search(args.query, scope=args.scope, budget=args.budget)
+            _print_retrieval_output(payload, output_format=args.format, renderer=render_memory_index)
+            return
+        if args.memory_command == "get":
+            payload = runtime.memory_get(_split_ids(args.record_ids), include_timeline=args.timeline)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_memory_records(payload))
+            return
+    if args.command == "mcp" and args.mcp_command == "serve":
+        from .mcp import run_stdio_bridge
+
+        run_stdio_bridge(runtime)
         return
     if args.command in {"compare", "hybrid-compare"}:
         orchestrator = _build_retrieval_orchestrator(runtime, args)
         search_result = runtime.search_ir(args.query, scope=args.scope, budget=args.budget).to_dict()
-        retrieved = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace).to_dict()
+        retrieved = orchestrator.search(args.query, scope=args.scope, budget=args.budget, include_trace=args.trace, mode=args.mode).to_dict()
         _print_retrieval_output({"search": search_result, "retrieve": retrieved}, output_format=args.format, renderer=_render_compare_pretty)
         return
     if args.command in {"index", "rag-sync"}:
@@ -472,6 +552,7 @@ def run_cli(argv: list[str] | None = None) -> None:
                 lens=args.lens,
                 mode=args.mode,
                 include_trace=args.trace,
+                retrieval_mode=args.retrieval_mode,
             ).to_dict(),
             view=args.view,
         )
@@ -524,6 +605,8 @@ def run_cli(argv: list[str] | None = None) -> None:
         return
     if args.command == "benchmark":
         if args.benchmark_command == "run":
+            if args.holdout and not args.confirm_holdout:
+                _confirm_holdout_run()
             payload = runtime.run_benchmark_suite(
                 suite=args.suite,
                 tokenizer=args.tokenizer,
@@ -531,11 +614,17 @@ def run_cli(argv: list[str] | None = None) -> None:
                 persist=args.persist,
                 include_machine_text=args.include_machine_text,
                 bundle_path=args.output,
+                holdout=args.holdout,
             )
+            holdout_output = None
+            if args.holdout and args.output is None:
+                holdout_output = write_holdout_benchmark_bundle(payload, args.holdout_output_dir)
             if args.format == "json":
                 print(json.dumps(payload, indent=2))
                 return
             print(render_benchmark_pretty(payload))
+            if holdout_output is not None:
+                print(f"\nHoldout bundle: {holdout_output}")
             return
         if args.benchmark_command == "show":
             if args.run_id == "latest":
@@ -560,12 +649,62 @@ def run_cli(argv: list[str] | None = None) -> None:
                 return
             print(render_benchmark_verification_pretty(payload))
             return
+        if args.benchmark_command == "diff":
+            run_a = _resolve_benchmark_ref(runtime, args.run_a)
+            run_b = _resolve_benchmark_ref(runtime, args.run_b)
+            payload = runtime.diff_benchmark_runs(run_a, run_b)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            print(render_benchmark_diff_pretty(payload))
+            return
+        if args.benchmark_command == "gate":
+            bundle = _resolve_benchmark_ref(runtime, args.bundle)
+            baseline = _resolve_benchmark_ref(runtime, args.baseline) if args.baseline else None
+            payload = runtime.evaluate_benchmark_gate(bundle, baseline=baseline, policy=args.policy)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+            else:
+                print(render_benchmark_gate_pretty(payload))
+            if payload.get("status") != "PASS":
+                raise SystemExit(1)
+            return
 
         print(json.dumps(runtime.run_retrieval_benchmark(), indent=2))
 
 
 def _split_ids(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def _confirm_holdout_run() -> None:
+    message = (
+        "Holdout benchmark runs are publish-only and should not be used for routine tuning. "
+        "Type RUN HOLDOUT to continue: "
+    )
+    if not sys.stdin.isatty():
+        raise SystemExit("Holdout benchmark requires --confirm-holdout in non-interactive shells.")
+    try:
+        response = input(message).strip()
+    except EOFError as exc:
+        raise SystemExit("Holdout benchmark requires --confirm-holdout in non-interactive shells.") from exc
+    if response != "RUN HOLDOUT":
+        raise SystemExit("Holdout benchmark cancelled.")
+
+
+def _resolve_benchmark_ref(runtime: SeamRuntime, value: str) -> str | dict[str, object]:
+    if value == "latest":
+        runs = runtime.list_benchmark_runs(limit=1)
+        if not runs:
+            raise SystemExit("No benchmark runs have been persisted yet.")
+        value = str(runs[0]["run_id"])
+    path = Path(value)
+    if path.exists():
+        return value
+    payload = runtime.read_benchmark_run(value)
+    if not payload:
+        raise SystemExit(f"Benchmark bundle or persisted run not found: {value}")
+    return payload
 
 
 def _read_text_source(source: str) -> str:
@@ -637,6 +776,22 @@ def _render_readable_query_pretty(payload: dict[str, object]) -> str:
             lines.append(f"   reasons={reasons}")
         lines.append(f"   {str(hit.get('text', '')).rstrip()}")
     return "\n".join(lines)
+
+
+def _render_ingest_report(payload: dict[str, object]) -> str:
+    document = payload.get("document", {})
+    stored_ids = payload.get("stored_ids", [])
+    return "\n".join(
+        [
+            f"Ingested: {document.get('source_ref')}",
+            f"Document: {document.get('document_id')}",
+            f"Bytes: {document.get('byte_count')}",
+            f"Chunks: {document.get('chunk_count')}",
+            f"Extraction: {document.get('extraction_status')}",
+            f"Index: {document.get('indexed_status')}",
+            f"Stored ids: {', '.join(stored_ids) if stored_ids else '(none)'}",
+        ]
+    )
 
 
 def _check_pgvector(dsn: str | None) -> dict[str, object]:
@@ -732,6 +887,7 @@ def _render_doctor_report(payload: dict[str, object]) -> str:
 def _add_retrieval_common_args(parser: argparse.ArgumentParser, include_backend: bool = True) -> None:
     parser.add_argument("--scope")
     parser.add_argument("--budget", type=int, default=5)
+    parser.add_argument("--mode", choices=["vector", "graph", "hybrid", "mix"], default="hybrid")
     parser.add_argument("--format", choices=["pretty", "json", "ids"], default="pretty")
     parser.add_argument("--trace", action="store_true")
     if include_backend:
@@ -843,6 +999,8 @@ def _render_ids(payload: dict[str, object]) -> str:
         return "\n".join(candidate["record"]["id"] for candidate in payload.get("candidates", []))
     if "candidate_ids" in payload:
         return "\n".join(payload.get("candidate_ids", []))
+    if "results" in payload:
+        return "\n".join(str(item.get("id")) for item in payload.get("results", []))
     if "legs" in payload:
         return "\n".join(leg["name"] for leg in payload.get("legs", []))
     if "record_ids" in payload:

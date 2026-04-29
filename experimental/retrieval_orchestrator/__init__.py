@@ -1,4 +1,4 @@
-from .adapters import ChromaSemanticAdapter, SeamVectorSearchAdapter, SQLiteIRAdapter
+from .adapters import ChromaSemanticAdapter, SeamVectorSearchAdapter, SQLiteGraphAdapter, SQLiteIRAdapter
 from .orchestrator import RetrievalOrchestrator
 from .types import (
     QueryFilters,
@@ -26,6 +26,7 @@ __all__ = [
     "RetrievalPlan",
     "RetrievalSearchResult",
     "SeamVectorSearchAdapter",
+    "SQLiteGraphAdapter",
     "SQLiteIRAdapter",
     "HybridCandidate",
     "HybridSearchResult",

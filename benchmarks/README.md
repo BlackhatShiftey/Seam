@@ -26,6 +26,10 @@ Current fixture groups:
 
 Keep fixtures deterministic and easy to understand from raw text.
 
+Holdout fixtures live under `benchmarks/fixtures/holdout/` and are ignored by
+git. They are publish-only. Do not run them while tuning a change; use them only
+to audit a benchmark claim after development is complete.
+
 ## CLI
 
 Run the full suite:
@@ -52,6 +56,22 @@ Verify a saved bundle:
 ```powershell
 seam benchmark verify seam-benchmark-report.json
 ```
+
+Compare two saved bundles or persisted run ids:
+
+```powershell
+seam benchmark diff run-a.json run-b.json
+seam benchmark diff bench:old bench:new --format json
+```
+
+Run publish-only holdout fixtures:
+
+```powershell
+seam benchmark run all --holdout --confirm-holdout
+```
+
+When no `--output` is supplied, holdout bundles are written under
+`benchmarks/runs/holdout/`, separate from routine benchmark outputs.
 
 ## Blueprint
 
