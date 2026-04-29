@@ -2102,50 +2102,52 @@ State check also found `_imports/awesome-design-md` as an empty leftover directo
 
 ---BEGIN-ENTRY-#104---
 id: 104
-date: 2026-04-29T15:12:11Z
+date: 2026-04-29T15:35:06Z
 agent: codex
 status: done
 topics: dashboard, tui, command, verify, history, snapshot
 commits: none
-refs: seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+refs: seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
 supersedes: 103
-tokens: 123
+tokens: 184
 ---
-Applied the dashboard reload follow-up on the SEAM-CC dashboard redesign branch after review found the reload surface still refreshed the ExplorerTree explicitly. Removed the `_refresh_explorer()` call from `_reload_dashboard_surface()` while leaving startup/timer explorer refresh behavior intact; the interactive ExplorerTree remains responsible for its own rendered hierarchy.
+Fixed the Textual/Dash migration reload blocker on the active PR branch. The migration replaced the old static explorer panel with the interactive `ExplorerTree` widget, but `_reload_dashboard_surface()` still called the removed `_refresh_explorer()` method. Removed that reload call and updated the reload regression to assert the mounted `#explorer-tree` widget instead of the deleted `#explorer-panel` compatibility surface.
 
-Verification: `python -m py_compile seam_runtime\dashboard.py` passed; `git diff --check` passed with only the existing LF-to-CRLF warning; reload-focused pytest passed with 2 selected tests; `python seam.py dashboard --run reload --no-clear` rendered the Reload payload; dashboard pytest passed with 26 selected tests; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 143 tests.
+Verification: `python -m py_compile seam_runtime\dashboard.py seam_runtime\lossless.py test_seam.py` passed; `git diff --check` passed with only LF-to-CRLF warnings; reload-focused pytest passed with 2 selected tests; dashboard pytest passed with 26 selected tests; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 143 tests; `python seam.py dashboard --run reload --no-clear` rendered the Reload payload.
+
+Continuity note: before this entry, `python -m tools.history.verify_continuity` on the PR worktree reported stale HISTORY_INDEX metadata for HISTORY#103 and no latest snapshot after the branch merge. This entry rebuilds the index and is followed by a fresh snapshot.
 ---END-ENTRY-#104---
 
 ---BEGIN-ENTRY-#105---
 id: 105
-date: 2026-04-29T15:13:27Z
+date: 2026-04-29T15:40:45Z
 agent: codex
 status: done
-topics: dashboard, tui, security, verify, history, snapshot
+topics: dashboard, tui, status, verify, history, snapshot
 commits: none
-refs: seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/dashboard.py,test_seam.py
 supersedes: 104
-tokens: 98
+tokens: 109
 ---
-Follow-up security cleanup on the dashboard settings tab. The new pgvector DSN input used a placeholder shaped like a password-bearing DSN, which triggered `python -m tools.history.verify_continuity` even though no real secret was present. Replaced the placeholder with a non-secret local-env instruction while keeping the input masked and env-backed.
+Post-merge bookkeeping after PR #7 merged the Textual/Dash migration into main. The merge brought in the IDE-style ExplorerTree/status-bar dashboard update and the reload regression fix, then local continuity on main reported stale derived hashes/snapshot coverage for the merged HISTORY entries. Updated PROJECT_STATUS to reflect the current dashboard baseline and rebuilt continuity metadata from the merged main checkout.
 
-Verification after cleanup: `python -m tools.history.verify_continuity` passed; `python -m py_compile seam_runtime\dashboard.py` passed; dashboard pytest passed with 26 selected tests; `git diff --check` passed with only existing LF-to-CRLF warnings.
+Verification target after this entry: rerun `python -m tools.history.verify_continuity`, full `python -m pytest test_seam.py tools/history/test_history_tools.py`, and dashboard reload smoke from current main before starting new feature work.
 ---END-ENTRY-#105---
 
 ---BEGIN-ENTRY-#106---
 id: 106
-date: 2026-04-29T23:01:18Z
+date: 2026-04-29T23:38:09Z
 agent: codex
 status: done
 topics: dashboard, tui, textual, verify, status, history, snapshot
 commits: none
-refs: seam_runtime/dashboard.py,seam_runtime/storage.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+refs: seam_runtime/dashboard.py,seam_runtime/storage.py,seam_runtime/lossless.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
 supersedes: 105
-tokens: 230
+tokens: 144
 ---
-Completed the dashboard redesign P0 follow-up on the SEAM-CC branch. Replaced the markup-stripping Log shim with a RichLog-backed `_TextualMarkupPanel` for Overview, MIRL Compression, and Runtime Log so dashboard-authored Rich markup renders in color while arbitrary text/JSON panels remain plain Log widgets. Removed the dead `_refresh_overview` `pgvec_status` and `_cell()` code.
+Rebased the SEAM-CC dashboard P0 polish onto current `origin/main` after the branch diverged from the merged Textual/Dash migration. Resolved the merge by keeping main's newer IDE-style `#explorer-tree` and status-bar dashboard architecture, then reapplied the P0 polish: RichLog-backed colored Overview/MIRL/Runtime panels, Settings tab controls, Settings API apply handling, store list helpers, and Textual tests for Settings and explorer namespace visibility.
 
-Finished the ExplorerTree namespace branch by adding store-backed namespace, scope, and capped record-summary listing. Added SQLiteStore list helpers and a Textual regression test that expands the namespace tree to `local.default` and `thread`. Smoke-tested the Settings tab apply path with a Textual pilot test that switches to Settings, clicks Apply API Settings, verifies env mutation, and verifies the Results panel message.
+Verification during conflict resolution: `python -m py_compile seam_runtime\dashboard.py seam_runtime\storage.py seam_runtime\lossless.py test_seam.py` passed; focused Textual pytest for mount/reload/settings/explorer passed with 4 selected tests; `python seam.py dashboard --run reload --no-clear` rendered the reload dashboard.
 
-Verification: baseline `python -m pytest test_seam.py -q` passed with 117 tests before edits. After edits, `python -m py_compile seam_runtime\dashboard.py seam_runtime\storage.py test_seam.py` passed; focused Textual tests passed; full `python -m pytest test_seam.py -q` passed with 119 tests; `python seam.py dashboard --snapshot --no-clear` passed; `python seam.py dashboard --run reload --no-clear` passed. `git diff --check` returned only existing LF-to-CRLF warnings, and the candidate secret/session scan over changed files found no hits.
+Next verification target: rebuild HISTORY_INDEX.md, write a snapshot, run continuity/integrity, full pytest, then complete the merge commit and PR path.
 ---END-ENTRY-#106---

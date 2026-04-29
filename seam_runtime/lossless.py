@@ -702,7 +702,7 @@ def _resolve_token_counter(tokenizer: str) -> tuple[Callable[[str], int], str]:
     if tokenizer == "auto":
         try:
             encoder = _load_tiktoken_encoding("cl100k_base")
-        except RuntimeError:
+        except Exception:
             return _approximate_prompt_tokens, TOKEN_ESTIMATOR
         return lambda text: len(encoder.encode(text)), "tiktoken:cl100k_base"
     if tokenizer == TOKEN_ESTIMATOR:

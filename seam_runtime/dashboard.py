@@ -33,12 +33,11 @@ try:
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, ScrollableContainer, Vertical
     from textual.widgets import Button, Input, Label, Log, RichLog, Static, TabbedContent, TabPane, Tree
-    from textual.widgets.tree import TreeNode
 
     _TEXTUAL_IMPORT_ERROR = None
 except ImportError as exc:  # pragma: no cover - optional dashboard path
     on = App = ComposeResult = Horizontal = Vertical = Input = Log = RichLog = Static = None  # type: ignore[assignment]
-    TabbedContent = TabPane = Tree = TreeNode = Button = Label = None  # type: ignore[assignment]
+    TabbedContent = TabPane = Tree = Button = Label = None  # type: ignore[assignment]
     ScrollableContainer = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
 
@@ -197,10 +196,17 @@ class SeamChatClient:
             return f"Chat request failed: {exc}"
 
 
-if App is not None and Static is not None and Input is not None and Log is not None and RichLog is not None:
+if (
+    App is not None
+    and Static is not None
+    and Input is not None
+    and Log is not None
+    and RichLog is not None
+    and Button is not None
+    and Label is not None
+    and ScrollableContainer is not None
+):
     class _TextualPanel(Log):
-        """Plain scrollable log panel for arbitrary text output."""
-
         can_focus = True
         BINDINGS = [
             ("up", "scroll_up", "Up"),
@@ -216,13 +222,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
             ("escape", "focus_input", "Back to input"),
         ]
 
-        def __init__(
-            self,
-            title: str,
-            panel_id: str,
-            *,
-            auto_scroll_mode: bool = False,
-        ) -> None:
+        def __init__(self, title: str, panel_id: str, *, auto_scroll_mode: bool = False) -> None:
             super().__init__(highlight=False, max_lines=2000, auto_scroll=False, id=panel_id)
             self._title = title
             self._panel_lines: list[str] = []
@@ -275,13 +275,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
         can_focus = True
         BINDINGS = _TextualPanel.BINDINGS
 
-        def __init__(
-            self,
-            title: str,
-            panel_id: str,
-            *,
-            auto_scroll_mode: bool = False,
-        ) -> None:
+        def __init__(self, title: str, panel_id: str, *, auto_scroll_mode: bool = False) -> None:
             super().__init__(highlight=False, markup=True, max_lines=2000, id=panel_id)
             self._title = title
             self._panel_lines: list[str] = []
@@ -324,207 +318,65 @@ if App is not None and Static is not None and Input is not None and Log is not N
 
 
     class ExplorerTree(Tree):
-        """VS Code-style explorer tree.
-
-        Supports two root branches:
-        - ``SEAM Database`` — live record counts, expandable namespace tree.
-        - ``File System``   — lazy filesystem browser; click a file to stage
-          it for compilation or batch-compile.
-
-        Maintains a ``_panel_lines`` list for test-suite compatibility
-        (tests check for expected labels via string search).
-        """
+        """Interactive explorer sidebar showing ns → scope → kind hierarchy."""
 
         BINDINGS = [
+            ("r", "refresh_tree", "Refresh"),
             ("escape", "focus_input", "Back to input"),
         ]
-        can_focus = True
 
-        def __init__(self) -> None:
-            super().__init__("seam/", id="explorer-panel")
-            self._panel_lines: list[str] = ["seam/", "  memory 0"]
-            self._db_root: Any = None
-            self._fs_root: Any = None
+        def __init__(self, store_path: str) -> None:
+            super().__init__("seam://", id="explorer-tree")
+            self._store_path = store_path
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.border_title = "Explorer"
+            self.border_subtitle = "r=refresh  Enter=open"
             self.root.expand()
-            self._db_root = self.root.add(
-                "\U0001f4e6 SEAM Database", data={"type": "db_root"}, expand=True
-            )
-            self._db_root.add_leaf("(loading…)", data={"type": "placeholder"})
-            cwd = Path.cwd()
-            self._fs_root = self.root.add(
-                f"\U0001f4c1 {cwd.name}", data={"type": "fs_dir", "path": cwd}
-            )
-            self._fs_root.add_leaf("(expand to browse)", data={"type": "placeholder"})
+            self._populate()
 
-        def populate_db(self, metrics: "DashboardMetrics") -> None:
-            """Refresh the Database branch from fresh metrics."""
-            if self._db_root is None:
-                return
-            self._db_root.remove_children()
-            stats = self._db_root.add("\U0001f4ca Stats", data={"type": "db_stats"}, expand=True)
-            stats.add_leaf(f"memory   {metrics.total_records}", data={"type": "stat"})
-            stats.add_leaf(f"vectors  {metrics.vector_entries}", data={"type": "stat"})
-            stats.add_leaf(f"packs    {metrics.pack_entries}", data={"type": "stat"})
-            stats.add_leaf(f"prov     {metrics.provenance_entries}", data={"type": "stat"})
-            ns_node = self._db_root.add(
-                f"\U0001f4c2 Namespaces ({metrics.namespaces})",
-                data={"type": "ns_root"},
-            )
-            ns_node.add_leaf("(expand to list)", data={"type": "placeholder"})
-            self._panel_lines = [
-                "seam/",
-                f"  memory   {metrics.total_records}",
-                f"  vectors  {metrics.vector_entries}",
-                f"  packs    {metrics.pack_entries}",
-                f"  prov     {metrics.provenance_entries}",
-                f"  ns       {metrics.namespaces}",
-            ]
-
-        # ── Lazy filesystem expand ─────────────────────────────────────
-
-        def on_tree_node_expanded(  # pragma: no cover - textual runtime behavior
-            self, event: "Tree.NodeExpanded"
-        ) -> None:
-            node = event.node
-            data = node.data or {}
-            node_type = data.get("type")
-            children = list(node.children)
-            # Only expand when there is exactly one placeholder child
-            if not (len(children) == 1 and (children[0].data or {}).get("type") == "placeholder"):
-                return
-            if node_type == "fs_dir":
-                self._lazy_expand_dir(node, data["path"])
-            elif node_type == "ns_root":
-                self._lazy_expand_namespaces(node)
-            elif node_type == "namespace":
-                self._lazy_expand_namespace(node, data["ns"])
-            elif node_type == "scope":
-                self._lazy_expand_scope(node, data["ns"], data["scope"])
-
-        def _store(self) -> Any:
-            controller = getattr(self.app, "controller", None)
-            runtime = getattr(controller, "runtime", None)
-            return getattr(runtime, "store", None)
-
-        def _lazy_expand_namespaces(self, node: Any) -> None:  # pragma: no cover
-            node.remove_children()
-            store = self._store()
-            if store is None:
-                node.add_leaf("(runtime store unavailable)", data={"type": "info"})
-                return
+        def _populate(self) -> None:
+            self.clear()
+            self.root.expand()
             try:
-                namespaces = store.list_namespaces()
-            except Exception as exc:
-                node.add_leaf(f"(error: {exc})", data={"type": "info"})
-                return
-            if not namespaces:
-                node.add_leaf("(no namespaces)", data={"type": "info"})
-                return
-            for namespace in namespaces:
-                child = node.add(
-                    f"\U0001f4c1 {namespace}",
-                    data={"type": "namespace", "ns": namespace},
-                )
-                child.add_leaf("(expand for scopes)", data={"type": "placeholder"})
-
-        def _lazy_expand_namespace(self, node: Any, namespace: str) -> None:  # pragma: no cover
-            node.remove_children()
-            store = self._store()
-            if store is None:
-                node.add_leaf("(runtime store unavailable)", data={"type": "info"})
-                return
-            try:
-                scopes = store.list_scopes(namespace)
-            except Exception as exc:
-                node.add_leaf(f"(error: {exc})", data={"type": "info"})
-                return
-            if not scopes:
-                node.add_leaf("(no scopes)", data={"type": "info"})
-                return
-            for scope in scopes:
-                child = node.add(
-                    f"\U0001f4c2 {scope}",
-                    data={"type": "scope", "ns": namespace, "scope": scope},
-                )
-                child.add_leaf("(expand for records)", data={"type": "placeholder"})
-
-        def _lazy_expand_scope(self, node: Any, namespace: str, scope: str) -> None:  # pragma: no cover
-            node.remove_children()
-            store = self._store()
-            if store is None:
-                node.add_leaf("(runtime store unavailable)", data={"type": "info"})
-                return
-            try:
-                records = store.list_record_summaries(namespace, scope, limit=100)
-            except Exception as exc:
-                node.add_leaf(f"(error: {exc})", data={"type": "info"})
-                return
-            if not records:
-                node.add_leaf("(no records)", data={"type": "info"})
-                return
-            for record in records:
-                node.add_leaf(
-                    f"{record['kind']:<4} {record['id']}",
-                    data={"type": "record", "id": record["id"]},
-                )
-            if len(records) >= 100:
-                node.add_leaf("... (showing first 100)", data={"type": "info"})
-
-        def _lazy_expand_dir(self, node: Any, path: Path) -> None:  # pragma: no cover
-            node.remove_children()
-            try:
-                entries = sorted(
-                    path.iterdir(),
-                    key=lambda p: (not p.is_dir(), p.name.lower()),
-                )
-                count = 0
-                for entry in entries:
-                    if entry.name.startswith(".") and entry.name not in {".env", ".seam"}:
-                        continue
-                    if entry.is_dir():
-                        child = node.add(
-                            f"\U0001f4c1 {entry.name}",
-                            data={"type": "fs_dir", "path": entry},
+                with sqlite3.connect(self._store_path) as conn:
+                    ns_rows = conn.execute(
+                        "SELECT ns, COUNT(*) FROM ir_records GROUP BY ns ORDER BY ns"
+                    ).fetchall()
+                    if not ns_rows:
+                        self.root.add_leaf("(no records yet)")
+                        return
+                    for ns, ns_count in ns_rows:
+                        ns_node = self.root.add(
+                            f"\U0001f4c2 {ns}  [{ns_count}]",
+                            data={"type": "ns", "ns": ns},
                         )
-                        child.add_leaf("(expand)", data={"type": "placeholder"})
-                    else:
-                        suffix = entry.suffix.lower()
-                        icon = (
-                            "\U0001f40d" if suffix == ".py"
-                            else "⚙️" if suffix in {".json", ".yaml", ".toml", ".env"}
-                            else "\U0001f4c4"
-                        )
-                        node.add_leaf(
-                            f"{icon} {entry.name}",
-                            data={"type": "fs_file", "path": entry},
-                        )
-                    count += 1
-                    if count >= 120:
-                        node.add_leaf("… (truncated)", data={"type": "info"})
-                        break
-            except (PermissionError, OSError):
-                node.add_leaf("⛔ (permission denied)")
+                        scope_rows = conn.execute(
+                            "SELECT scope, COUNT(*) FROM ir_records WHERE ns=? GROUP BY scope ORDER BY scope",
+                            (ns,),
+                        ).fetchall()
+                        for scope, scope_count in scope_rows:
+                            scope_node = ns_node.add(
+                                f"\U0001f4c4 {scope}  [{scope_count}]",
+                                data={"type": "scope", "ns": ns, "scope": scope},
+                            )
+                            kind_rows = conn.execute(
+                                "SELECT kind, COUNT(*) FROM ir_records WHERE ns=? AND scope=? GROUP BY kind ORDER BY COUNT(*) DESC",
+                                (ns, scope),
+                            ).fetchall()
+                            for kind, count in kind_rows:
+                                scope_node.add_leaf(
+                                    f"  {kind:<6} {count}",
+                                    data={"type": "kind", "ns": ns, "scope": scope, "kind": kind},
+                                )
+            except Exception as exc:
+                self.root.add_leaf(f"(error: {exc})")
 
-        def on_tree_node_selected(  # pragma: no cover - textual runtime behavior
-            self, event: "Tree.NodeSelected"
-        ) -> None:
-            node = event.node
-            data = node.data or {}
-            node_type = data.get("type")
-            if node_type == "fs_file":
-                path: Path = data["path"]
-                try:
-                    self.app._push_file_action(path)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+        def action_refresh_tree(self) -> None:  # pragma: no cover - textual runtime behavior
+            self._populate()
 
         def action_focus_input(self) -> None:  # pragma: no cover - textual runtime behavior
-            try:
-                self.app.query_one("#command-input", Input).focus()
-            except Exception:
-                pass
+            self.app.query_one("#command-input", Input).focus()
 
 
     class TextualDashboardApp(App[None]):
@@ -542,27 +394,10 @@ if App is not None and Static is not None and Input is not None and Log is not N
             background: #050b1e;
             text-style: bold;
         }
-        /* ── Metric cards strip ─────────────────────────────── */
-        #metrics-row {
-            height: 6;
-        }
-        #card-compression {
-            width: 1fr;
-            border: round #7fe0ff;
+        #metrics {
+            height: 3;
+            border: round $primary;
             padding: 0 1;
-            background: #08132a;
-        }
-        #card-persistence {
-            width: 1fr;
-            border: round #4f8cfb;
-            padding: 0 1;
-            background: #08132a;
-        }
-        #card-improvement {
-            width: 1fr;
-            border: round #9b6cff;
-            padding: 0 1;
-            background: #08132a;
         }
 
         /* ── IDE body: explorer | tabs | chat+results ────────────── */
@@ -570,21 +405,14 @@ if App is not None and Static is not None and Input is not None and Log is not N
             height: 1fr;
         }
 
-        /* Explorer sidebar (Tree widget) */
-        #explorer-panel {
-            width: 28;
+        /* Explorer sidebar */
+        #explorer-tree {
+            width: 30;
             border: round #4f8cfb;
             background: #050b1e;
         }
-        #explorer-panel:focus {
+        #explorer-tree:focus {
             border: heavy #7efbff;
-        }
-        ExplorerTree > .tree--cursor {
-            background: #274063;
-            color: #7fe0ff;
-        }
-        ExplorerTree > .tree--highlight {
-            background: #1a2540;
         }
 
         /* Centre: TabbedContent fills remaining width */
@@ -659,12 +487,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
             display: none;
         }
 
-        /* ── Input bar docked to bottom ──────────────────────────── */
-        #command-input {
-            dock: bottom;
-            border: round $primary;
-        }
-
         /* ── Settings tab ─────────────────────────────────────────── */
         #settings-scroll {
             width: 1fr;
@@ -705,9 +527,32 @@ if App is not None and Static is not None and Input is not None and Log is not N
             border: round #9b6cff;
             color: #d391ff;
         }
+
+        /* ── Status bar above input ──────────────────────────────── */
+        #status-bar {
+            dock: bottom;
+            height: 1;
+            background: #1a2a4a;
+            color: #8df6ff;
+            padding: 0 1;
+        }
+
+        /* ── Input bar docked to bottom ──────────────────────────── */
+        #command-input {
+            dock: bottom;
+            border: round $primary;
+        }
         """
 
-        BINDINGS = [("ctrl+c", "quit", "Quit"), ("ctrl+d", "quit", "Quit")]
+        BINDINGS = [
+            ("ctrl+c", "quit", "Quit"),
+            ("ctrl+d", "quit", "Quit"),
+            ("ctrl+b", "toggle_sidebar", "Toggle Explorer"),
+            ("[", "sidebar_shrink", "Shrink Explorer"),
+            ("]", "sidebar_grow", "Grow Explorer"),
+            ("{", "rightcol_shrink", "Shrink Chat"),
+            ("}", "rightcol_grow", "Grow Chat"),
+        ]
 
         def __init__(
             self,
@@ -784,18 +629,17 @@ if App is not None and Static is not None and Input is not None and Log is not N
             # compile/compress/benchmark triggers.
             self._anim_engine = _ui_animations.AnimationEngine(height=6)
             self._mirl_animation_running = False
+            self._sidebar_width = 30
+            self._rightcol_width = 34
 
         def compose(self) -> ComposeResult:
-            # ── Header: logo + 3-card metrics strip (always visible) ──
+            # ── Header: logo + slim metrics bar (always visible) ──────
             yield Static("", id="logo-header")
-            with Horizontal(id="metrics-row"):
-                yield Static("", id="card-compression")
-                yield Static("", id="card-persistence")
-                yield Static("", id="card-improvement")
+            yield Static("", id="metrics")
             # ── IDE body ──────────────────────────────────────────────
             with Horizontal(id="ide-layout"):
-                # Left: VS Code-style interactive explorer tree
-                yield ExplorerTree()
+                # Left: interactive explorer sidebar
+                yield ExplorerTree(self.controller.runtime.store.path)
                 # Centre: tabbed workspace
                 with TabbedContent(id="main-tabs"):
                     with TabPane("Overview", id="tab-overview"):
@@ -810,74 +654,29 @@ if App is not None and Static is not None and Input is not None and Log is not N
                         yield _TextualMarkupPanel("MIRL Compression", "mirl-panel")
                     with TabPane("Live", id="tab-live"):
                         with Horizontal(id="live-row"):
-                            yield _TextualMarkupPanel(
-                                "Runtime Log", "runtime-log-panel",
-                                auto_scroll_mode=True,
-                            )
-                            yield _TextualPanel(
-                                "Command History", "command-history-panel",
-                                auto_scroll_mode=True,
-                            )
+                            yield _TextualMarkupPanel("Runtime Log", "runtime-log-panel", auto_scroll_mode=True)
+                            yield _TextualPanel("Command History", "command-history-panel", auto_scroll_mode=True)
                     with TabPane("Provenance", id="tab-prov"):
                         yield _TextualPanel("Provenance Graph", "prov-panel")
                     with TabPane("Settings", id="tab-settings"):
                         with ScrollableContainer(id="settings-scroll"):
                             with Vertical(id="settings-panel"):
-                                yield Static(
-                                    "── Chat / AI ──────────────────────────────",
-                                    classes="settings-section",
-                                )
+                                yield Static("── Chat / AI ──────────────────────────────", classes="settings-section")
                                 yield Label("Chat API Key  (SEAM_CHAT_API_KEY / OPENAI_API_KEY)", classes="settings-label")
-                                yield Input(
-                                    value=os.environ.get("SEAM_CHAT_API_KEY", ""),
-                                    placeholder="sk-…  or  or-…",
-                                    password=True,
-                                    id="cfg-api-key",
-                                    classes="settings-input",
-                                )
+                                yield Input(value=os.environ.get("SEAM_CHAT_API_KEY", ""), placeholder="sk-…  or  or-…", password=True, id="cfg-api-key", classes="settings-input")
                                 yield Label("Base URL  (SEAM_CHAT_BASE_URL)", classes="settings-label")
-                                yield Input(
-                                    value=os.environ.get("SEAM_CHAT_BASE_URL", "https://api.openai.com/v1"),
-                                    placeholder="https://api.openai.com/v1",
-                                    id="cfg-base-url",
-                                    classes="settings-input",
-                                )
+                                yield Input(value=os.environ.get("SEAM_CHAT_BASE_URL", "https://api.openai.com/v1"), placeholder="https://api.openai.com/v1", id="cfg-base-url", classes="settings-input")
                                 yield Label("Model  (SEAM_CHAT_MODEL)", classes="settings-label")
-                                yield Input(
-                                    value=os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini"),
-                                    placeholder="gpt-4o-mini",
-                                    id="cfg-model",
-                                    classes="settings-input",
-                                )
+                                yield Input(value=os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini"), placeholder="gpt-4o-mini", id="cfg-model", classes="settings-input")
                                 yield Button("Apply API Settings", id="btn-apply-api", classes="settings-btn")
-                                yield Static(
-                                    "── Database ────────────────────────────────",
-                                    classes="settings-section",
-                                )
+                                yield Static("── Database ────────────────────────────────", classes="settings-section")
                                 yield Label("DB Path  (SEAM_DB_PATH)", classes="settings-label")
-                                yield Input(
-                                    value=os.environ.get("SEAM_DB_PATH", ""),
-                                    placeholder="(default: ~/.seam/seam.db)",
-                                    id="cfg-db-path",
-                                    classes="settings-input",
-                                )
-                                yield Static(
-                                    "── pgvector ────────────────────────────────",
-                                    classes="settings-section",
-                                )
+                                yield Input(value=os.environ.get("SEAM_DB_PATH", ""), placeholder="(default: ~/.seam/seam.db)", id="cfg-db-path", classes="settings-input")
+                                yield Static("── pgvector ────────────────────────────────", classes="settings-section")
                                 yield Label("pgvector DSN  (SEAM_PGVECTOR_DSN)", classes="settings-label")
-                                yield Input(
-                                    value=os.environ.get("SEAM_PGVECTOR_DSN", ""),
-                                    placeholder="Set SEAM_PGVECTOR_DSN in local env",
-                                    password=True,
-                                    id="cfg-pgvector-dsn",
-                                    classes="settings-input",
-                                )
+                                yield Input(value=os.environ.get("SEAM_PGVECTOR_DSN", ""), placeholder="Set SEAM_PGVECTOR_DSN in local env", password=True, id="cfg-pgvector-dsn", classes="settings-input")
                                 yield Button("Apply DB / pgvector Settings", id="btn-apply-db", classes="settings-btn")
-                                yield Static(
-                                    "── Config Files ────────────────────────────",
-                                    classes="settings-section",
-                                )
+                                yield Static("── Config Files ────────────────────────────", classes="settings-section")
                                 yield Button("Open .env in explorer", id="btn-open-env", classes="settings-btn")
                                 yield Button("Open seam config dir", id="btn-open-config-dir", classes="settings-btn")
                                 yield Button("Reload env from disk", id="btn-reload-env", classes="settings-btn settings-btn-danger")
@@ -887,6 +686,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     yield _TextualPanel("Results", "result-panel", auto_scroll_mode=True)
             # ── Overlay: command palette + input bar ──────────────────
             yield Static("", id="command-palette")
+            yield Static("", id="status-bar")
             yield Input(placeholder="", id="command-input")
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
@@ -894,7 +694,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._refresh_metrics()
             self._refresh_input_placeholder()
             self._sync_side_panel()
-            self._refresh_explorer()
             self._refresh_overview()
             self.query_one("#benchmark-panel", _TextualPanel).set_lines(["Run `benchmark <file>` to populate benchmark results."])
             self.query_one("#retrieval-panel", _TextualPanel).set_lines(["Run search/retrieve/context/plan to populate this panel."])
@@ -917,17 +716,10 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self.query_one("#command-history-panel", _TextualPanel).set_lines(["No commands yet."])
             self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(
                 [
-                    "[bold #7fe0ff]MIRL Live Interpreter[/]  [dim]SEAM-LX/1 Compression Engine[/]",
+                    "SEAM-LX/1 Compression Engine",
                     "",
-                    f"[#4f8cfb][MIRL][/][dim]>>[/][#bfefff]pack[/]([dim]src:[/][#f4d676]\"./config/\"[/], [dim]dest:[/][#f4d676]\"conf.seam\"[/], [dim]codec:[/][#f4d676]MIRL-LZ[/])",
-                    f"[#4f8cfb][MIRL][/][dim]>>[/][#bfefff]db.store[/]([#f4d676]\"conf.seam\"[/], [dim]tags:[/][[#f4d676]\"config\"[/], [#f4d676]\"v1\"[/]])",
-                    f"[#4f8cfb][MIRL][/][dim]>>[/][#bfefff]retrieve[/]([dim]query:[/][#f4d676]\"natural language\"[/], [dim]budget:[/][#d391ff]6[/], [dim]mode:[/][#f4d676]hybrid[/])",
-                    f"[#4f8cfb][MIRL][/][dim]>>[/][#bfefff]improve[/]([dim]ref:[/][#f4d676]\"db/conf.seam\"[/], [dim]goal:[/][#d391ff]0.95[/])",
-                    "",
-                    f"[#7efdb9][SEAM_OK: idle — awaiting input][/]",
-                    "",
-                    "[dim]Run  compile / compress / benchmark  to trigger the[/]",
-                    "[dim]live  RAW → IR → PACK → LX/1  animation pipeline.[/]",
+                    "Idle — run compile/compress/benchmark to trigger the",
+                    "live RAW → IR → PACK → LX/1 animation.",
                 ]
             )
             self.query_one("#prov-panel", _TextualPanel).set_lines(
@@ -1229,6 +1021,40 @@ if App is not None and Static is not None and Input is not None and Log is not N
             if should_exit:
                 self.exit()
 
+        @on(Tree.NodeSelected, "#explorer-tree")
+        def _on_explorer_node_selected(self, event: Tree.NodeSelected) -> None:  # pragma: no cover - textual runtime behavior
+            data = event.node.data
+            if not data:
+                return
+            ns = data.get("ns")
+            scope = data.get("scope")
+            kind = data.get("kind")
+            try:
+                batch = self.controller.runtime.store.load_ir(
+                    ns=ns,
+                    scope=scope if scope else None,
+                )
+                if kind:
+                    records = [r for r in batch.records if r.kind.value == kind]
+                else:
+                    records = batch.records
+                if not records:
+                    lines = [f"No records for {ns}/{scope or '*'}/{kind or '*'}"]
+                else:
+                    lines = []
+                    for rec in records[:200]:
+                        lines.append(f"[{rec.kind.value}] {rec.id}")
+                        if hasattr(rec, 'body') and rec.body:
+                            preview = str(rec.body)[:120].replace('\n', ' ')
+                            lines.append(f"  {preview}")
+                        lines.append("")
+                self.query_one("#memory-panel", _TextualPanel).set_lines(lines)
+                tabs = self.query_one("#main-tabs", TabbedContent)
+                tabs.active = "tab-memory"
+                self._update_status(f"Explorer: {ns}/{scope or '*'}")
+            except Exception as exc:
+                self._update_status(f"Explorer error: {exc}")
+
         def _handle_shortcut(self, raw: str) -> None:
             prefix = raw[:1]
             content = raw[1:].strip()
@@ -1489,8 +1315,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self.result_lines.extend([f"{title}", body, ""])
             self.query_one("#result-panel", _TextualPanel).set_lines(self.result_lines)
 
-        # ── Settings button handlers ───────────────────────────────────
-
         @on(Button.Pressed, "#btn-apply-api")
         def _on_btn_apply_api(self, event: Button.Pressed) -> None:  # pragma: no cover
             api_key = self.query_one("#cfg-api-key", Input).value.strip()
@@ -1516,12 +1340,21 @@ if App is not None and Static is not None and Input is not None and Log is not N
 
         @on(Button.Pressed, "#btn-apply-db")
         def _on_btn_apply_db(self, event: Button.Pressed) -> None:  # pragma: no cover
+            db_path = self.query_one("#cfg-db-path", Input).value.strip()
             dsn = self.query_one("#cfg-pgvector-dsn", Input).value.strip()
+            changed: list[str] = []
+            if db_path:
+                os.environ["SEAM_DB_PATH"] = db_path
+                changed.append("SEAM_DB_PATH")
             if dsn:
                 os.environ["SEAM_PGVECTOR_DSN"] = dsn
-                self._push_result("Settings", "SEAM_PGVECTOR_DSN updated for this session. Restart required for pgvector connection.")
-            else:
-                self._push_result("Settings", "pgvector DSN field empty — nothing changed.")
+                changed.append("SEAM_PGVECTOR_DSN")
+            msg = (
+                f"Updated for this session: {', '.join(changed)}. Restart required for new runtime connections."
+                if changed else
+                "DB and pgvector fields empty — nothing changed."
+            )
+            self._push_result("Settings", msg)
 
         @on(Button.Pressed, "#btn-open-env")
         def _on_btn_open_env(self, event: Button.Pressed) -> None:  # pragma: no cover
@@ -1530,23 +1363,18 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 Path.home() / "Documents" / "SEAM" / "local" / ".env",
                 Path(".env"),
             ]
-            found = next((p for p in env_candidates if p.exists()), None)
-            if found:
-                self._push_file_action(found)
-            else:
+            found = next((path for path in env_candidates if str(path) and path.exists()), None)
+            if found is None:
                 self._push_result("Settings", f"No .env found. Checked: {[str(p) for p in env_candidates]}")
+            else:
+                self._push_result("Settings", f".env found: {found}\nSize: {found.stat().st_size} bytes")
 
         @on(Button.Pressed, "#btn-open-config-dir")
         def _on_btn_open_config_dir(self, event: Button.Pressed) -> None:  # pragma: no cover
             config_dir = Path.home() / "Documents" / "SEAM"
             if config_dir.exists():
-                tree = self.query_one("#explorer-panel", ExplorerTree)
-                if tree._fs_root is not None:
-                    tree._fs_root.data = {"type": "fs_dir", "path": config_dir}
-                    tree._fs_root.label = f"\U0001f4c1 SEAM ({config_dir.name})"  # type: ignore[assignment]
-                    tree._fs_root.remove_children()
-                    tree._fs_root.add_leaf("(expand)", data={"type": "placeholder"})
-                self._push_result("Settings", f"Explorer rooted at {config_dir}. Expand the File System node.")
+                self._push_result("Settings", f"Config dir found: {config_dir}")
+                self._update_status(f"Config dir: {config_dir}")
             else:
                 self._push_result("Settings", f"Config dir not found: {config_dir}")
 
@@ -1554,12 +1382,12 @@ if App is not None and Static is not None and Input is not None and Log is not N
         def _on_btn_reload_env(self, event: Button.Pressed) -> None:  # pragma: no cover
             env_path = next(
                 (
-                    p for p in [
+                    path for path in [
                         Path(os.environ.get("SEAM_LOCAL_ENV", "")).expanduser(),
                         Path.home() / "Documents" / "SEAM" / "local" / ".env",
                         Path(".env"),
                     ]
-                    if p.exists()
+                    if str(path) and path.exists()
                 ),
                 None,
             )
@@ -1572,39 +1400,16 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     line = raw_line.strip()
                     if not line or line.startswith("#") or "=" not in line:
                         continue
-                    key, _, val = line.partition("=")
+                    key, value = line.split("=", 1)
                     key = key.strip()
-                    val = val.strip().strip("\"'")
-                    if key:
-                        os.environ[key] = val
+                    if key.startswith("SEAM_") or key in {"OPENAI_API_KEY"}:
+                        os.environ[key] = value.strip().strip('"').strip("'")
                         loaded.append(key)
                 self.chat_client = SeamChatClient()
                 self._refresh_logo()
                 self._push_result("Settings", f"Reloaded {len(loaded)} vars from {env_path}: {', '.join(loaded[:8])}")
             except Exception as exc:
                 self._push_result("Settings", f"Failed to reload .env: {exc}")
-
-        def _push_file_action(self, path: Path) -> None:  # pragma: no cover
-            """Show file info in the result panel when the explorer selects a file."""
-            suffix = path.suffix.lower()
-            is_compilable = suffix in {".txt", ".md", ".py", ".json", ".yaml", ".toml", ""}
-            size = path.stat().st_size if path.exists() else 0
-            lines = [
-                f"File: {path}",
-                f"Size: {size:,} bytes",
-                "",
-            ]
-            if is_compilable:
-                lines += [
-                    "Compile this file:",
-                    f"  /compile-dsl {path}",
-                    "",
-                    "Or batch compile with:",
-                    f"  !seam ingest {path} --persist",
-                ]
-            else:
-                lines.append("(not a text file — cannot compile directly)")
-            self._push_result(f"File: {path.name}", "\n".join(lines))
 
         def _reload_dashboard_surface(self) -> None:
             self._hide_command_palette()
@@ -1633,12 +1438,15 @@ if App is not None and Static is not None and Input is not None and Log is not N
             # This panel always shows the live runtime event stream.
             panel = self.query_one("#runtime-log-panel", _TextualMarkupPanel)
             _kind_color: dict[str, str] = {
-                "store": "#7efdb9",   # mint — ok/persisted
-                "index": "#d391ff",   # bloom — vector sync
-                "query": "#7fe0ff",   # cyan — retrieval
-                "pack":  "#7efdb9",   # mint — context pack
-                "agent": "#f4d676",   # gold — agent activity
-                "trace": "#9b6cff",   # violet — provenance
+                "store": "#7efdb9",
+                "index": "#d391ff",
+                "query": "#7fe0ff",
+                "pack": "#7efdb9",
+                "agent": "#f4d676",
+                "trace": "#9b6cff",
+                "reload": "#7fe0ff",
+                "shell": "#f4d676",
+                "system": "#9fd4ff",
             }
             lines = [
                 f"[dim]{event.timestamp}[/]  "
@@ -1659,41 +1467,14 @@ if App is not None and Static is not None and Input is not None and Log is not N
             compressed = max(source_tokens - machine_tokens, 0)
             savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
             token_rate = self._estimate_token_rate()
-
-            # ── Card 1: Compression & Packaging ─────────────────────
-            bar_fill = self._bar(savings_ratio, 16)
-            pct = int(savings_ratio * 100)
-            compression_card = (
-                f"[bold #7fe0ff]Compression & Packaging[/]\n"
-                f"[#f4d676]•[/] Codec:    [#f4d676]SEAM-LX/1[/]\n"
-                f"[#f4d676]•[/] Savings:  [#d391ff]{pct}%[/]  src=[dim]{source_tokens}[/] → mch=[dim]{machine_tokens}[/]\n"
-                f"[#f4d676]•[/] Rate:     [#9fd4ff]{token_rate:.0f} tok/s[/]\n"
-                f"{bar_fill}"
+            summary = (
+                f"[{metrics.db_size}] {metrics.db_path}  "
+                f"records={metrics.total_records}  vectors={metrics.vector_entries}  "
+                f"packs={metrics.pack_entries}  mode={self.input_mode}\n"
+                f"tok/s={token_rate:.0f}  compressed={compressed} (src={source_tokens} → mch={machine_tokens})  "
+                f"DB:{self._bar(db_ratio, 14)}  lx1:{self._bar(savings_ratio, 14)}"
             )
-
-            # ── Card 2: Persistence DB ──────────────────────────────
-            db_bar = self._bar(db_ratio, 16)
-            rw_ops = "—"
-            persistence_card = (
-                f"[bold #4f8cfb]Persistence DB[/]\n"
-                f"[#f4d676]•[/] Objects:  [#d391ff]{metrics.total_records}[/]\n"
-                f"[#f4d676]•[/] DB Size:  [#d391ff]{metrics.db_size}[/]  vectors=[dim]{metrics.vector_entries}[/]\n"
-                f"[#f4d676]•[/] Packs:    [#d391ff]{metrics.pack_entries}[/]  prov=[dim]{metrics.provenance_entries}[/]\n"
-                f"{db_bar}"
-            )
-
-            # ── Card 3: Improvement Loop ────────────────────────────
-            improvement_card = (
-                f"[bold #9b6cff]Improvement Loop[/]\n"
-                f"[#f4d676]•[/] Mode:     [#7efdb9]{self.input_mode}[/]\n"
-                f"[#f4d676]•[/] Model:    [#9fd4ff]{metrics.model_name[:22]}[/]\n"
-                f"[#f4d676]•[/] Adapter:  [#d391ff]{metrics.vector_adapter_name}[/]\n"
-                f"[#f4d676]•[/] pgvector: [{'#7efdb9]configured' if metrics.pgvector_configured else '#f4d676]standby'}[/]"
-            )
-
-            self.query_one("#card-compression", Static).update(compression_card)
-            self.query_one("#card-persistence", Static).update(persistence_card)
-            self.query_one("#card-improvement", Static).update(improvement_card)
+            self.query_one("#metrics", Static).update(summary)
 
         def _refresh_tab_bar(self) -> None:
             # Sync TabbedContent active state from the controller's coarse tab flag.
@@ -1825,16 +1606,9 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             try:
                 self._refresh_metrics()
-                self._refresh_explorer()
                 self._refresh_overview()
+                self._update_status()
             except Exception:  # pragma: no cover - timer can fire during teardown
-                return
-
-        def _refresh_explorer(self) -> None:
-            try:
-                metrics = self.controller._collect_metrics()
-                self.query_one("#explorer-panel", ExplorerTree).populate_db(metrics)
-            except Exception:
                 return
 
         def _refresh_overview(self) -> None:
@@ -1845,64 +1619,41 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 compressed = max(source_tokens - machine_tokens, 0)
                 savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
                 total = max(metrics.total_records, 1)
-                profile_pairs = [
-                    ("PRIMARY MODEL",    metrics.model_name[:20]),
-                    ("EXECUTION MODE",   metrics.execution_mode),
-                    ("EMBEDDING",        metrics.vector_adapter_name),
-                    ("PGVECTOR",         "configured" if metrics.pgvector_configured else "standby"),
-                    ("DB SIZE",          metrics.db_size),
-                    ("DB PATH",          Path(metrics.db_path).name),
-                ]
-
                 lines = [
-                    f"[bold #7fe0ff]── Runtime Profile {'─' * 36}[/]",
+                    "─── SEAM Runtime Overview ─────────────────────────────────",
+                    f"  Database   {metrics.db_path}",
+                    f"  Size       {metrics.db_size}   execution={metrics.execution_mode}",
+                    f"  Model      {metrics.model_name}",
+                    f"  Adapter    {metrics.vector_adapter_name}   pgvector={'configured' if metrics.pgvector_configured else 'not set'}",
                     "",
-                ]
-                for i in range(0, len(profile_pairs), 2):
-                    left_label, left_val = profile_pairs[i]
-                    right_pair = profile_pairs[i + 1] if i + 1 < len(profile_pairs) else ("", "")
-                    right_label, right_val = right_pair
-                    w = 22
-                    lines.extend([
-                        f"[dim]┌{'─' * w}┐[/] [dim]┌{'─' * w}┐[/]",
-                        f"[dim]│[/] [dim]{left_label:<{w - 1}}[/][dim]│[/] [dim]│[/] [dim]{right_label:<{w - 1}}[/][dim]│[/]",
-                        f"[dim]│[/] [#bfefff]{left_val:<{w - 1}}[/][dim]│[/] [dim]│[/] [#bfefff]{right_val:<{w - 1}}[/][dim]│[/]",
-                        f"[dim]└{'─' * w}┘[/] [dim]└{'─' * w}┘[/]",
-                        "",
-                    ])
-
-                # ── Record Counts ────────────────────────────────────
-                lines += [
-                    f"[bold #7fe0ff]── Record Counts {'─' * 38}[/]",
-                    f"  [dim]Total[/]       [#d391ff]{metrics.total_records}[/]"
-                    f"   [dim]Vectors[/]  [#d391ff]{metrics.vector_entries}[/]"
-                    f"   [dim]Packs[/]  [#d391ff]{metrics.pack_entries}[/]",
-                    f"  [dim]Prov[/]        [#d391ff]{metrics.provenance_entries}[/]"
-                    f"   [dim]Symbols[/]  [#d391ff]{metrics.symbol_entries}[/]"
-                    f"   [dim]Raw[/]    [#d391ff]{metrics.raw_entries}[/]",
-                    f"  [dim]Namespaces[/]  [#7fe0ff]{metrics.namespaces}[/]"
-                    f"   [dim]Scopes[/]   [#7fe0ff]{metrics.scopes}[/]",
+                    "─── Record Counts ─────────────────────────────────────────",
+                    f"  Total       {metrics.total_records}",
+                    f"  Vectors     {metrics.vector_entries}",
+                    f"  Packs       {metrics.pack_entries}",
+                    f"  Provenance  {metrics.provenance_entries}",
+                    f"  Symbols     {metrics.symbol_entries}",
+                    f"  Raw docs    {metrics.raw_entries}",
+                    f"  Namespaces  {metrics.namespaces}    Scopes  {metrics.scopes}",
                     "",
-                    f"[bold #7fe0ff]── Top Kinds {'─' * 42}[/]",
+                    "─── Top Record Kinds ──────────────────────────────────────",
                 ]
                 for kind, count in metrics.top_kinds:
-                    bar = _ui_bars.solid(count / total, width=18, show_pct=False)
-                    lines.append(f"  [#9fd4ff]{kind:<14}[/] [dim]{count:>5}[/]  {bar}")
+                    bar = _ui_bars.solid(count / total, width=20, show_pct=False)
+                    lines.append(f"  {kind:<12} {count:>5}  {bar}")
                 if not metrics.top_kinds:
-                    lines.append("  [dim](no records yet)[/]")
-
-                # ── Token Budget ─────────────────────────────────────
+                    lines.append("  (no records yet)")
                 lines += [
                     "",
-                    f"[bold #7fe0ff]── Token Budget {'─' * 39}[/]",
-                    f"  [dim]source[/]  [#bfefff]{source_tokens}[/]   [dim]machine[/]  [#d391ff]{machine_tokens}[/]",
-                    f"  [dim]lx1[/]    {self._bar(savings_ratio, 20)}",
+                    "─── Token Budget ──────────────────────────────────────────",
+                    f"  Source tokens   {source_tokens}",
+                    f"  Machine tokens  {machine_tokens}",
+                    f"  Savings         {self._bar(savings_ratio, 20)}",
                     "",
-                    f"[bold #7fe0ff]── Quick Commands {'─' * 37}[/]",
-                    "  [#7fe0ff]/compile[/] [dim]<text>[/]     compile NL into MIRL",
-                    "  [#7fe0ff]/search[/]  [dim]<query>[/]    lexical + vector search",
-                    "  [#7fe0ff]/benchmark[/] [dim]<file>[/]   lossless compression benchmark",
-                    "  [#7fe0ff]/stats[/]              refresh all metrics",
+                    "─── Quick Commands ────────────────────────────────────────",
+                    "  /compile <text>     compile NL into MIRL",
+                    "  /search  <query>    lexical + vector search",
+                    "  /benchmark <file>   lossless compression benchmark",
+                    "  /stats              refresh all metrics",
                 ]
                 self.query_one("#overview-panel", _TextualMarkupPanel).set_lines(lines)
             except Exception:
@@ -1968,6 +1719,57 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     handle.write(json.dumps(row, sort_keys=True))
                     handle.write("\n")
             return destination.resolve(), len(self.chat_history)
+
+        def _update_status(self, message: str = "") -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                metrics = self.controller._collect_metrics()
+                mode_str = f"mode:{self.input_mode}"
+                rec_str = f"records:{metrics.total_records}"
+                right = f"{mode_str}  {rec_str}  {metrics.db_path}"
+                text = f" {message}{'  ' if message else ''}{right}"
+                self.query_one("#status-bar", Static).update(text)
+            except Exception:
+                return
+
+        def action_toggle_sidebar(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                tree = self.query_one("#explorer-tree", ExplorerTree)
+                tree.display = not tree.display
+            except Exception:
+                return
+
+        def action_sidebar_grow(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                tree = self.query_one("#explorer-tree", ExplorerTree)
+                self._sidebar_width = min(self._sidebar_width + 4, 60)
+                tree.styles.width = self._sidebar_width
+            except Exception:
+                return
+
+        def action_sidebar_shrink(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                tree = self.query_one("#explorer-tree", ExplorerTree)
+                self._sidebar_width = max(self._sidebar_width - 4, 14)
+                tree.styles.width = self._sidebar_width
+            except Exception:
+                return
+
+        def action_rightcol_grow(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                col = self.query_one("#right-col", Vertical)
+                self._rightcol_width = min(self._rightcol_width + 4, 80)
+                col.styles.width = self._rightcol_width
+            except Exception:
+                return
+
+        def action_rightcol_shrink(self) -> None:  # pragma: no cover - textual runtime behavior
+            try:
+                col = self.query_one("#right-col", Vertical)
+                self._rightcol_width = max(self._rightcol_width - 4, 20)
+                col.styles.width = self._rightcol_width
+            except Exception:
+                return
+
 else:
     class TextualDashboardApp:  # pragma: no cover - exercised when textual is missing
         def __init__(self, *args: Any, **kwargs: Any) -> None:

@@ -1,7 +1,7 @@
 # History Index
 
 total_entries: 106
-total_tokens: ~11619
+total_tokens: ~11605
 latest_id: 106
 source: HISTORY.md
 schema: v1
@@ -11,9 +11,9 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
-| 106 | 2026-04-29 | done | 552442fb619d6a0c | dashboard,tui,textual,verify,+ | 105 |
-| 105 | 2026-04-29 | done | 077f81503e0abd17 | dashboard,tui,security,verify,+ | 104 |
-| 104 | 2026-04-29 | done | d71dc923a47c58f9 | dashboard,tui,command,verify,+ | 103 |
+| 106 | 2026-04-29 | done | 2890c85260d8d243 | dashboard,tui,textual,verify,+ | 105 |
+| 105 | 2026-04-29 | done | 7ac13c2766d26708 | dashboard,tui,status,verify,+ | 104 |
+| 104 | 2026-04-29 | done | 64982166eecd148a | dashboard,tui,command,verify,+ | 103 |
 | 103 | 2026-04-28 | done | 5982069844a4239a | history,integrity,verify,snapshot | 102 |
 | 102 | 2026-04-28 | done | ef8d5efb988a4bb1 | history,integrity,verify,snapshot | 101 |
 | 101 | 2026-04-28 | done | d00543434688c854 | history,integrity,verify,snapshot | 100 |
@@ -166,10 +166,10 @@ compact: true
 - roundtrip: count=2 latest=#007, #006
 - sbert: count=3 latest=#023, #022, #011
 - search: count=11 latest=#088, #077, #047, #046, #041
-- security: count=2 latest=#105, #100
+- security: count=1 latest=#100
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=58 latest=#106, #105, #104, #103, #102
-- status: count=24 latest=#106, #097, #094, #092, #080
+- status: count=25 latest=#106, #105, #097, #094, #092
 - textual: count=16 latest=#106, #063, #062, #061, #060
 - tui: count=15 latest=#106, #105, #104, #098, #097
 - vector: count=18 latest=#099, #066, #044, #038, #034

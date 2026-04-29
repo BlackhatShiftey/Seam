@@ -1196,11 +1196,12 @@ claim c2:
                 self.assertIsNotNone(app.query_one("#overview-panel"))
                 self.assertIsNotNone(app.query_one("#mirl-panel"))
                 self.assertIsNotNone(app.query_one("#prov-panel"))
-                self.assertIsNotNone(app.query_one("#explorer-panel"))
+                self.assertIsNotNone(app.query_one("#explorer-tree"))
                 self.assertIsNotNone(app.query_one("#ide-layout"))
                 self.assertIsNotNone(app.query_one("#right-col"))
                 self.assertIsNotNone(app.query_one("#chat-panel"))
                 self.assertIsNotNone(app.query_one("#result-panel"))
+                self.assertIsNotNone(app.query_one("#status-bar"))
                 self.assertIsNotNone(app.query_one("#command-palette"))
                 self.assertIsNotNone(app.query_one("#command-input"))
 
@@ -1329,15 +1330,15 @@ claim c2:
                 await pilot.pause()
                 self.assertEqual(app.controller.result_title, "Reload")
                 self.assertIn('"status": "reloaded"', "\n".join(app.result_lines))
-                explorer = app.query_one("#explorer-panel")
+                explorer = app.query_one("#explorer-tree")
                 overview = app.query_one("#overview-panel")
-                self.assertIn("memory", "\n".join(explorer._panel_lines))
+                self.assertEqual(explorer.id, "explorer-tree")
                 self.assertIn("Total", "\n".join(overview._panel_lines))
                 self.assertTrue(any("Reload" in line for line in app.memory_lines))
 
         asyncio.run(_check())
 
-    def test_textual_dashboard_explorer_lazy_loads_namespaces(self) -> None:
+    def test_textual_dashboard_explorer_lists_namespaces(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
         runtime = SeamRuntime(self.db_path)
@@ -1353,22 +1354,14 @@ claim c2:
         async def _check() -> None:
             async with app.run_test() as pilot:
                 await pilot.pause()
-                explorer = app.query_one("#explorer-panel")
-                explorer.populate_db(app.controller._collect_metrics())
-                ns_root = next(
-                    child
-                    for child in explorer._db_root.children
-                    if (child.data or {}).get("type") == "ns_root"
-                )
-                explorer._lazy_expand_namespaces(ns_root)
-                namespace_labels = [str(child.label) for child in ns_root.children]
+                explorer = app.query_one("#explorer-tree")
+                namespace_labels = [str(child.label) for child in explorer.root.children]
                 self.assertTrue(any("local.default" in label for label in namespace_labels))
                 ns_node = next(
                     child
-                    for child in ns_root.children
+                    for child in explorer.root.children
                     if (child.data or {}).get("ns") == "local.default"
                 )
-                explorer._lazy_expand_namespace(ns_node, "local.default")
                 scope_labels = [str(child.label) for child in ns_node.children]
                 self.assertTrue(any("thread" in label for label in scope_labels))
 
