@@ -1,13 +1,13 @@
 # SEAM Project Status
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 ## Current State
 
 SEAM is operating as a local machine-first memory runtime with:
 
 - MIRL compile/verify/persist/search/context flows in production use
-- Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, and independently scrollable panes
+- Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, independently scrollable panes, IDE-style explorer tree, and status bar
 - Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - lossless SEAM-LX/1 compression with integrity verification
 - benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
@@ -19,7 +19,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## What Is Stable
 
 - Core runtime paths (compile, verify, persist, search, context, benchmark)
-- Textual dashboard (interactive TUI, chat, slash palette, reload command, MIRL animation, independent pane scrolling)
+- Textual dashboard (interactive TUI, chat, slash palette, reload command, MIRL animation, independent pane scrolling, ExplorerTree navigation, status bar)
 - Dashboard installers: `seam-dash` shim on Windows (`.cmd`) and POSIX; `seam-dash` entrypoint in `pyproject.toml`
 - Dashboard launcher: `scripts/windows/launch_dashboard.bat` + `launch_dashboard.ps1`; propagates pgvector config from `SEAM_LOCAL_ENV` or a private Documents `SEAM\local\.env`
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)

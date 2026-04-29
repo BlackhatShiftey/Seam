@@ -2117,3 +2117,19 @@ Verification: `python -m py_compile seam_runtime\dashboard.py seam_runtime\lossl
 
 Continuity note: before this entry, `python -m tools.history.verify_continuity` on the PR worktree reported stale HISTORY_INDEX metadata for HISTORY#103 and no latest snapshot after the branch merge. This entry rebuilds the index and is followed by a fresh snapshot.
 ---END-ENTRY-#104---
+
+---BEGIN-ENTRY-#105---
+id: 105
+date: 2026-04-29T15:40:45Z
+agent: codex
+status: done
+topics: dashboard, tui, status, verify, history, snapshot
+commits: none
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/dashboard.py,test_seam.py
+supersedes: 104
+tokens: 109
+---
+Post-merge bookkeeping after PR #7 merged the Textual/Dash migration into main. The merge brought in the IDE-style ExplorerTree/status-bar dashboard update and the reload regression fix, then local continuity on main reported stale derived hashes/snapshot coverage for the merged HISTORY entries. Updated PROJECT_STATUS to reflect the current dashboard baseline and rebuilt continuity metadata from the merged main checkout.
+
+Verification target after this entry: rerun `python -m tools.history.verify_continuity`, full `python -m pytest test_seam.py tools/history/test_history_tools.py`, and dashboard reload smoke from current main before starting new feature work.
+---END-ENTRY-#105---
