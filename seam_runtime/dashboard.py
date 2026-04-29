@@ -780,7 +780,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                                 yield Label("pgvector DSN  (SEAM_PGVECTOR_DSN)", classes="settings-label")
                                 yield Input(
                                     value=os.environ.get("SEAM_PGVECTOR_DSN", ""),
-                                    placeholder="postgresql://user:pass@localhost:55432/seam",
+                                    placeholder="Set SEAM_PGVECTOR_DSN in local env",
                                     password=True,
                                     id="cfg-pgvector-dsn",
                                     classes="settings-input",
@@ -1523,7 +1523,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._refresh_logo()
             self._refresh_input_placeholder()
             self._refresh_metrics()
-            self._refresh_explorer()
             self._refresh_overview()
             self._sync_side_panel()
             self._refresh_tab_bar()

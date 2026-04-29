@@ -2099,3 +2099,35 @@ Repaired current `main` after checking branch/snapshot state. The backup branch 
 
 State check also found `_imports/awesome-design-md` as an empty leftover directory from branch switching; it contains no file data and can be removed from the `main` checkout without losing repo content. Verification target: rerun continuity, targeted tests, and git status after cleanup.
 ---END-ENTRY-#103---
+
+---BEGIN-ENTRY-#104---
+id: 104
+date: 2026-04-29T15:12:11Z
+agent: codex
+status: done
+topics: dashboard, tui, command, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 103
+tokens: 123
+---
+Applied the dashboard reload follow-up on the SEAM-CC dashboard redesign branch after review found the reload surface still refreshed the ExplorerTree explicitly. Removed the `_refresh_explorer()` call from `_reload_dashboard_surface()` while leaving startup/timer explorer refresh behavior intact; the interactive ExplorerTree remains responsible for its own rendered hierarchy.
+
+Verification: `python -m py_compile seam_runtime\dashboard.py` passed; `git diff --check` passed with only the existing LF-to-CRLF warning; reload-focused pytest passed with 2 selected tests; `python seam.py dashboard --run reload --no-clear` rendered the Reload payload; dashboard pytest passed with 26 selected tests; full `python -m pytest test_seam.py tools/history/test_history_tools.py` passed with 143 tests.
+---END-ENTRY-#104---
+
+---BEGIN-ENTRY-#105---
+id: 105
+date: 2026-04-29T15:13:27Z
+agent: codex
+status: done
+topics: dashboard, tui, security, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 104
+tokens: 98
+---
+Follow-up security cleanup on the dashboard settings tab. The new pgvector DSN input used a placeholder shaped like a password-bearing DSN, which triggered `python -m tools.history.verify_continuity` even though no real secret was present. Replaced the placeholder with a non-secret local-env instruction while keeping the input masked and env-backed.
+
+Verification after cleanup: `python -m tools.history.verify_continuity` passed; `python -m py_compile seam_runtime\dashboard.py` passed; dashboard pytest passed with 26 selected tests; `git diff --check` passed with only existing LF-to-CRLF warnings.
+---END-ENTRY-#105---
