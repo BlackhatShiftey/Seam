@@ -2131,3 +2131,21 @@ Follow-up security cleanup on the dashboard settings tab. The new pgvector DSN i
 
 Verification after cleanup: `python -m tools.history.verify_continuity` passed; `python -m py_compile seam_runtime\dashboard.py` passed; dashboard pytest passed with 26 selected tests; `git diff --check` passed with only existing LF-to-CRLF warnings.
 ---END-ENTRY-#105---
+
+---BEGIN-ENTRY-#106---
+id: 106
+date: 2026-04-29T23:01:18Z
+agent: codex
+status: done
+topics: dashboard, tui, textual, verify, status, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,seam_runtime/storage.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 105
+tokens: 230
+---
+Completed the dashboard redesign P0 follow-up on the SEAM-CC branch. Replaced the markup-stripping Log shim with a RichLog-backed `_TextualMarkupPanel` for Overview, MIRL Compression, and Runtime Log so dashboard-authored Rich markup renders in color while arbitrary text/JSON panels remain plain Log widgets. Removed the dead `_refresh_overview` `pgvec_status` and `_cell()` code.
+
+Finished the ExplorerTree namespace branch by adding store-backed namespace, scope, and capped record-summary listing. Added SQLiteStore list helpers and a Textual regression test that expands the namespace tree to `local.default` and `thread`. Smoke-tested the Settings tab apply path with a Textual pilot test that switches to Settings, clicks Apply API Settings, verifies env mutation, and verifies the Results panel message.
+
+Verification: baseline `python -m pytest test_seam.py -q` passed with 117 tests before edits. After edits, `python -m py_compile seam_runtime\dashboard.py seam_runtime\storage.py test_seam.py` passed; focused Textual tests passed; full `python -m pytest test_seam.py -q` passed with 119 tests; `python seam.py dashboard --snapshot --no-clear` passed; `python seam.py dashboard --run reload --no-clear` passed. `git diff --check` returned only existing LF-to-CRLF warnings, and the candidate secret/session scan over changed files found no hits.
+---END-ENTRY-#106---

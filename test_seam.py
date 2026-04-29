@@ -1206,6 +1206,43 @@ claim c2:
 
         asyncio.run(_check())
 
+    def test_textual_dashboard_settings_apply_api_updates_env(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        from textual.widgets import TabbedContent
+
+        saved = {
+            "SEAM_CHAT_API_KEY": os.environ.get("SEAM_CHAT_API_KEY"),
+            "SEAM_CHAT_BASE_URL": os.environ.get("SEAM_CHAT_BASE_URL"),
+            "SEAM_CHAT_MODEL": os.environ.get("SEAM_CHAT_MODEL"),
+        }
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(160, 60)) as pilot:
+                await pilot.pause()
+                app.query_one("#main-tabs", TabbedContent).active = "tab-settings"
+                await pilot.pause()
+                app.query_one("#cfg-api-key").value = "test-settings-key"
+                app.query_one("#cfg-base-url").value = "https://example.invalid/v1"
+                app.query_one("#cfg-model").value = "test-model"
+                await pilot.click("#btn-apply-api")
+                await pilot.pause()
+                self.assertEqual(os.environ.get("SEAM_CHAT_API_KEY"), "test-settings-key")
+                self.assertEqual(os.environ.get("SEAM_CHAT_BASE_URL"), "https://example.invalid/v1")
+                self.assertEqual(os.environ.get("SEAM_CHAT_MODEL"), "test-model")
+                self.assertTrue(any("Applied: SEAM_CHAT_API_KEY" in line for line in app.result_lines))
+
+        try:
+            asyncio.run(_check())
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
     def test_textual_dashboard_command_palette_filters_prefix_menus(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
@@ -1297,6 +1334,43 @@ claim c2:
                 self.assertIn("memory", "\n".join(explorer._panel_lines))
                 self.assertIn("Total", "\n".join(overview._panel_lines))
                 self.assertTrue(any("Reload" in line for line in app.memory_lines))
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_explorer_lazy_loads_namespaces(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(
+            runtime.compile_nl(
+                "Explorer namespace lazy loading should reveal persisted memory records.",
+                ns="local.default",
+                scope="thread",
+            )
+        )
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                explorer = app.query_one("#explorer-panel")
+                explorer.populate_db(app.controller._collect_metrics())
+                ns_root = next(
+                    child
+                    for child in explorer._db_root.children
+                    if (child.data or {}).get("type") == "ns_root"
+                )
+                explorer._lazy_expand_namespaces(ns_root)
+                namespace_labels = [str(child.label) for child in ns_root.children]
+                self.assertTrue(any("local.default" in label for label in namespace_labels))
+                ns_node = next(
+                    child
+                    for child in ns_root.children
+                    if (child.data or {}).get("ns") == "local.default"
+                )
+                explorer._lazy_expand_namespace(ns_node, "local.default")
+                scope_labels = [str(child.label) for child in ns_node.children]
+                self.assertTrue(any("thread" in label for label in scope_labels))
 
         asyncio.run(_check())
 

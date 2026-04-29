@@ -32,12 +32,12 @@ try:
     from textual import on
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, ScrollableContainer, Vertical
-    from textual.widgets import Button, Input, Label, Log, Static, TabbedContent, TabPane, Tree
+    from textual.widgets import Button, Input, Label, Log, RichLog, Static, TabbedContent, TabPane, Tree
     from textual.widgets.tree import TreeNode
 
     _TEXTUAL_IMPORT_ERROR = None
 except ImportError as exc:  # pragma: no cover - optional dashboard path
-    on = App = ComposeResult = Horizontal = Vertical = Input = Log = Static = None  # type: ignore[assignment]
+    on = App = ComposeResult = Horizontal = Vertical = Input = Log = RichLog = Static = None  # type: ignore[assignment]
     TabbedContent = TabPane = Tree = TreeNode = Button = Label = None  # type: ignore[assignment]
     ScrollableContainer = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
@@ -197,23 +197,9 @@ class SeamChatClient:
             return f"Chat request failed: {exc}"
 
 
-if App is not None and Static is not None and Input is not None and Log is not None:
+if App is not None and Static is not None and Input is not None and Log is not None and RichLog is not None:
     class _TextualPanel(Log):
-        """Scrollable log panel.
-
-        Parameters
-        ----------
-        markup_mode:
-            When True, lines passed to ``set_lines`` are rendered as Rich
-            markup (colors, bold, etc.).  When False (default) lines are
-            treated as plain text, which is safe for arbitrary output that
-            may contain bare ``[`` characters such as JSON arrays.
-        auto_scroll_mode:
-            When True, ``set_lines`` scrolls to the bottom after every
-            update — appropriate for live streams (chat, runtime log,
-            command history).  When False the user's scroll position is
-            preserved so they can read content without being yanked back.
-        """
+        """Plain scrollable log panel for arbitrary text output."""
 
         can_focus = True
         BINDINGS = [
@@ -235,13 +221,11 @@ if App is not None and Static is not None and Input is not None and Log is not N
             title: str,
             panel_id: str,
             *,
-            markup_mode: bool = False,
             auto_scroll_mode: bool = False,
         ) -> None:
             super().__init__(highlight=False, max_lines=2000, auto_scroll=False, id=panel_id)
             self._title = title
             self._panel_lines: list[str] = []
-            self._markup_mode = markup_mode
             self._auto_scroll_mode = auto_scroll_mode
 
         def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
@@ -253,32 +237,11 @@ if App is not None and Static is not None and Input is not None and Log is not N
             self._title = title
             self.border_title = title
 
-        def _write_panel_lines(self) -> None:
-            """Write ``_panel_lines`` respecting markup_mode.
-
-            ``Log`` only accepts plain strings (it calls ``str.splitlines``
-            internally), so when ``markup_mode`` is on we strip Rich markup
-            tags rather than passing ``Text`` objects.  Color rendering for
-            markup panels will be re-added in a follow-up that switches
-            those panels to ``RichLog``.
-            """
-            if self._markup_mode:
-                from rich.text import Text as _RichText
-                plain_lines: list[str] = []
-                for line in self._panel_lines:
-                    try:
-                        plain_lines.append(_RichText.from_markup(line).plain)
-                    except Exception:
-                        plain_lines.append(line)
-                self.write_lines(plain_lines)
-            else:
-                self.write_lines(self._panel_lines)
-
         def set_lines(self, lines: list[str]) -> None:
             self._panel_lines = lines[-2000:]
             self.clear()
             if self._panel_lines:
-                self._write_panel_lines()
+                self.write_lines(self._panel_lines)
             else:
                 self.write_line("(empty)")
             if self._auto_scroll_mode:
@@ -287,9 +250,63 @@ if App is not None and Static is not None and Input is not None and Log is not N
         def _refresh_content(self) -> None:
             self.clear()
             if self._panel_lines:
-                self._write_panel_lines()
+                self.write_lines(self._panel_lines)
             else:
                 self.write_line("(empty)")
+            if self._auto_scroll_mode:
+                self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
+
+        def on_mouse_down(self, event: Any) -> None:  # pragma: no cover - textual runtime behavior
+            self.focus()
+
+        def action_page_up(self) -> None:
+            self.scroll_page_up(animate=False, force=True)
+
+        def action_page_down(self) -> None:
+            self.scroll_page_down(animate=False, force=True)
+
+        def action_focus_input(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.app.query_one("#command-input", Input).focus()
+
+
+    class _TextualMarkupPanel(RichLog):
+        """Markup-rendering scrollable panel for dashboard-authored lines."""
+
+        can_focus = True
+        BINDINGS = _TextualPanel.BINDINGS
+
+        def __init__(
+            self,
+            title: str,
+            panel_id: str,
+            *,
+            auto_scroll_mode: bool = False,
+        ) -> None:
+            super().__init__(highlight=False, markup=True, max_lines=2000, id=panel_id)
+            self._title = title
+            self._panel_lines: list[str] = []
+            self._auto_scroll_mode = auto_scroll_mode
+
+        def on_mount(self) -> None:  # pragma: no cover - textual runtime behavior
+            self.border_title = self._title
+            self.border_subtitle = "Tab/S+Tab · Esc→input"
+            self._refresh_content()
+
+        def set_title(self, title: str) -> None:
+            self._title = title
+            self.border_title = title
+
+        def set_lines(self, lines: list[str]) -> None:
+            self._panel_lines = lines[-2000:]
+            self._refresh_content()
+
+        def _refresh_content(self) -> None:
+            self.clear()
+            if self._panel_lines:
+                for line in self._panel_lines:
+                    self.write(line)
+            else:
+                self.write("(empty)")
             if self._auto_scroll_mode:
                 self.scroll_end(animate=False, force=True, immediate=True, x_axis=False, y_axis=True)
 
@@ -379,6 +396,81 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             if node_type == "fs_dir":
                 self._lazy_expand_dir(node, data["path"])
+            elif node_type == "ns_root":
+                self._lazy_expand_namespaces(node)
+            elif node_type == "namespace":
+                self._lazy_expand_namespace(node, data["ns"])
+            elif node_type == "scope":
+                self._lazy_expand_scope(node, data["ns"], data["scope"])
+
+        def _store(self) -> Any:
+            controller = getattr(self.app, "controller", None)
+            runtime = getattr(controller, "runtime", None)
+            return getattr(runtime, "store", None)
+
+        def _lazy_expand_namespaces(self, node: Any) -> None:  # pragma: no cover
+            node.remove_children()
+            store = self._store()
+            if store is None:
+                node.add_leaf("(runtime store unavailable)", data={"type": "info"})
+                return
+            try:
+                namespaces = store.list_namespaces()
+            except Exception as exc:
+                node.add_leaf(f"(error: {exc})", data={"type": "info"})
+                return
+            if not namespaces:
+                node.add_leaf("(no namespaces)", data={"type": "info"})
+                return
+            for namespace in namespaces:
+                child = node.add(
+                    f"\U0001f4c1 {namespace}",
+                    data={"type": "namespace", "ns": namespace},
+                )
+                child.add_leaf("(expand for scopes)", data={"type": "placeholder"})
+
+        def _lazy_expand_namespace(self, node: Any, namespace: str) -> None:  # pragma: no cover
+            node.remove_children()
+            store = self._store()
+            if store is None:
+                node.add_leaf("(runtime store unavailable)", data={"type": "info"})
+                return
+            try:
+                scopes = store.list_scopes(namespace)
+            except Exception as exc:
+                node.add_leaf(f"(error: {exc})", data={"type": "info"})
+                return
+            if not scopes:
+                node.add_leaf("(no scopes)", data={"type": "info"})
+                return
+            for scope in scopes:
+                child = node.add(
+                    f"\U0001f4c2 {scope}",
+                    data={"type": "scope", "ns": namespace, "scope": scope},
+                )
+                child.add_leaf("(expand for records)", data={"type": "placeholder"})
+
+        def _lazy_expand_scope(self, node: Any, namespace: str, scope: str) -> None:  # pragma: no cover
+            node.remove_children()
+            store = self._store()
+            if store is None:
+                node.add_leaf("(runtime store unavailable)", data={"type": "info"})
+                return
+            try:
+                records = store.list_record_summaries(namespace, scope, limit=100)
+            except Exception as exc:
+                node.add_leaf(f"(error: {exc})", data={"type": "info"})
+                return
+            if not records:
+                node.add_leaf("(no records)", data={"type": "info"})
+                return
+            for record in records:
+                node.add_leaf(
+                    f"{record['kind']:<4} {record['id']}",
+                    data={"type": "record", "id": record["id"]},
+                )
+            if len(records) >= 100:
+                node.add_leaf("... (showing first 100)", data={"type": "info"})
 
         def _lazy_expand_dir(self, node: Any, path: Path) -> None:  # pragma: no cover
             node.remove_children()
@@ -707,9 +799,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 # Centre: tabbed workspace
                 with TabbedContent(id="main-tabs"):
                     with TabPane("Overview", id="tab-overview"):
-                        yield _TextualPanel(
-                            "Overview", "overview-panel", markup_mode=True
-                        )
+                        yield _TextualMarkupPanel("Overview", "overview-panel")
                     with TabPane("Memory", id="tab-memory"):
                         yield _TextualPanel("Memory Records", "memory-panel")
                     with TabPane("Retrieval", id="tab-retrieval"):
@@ -717,14 +807,12 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     with TabPane("Benchmarks", id="tab-benchmarks"):
                         yield _TextualPanel("Benchmark", "benchmark-panel")
                     with TabPane("Compression", id="tab-compression"):
-                        yield _TextualPanel(
-                            "MIRL Compression", "mirl-panel", markup_mode=True
-                        )
+                        yield _TextualMarkupPanel("MIRL Compression", "mirl-panel")
                     with TabPane("Live", id="tab-live"):
                         with Horizontal(id="live-row"):
-                            yield _TextualPanel(
+                            yield _TextualMarkupPanel(
                                 "Runtime Log", "runtime-log-panel",
-                                markup_mode=True, auto_scroll_mode=True,
+                                auto_scroll_mode=True,
                             )
                             yield _TextualPanel(
                                 "Command History", "command-history-panel",
@@ -827,7 +915,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 ]
             )
             self.query_one("#command-history-panel", _TextualPanel).set_lines(["No commands yet."])
-            self.query_one("#mirl-panel", _TextualPanel).set_lines(
+            self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(
                 [
                     "[bold #7fe0ff]MIRL Live Interpreter[/]  [dim]SEAM-LX/1 Compression Engine[/]",
                     "",
@@ -1536,14 +1624,14 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 self.benchmark_lines or ["Dashboard reloaded. Benchmark panel is ready for benchmark or compression commands."]
             )
             if self.mirl_lines:
-                self.query_one("#mirl-panel", _TextualPanel).set_lines(self.mirl_lines)
+                self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(self.mirl_lines)
             elif not self._mirl_animation_running:
-                self.query_one("#mirl-panel", _TextualPanel).set_lines(self._anim_engine.tick_and_render())
+                self.query_one("#mirl-panel", _TextualMarkupPanel).set_lines(self._anim_engine.tick_and_render())
 
         def _sync_side_panel(self) -> None:
             # Benchmark search-log goes into #benchmark-panel via _route_command_output.
             # This panel always shows the live runtime event stream.
-            panel = self.query_one("#runtime-log-panel", _TextualPanel)
+            panel = self.query_one("#runtime-log-panel", _TextualMarkupPanel)
             _kind_color: dict[str, str] = {
                 "store": "#7efdb9",   # mint — ok/persisted
                 "index": "#d391ff",   # bloom — vector sync
@@ -1724,7 +1812,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 return
             self._animation_phase = (self._animation_phase + 1) % 8
             try:
-                panel = self.query_one("#mirl-panel", _TextualPanel)
+                panel = self.query_one("#mirl-panel", _TextualMarkupPanel)
             except Exception:  # pragma: no cover - timer can fire during teardown
                 return
             lines = self._anim_engine.tick_and_render()
@@ -1757,18 +1845,6 @@ if App is not None and Static is not None and Input is not None and Log is not N
                 compressed = max(source_tokens - machine_tokens, 0)
                 savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
                 total = max(metrics.total_records, 1)
-                pgvec_status = "[#7efdb9]configured[/]" if metrics.pgvector_configured else "[#f4d676]standby[/]"
-
-                # ── Runtime Profile: 2-column bordered grid ──────────
-                def _cell(label: str, value: str, w: int = 22) -> str:
-                    pad = max(0, w - len(label))
-                    return (
-                        f"[dim]┌{'─' * w}┐[/]\n"
-                        f"[dim]│[/][dim] {label}{' ' * pad}[/][dim]│[/]\n"
-                        f"[dim]│[/] [#bfefff]{value:<{w - 1}}[/][dim]│[/]\n"
-                        f"[dim]└{'─' * w}┘[/]"
-                    )
-
                 profile_pairs = [
                     ("PRIMARY MODEL",    metrics.model_name[:20]),
                     ("EXECUTION MODE",   metrics.execution_mode),
@@ -1828,7 +1904,7 @@ if App is not None and Static is not None and Input is not None and Log is not N
                     "  [#7fe0ff]/benchmark[/] [dim]<file>[/]   lossless compression benchmark",
                     "  [#7fe0ff]/stats[/]              refresh all metrics",
                 ]
-                self.query_one("#overview-panel", _TextualPanel).set_lines(lines)
+                self.query_one("#overview-panel", _TextualMarkupPanel).set_lines(lines)
             except Exception:
                 return
 

@@ -191,6 +191,36 @@ class SQLiteStore:
             "machine_artifacts": machine_artifacts,
         }
 
+    def list_namespaces(self, limit: int = 100) -> list[str]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "select distinct ns from ir_records order by ns limit ?",
+                (limit,),
+            ).fetchall()
+        return [row["ns"] for row in rows]
+
+    def list_scopes(self, ns: str, limit: int = 100) -> list[str]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "select distinct scope from ir_records where ns = ? order by scope limit ?",
+                (ns, limit),
+            ).fetchall()
+        return [row["scope"] for row in rows]
+
+    def list_record_summaries(self, ns: str, scope: str, limit: int = 100) -> list[dict[str, object]]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                select id, kind, status, updated_at
+                from ir_records
+                where ns = ? and scope = ?
+                order by updated_at desc, id
+                limit ?
+                """,
+                (ns, scope, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def persist_ir(self, batch: IRBatch) -> PersistReport:
         with closing(self._connect()) as connection:
             for record in batch.records:
