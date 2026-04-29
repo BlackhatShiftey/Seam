@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 106
-total_tokens: ~11605
-latest_id: 106
+total_entries: 107
+total_tokens: ~11737
+latest_id: 107
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,7 +11,8 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
-| 106 | 2026-04-29 | done | 2890c85260d8d243 | dashboard,tui,textual,verify,+ | 105 |
+| 107 | 2026-04-29 | done | 5c4f3f1f51e0abf3 | dashboard,tui,verify,status,+ | 106 |
+| 106 | 2026-04-29 | done | 92f6f0bd5206245a | dashboard,tui,textual,verify,+ | 105 |
 | 105 | 2026-04-29 | done | 7ac13c2766d26708 | dashboard,tui,status,verify,+ | 104 |
 | 104 | 2026-04-29 | done | 64982166eecd148a | dashboard,tui,command,verify,+ | 103 |
 | 103 | 2026-04-28 | done | 5982069844a4239a | history,integrity,verify,snapshot | 102 |
@@ -132,7 +133,7 @@ compact: true
 - command: count=36 latest=#104, #099, #098, #097, #096
 - compile: count=12 latest=#047, #046, #043, #042, #041
 - compress: count=11 latest=#091, #090, #089, #088, #087
-- dashboard: count=42 latest=#106, #105, #104, #098, #097
+- dashboard: count=43 latest=#107, #106, #105, #104, #098
 - diff: count=3 latest=#093, #092, #037
 - docker: count=2 latest=#085, #084
 - docs: count=1 latest=#099
@@ -142,7 +143,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
 - handoff: count=2 latest=#075, #025
-- history: count=60 latest=#106, #105, #104, #103, #102
+- history: count=61 latest=#107, #106, #105, #104, #103
 - holdout: count=3 latest=#093, #092, #036
 - installer: count=9 latest=#100, #099, #063, #035, #021
 - integrity: count=4 latest=#103, #102, #101, #048
@@ -168,17 +169,17 @@ compact: true
 - search: count=11 latest=#088, #077, #047, #046, #041
 - security: count=1 latest=#100
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=58 latest=#106, #105, #104, #103, #102
-- status: count=25 latest=#106, #105, #097, #094, #092
+- snapshot: count=59 latest=#107, #106, #105, #104, #103
+- status: count=26 latest=#107, #106, #105, #097, #094
 - textual: count=16 latest=#106, #063, #062, #061, #060
-- tui: count=15 latest=#106, #105, #104, #098, #097
+- tui: count=16 latest=#107, #106, #105, #104, #098
 - vector: count=18 latest=#099, #066, #044, #038, #034
-- verify: count=50 latest=#106, #105, #104, #103, #102
+- verify: count=51 latest=#107, #106, #105, #104, #103
 - windows: count=10 latest=#091, #084, #083, #067, #066
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 86
+- done: 87
 - planned: 20

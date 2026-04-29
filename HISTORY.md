@@ -2151,3 +2151,21 @@ Verification during conflict resolution: `python -m py_compile seam_runtime\dash
 
 Next verification target: rebuild HISTORY_INDEX.md, write a snapshot, run continuity/integrity, full pytest, then complete the merge commit and PR path.
 ---END-ENTRY-#106---
+
+---BEGIN-ENTRY-#107---
+id: 107
+date: 2026-04-29T23:44:01Z
+agent: codex
+status: done
+topics: dashboard, tui, verify, status, history, snapshot
+commits: 147210c
+refs: HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,PROJECT_STATUS.md,seam_runtime/dashboard.py,test_seam.py
+supersedes: 106
+tokens: 132
+---
+Post-merge bookkeeping after PR #12 merged the dashboard P0 polish branch into main. The merge landed as 147210c and brought the RichLog colored markup panels, Settings tab smoke coverage, and the reconciled ExplorerTree/status-bar dashboard baseline onto main.
+
+Verification after fast-forwarding local main: `python -m pytest test_seam.py tools/history/test_history_tools.py -q` passed with 145 tests; `python seam.py dashboard --run reload --no-clear` rendered the dashboard reload view. Initial `python -m tools.history.verify_continuity` failed with expected derived hash/snapshot drift for merged HISTORY entries, so this entry rebuilds continuity metadata from current main.
+
+Next step: rerun index/snapshot generation and continuity/integrity before starting P1 dashboard work on a fresh branch.
+---END-ENTRY-#107---
