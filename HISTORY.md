@@ -2169,3 +2169,21 @@ Verification after fast-forwarding local main: `python -m pytest test_seam.py to
 
 Next step: rerun index/snapshot generation and continuity/integrity before starting P1 dashboard work on a fresh branch.
 ---END-ENTRY-#107---
+
+---BEGIN-ENTRY-#108---
+id: 108
+date: 2026-04-29T23:46:56Z
+agent: codex
+status: done
+topics: dashboard, tui, textual, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 107
+tokens: 195
+---
+Started P1 dashboard work on `codex/dashboard-p1-focus-batch` with the focus-zoom slice. Added `Ctrl+M` / `action_toggle_zoom` for focused dashboard panels and the explorer, using a `zoomed` CSS class on an overlay layer while keeping non-panel widgets such as the command input out of the zoom target set. Added a Textual regression that focuses the Memory panel, toggles zoom on, and toggles it back off.
+
+Verification: `python -m py_compile seam_runtime\dashboard.py test_seam.py` passed; focused Textual pytest for focus zoom, keyboard scrolling, and core panel mount passed with 3 selected tests; `python seam.py dashboard --run reload --no-clear` rendered the dashboard; full `python -m pytest test_seam.py tools/history/test_history_tools.py -q` passed with 146 tests.
+
+Deferred: P1 batch compile should be adapted to the current merged `#explorer-tree` architecture, which is now a database namespace/scope/kind tree rather than the older filesystem browser. Do not attach batch compile to the DB tree without adding or designing a filesystem source branch first.
+---END-ENTRY-#108---

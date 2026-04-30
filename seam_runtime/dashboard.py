@@ -383,6 +383,7 @@ if (
         CSS = """
         Screen {
             layout: vertical;
+            layers: base overlay;
         }
 
         /* ── Header band ─────────────────────────────────────────── */
@@ -472,8 +473,16 @@ if (
         #memory-panel:focus, #retrieval-panel:focus, #benchmark-panel:focus,
         #overview-panel:focus, #mirl-panel:focus, #prov-panel:focus,
         #runtime-log-panel:focus, #command-history-panel:focus,
-        #chat-panel:focus, #result-panel:focus {
+        #chat-panel:focus, #result-panel:focus, #explorer-tree:focus {
             border: heavy #7efbff;
+        }
+        .zoomed {
+            layer: overlay;
+            width: 100%;
+            height: 100%;
+            dock: top;
+            border: heavy #7efbff;
+            background: #050b1e;
         }
 
         /* ── Command palette overlay ──────────────────────────────── */
@@ -548,6 +557,7 @@ if (
             ("ctrl+c", "quit", "Quit"),
             ("ctrl+d", "quit", "Quit"),
             ("ctrl+b", "toggle_sidebar", "Toggle Explorer"),
+            ("ctrl+m", "toggle_zoom", "Zoom focused panel"),
             ("[", "sidebar_shrink", "Shrink Explorer"),
             ("]", "sidebar_grow", "Grow Explorer"),
             ("{", "rightcol_shrink", "Shrink Chat"),
@@ -1737,6 +1747,35 @@ if (
                 tree.display = not tree.display
             except Exception:
                 return
+
+        def action_toggle_zoom(self) -> None:  # pragma: no cover - textual runtime behavior
+            target = self.focused
+            if target is None:
+                return
+            zoomable_ids = {
+                "explorer-tree",
+                "overview-panel",
+                "memory-panel",
+                "retrieval-panel",
+                "benchmark-panel",
+                "mirl-panel",
+                "runtime-log-panel",
+                "command-history-panel",
+                "prov-panel",
+                "chat-panel",
+                "result-panel",
+            }
+            target_id = getattr(target, "id", None)
+            if target_id not in zoomable_ids:
+                return
+            if "zoomed" in target.classes:
+                target.remove_class("zoomed")
+                self._update_status("Zoom cleared")
+                return
+            for widget in self.query(".zoomed"):
+                widget.remove_class("zoomed")
+            target.add_class("zoomed")
+            self._update_status(f"Zoomed: {target_id}")
 
         def action_sidebar_grow(self) -> None:  # pragma: no cover - textual runtime behavior
             try:

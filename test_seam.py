@@ -1452,6 +1452,27 @@ claim c2:
 
         asyncio.run(_check())
 
+    def test_textual_dashboard_focus_zoom_toggles_focused_panel(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                panel = app.query_one("#memory-panel")
+                panel.focus()
+                await pilot.pause()
+                app.action_toggle_zoom()
+                await pilot.pause()
+                self.assertIn("zoomed", panel.classes)
+                app.action_toggle_zoom()
+                await pilot.pause()
+                self.assertNotIn("zoomed", panel.classes)
+
+        asyncio.run(_check())
+
     def test_textual_dashboard_routes_compile_output(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
