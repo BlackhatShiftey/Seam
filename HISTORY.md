@@ -2187,3 +2187,21 @@ Verification: `python -m py_compile seam_runtime\dashboard.py test_seam.py` pass
 
 Deferred: P1 batch compile should be adapted to the current merged `#explorer-tree` architecture, which is now a database namespace/scope/kind tree rather than the older filesystem browser. Do not attach batch compile to the DB tree without adding or designing a filesystem source branch first.
 ---END-ENTRY-#108---
+
+---BEGIN-ENTRY-#109---
+id: 109
+date: 2026-04-30T06:10:55Z
+agent: codex
+status: done
+topics: dashboard, tui, verify, status, history, snapshot
+commits: d9645f9
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/dashboard.py,test_seam.py
+supersedes: 108
+tokens: 180
+---
+Merged PR #13 into main as d9645f9 after CI passed and the owner-only main ruleset required an admin/bypass merge path. The merge brought the P1 dashboard focus zoom toggle onto main, including Ctrl+M focus zoom behavior for dashboard panels/explorer, regression coverage in test_seam.py, and HISTORY#108 continuity metadata.
+
+Post-merge continuity initially failed with derived HISTORY_INDEX.md and latest snapshot hash drift for HISTORY#107 and HISTORY#108, matching prior post-merge line/hash drift patterns. Updated PROJECT_STATUS.md so the current dashboard baseline names the focus zoom toggle, then rebuilt continuity metadata from the merged main checkout.
+
+Verification before this entry: PR #13 CI test-and-benchmark passed, local `python -m pytest test_seam.py tools/history/test_history_tools.py -q` passed with 146 tests before merge, and `gh pr view 13` reported merged at 2026-04-30T06:10:08Z with merge commit d9645f9. Verification target: rerun index rebuild, snapshot write, and `python -m tools.history.verify_continuity` after this entry.
+---END-ENTRY-#109---
