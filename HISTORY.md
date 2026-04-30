@@ -2280,3 +2280,107 @@ Post-merge verification initially found derived continuity drift: `python -m too
 
 Next step: rebuild `HISTORY_INDEX.md`, write a fresh snapshot covering the HS/1 merge chain, rerun integrity/routing/continuity, and publish the resulting bookkeeping commit.
 ---END-ENTRY-#113---
+
+---BEGIN-ENTRY-#114---
+id: 114
+date: 2026-04-30T10:27:14Z
+agent: codex
+status: done
+topics: dashboard, tui, command, compress, verify, history, snapshot, status
+commits: none
+refs: seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 113
+tokens: 239
+---
+Recovered and continued the dashboard settings-overhaul concept from the Claude `.claude/worktrees/settings-overhaul` draft onto branch `codex/dashboard-settings-overhaul`, but implemented it in the real dashboard path used by `seam-dash`, `python seam.py dashboard`, and the Windows launcher.
+
+Changed the Textual dashboard layout so Overview stays in the always-visible right column, Chat becomes a main tab, and Results moves into the Live tab beside Runtime Log and Command History. Expanded Settings with provider-key presets for OpenAI/OpenRouter/Anthropic/Gemini, chat model list and transcript directory controls, embedding controls, REST API controls, pgvector/Docker controls, a guarded local-env save path, and SEAM-HS/1 Holographic Surface mode (`bw1`, `rgb24`, or explicit `rgba32`). Secret values are applied or saved only to operator-local environment paths and are not printed in result text.
+
+Added regression coverage for the new layout, provider activation, Holographic Surface setting, and shim routing so future dashboard updates keep using the new surface. Verification: `python -m py_compile seam_runtime\dashboard.py Test-Seam-All\test_seam.py` passed; focused dashboard tests passed 5 selected tests; `python -m pytest Test-Seam-All\test_seam.py -q -k "textual_dashboard"` passed 23 tests; `python seam.py dashboard --run reload --no-clear` rendered; full `python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q` passed with 157 tests.
+---END-ENTRY-#114---
+
+---BEGIN-ENTRY-#115---
+id: 115
+date: 2026-04-30T10:29:39Z
+agent: codex
+status: done
+topics: dashboard, tui, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 114
+tokens: 111
+---
+Follow-up hardening on the dashboard settings-overhaul branch after recovering the Claude draft: fixed local environment path resolution so an empty `SEAM_LOCAL_ENV` no longer resolves to `.` and causes the repo root to be treated as an env file. Added shared local-env candidate helpers used by Settings env discovery, reload, Docker compose env-file lookup, and guarded local-env save.
+
+Verification: `python -m py_compile seam_runtime\dashboard.py Test-Seam-All\test_seam.py` passed; `python -m pytest Test-Seam-All\test_seam.py -q -k "textual_dashboard"` passed with 23 tests; full `python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q` passed with 157 tests.
+---END-ENTRY-#115---
+
+---BEGIN-ENTRY-#116---
+id: 116
+date: 2026-04-30T11:40:02Z
+agent: codex
+status: done
+topics: ledger, readme, benchmark, verify, history, snapshot
+commits: none
+refs: LICENSE,NOTICE,README.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 115
+tokens: 195
+---
+Implemented the SEAM protective source-available license policy and benchmark-proof framing. Replaced the untracked AGPL license text with a custom SEAM Source-Available License that blocks hosted, SaaS, API, managed-service, commercial, embedded, redistribution, customer-deployment, and closed-source use without a separate written commercial license from the project owner. Added explicit contributor-grant and project-owner-rights sections so BlackhatShiftey can keep developing SEAM, accept contributions, sublicense/relicense, and commercially license SEAM without later contributor permission. Updated NOTICE, README, and REPO_LEDGER.md so license policy, contribution control, and benchmark proof wording align. README now names the benchmark run/verify/gate/diff workflow and states that benchmark evidence proves commercial value but does not expand license rights. Verification: active root/docs scan found no lingering AGPL, GNU Affero, MIT, Apache, or permissive-license conflict; only expected source-available/open-source/commercial restriction wording and an unrelated self-hosted endpoint reference appeared. No root seam-benchmark-report.json existed, so fresh benchmark generation remains the next proof step before making any new performance claim.
+---END-ENTRY-#116---
+
+---BEGIN-ENTRY-#117---
+id: 117
+date: 2026-04-30T12:13:06Z
+agent: codex
+status: done
+topics: ledger, readme, verify, history, snapshot
+commits: none
+refs: LICENSE,NOTICE,README.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 116
+tokens: 91
+---
+Clarified the SEAM source-available license wording so commercial use reads as available by separate written commercial license rather than permanently forbidden. Updated LICENSE, NOTICE, README, and REPO_LEDGER.md to emphasize that commercial, hosted, SaaS, API, managed-service, customer-facing, closed-source, embedded, redistribution, resale, and paid use require written commercial permission from the copyright holder/project owner. This preserves the protective restriction while making the commercial permission path explicit. Verification planned in follow-up continuity checks.
+---END-ENTRY-#117---
+
+---BEGIN-ENTRY-#118---
+id: 118
+date: 2026-04-30T12:32:18Z
+agent: codex
+status: done
+topics: dashboard, tui, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 115
+tokens: 137
+---
+Fixed the Textual dashboard Settings tab scroll regression on the settings-overhaul branch. The Settings tab was wrapped in a ScrollableContainer, but the inner #settings-panel Vertical was constrained to the viewport height, so #settings-scroll saw max_scroll_y=0 even though the settings form had much more virtual content. Set #settings-panel height to auto so the parent scroll container receives the full content height. Added a regression test that activates tab-settings, asserts #settings-scroll.max_scroll_y is positive, scrolls to the end, and verifies scroll_y reaches max_scroll_y. Verification: python -m py_compile seam_runtime\dashboard.py Test-Seam-All\test_seam.py passed; focused Textual dashboard pytest passed 24 tests; a direct Textual harness smoke reported settings max_scroll_y=149 and scroll_y=149 after scroll_end.
+---END-ENTRY-#118---
+
+---BEGIN-ENTRY-#119---
+id: 119
+date: 2026-04-30T13:31:12Z
+agent: codex
+status: done
+topics: dashboard, tui, pgvector, verify, history, snapshot
+commits: none
+refs: seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 118
+tokens: 209
+---
+Updated the Textual dashboard Overview to act as a live settings/status surface instead of only static runtime text. Overview now renders color-coded Rich bars for database health, pgvector status, pgvector DSN configuration, Chat/API readiness, REST token state, local settings paths, provider-key presence, surface mode, embedding settings, rate limit, record counts, top kinds, and token budget. The Settings pgvector Status button now records docker compose status output into Overview so active/inactive/error state is visible there. Fixed the Overview scroll snap-back by disabling RichLog auto-scroll by default and preserving manual scroll position across periodic Overview refreshes; auto-follow still happens only for panels that opt into auto_scroll_mode. Added regression coverage for pgvector/status health display, Overview manual-scroll preservation, and the prior Settings-tab scroll fix. Verification: python -m py_compile seam_runtime\dashboard.py Test-Seam-All\test_seam.py passed; focused Textual dashboard pytest passed 26 tests; python seam.py dashboard --run reload --no-clear rendered successfully. A raw harness print of Rich markup hit Windows cp1252 Unicode output, but the dashboard path itself rendered correctly.
+---END-ENTRY-#119---
+
+---BEGIN-ENTRY-#120---
+id: 120
+date: 2026-04-30T13:42:07Z
+agent: codex
+status: done
+topics: dashboard, tui, status, verify, history, snapshot
+commits: none
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 119
+tokens: 87
+---
+Updated PROJECT_STATUS.md before publishing the dashboard settings-overhaul branch so the current-state and stable-dashboard sections name the new live Overview health bars and the independently scrollable Settings/Overview behavior. This keeps future agents from treating the Overview pgvector/database/API/settings path bars or scroll fixes as unrecorded local-only changes. Verification target before commit: rerun dashboard tests, history integrity, continuity, and git diff checks, then stage by explicit file list for commit/push/merge.
+---END-ENTRY-#120---

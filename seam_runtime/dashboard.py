@@ -276,7 +276,7 @@ if (
         BINDINGS = _TextualPanel.BINDINGS
 
         def __init__(self, title: str, panel_id: str, *, auto_scroll_mode: bool = False) -> None:
-            super().__init__(highlight=False, markup=True, max_lines=2000, id=panel_id)
+            super().__init__(highlight=False, markup=True, max_lines=2000, auto_scroll=False, id=panel_id)
             self._title = title
             self._panel_lines: list[str] = []
             self._auto_scroll_mode = auto_scroll_mode
@@ -428,7 +428,7 @@ if (
 
         /* Tab content panels fill their pane */
         #memory-panel, #retrieval-panel, #benchmark-panel,
-        #overview-panel, #mirl-panel, #prov-panel {
+        #mirl-panel, #prov-panel, #chat-panel {
             width: 1fr;
             height: 1fr;
             border: round $primary;
@@ -437,11 +437,11 @@ if (
             overflow-x: auto;
         }
 
-        /* Live tab: two panels side-by-side */
+        /* Live tab: runtime, command history, and results side-by-side */
         #live-row {
             height: 1fr;
         }
-        #runtime-log-panel, #command-history-panel {
+        #runtime-log-panel, #command-history-panel, #result-panel {
             width: 1fr;
             height: 1fr;
             border: round $primary;
@@ -450,18 +450,12 @@ if (
             overflow-x: auto;
         }
 
-        /* Right column: chat (tall) + results */
+        /* Right column: always-visible overview */
         #right-col {
             width: 34;
         }
-        #chat-panel {
-            height: 2fr;
-            border: round $primary;
-            padding: 0 1;
-            overflow-y: auto;
-            overflow-x: auto;
-        }
-        #result-panel {
+        #overview-panel {
+            width: 1fr;
             height: 1fr;
             border: round $primary;
             padding: 0 1;
@@ -502,6 +496,7 @@ if (
             height: 1fr;
         }
         #settings-panel {
+            height: auto;
             padding: 1 2;
         }
         .settings-section {
@@ -536,6 +531,17 @@ if (
             border: round #9b6cff;
             color: #d391ff;
         }
+        .settings-row {
+            height: auto;
+        }
+        .settings-fill {
+            width: 1fr;
+        }
+        .settings-use {
+            width: 7;
+            min-width: 7;
+            margin-left: 1;
+        }
 
         /* ── Status bar above input ──────────────────────────────── */
         #status-bar {
@@ -560,8 +566,8 @@ if (
             ("ctrl+m", "toggle_zoom", "Zoom focused panel"),
             ("[", "sidebar_shrink", "Shrink Explorer"),
             ("]", "sidebar_grow", "Grow Explorer"),
-            ("{", "rightcol_shrink", "Shrink Chat"),
-            ("}", "rightcol_grow", "Grow Chat"),
+            ("{", "rightcol_shrink", "Shrink Overview"),
+            ("}", "rightcol_grow", "Grow Overview"),
         ]
 
         def __init__(
@@ -641,6 +647,10 @@ if (
             self._mirl_animation_running = False
             self._sidebar_width = 30
             self._rightcol_width = 34
+            self._overview_phase = 0
+            self._pgvector_status = "unknown"
+            self._pgvector_status_detail = "Press Settings > Status"
+            self._pgvector_status_checked = "never"
 
         def compose(self) -> ComposeResult:
             # ── Header: logo + slim metrics bar (always visible) ──────
@@ -652,8 +662,6 @@ if (
                 yield ExplorerTree(self.controller.runtime.store.path)
                 # Centre: tabbed workspace
                 with TabbedContent(id="main-tabs"):
-                    with TabPane("Overview", id="tab-overview"):
-                        yield _TextualMarkupPanel("Overview", "overview-panel")
                     with TabPane("Memory", id="tab-memory"):
                         yield _TextualPanel("Memory Records", "memory-panel")
                     with TabPane("Retrieval", id="tab-retrieval"):
@@ -662,15 +670,36 @@ if (
                         yield _TextualPanel("Benchmark", "benchmark-panel")
                     with TabPane("Compression", id="tab-compression"):
                         yield _TextualMarkupPanel("MIRL Compression", "mirl-panel")
+                    with TabPane("Chat", id="tab-chat"):
+                        yield _TextualPanel("Chat", "chat-panel", auto_scroll_mode=True)
                     with TabPane("Live", id="tab-live"):
                         with Horizontal(id="live-row"):
                             yield _TextualMarkupPanel("Runtime Log", "runtime-log-panel", auto_scroll_mode=True)
                             yield _TextualPanel("Command History", "command-history-panel", auto_scroll_mode=True)
+                            yield _TextualPanel("Results", "result-panel", auto_scroll_mode=True)
                     with TabPane("Provenance", id="tab-prov"):
                         yield _TextualPanel("Provenance Graph", "prov-panel")
                     with TabPane("Settings", id="tab-settings"):
                         with ScrollableContainer(id="settings-scroll"):
                             with Vertical(id="settings-panel"):
+                                yield Static("Provider Keys", classes="settings-section")
+                                yield Label("OpenAI  (OPENAI_API_KEY)", classes="settings-label")
+                                with Horizontal(classes="settings-row"):
+                                    yield Input(value=os.environ.get("OPENAI_API_KEY", ""), placeholder="sk-...", password=True, id="cfg-key-openai", classes="settings-input settings-fill")
+                                    yield Button("Use", id="btn-use-openai", classes="settings-btn settings-use")
+                                yield Label("OpenRouter  (OPENROUTER_API_KEY)", classes="settings-label")
+                                with Horizontal(classes="settings-row"):
+                                    yield Input(value=os.environ.get("OPENROUTER_API_KEY", ""), placeholder="sk-or-...", password=True, id="cfg-key-openrouter", classes="settings-input settings-fill")
+                                    yield Button("Use", id="btn-use-openrouter", classes="settings-btn settings-use")
+                                yield Label("Anthropic  (ANTHROPIC_API_KEY)", classes="settings-label")
+                                with Horizontal(classes="settings-row"):
+                                    yield Input(value=os.environ.get("ANTHROPIC_API_KEY", ""), placeholder="sk-ant-...", password=True, id="cfg-key-anthropic", classes="settings-input settings-fill")
+                                    yield Button("Use", id="btn-use-anthropic", classes="settings-btn settings-use")
+                                yield Label("Gemini  (GEMINI_API_KEY)", classes="settings-label")
+                                with Horizontal(classes="settings-row"):
+                                    yield Input(value=os.environ.get("GEMINI_API_KEY", ""), placeholder="AIza...", password=True, id="cfg-key-gemini", classes="settings-input settings-fill")
+                                    yield Button("Use", id="btn-use-gemini", classes="settings-btn settings-use")
+                                yield Button("Apply Provider Keys", id="btn-apply-provider-keys", classes="settings-btn")
                                 yield Static("── Chat / AI ──────────────────────────────", classes="settings-section")
                                 yield Label("Chat API Key  (SEAM_CHAT_API_KEY / OPENAI_API_KEY)", classes="settings-label")
                                 yield Input(value=os.environ.get("SEAM_CHAT_API_KEY", ""), placeholder="sk-…  or  or-…", password=True, id="cfg-api-key", classes="settings-input")
@@ -678,7 +707,25 @@ if (
                                 yield Input(value=os.environ.get("SEAM_CHAT_BASE_URL", "https://api.openai.com/v1"), placeholder="https://api.openai.com/v1", id="cfg-base-url", classes="settings-input")
                                 yield Label("Model  (SEAM_CHAT_MODEL)", classes="settings-label")
                                 yield Input(value=os.environ.get("SEAM_CHAT_MODEL", "gpt-4o-mini"), placeholder="gpt-4o-mini", id="cfg-model", classes="settings-input")
+                                yield Label("Model List  (SEAM_CHAT_MODELS, comma-separated)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_CHAT_MODELS", ""), placeholder="gpt-4o-mini,qwen/qwen3-coder,deepseek/deepseek-v3.2", id="cfg-chat-models", classes="settings-input")
+                                yield Label("Transcript Dir  (SEAM_CHAT_TRANSCRIPT_DIR)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_CHAT_TRANSCRIPT_DIR", ""), placeholder=".seam/chat_transcripts", id="cfg-transcript-dir", classes="settings-input")
                                 yield Button("Apply API Settings", id="btn-apply-api", classes="settings-btn")
+                                yield Static("Embedding", classes="settings-section")
+                                yield Label("Provider  (SEAM_EMBEDDING_PROVIDER)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_EMBEDDING_PROVIDER", "hash"), placeholder="hash or openai", id="cfg-embed-provider", classes="settings-input")
+                                yield Label("Model  (SEAM_EMBEDDING_MODEL)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_EMBEDDING_MODEL", "text-embedding-3-small"), placeholder="text-embedding-3-small", id="cfg-embed-model", classes="settings-input")
+                                yield Label("API key env var  (SEAM_EMBEDDING_API_KEY_ENV)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_EMBEDDING_API_KEY_ENV", "OPENAI_API_KEY"), placeholder="OPENAI_API_KEY", id="cfg-embed-key-env", classes="settings-input")
+                                yield Label("Dimensions  (SEAM_EMBEDDING_DIMENSIONS)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_EMBEDDING_DIMENSIONS", ""), placeholder="leave blank for model default", id="cfg-embed-dims", classes="settings-input")
+                                yield Button("Apply Embedding Settings", id="btn-apply-embed", classes="settings-btn")
+                                yield Static("Holographic Surface", classes="settings-section")
+                                yield Label("Default PNG mode  (SEAM_SURFACE_MODE)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_SURFACE_MODE", "rgb24"), placeholder="rgb24, bw1, or explicit rgba32", id="cfg-surface-mode", classes="settings-input")
+                                yield Button("Apply Surface Settings", id="btn-apply-surface", classes="settings-btn")
                                 yield Static("── Database ────────────────────────────────", classes="settings-section")
                                 yield Label("DB Path  (SEAM_DB_PATH)", classes="settings-label")
                                 yield Input(value=os.environ.get("SEAM_DB_PATH", ""), placeholder="(default: ~/.seam/seam.db)", id="cfg-db-path", classes="settings-input")
@@ -686,14 +733,27 @@ if (
                                 yield Label("pgvector DSN  (SEAM_PGVECTOR_DSN)", classes="settings-label")
                                 yield Input(value=os.environ.get("SEAM_PGVECTOR_DSN", ""), placeholder="Set SEAM_PGVECTOR_DSN in local env", password=True, id="cfg-pgvector-dsn", classes="settings-input")
                                 yield Button("Apply DB / pgvector Settings", id="btn-apply-db", classes="settings-btn")
+                                yield Static("pgvector / Docker", classes="settings-section")
+                                yield Label("Compose env file  (SEAM_LOCAL_ENV)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_LOCAL_ENV", ""), placeholder="optional path to ignored local .env", id="cfg-compose-env", classes="settings-input")
+                                with Horizontal(classes="settings-row"):
+                                    yield Button("Start pgvector", id="btn-pg-start", classes="settings-btn")
+                                    yield Button("Stop pgvector", id="btn-pg-stop", classes="settings-btn settings-btn-danger")
+                                    yield Button("Status", id="btn-pg-status", classes="settings-btn")
+                                yield Static("REST API", classes="settings-section")
+                                yield Label("Bearer token  (SEAM_API_TOKEN)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_API_TOKEN", ""), placeholder="optional local token", password=True, id="cfg-api-token", classes="settings-input")
+                                yield Label("Rate limit/min  (SEAM_API_RATE_LIMIT_PER_MINUTE)", classes="settings-label")
+                                yield Input(value=os.environ.get("SEAM_API_RATE_LIMIT_PER_MINUTE", ""), placeholder="60", id="cfg-rate-limit-min", classes="settings-input")
+                                yield Button("Apply REST Settings", id="btn-apply-rest", classes="settings-btn")
                                 yield Static("── Config Files ────────────────────────────", classes="settings-section")
                                 yield Button("Open .env in explorer", id="btn-open-env", classes="settings-btn")
                                 yield Button("Open seam config dir", id="btn-open-config-dir", classes="settings-btn")
+                                yield Button("Save local env", id="btn-save-env", classes="settings-btn")
                                 yield Button("Reload env from disk", id="btn-reload-env", classes="settings-btn settings-btn-danger")
-                # Right: chat + results (always visible alongside tabs)
+                # Right: overview stays visible while the operator works in tabs.
                 with Vertical(id="right-col"):
-                    yield _TextualPanel("Chat", "chat-panel", auto_scroll_mode=True)
-                    yield _TextualPanel("Results", "result-panel", auto_scroll_mode=True)
+                    yield _TextualMarkupPanel("Overview", "overview-panel")
             # ── Overlay: command palette + input bar ──────────────────
             yield Static("", id="command-palette")
             yield Static("", id="status-bar")
@@ -1318,18 +1378,113 @@ if (
             if token == "tab":
                 self._record_command("state", f"active tab => {self.controller.active_tab}")
                 if tabs:
-                    _tab_map = {"benchmark": "tab-benchmarks", "runtime": "tab-overview"}
-                    tabs.active = _tab_map.get(self.controller.active_tab, "tab-overview")
+                    _tab_map = {"benchmark": "tab-benchmarks", "runtime": "tab-memory"}
+                    tabs.active = _tab_map.get(self.controller.active_tab, "tab-memory")
 
         def _push_result(self, title: str, body: str) -> None:
             self.result_lines.extend([f"{title}", body, ""])
             self.query_one("#result-panel", _TextualPanel).set_lines(self.result_lines)
+
+        _PROVIDER_PRESETS: dict[str, tuple[str, str]] = {
+            "openai": ("OPENAI_API_KEY", "https://api.openai.com/v1"),
+            "openrouter": ("OPENROUTER_API_KEY", "https://openrouter.ai/api/v1"),
+            "anthropic": ("ANTHROPIC_API_KEY", "https://api.anthropic.com/v1"),
+            "gemini": ("GEMINI_API_KEY", "https://generativelanguage.googleapis.com/v1beta/openai"),
+        }
+
+        def _set_env_fields(self, fields: dict[str, str]) -> list[str]:
+            changed: list[str] = []
+            for key, value in fields.items():
+                clean_value = value.strip()
+                if clean_value:
+                    os.environ[key] = clean_value
+                    changed.append(key)
+            return changed
+
+        def _repo_root(self) -> Path:
+            return Path(__file__).resolve().parents[1]
+
+        def _path_inside_repo(self, path: Path) -> bool:
+            try:
+                path.resolve().relative_to(self._repo_root())
+                return True
+            except ValueError:
+                return False
+
+        def _configured_local_env_path(self) -> Path | None:
+            raw_path = os.environ.get("SEAM_LOCAL_ENV", "").strip()
+            return Path(raw_path).expanduser() if raw_path else None
+
+        def _local_env_candidates(self, *, include_repo_fallback: bool = False) -> list[Path]:
+            candidates: list[Path] = []
+            configured = self._configured_local_env_path()
+            if configured is not None:
+                candidates.append(configured)
+            candidates.append(Path.home() / "Documents" / "SEAM" / "local" / ".env")
+            if include_repo_fallback:
+                candidates.append(Path(".env"))
+            return candidates
+
+        def _local_env_path(self) -> Path:
+            configured = self.query_one("#cfg-compose-env", Input).value.strip()
+            if configured:
+                return Path(configured).expanduser()
+            existing = next(
+                (path for path in self._local_env_candidates() if path.exists()),
+                None,
+            )
+            return existing or Path.home() / "Documents" / "SEAM" / "local" / ".env"
+
+        def _activate_provider(self, provider: str) -> None:  # pragma: no cover
+            env_var, base_url = self._PROVIDER_PRESETS[provider]
+            key = self.query_one(f"#cfg-key-{provider}", Input).value.strip()
+            if not key:
+                self._push_result("Settings", f"No {provider} key entered.")
+                return
+            os.environ[env_var] = key
+            os.environ["SEAM_CHAT_API_KEY"] = key
+            os.environ["SEAM_CHAT_BASE_URL"] = base_url
+            self.chat_client.api_key = key
+            self.chat_client.base_url = base_url
+            self.query_one("#cfg-api-key", Input).value = key
+            self.query_one("#cfg-base-url", Input).value = base_url
+            self._push_result("Settings", f"Activated {provider}: {env_var}, SEAM_CHAT_API_KEY, SEAM_CHAT_BASE_URL.")
+            self._refresh_logo()
+
+        @on(Button.Pressed, "#btn-use-openai")
+        def _on_btn_use_openai(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._activate_provider("openai")
+
+        @on(Button.Pressed, "#btn-use-openrouter")
+        def _on_btn_use_openrouter(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._activate_provider("openrouter")
+
+        @on(Button.Pressed, "#btn-use-anthropic")
+        def _on_btn_use_anthropic(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._activate_provider("anthropic")
+
+        @on(Button.Pressed, "#btn-use-gemini")
+        def _on_btn_use_gemini(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._activate_provider("gemini")
+
+        @on(Button.Pressed, "#btn-apply-provider-keys")
+        def _on_btn_apply_provider_keys(self, _: Button.Pressed) -> None:  # pragma: no cover
+            changed = self._set_env_fields(
+                {
+                    env_var: self.query_one(f"#cfg-key-{provider}", Input).value
+                    for provider, (env_var, _) in self._PROVIDER_PRESETS.items()
+                }
+            )
+            msg = f"Stored for this session: {', '.join(changed)}" if changed else "No provider keys entered."
+            self._push_result("Settings", msg)
 
         @on(Button.Pressed, "#btn-apply-api")
         def _on_btn_apply_api(self, event: Button.Pressed) -> None:  # pragma: no cover
             api_key = self.query_one("#cfg-api-key", Input).value.strip()
             base_url = self.query_one("#cfg-base-url", Input).value.strip()
             model = self.query_one("#cfg-model", Input).value.strip()
+            models = self.query_one("#cfg-chat-models", Input).value.strip()
+            transcript_dir = self.query_one("#cfg-transcript-dir", Input).value.strip()
             changed: list[str] = []
             if api_key:
                 os.environ["SEAM_CHAT_API_KEY"] = api_key
@@ -1343,10 +1498,41 @@ if (
                 os.environ["SEAM_CHAT_MODEL"] = model
                 self.chat_client.model = model
                 changed.append("SEAM_CHAT_MODEL")
+            if models:
+                os.environ["SEAM_CHAT_MODELS"] = models
+                self.chat_client.available_models = [item.strip() for item in models.split(",") if item.strip()]
+                changed.append("SEAM_CHAT_MODELS")
+            if transcript_dir:
+                os.environ["SEAM_CHAT_TRANSCRIPT_DIR"] = transcript_dir
+                self.transcript_dir = Path(transcript_dir)
+                changed.append("SEAM_CHAT_TRANSCRIPT_DIR")
             msg = f"Applied: {', '.join(changed)}" if changed else "Nothing to apply — all fields empty."
             self._push_result("Settings", msg)
             self._append_chat_activity("harness", f"settings -> {msg}")
             self._refresh_logo()
+
+        @on(Button.Pressed, "#btn-apply-embed")
+        def _on_btn_apply_embed(self, _: Button.Pressed) -> None:  # pragma: no cover
+            changed = self._set_env_fields(
+                {
+                    "SEAM_EMBEDDING_PROVIDER": self.query_one("#cfg-embed-provider", Input).value,
+                    "SEAM_EMBEDDING_MODEL": self.query_one("#cfg-embed-model", Input).value,
+                    "SEAM_EMBEDDING_API_KEY_ENV": self.query_one("#cfg-embed-key-env", Input).value,
+                    "SEAM_EMBEDDING_DIMENSIONS": self.query_one("#cfg-embed-dims", Input).value,
+                }
+            )
+            msg = f"Applied embedding settings: {', '.join(changed)}. Restart required for model reload." if changed else "Nothing changed."
+            self._push_result("Settings", msg)
+
+        @on(Button.Pressed, "#btn-apply-surface")
+        def _on_btn_apply_surface(self, _: Button.Pressed) -> None:  # pragma: no cover
+            mode = self.query_one("#cfg-surface-mode", Input).value.strip().lower()
+            if mode and mode not in {"bw1", "rgb24", "rgba32"}:
+                self._push_result("Settings", "Surface mode must be bw1, rgb24, or rgba32.")
+                return
+            changed = self._set_env_fields({"SEAM_SURFACE_MODE": mode})
+            msg = f"Applied Holographic Surface settings: {', '.join(changed)}" if changed else "Nothing changed."
+            self._push_result("Settings", msg)
 
         @on(Button.Pressed, "#btn-apply-db")
         def _on_btn_apply_db(self, event: Button.Pressed) -> None:  # pragma: no cover
@@ -1366,13 +1552,58 @@ if (
             )
             self._push_result("Settings", msg)
 
+        def _pg_compose_cmd(self, *args: str) -> list[str]:
+            env_path = self._local_env_path()
+            cmd = ["docker", "compose"]
+            if env_path.exists():
+                cmd.extend(["--env-file", str(env_path)])
+            return cmd + list(args)
+
+        def _run_docker_compose(self, *args: str, label: str) -> None:  # pragma: no cover
+            cmd = self._pg_compose_cmd(*args)
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            except FileNotFoundError:
+                output = "docker not found. Install/start Docker Desktop first."
+                self._push_result(label, output)
+                self._record_pgvector_status(label, output, returncode=-1)
+                return
+            except subprocess.TimeoutExpired:
+                output = "docker compose timed out after 30 seconds."
+                self._push_result(label, output)
+                self._record_pgvector_status(label, output, returncode=-1)
+                return
+            output = (result.stdout + result.stderr).strip()
+            status = f"exit={result.returncode}"
+            self._push_result(label, output or status)
+            self._record_pgvector_status(label, output or status, returncode=result.returncode)
+
+        @on(Button.Pressed, "#btn-pg-start")
+        def _on_btn_pg_start(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._run_docker_compose("up", "-d", "seam-pgvector", label="pgvector start")
+
+        @on(Button.Pressed, "#btn-pg-stop")
+        def _on_btn_pg_stop(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._run_docker_compose("stop", "seam-pgvector", label="pgvector stop")
+
+        @on(Button.Pressed, "#btn-pg-status")
+        def _on_btn_pg_status(self, _: Button.Pressed) -> None:  # pragma: no cover
+            self._run_docker_compose("ps", "seam-pgvector", label="pgvector status")
+
+        @on(Button.Pressed, "#btn-apply-rest")
+        def _on_btn_apply_rest(self, _: Button.Pressed) -> None:  # pragma: no cover
+            changed = self._set_env_fields(
+                {
+                    "SEAM_API_TOKEN": self.query_one("#cfg-api-token", Input).value,
+                    "SEAM_API_RATE_LIMIT_PER_MINUTE": self.query_one("#cfg-rate-limit-min", Input).value,
+                }
+            )
+            msg = f"Applied REST settings: {', '.join(changed)}. Restart seam serve to apply." if changed else "Nothing changed."
+            self._push_result("Settings", msg)
+
         @on(Button.Pressed, "#btn-open-env")
         def _on_btn_open_env(self, event: Button.Pressed) -> None:  # pragma: no cover
-            env_candidates = [
-                Path(os.environ.get("SEAM_LOCAL_ENV", "")).expanduser(),
-                Path.home() / "Documents" / "SEAM" / "local" / ".env",
-                Path(".env"),
-            ]
+            env_candidates = self._local_env_candidates(include_repo_fallback=True)
             found = next((path for path in env_candidates if str(path) and path.exists()), None)
             if found is None:
                 self._push_result("Settings", f"No .env found. Checked: {[str(p) for p in env_candidates]}")
@@ -1388,17 +1619,54 @@ if (
             else:
                 self._push_result("Settings", f"Config dir not found: {config_dir}")
 
+        @on(Button.Pressed, "#btn-save-env")
+        def _on_btn_save_env(self, _: Button.Pressed) -> None:  # pragma: no cover
+            env_path = self._local_env_path()
+            if self._path_inside_repo(env_path):
+                self._push_result("Settings", f"Refusing to write secrets inside repo: {env_path}")
+                return
+            values = {
+                "OPENAI_API_KEY": self.query_one("#cfg-key-openai", Input).value,
+                "OPENROUTER_API_KEY": self.query_one("#cfg-key-openrouter", Input).value,
+                "ANTHROPIC_API_KEY": self.query_one("#cfg-key-anthropic", Input).value,
+                "GEMINI_API_KEY": self.query_one("#cfg-key-gemini", Input).value,
+                "SEAM_CHAT_API_KEY": self.query_one("#cfg-api-key", Input).value,
+                "SEAM_CHAT_BASE_URL": self.query_one("#cfg-base-url", Input).value,
+                "SEAM_CHAT_MODEL": self.query_one("#cfg-model", Input).value,
+                "SEAM_CHAT_MODELS": self.query_one("#cfg-chat-models", Input).value,
+                "SEAM_CHAT_TRANSCRIPT_DIR": self.query_one("#cfg-transcript-dir", Input).value,
+                "SEAM_EMBEDDING_PROVIDER": self.query_one("#cfg-embed-provider", Input).value,
+                "SEAM_EMBEDDING_MODEL": self.query_one("#cfg-embed-model", Input).value,
+                "SEAM_EMBEDDING_API_KEY_ENV": self.query_one("#cfg-embed-key-env", Input).value,
+                "SEAM_EMBEDDING_DIMENSIONS": self.query_one("#cfg-embed-dims", Input).value,
+                "SEAM_SURFACE_MODE": self.query_one("#cfg-surface-mode", Input).value,
+                "SEAM_DB_PATH": self.query_one("#cfg-db-path", Input).value,
+                "SEAM_PGVECTOR_DSN": self.query_one("#cfg-pgvector-dsn", Input).value,
+                "SEAM_LOCAL_ENV": self.query_one("#cfg-compose-env", Input).value,
+                "SEAM_API_TOKEN": self.query_one("#cfg-api-token", Input).value,
+                "SEAM_API_RATE_LIMIT_PER_MINUTE": self.query_one("#cfg-rate-limit-min", Input).value,
+            }
+            lines = ["# SEAM local environment written by dashboard\n"]
+            saved_keys: list[str] = []
+            for key, value in values.items():
+                clean_value = value.strip()
+                if clean_value:
+                    lines.append(f"{key}={clean_value}\n")
+                    saved_keys.append(key)
+            if not saved_keys:
+                self._push_result("Settings", "No non-empty settings to save.")
+                return
+            try:
+                env_path.parent.mkdir(parents=True, exist_ok=True)
+                env_path.write_text("".join(lines), encoding="utf-8")
+                self._push_result("Settings", f"Saved {len(saved_keys)} keys to local env: {env_path}")
+            except Exception as exc:
+                self._push_result("Settings", f"Failed to save local env: {exc}")
+
         @on(Button.Pressed, "#btn-reload-env")
         def _on_btn_reload_env(self, event: Button.Pressed) -> None:  # pragma: no cover
             env_path = next(
-                (
-                    path for path in [
-                        Path(os.environ.get("SEAM_LOCAL_ENV", "")).expanduser(),
-                        Path.home() / "Documents" / "SEAM" / "local" / ".env",
-                        Path(".env"),
-                    ]
-                    if str(path) and path.exists()
-                ),
+                (path for path in self._local_env_candidates(include_repo_fallback=True) if path.exists()),
                 None,
             )
             if env_path is None:
@@ -1412,7 +1680,7 @@ if (
                         continue
                     key, value = line.split("=", 1)
                     key = key.strip()
-                    if key.startswith("SEAM_") or key in {"OPENAI_API_KEY"}:
+                    if key.startswith("SEAM_") or key in {"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"}:
                         os.environ[key] = value.strip().strip('"').strip("'")
                         loaded.append(key)
                 self.chat_client = SeamChatClient()
@@ -1495,7 +1763,7 @@ if (
                 if self.controller.active_tab == "benchmark" and tabs.active not in {"tab-benchmarks"}:
                     tabs.active = "tab-benchmarks"
                 elif self.controller.active_tab == "runtime" and tabs.active == "tab-benchmarks":
-                    tabs.active = "tab-overview"
+                    tabs.active = "tab-memory"
             except Exception:
                 return
 
@@ -1615,11 +1883,71 @@ if (
             if not self.is_mounted:
                 return
             try:
+                self._overview_phase = (self._overview_phase + 1) % 24
                 self._refresh_metrics()
                 self._refresh_overview()
                 self._update_status()
             except Exception:  # pragma: no cover - timer can fire during teardown
                 return
+
+        def _record_pgvector_status(self, label: str, output: str, *, returncode: int) -> None:
+            lower = output.lower()
+            if returncode != 0:
+                state = "error"
+            elif any(marker in lower for marker in ("running", "healthy", " up ")):
+                state = "active"
+            elif any(marker in lower for marker in ("exited", "created", "not running", "no containers", "not found")):
+                state = "inactive"
+            elif output.strip() in {"", "exit=0"}:
+                state = "inactive"
+            else:
+                state = "unknown"
+            detail_lines = [line.strip() for line in output.splitlines() if line.strip()]
+            detail = detail_lines[-1] if detail_lines else f"{label}: exit={returncode}"
+            self._pgvector_status = state
+            self._pgvector_status_detail = detail[:120]
+            self._pgvector_status_checked = datetime.now().strftime("%H:%M:%S")
+            self._refresh_overview()
+
+        def _status_bar(self, state: str, *, width: int = 14) -> str:
+            if state in {"active", "ok", "set"}:
+                return _ui_bars.solid(1.0, width=width, style=_ui_bars.OK_STYLE, show_pct=False)
+            if state in {"inactive", "missing", "unset", "warn"}:
+                return _ui_bars.solid(1.0, width=width, style=_ui_bars.WARN_STYLE, show_pct=False)
+            if state == "error":
+                return _ui_bars.error(1.0, width=width, note="error")
+            return _ui_bars.indeterminate(self._overview_phase, width=width, style=_ui_bars.RUN_STYLE)
+
+        def _overview_status_line(self, label: str, state: str, detail: str) -> str:
+            state_label = {
+                "active": "[green]active[/]",
+                "ok": "[green]ok[/]",
+                "set": "[green]set[/]",
+                "inactive": "[yellow]inactive[/]",
+                "missing": "[yellow]missing[/]",
+                "unset": "[yellow]unset[/]",
+                "warn": "[yellow]warn[/]",
+                "error": "[red]error[/]",
+                "unknown": "[cyan]unknown[/]",
+            }.get(state, f"[cyan]{escape(state)}[/]")
+            return f"  {label:<13} {self._status_bar(state)} {state_label}  {escape(detail)}"
+
+        def _path_state(self, path: Path, *, directory: bool = False) -> str:
+            try:
+                if directory:
+                    return "set" if path.exists() and path.is_dir() else "missing"
+                return "set" if path.exists() else "missing"
+            except OSError:
+                return "error"
+
+        def _settings_value(self, selector: str, env_key: str = "") -> str:
+            try:
+                value = self.query_one(selector, Input).value.strip()
+            except Exception:
+                value = ""
+            if value:
+                return value
+            return os.environ.get(env_key, "").strip() if env_key else ""
 
         def _refresh_overview(self) -> None:
             try:
@@ -1629,6 +1957,87 @@ if (
                 compressed = max(source_tokens - machine_tokens, 0)
                 savings_ratio = 0.0 if source_tokens == 0 else compressed / float(source_tokens)
                 total = max(metrics.total_records, 1)
+                db_path = Path(metrics.db_path)
+                db_state = "ok" if db_path.exists() else "missing"
+                local_env_path = self._local_env_path()
+                transcript_dir = Path(
+                    self._settings_value("#cfg-transcript-dir", "SEAM_CHAT_TRANSCRIPT_DIR") or ".seam/chat_transcripts"
+                )
+                config_dir = Path.home() / "Documents" / "SEAM"
+                pgvector_env_state = "set" if self._settings_value("#cfg-pgvector-dsn", "SEAM_PGVECTOR_DSN") else "unset"
+                chat_state = "set" if (
+                    self._settings_value("#cfg-api-key", "SEAM_CHAT_API_KEY")
+                    or os.environ.get("OPENAI_API_KEY", "").strip()
+                    or os.environ.get("OPENROUTER_API_KEY", "").strip()
+                ) else "unset"
+                rest_state = "set" if self._settings_value("#cfg-api-token", "SEAM_API_TOKEN") else "unset"
+                lines = [
+                    "--- Live Health Bars -----------------------------",
+                    self._overview_status_line("Database", db_state, f"{metrics.db_size} at {metrics.db_path}"),
+                    self._overview_status_line(
+                        "pgvector",
+                        self._pgvector_status,
+                        f"{self._pgvector_status_detail}  checked={self._pgvector_status_checked}",
+                    ),
+                    self._overview_status_line("pg DSN", pgvector_env_state, "SEAM_PGVECTOR_DSN configured" if pgvector_env_state == "set" else "SEAM_PGVECTOR_DSN not set"),
+                    self._overview_status_line("Chat/API", chat_state, f"{self.chat_client.model} via {self.chat_client.base_url}"),
+                    self._overview_status_line("REST token", rest_state, "SEAM_API_TOKEN set" if rest_state == "set" else "local unauthenticated mode"),
+                    f"  {'Runtime pulse':<13} {_ui_bars.indeterminate(self._overview_phase, width=14, style=_ui_bars.RUN_STYLE)} [cyan]live[/]",
+                    "",
+                    "--- Settings Paths --------------------------------",
+                    self._overview_status_line("DB path", db_state, metrics.db_path),
+                    self._overview_status_line("Local env", self._path_state(local_env_path), str(local_env_path)),
+                    self._overview_status_line("Transcript", self._path_state(transcript_dir, directory=True), str(transcript_dir)),
+                    self._overview_status_line("Config dir", self._path_state(config_dir, directory=True), str(config_dir)),
+                    self._overview_status_line("Compose env", self._path_state(local_env_path), str(local_env_path)),
+                    "",
+                    "--- Settings Values -------------------------------",
+                    f"  Embedding     {escape(self._settings_value('#cfg-embed-provider', 'SEAM_EMBEDDING_PROVIDER') or 'hash')} / {escape(self._settings_value('#cfg-embed-model', 'SEAM_EMBEDDING_MODEL') or metrics.model_name)}",
+                    f"  Surface mode  {escape(self._settings_value('#cfg-surface-mode', 'SEAM_SURFACE_MODE') or 'rgb24')}",
+                    f"  Rate limit    {escape(self._settings_value('#cfg-rate-limit-min', 'SEAM_API_RATE_LIMIT_PER_MINUTE') or 'off')}",
+                    self._overview_status_line("OpenAI key", "set" if self._settings_value("#cfg-key-openai", "OPENAI_API_KEY") else "unset", "OPENAI_API_KEY"),
+                    self._overview_status_line("OpenRouter", "set" if self._settings_value("#cfg-key-openrouter", "OPENROUTER_API_KEY") else "unset", "OPENROUTER_API_KEY"),
+                    self._overview_status_line("Anthropic", "set" if self._settings_value("#cfg-key-anthropic", "ANTHROPIC_API_KEY") else "unset", "ANTHROPIC_API_KEY"),
+                    self._overview_status_line("Gemini", "set" if self._settings_value("#cfg-key-gemini", "GEMINI_API_KEY") else "unset", "GEMINI_API_KEY"),
+                    "",
+                    "--- Record Counts ---------------------------------",
+                    f"  Total         {metrics.total_records}",
+                    f"  Vectors       {metrics.vector_entries}",
+                    f"  Packs         {metrics.pack_entries}",
+                    f"  Provenance    {metrics.provenance_entries}",
+                    f"  Symbols       {metrics.symbol_entries}",
+                    f"  Raw docs      {metrics.raw_entries}",
+                    f"  Namespaces    {metrics.namespaces}    Scopes  {metrics.scopes}",
+                    f"  Adapter       {metrics.vector_adapter_name}   store={metrics.vector_store_size}",
+                    "",
+                    "--- Top Record Kinds ------------------------------",
+                ]
+                for kind, count in metrics.top_kinds:
+                    bar = _ui_bars.solid(count / total, width=20, show_pct=False)
+                    lines.append(f"  {kind:<12} {count:>5}  {bar}")
+                if not metrics.top_kinds:
+                    lines.append("  (no records yet)")
+                lines += [
+                    "",
+                    "--- Token Budget ----------------------------------",
+                    f"  Source tokens   {source_tokens}",
+                    f"  Machine tokens  {machine_tokens}",
+                    f"  Savings         {self._bar(savings_ratio, 20)}",
+                    "",
+                    "--- Quick Commands --------------------------------",
+                    "  /compile <text>     compile NL into MIRL",
+                    "  /search  <query>    lexical + vector search",
+                    "  /benchmark <file>   lossless compression benchmark",
+                    "  /stats              refresh all metrics",
+                ]
+                panel = self.query_one("#overview-panel", _TextualMarkupPanel)
+                previous_y = float(panel.scroll_y)
+                previous_max = float(panel.max_scroll_y)
+                preserve_y = previous_y if previous_y < max(previous_max - 1.0, 0.0) else None
+                panel.set_lines(lines)
+                if preserve_y is not None:
+                    panel.scroll_to(y=preserve_y, animate=False, force=True, immediate=True)
+                return
                 lines = [
                     "─── SEAM Runtime Overview ─────────────────────────────────",
                     f"  Database   {metrics.db_path}",

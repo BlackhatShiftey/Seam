@@ -166,10 +166,17 @@ seam benchmark run all --persist --output seam-benchmark-report.json
 seam benchmark show latest
 seam benchmark verify seam-benchmark-report.json
 seam benchmark gate seam-benchmark-report.json
+seam benchmark diff <baseline-report.json> seam-benchmark-report.json
 ```
+
+Benchmark evidence is the proof layer for SEAM's commercial value; it does not
+grant commercial, hosted, SaaS, API, managed-service, embedded, redistribution,
+or closed-source rights.
 
 Publication claims must include bundle hash, case hashes, fixture hashes, git
 SHA, diff output, gate output, and holdout output when the claim is external.
+Do not claim "best", "production proven", or "commercial-grade" unless the
+benchmark bundle supports that exact claim.
 
 ## Machine-First Layer
 
@@ -184,3 +191,24 @@ context. Under that surface, SEAM is still machine-first:
 The design stance is unchanged: SQLite is canonical, derived indexes are
 rebuildable, lossless claims require exact reconstruction, and compressed
 artifacts must remain useful to an agent without hiding provenance.
+
+## License
+
+SEAM is proprietary source-available software under the SEAM Source-Available
+License. The repository is public for review, evaluation, and contribution; no
+open-source license is granted.
+
+You may review, evaluate, fork for contribution, and use SEAM locally for
+personal, educational, research, or non-commercial purposes. You may not host,
+SaaS, sell, embed, redistribute, deploy for customers, commercialize, or use
+SEAM in a closed-source or commercial project without a separate written
+commercial license from the copyright holder.
+
+Commercial use is available with permission: get a separate written commercial
+license from the copyright holder before using SEAM in a paid product, hosted
+service, customer deployment, closed-source product, or business offering.
+
+Contributions grant the project owner rights to keep developing SEAM and to
+commercially license SEAM without needing later contributor permission.
+
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).
