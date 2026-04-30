@@ -1,0 +1,465 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import struct
+import zlib
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from .lossless import query_readable_compressed
+from .mirl import IRBatch
+from .pack import pack_records
+from .retrieval import search_batch
+
+
+SURFACE_MAGIC = "SEAM-HS/1"
+SURFACE_MAGIC_BYTES = b"SEAM-HS/1\n"
+SURFACE_MODES = ("bw1", "rgb24", "rgba32")
+SURFACE_PAYLOAD_FORMATS = ("auto", "MIRL", "SEAM-RC/1", "SEAM-LX/1", "bytes")
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+@dataclass
+class SurfaceArtifact:
+    path: str
+    mode: str
+    payload_format: str
+    payload_bytes: int
+    payload_sha256: str
+    surface_bytes: int
+    width: int
+    height: int
+    capacity_bytes: int
+    overhead_bytes: int
+
+    @property
+    def capacity_used_ratio(self) -> float:
+        if self.capacity_bytes <= 0:
+            return 0.0
+        return self.payload_bytes / self.capacity_bytes
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "format": SURFACE_MAGIC,
+            "path": self.path,
+            "mode": self.mode,
+            "payload_format": self.payload_format,
+            "payload_bytes": self.payload_bytes,
+            "payload_sha256": self.payload_sha256,
+            "surface_bytes": self.surface_bytes,
+            "width": self.width,
+            "height": self.height,
+            "capacity_bytes": self.capacity_bytes,
+            "overhead_bytes": self.overhead_bytes,
+            "capacity_used_ratio": round(self.capacity_used_ratio, 6),
+        }
+
+
+@dataclass
+class SurfacePayload:
+    payload: bytes
+    metadata: dict[str, Any]
+    mode: str
+    payload_format: str
+    payload_sha256: str
+    payload_bytes: int
+    width: int
+    height: int
+    path: str
+
+    @property
+    def text(self) -> str:
+        return self.payload.decode("utf-8")
+
+    def to_dict(self, include_payload: bool = False) -> dict[str, object]:
+        data: dict[str, object] = {
+            "format": SURFACE_MAGIC,
+            "path": self.path,
+            "mode": self.mode,
+            "payload_format": self.payload_format,
+            "payload_bytes": self.payload_bytes,
+            "payload_sha256": self.payload_sha256,
+            "width": self.width,
+            "height": self.height,
+            "metadata": dict(self.metadata),
+        }
+        if include_payload:
+            data["payload_text"] = self.text if _is_utf8(self.payload) else None
+            data["payload_hex"] = self.payload.hex() if not _is_utf8(self.payload) else None
+        return data
+
+
+@dataclass
+class SurfaceVerification:
+    ok: bool
+    path: str
+    mode: str | None = None
+    payload_format: str | None = None
+    payload_bytes: int | None = None
+    payload_sha256: str | None = None
+    actual_sha256: str | None = None
+    errors: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "format": SURFACE_MAGIC,
+            "status": "PASS" if self.ok else "FAIL",
+            "path": self.path,
+            "mode": self.mode,
+            "payload_format": self.payload_format,
+            "payload_bytes": self.payload_bytes,
+            "payload_sha256": self.payload_sha256,
+            "actual_sha256": self.actual_sha256,
+            "errors": list(self.errors),
+        }
+
+
+@dataclass
+class SurfaceQueryResult:
+    query: str
+    source_path: str
+    payload_format: str
+    hits: list[dict[str, object]]
+    context: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "format": SURFACE_MAGIC,
+            "query": self.query,
+            "source_path": self.source_path,
+            "payload_format": self.payload_format,
+            "hits": list(self.hits),
+            "context": self.context,
+        }
+
+
+class HolographicReader:
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+
+    def read(self) -> SurfacePayload:
+        return decode_surface(self.path)
+
+    def verify(self) -> SurfaceVerification:
+        return verify_surface(self.path)
+
+    def query(self, query: str, limit: int = 5) -> SurfaceQueryResult:
+        return query_surface(self.path, query=query, limit=limit)
+
+    def context(self, query: str, budget: int = 1200) -> dict[str, object]:
+        return context_surface(self.path, query=query, budget=budget)
+
+
+def encode_surface(
+    payload: bytes,
+    output_path: Path,
+    mode: str = "rgb24",
+    payload_format: str = "auto",
+    source_ref: str | None = None,
+) -> SurfaceArtifact:
+    if mode not in SURFACE_MODES:
+        raise ValueError(f"Unsupported holographic surface mode: {mode}")
+    resolved_format = _detect_payload_format(payload) if payload_format == "auto" else payload_format
+    if resolved_format not in SURFACE_PAYLOAD_FORMATS or resolved_format == "auto":
+        raise ValueError(f"Unsupported holographic payload format: {payload_format}")
+
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    metadata = {
+        "format": SURFACE_MAGIC,
+        "mode": mode,
+        "payload_format": resolved_format,
+        "payload_bytes": len(payload),
+        "payload_sha256": payload_sha256,
+        "source_ref": source_ref or "",
+        "contract": "direct_read_visual_container",
+    }
+    header = json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    container = SURFACE_MAGIC_BYTES + struct.pack(">I", len(header)) + header + payload
+    width, height, pixels, color_type, capacity_bytes = _container_to_pixels(container, mode)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_png(output_path, width=width, height=height, color_type=color_type, pixel_bytes=pixels)
+    return SurfaceArtifact(
+        path=str(output_path),
+        mode=mode,
+        payload_format=resolved_format,
+        payload_bytes=len(payload),
+        payload_sha256=payload_sha256,
+        surface_bytes=output_path.stat().st_size,
+        width=width,
+        height=height,
+        capacity_bytes=capacity_bytes,
+        overhead_bytes=len(container) - len(payload),
+    )
+
+
+def decode_surface(path: Path) -> SurfacePayload:
+    path = Path(path)
+    if path.suffix.lower() in {".jpg", ".jpeg"}:
+        raise ValueError("SEAM-HS/1 refuses lossy JPEG surfaces for exact memory")
+    width, height, color_type, pixel_bytes = _read_png(path)
+    if color_type in {2, 6}:
+        container = pixel_bytes
+    elif color_type == 0:
+        container = _bits_to_bytes(pixel_bytes)
+    else:
+        raise ValueError(f"Unsupported PNG color type for SEAM-HS/1: {color_type}")
+
+    metadata, payload = _parse_container(container)
+    expected_sha = str(metadata["payload_sha256"])
+    actual_sha = hashlib.sha256(payload).hexdigest()
+    if actual_sha != expected_sha:
+        raise ValueError(f"Holographic surface hash mismatch: expected {expected_sha}, got {actual_sha}")
+    return SurfacePayload(
+        payload=payload,
+        metadata=metadata,
+        mode=str(metadata["mode"]),
+        payload_format=str(metadata["payload_format"]),
+        payload_sha256=expected_sha,
+        payload_bytes=int(metadata["payload_bytes"]),
+        width=width,
+        height=height,
+        path=str(path),
+    )
+
+
+def verify_surface(path: Path) -> SurfaceVerification:
+    try:
+        payload = decode_surface(path)
+    except Exception as exc:
+        return SurfaceVerification(ok=False, path=str(path), errors=[str(exc)])
+    actual_sha = hashlib.sha256(payload.payload).hexdigest()
+    return SurfaceVerification(
+        ok=actual_sha == payload.payload_sha256,
+        path=str(path),
+        mode=payload.mode,
+        payload_format=payload.payload_format,
+        payload_bytes=payload.payload_bytes,
+        payload_sha256=payload.payload_sha256,
+        actual_sha256=actual_sha,
+        errors=[] if actual_sha == payload.payload_sha256 else ["payload hash mismatch"],
+    )
+
+
+def query_surface(path: Path, query: str, limit: int = 5) -> SurfaceQueryResult:
+    payload = decode_surface(path)
+    if payload.payload_format == "SEAM-RC/1":
+        result = query_readable_compressed(payload.text, query=query, limit=limit).to_dict()
+        return SurfaceQueryResult(
+            query=query,
+            source_path=str(path),
+            payload_format=payload.payload_format,
+            hits=list(result["hits"]),
+        )
+    if payload.payload_format == "MIRL":
+        batch = IRBatch.from_text(payload.text)
+        result = search_batch(batch, query=query, limit=limit).to_dict()
+        hits = [
+            {
+                "record_id": candidate["record"]["id"],
+                "record_type": candidate["record"]["kind"],
+                "score": candidate["score"],
+                "text": json.dumps(candidate["record"], sort_keys=True),
+                "reasons": candidate.get("reasons", []),
+            }
+            for candidate in result.get("candidates", [])
+        ]
+        return SurfaceQueryResult(query=query, source_path=str(path), payload_format=payload.payload_format, hits=hits)
+    raise ValueError(f"Surface query requires MIRL or SEAM-RC/1 payloads, got {payload.payload_format}")
+
+
+def context_surface(path: Path, query: str, budget: int = 1200) -> dict[str, object]:
+    payload = decode_surface(path)
+    if payload.payload_format == "MIRL":
+        batch = IRBatch.from_text(payload.text)
+        result = search_batch(batch, query=query, limit=max(1, min(10, budget // 120)))
+        records = [candidate.record for candidate in result.candidates]
+        pack = pack_records(records, lens="holographic", budget=budget, mode="context")
+        return {
+            "format": SURFACE_MAGIC,
+            "source_path": str(path),
+            "payload_format": payload.payload_format,
+            "query": query,
+            "context": pack.to_dict(),
+        }
+    result = query_surface(path, query=query, limit=max(1, min(10, budget // 120)))
+    context_lines = [str(hit.get("text", "")).rstrip() for hit in result.hits]
+    return {
+        "format": SURFACE_MAGIC,
+        "source_path": str(path),
+        "payload_format": payload.payload_format,
+        "query": query,
+        "context": {
+            "mode": "context",
+            "lens": "holographic",
+            "budget": budget,
+            "snippets": context_lines,
+            "token_cost": sum(max(1, len(line) // 4) for line in context_lines),
+        },
+    }
+
+
+def _detect_payload_format(payload: bytes) -> str:
+    if payload.startswith(b"SEAM-RC/1"):
+        return "SEAM-RC/1"
+    if payload.startswith(b"SEAM-LX/1"):
+        return "SEAM-LX/1"
+    if _looks_like_mirl(payload):
+        return "MIRL"
+    return "bytes"
+
+
+def _looks_like_mirl(payload: bytes) -> bool:
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines:
+        return False
+    return all(line.split("|", 2)[0] in {"RAW", "SPAN", "ENT", "CLM", "EVT", "REL", "STA", "SYM", "PACK", "FLOW", "PROV", "META"} for line in lines)
+
+
+def _container_to_pixels(container: bytes, mode: str) -> tuple[int, int, bytes, int, int]:
+    if mode in {"rgb24", "rgba32"}:
+        channels = 4 if mode == "rgba32" else 3
+        color_type = 6 if mode == "rgba32" else 2
+        total_pixels = max(1, math.ceil(len(container) / channels))
+        width = max(1, math.ceil(math.sqrt(total_pixels)))
+        height = math.ceil(total_pixels / width)
+        capacity_bytes = width * height * channels
+        return width, height, container.ljust(capacity_bytes, b"\x00"), color_type, capacity_bytes
+    bit_count = len(container) * 8
+    width = max(1, math.ceil(math.sqrt(bit_count)))
+    height = math.ceil(bit_count / width)
+    capacity_bits = width * height
+    bits = "".join(f"{byte:08b}" for byte in container).ljust(capacity_bits, "0")
+    pixels = bytes(255 if bit == "1" else 0 for bit in bits)
+    return width, height, pixels, 0, capacity_bits // 8
+
+
+def _parse_container(container: bytes) -> tuple[dict[str, Any], bytes]:
+    if not container.startswith(SURFACE_MAGIC_BYTES):
+        raise ValueError("PNG does not contain a SEAM-HS/1 surface")
+    offset = len(SURFACE_MAGIC_BYTES)
+    if len(container) < offset + 4:
+        raise ValueError("SEAM-HS/1 surface header is truncated")
+    header_length = struct.unpack(">I", container[offset : offset + 4])[0]
+    offset += 4
+    header_end = offset + header_length
+    metadata = json.loads(container[offset:header_end].decode("utf-8"))
+    if metadata.get("format") != SURFACE_MAGIC:
+        raise ValueError("SEAM-HS/1 metadata format mismatch")
+    payload_length = int(metadata["payload_bytes"])
+    payload = container[header_end : header_end + payload_length]
+    if len(payload) != payload_length:
+        raise ValueError("SEAM-HS/1 payload is truncated")
+    return metadata, payload
+
+
+def _write_png(path: Path, width: int, height: int, color_type: int, pixel_bytes: bytes) -> None:
+    channels = 4 if color_type == 6 else 3 if color_type == 2 else 1
+    stride = width * channels
+    expected = stride * height
+    if len(pixel_bytes) != expected:
+        raise ValueError(f"Pixel payload has {len(pixel_bytes)} bytes, expected {expected}")
+    raw = b"".join(b"\x00" + pixel_bytes[row * stride : (row + 1) * stride] for row in range(height))
+    png = bytearray(PNG_SIGNATURE)
+    png.extend(_png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0)))
+    png.extend(_png_chunk(b"IDAT", zlib.compress(raw, level=9)))
+    png.extend(_png_chunk(b"IEND", b""))
+    path.write_bytes(bytes(png))
+
+
+def _read_png(path: Path) -> tuple[int, int, int, bytes]:
+    data = path.read_bytes()
+    if not data.startswith(PNG_SIGNATURE):
+        raise ValueError("SEAM-HS/1 only supports lossless PNG surfaces")
+    offset = len(PNG_SIGNATURE)
+    width = height = color_type = None
+    idat = bytearray()
+    while offset < len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        chunk_type = data[offset + 4 : offset + 8]
+        chunk_data = data[offset + 8 : offset + 8 + length]
+        crc_expected = struct.unpack(">I", data[offset + 8 + length : offset + 12 + length])[0]
+        crc_actual = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if crc_actual != crc_expected:
+            raise ValueError(f"PNG chunk CRC mismatch: {chunk_type.decode('ascii', errors='replace')}")
+        offset += 12 + length
+        if chunk_type == b"IHDR":
+            width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(">IIBBBBB", chunk_data)
+            if bit_depth != 8 or compression != 0 or filter_method != 0 or interlace != 0:
+                raise ValueError("Unsupported PNG encoding for SEAM-HS/1")
+            if color_type not in {0, 2, 6}:
+                raise ValueError(f"Unsupported PNG color type for SEAM-HS/1: {color_type}")
+        elif chunk_type == b"IDAT":
+            idat.extend(chunk_data)
+        elif chunk_type == b"IEND":
+            break
+    if width is None or height is None or color_type is None:
+        raise ValueError("PNG is missing IHDR metadata")
+    channels = 4 if color_type == 6 else 3 if color_type == 2 else 1
+    stride = width * channels
+    raw = zlib.decompress(bytes(idat))
+    return width, height, color_type, _unfilter_png(raw, width, height, channels, stride)
+
+
+def _unfilter_png(raw: bytes, width: int, height: int, channels: int, stride: int) -> bytes:
+    rows = []
+    offset = 0
+    previous = bytearray(stride)
+    for _ in range(height):
+        filter_type = raw[offset]
+        offset += 1
+        row = bytearray(raw[offset : offset + stride])
+        offset += stride
+        for i in range(stride):
+            left = row[i - channels] if i >= channels else 0
+            up = previous[i]
+            upper_left = previous[i - channels] if i >= channels else 0
+            if filter_type == 1:
+                row[i] = (row[i] + left) & 0xFF
+            elif filter_type == 2:
+                row[i] = (row[i] + up) & 0xFF
+            elif filter_type == 3:
+                row[i] = (row[i] + ((left + up) // 2)) & 0xFF
+            elif filter_type == 4:
+                row[i] = (row[i] + _paeth(left, up, upper_left)) & 0xFF
+            elif filter_type != 0:
+                raise ValueError(f"Unsupported PNG filter type: {filter_type}")
+        rows.append(bytes(row))
+        previous = row
+    return b"".join(rows)
+
+
+def _paeth(left: int, up: int, upper_left: int) -> int:
+    estimate = left + up - upper_left
+    left_distance = abs(estimate - left)
+    up_distance = abs(estimate - up)
+    upper_left_distance = abs(estimate - upper_left)
+    if left_distance <= up_distance and left_distance <= upper_left_distance:
+        return left
+    if up_distance <= upper_left_distance:
+        return up
+    return upper_left
+
+
+def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+
+
+def _bits_to_bytes(pixels: bytes) -> bytes:
+    bits = "".join("1" if pixel > 127 else "0" for pixel in pixels)
+    return bytes(int(bits[index : index + 8], 2) for index in range(0, len(bits) - 7, 8))
+
+
+def _is_utf8(payload: bytes) -> bool:
+    try:
+        payload.decode("utf-8")
+        return True
+    except UnicodeDecodeError:
+        return False

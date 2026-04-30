@@ -64,6 +64,36 @@ RC/1 exactness cannot fall below 100%. A recipe document must be readable back
 from the compressed language exactly, including title, yield, ingredients,
 measurements, ordered steps, notes, punctuation, and quoted text.
 
+## SEAM-HS/1 Holographic Surface
+
+`SEAM-HS/1` is a lossless visual container for SEAM machine-language payloads.
+It stores MIRL, `SEAM-RC/1`, `SEAM-LX/1`, or raw bytes inside PNG pixel data
+with an envelope containing payload format, byte length, and SHA-256.
+
+`SEAM-HS/1` does not replace the readable language contract. It carries the
+payload. Direct readability still comes from MIRL or `SEAM-RC/1`; the surface
+lets SEAM read those bytes from the image in memory and immediately run the
+normal parser, query, search, or context path without OCR, natural-language
+recompilation, or SQLite import.
+
+Current CLI commands:
+
+```powershell
+python seam.py surface compile input.txt --output input.seam.png --mode rgb24
+python seam.py surface encode input.seamrc --output input.seam.png --mode rgb24
+python seam.py surface verify input.seam.png
+python seam.py surface query input.seam.png "exact phrase"
+python seam.py surface context input.seam.png --query "agent behavior" --budget 1200
+python seam.py benchmark run surface
+```
+
+Only lossless PNG surfaces are exact memory artifacts in v1. Lossy formats such
+as JPEG are rejected for exact read workflows.
+
+`rgb24` is the default density mode. `rgba32` is supported for explicit
+higher-density surfaces because it stores four channel bytes per pixel, but the
+alpha channel is easier for image tooling to alter, strip, or normalize.
+
 ## Record Kinds
 
 - `RAW`

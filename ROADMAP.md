@@ -3,6 +3,42 @@
 **Last updated:** 2026-04-20
 **Status:** Active planning document. This is the living roadmap for SEAM development beyond the stable v1 core.
 
+## 2026-04-30 Holographic Surface Integration
+
+Holographic Surface is now a roadmap track for directly readable visual memory
+snapshots:
+
+- `SEAM-HS/1` is a lossless PNG-backed surface that stores MIRL, `SEAM-RC/1`,
+  `SEAM-LX/1`, or raw bytes in pixel data.
+- The surface stores machine language, not pictures of text. Direct read means
+  SEAM reads pixel bytes into the embedded MIRL/RC payload in memory, then runs
+  the normal parser, query, search, or context path.
+- No OCR, natural-language recompilation, or SQLite import is required for
+  direct surface query/context workflows.
+- v1 supports `bw1` proof mode, `rgb24` default density mode, and explicit
+  `rgba32` high-density mode. JPEG and other lossy formats are rejected for
+  exact memory.
+- The automatic operator flow is `seam surface compile <source> --output
+  <file.seam.png>`: compile source text into MIRL, then encode the MIRL bytes
+  into a PNG surface using `rgb24` unless a denser mode is requested.
+- The benchmark gate is `surface_exact_rate == 1.0`,
+  `payload_hash_match_rate == 1.0`, and direct query exactness at 100%.
+- The claim is higher effective intelligence density for already-compiled SEAM
+  machine language, not impossible free compression.
+
+SOP:
+
+1. Use `seam surface compile <source> --output <file.seam.png> --mode rgb24`
+   for source text that should become MIRL-backed surface memory.
+2. Encode existing RC/1 or MIRL with `seam surface encode <input> --output <file.seam.png> --mode rgb24`.
+3. Use `--mode rgba32` only for explicit higher channel density; it stores 4
+   bytes per pixel but alpha channels are easier for image tooling to mutate.
+4. Verify with `seam surface verify <file.seam.png>`.
+5. Query without import using `seam surface query`, `seam surface search`, or
+   `seam surface context`.
+6. Import only when the snapshot should become active SQLite memory.
+7. Gate changes with `seam benchmark run surface`.
+
 ## 2026-04-28 Competitive Integration Update
 
 The current competitive plan moves README/install/RAG work ahead of older

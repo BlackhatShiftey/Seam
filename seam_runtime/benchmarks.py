@@ -23,6 +23,12 @@ from .lossless import (
     parse_readable_machine_text,
     query_readable_compressed,
 )
+from .holographic import (
+    encode_surface,
+    decode_surface,
+    query_surface,
+    verify_surface,
+)
 from .models import HashEmbeddingModel, cosine
 from .vector import INDEXABLE_KINDS, SQLiteVectorIndex
 
@@ -31,7 +37,7 @@ if TYPE_CHECKING:
 
 
 BENCHMARK_VERSION = "SEAM-BENCH/1"
-BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_context", "persistence", "agent_tasks")
+BENCHMARK_SUITES = ("lossless", "readable", "surface", "retrieval", "embedding", "long_context", "persistence", "agent_tasks")
 BENCHMARK_GATE_VERSION = "SEAM-BENCH-GATE/1"
 
 BENCHMARK_ROOT = Path(__file__).resolve().parent.parent / "benchmarks"
@@ -40,11 +46,12 @@ HOLDOUT_FIXTURE_ROOT = FIXTURE_ROOT / "holdout"
 HOLDOUT_RUN_ROOT = BENCHMARK_ROOT / "runs" / "holdout"
 LOSSLESS_FIXTURE_PATH = FIXTURE_ROOT / "lossless_cases.json"
 READABLE_FIXTURE_PATH = FIXTURE_ROOT / "readable_cases.json"
+SURFACE_FIXTURE_PATH = FIXTURE_ROOT / "surface_cases.json"
 LONG_CONTEXT_FIXTURE_PATH = FIXTURE_ROOT / "long_context_cases.json"
 AGENT_TASK_FIXTURE_PATH = FIXTURE_ROOT / "agent_tasks.json"
 RETRIEVAL_FIXTURE_PATH = Path(__file__).resolve().parent.parent / "docs" / "retrieval_gold_fixtures.json"
 LOSSLESS_DEMO_PATH = Path(__file__).resolve().parent.parent / "tools" / "lossless_demo_input.txt"
-HOLDOUT_BENCHMARK_SUITES = ("lossless", "readable", "retrieval", "embedding", "long_context", "agent_tasks")
+HOLDOUT_BENCHMARK_SUITES = ("lossless", "readable", "surface", "retrieval", "embedding", "long_context", "agent_tasks")
 DEFAULT_BENCHMARK_GATE_POLICY: dict[str, Any] = {
     "version": BENCHMARK_GATE_VERSION,
     "required_families": list(BENCHMARK_SUITES),
@@ -65,6 +72,12 @@ DEFAULT_BENCHMARK_GATE_POLICY: dict[str, Any] = {
             "exactness_rate": {"minimum": 1.0},
             "direct_text_exact_rate": {"minimum": 1.0},
             "direct_read_equivalence_rate": {"minimum": 1.0},
+            "direct_query_exactness_rate": {"minimum": 1.0},
+        },
+        "surface": {
+            "pass_rate": {"minimum": 1.0},
+            "surface_exact_rate": {"minimum": 1.0},
+            "payload_hash_match_rate": {"minimum": 1.0},
             "direct_query_exactness_rate": {"minimum": 1.0},
         },
         "retrieval": {
@@ -135,6 +148,15 @@ def run_benchmark_suite(
                 persist=persist,
                 include_machine_text=include_machine_text,
                 fixture_path=_holdout_fixture_path(READABLE_FIXTURE_PATH) if holdout else READABLE_FIXTURE_PATH,
+                require_fixture=holdout,
+            )
+            continue
+        if family == "surface":
+            family_reports[family] = _run_surface_family(
+                runtime,
+                persist=persist,
+                include_payload=include_machine_text,
+                fixture_path=_holdout_fixture_path(SURFACE_FIXTURE_PATH) if holdout else SURFACE_FIXTURE_PATH,
                 require_fixture=holdout,
             )
             continue
@@ -659,6 +681,86 @@ def _run_readable_family(
     }
     return {
         "family": "readable",
+        "summary": summary,
+        "cases": cases,
+        "improvement_loop": _unique_actions(case["improvement_loop"] for case in cases),
+    }
+
+
+def _run_surface_family(
+    runtime: "SeamRuntime",
+    persist: bool,
+    include_payload: bool,
+    fixture_path: Path = SURFACE_FIXTURE_PATH,
+    require_fixture: bool = False,
+) -> dict[str, Any]:
+    cases: list[dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="seam-bench-surface-") as temp_dir:
+        temp_root = Path(temp_dir)
+        for config in _load_json_fixture(fixture_path, _default_surface_cases(), require_exists=require_fixture):
+            payload_bytes, payload_format = _surface_case_payload(config)
+            surface_path = temp_root / f"{config['name']}.seam.png"
+            artifact = encode_surface(
+                payload_bytes,
+                output_path=surface_path,
+                mode=str(config.get("mode", "rgb24")),
+                payload_format=payload_format,
+                source_ref=str(config.get("source_ref", f"benchmark://surface/{config['name']}")),
+            )
+            decoded = decode_surface(surface_path)
+            verification = verify_surface(surface_path)
+            surface_exact = decoded.payload == payload_bytes
+            payload_hash_match = decoded.payload_sha256 == hashlib.sha256(payload_bytes).hexdigest()
+            query_checks = _surface_query_checks(surface_path, config)
+            direct_query_exactness = all(item["ok"] for item in query_checks)
+            artifact_id = None
+            if persist:
+                artifact_id = runtime.store.write_machine_artifact(
+                    source_type="benchmark.surface",
+                    source_id=config["name"],
+                    artifact={
+                        "surface": artifact.to_dict(),
+                        "payload": decoded.to_dict(include_payload=include_payload),
+                    },
+                    roundtrip_ok=surface_exact,
+                    metadata={"family": "surface", "case": config["name"], "format": "SEAM-HS/1"},
+                )
+            case = {
+                "case_id": config["name"],
+                "status": "PASS" if surface_exact and payload_hash_match and verification.ok and direct_query_exactness else "FAIL",
+                "metrics": {
+                    "roundtrip_match": surface_exact,
+                    "surface_exact": surface_exact,
+                    "payload_hash_match": payload_hash_match,
+                    "direct_query_exactness": direct_query_exactness,
+                    "payload_bytes": artifact.payload_bytes,
+                    "surface_bytes": artifact.surface_bytes,
+                    "capacity_bytes": artifact.capacity_bytes,
+                    "capacity_used_ratio": round(artifact.capacity_used_ratio, 6),
+                },
+                "trace": {
+                    "artifact": artifact.to_dict(),
+                    "verification": verification.to_dict(),
+                    "query_checks": query_checks,
+                    "payload": decoded.to_dict(include_payload=include_payload),
+                },
+                "debug_flags": _surface_flags(surface_exact, payload_hash_match, verification.ok, direct_query_exactness),
+                "improvement_loop": _surface_actions(config["name"], surface_exact, payload_hash_match, verification.ok, direct_query_exactness),
+            }
+            if artifact_id is not None:
+                case["artifact_id"] = artifact_id
+            cases.append(_stamp_case_hash(case))
+
+    summary = {
+        "case_count": len(cases),
+        "pass_rate": _ratio(sum(1 for case in cases if case["status"] == "PASS"), len(cases)),
+        "surface_exact_rate": _ratio(sum(1 for case in cases if case["metrics"]["surface_exact"]), len(cases)),
+        "payload_hash_match_rate": _ratio(sum(1 for case in cases if case["metrics"]["payload_hash_match"]), len(cases)),
+        "direct_query_exactness_rate": _ratio(sum(1 for case in cases if case["metrics"]["direct_query_exactness"]), len(cases)),
+        "avg_capacity_used_ratio": _average(case["metrics"]["capacity_used_ratio"] for case in cases),
+    }
+    return {
+        "family": "surface",
         "summary": summary,
         "cases": cases,
         "improvement_loop": _unique_actions(case["improvement_loop"] for case in cases),
@@ -1218,6 +1320,113 @@ def _default_readable_cases() -> list[dict[str, Any]]:
     ]
 
 
+def _default_surface_cases() -> list[dict[str, Any]]:
+    return [
+        {
+            "name": "hs1_rc1_direct_query_rgb24",
+            "payload_kind": "readable",
+            "mode": "rgb24",
+            "text": (
+                'Surface note: "Holographic Surface stores SEAM-RC/1 as exact pixel bytes." '
+                "Direct queries read the embedded machine language without OCR or SQLite import."
+            ),
+            "queries": [
+                '"Holographic Surface stores SEAM-RC/1 as exact pixel bytes."',
+                "without OCR SQLite import",
+            ],
+        },
+        {
+            "name": "hs1_mirl_direct_search_bw1",
+            "payload_kind": "mirl",
+            "mode": "bw1",
+            "dsl": """
+entity project "SEAM" as p1
+claim c1:
+  subject p1
+  predicate holographic_surface
+  object direct_read_memory
+claim c2:
+  subject p1
+  predicate stores
+  object machine_language_pixels
+""",
+            "queries": ["holographic_surface direct_read_memory", "machine_language_pixels"],
+        },
+        {
+            "name": "hs1_rc1_direct_query_rgba32",
+            "payload_kind": "readable",
+            "mode": "rgba32",
+            "text": (
+                'Surface density note: "RGBA32 stores four exact channel bytes per pixel." '
+                "SEAM keeps RGB24 as the default and uses RGBA32 only when explicitly requested."
+            ),
+            "queries": [
+                '"RGBA32 stores four exact channel bytes per pixel."',
+                "explicitly requested",
+            ],
+        },
+    ]
+
+
+def _surface_case_payload(config: dict[str, Any]) -> tuple[bytes, str]:
+    payload_kind = str(config.get("payload_kind", "readable"))
+    if payload_kind == "readable":
+        text = _resolve_lossless_text(config)
+        artifact = compress_text_readable(
+            text,
+            source_ref=str(config.get("source_ref", f"benchmark://surface/{config['name']}")),
+            granularity=str(config.get("granularity", "auto")),
+            tokenizer=str(config.get("tokenizer", "char4_approx")),
+        )
+        return artifact.machine_text.encode("utf-8"), "SEAM-RC/1"
+    if payload_kind == "mirl":
+        batch = compile_dsl(str(config["dsl"]), scope=str(config.get("scope", "project")))
+        return batch.to_text().encode("utf-8"), "MIRL"
+    if "payload" in config:
+        return str(config["payload"]).encode("utf-8"), str(config.get("payload_format", "bytes"))
+    raise ValueError(f"Unsupported surface fixture payload_kind: {payload_kind}")
+
+
+def _surface_query_checks(surface_path: Path, config: dict[str, Any]) -> list[dict[str, Any]]:
+    checks = []
+    for query in config.get("queries", []):
+        result = query_surface(surface_path, str(query), limit=5).to_dict()
+        hits = result.get("hits", [])
+        checks.append(
+            {
+                "query": query,
+                "ok": bool(hits),
+                "hit_count": len(hits),
+                "top_hit": hits[0] if hits else None,
+            }
+        )
+    return checks
+
+
+def _surface_flags(surface_exact: bool, payload_hash_match: bool, verify_ok: bool, direct_query_exactness: bool) -> list[str]:
+    flags = []
+    if not surface_exact:
+        flags.append("surface_decode_mismatch")
+    if not payload_hash_match:
+        flags.append("payload_hash_mismatch")
+    if not verify_ok:
+        flags.append("surface_verify_failed")
+    if not direct_query_exactness:
+        flags.append("surface_direct_query_failed")
+    return flags
+
+
+def _surface_actions(case_name: str, surface_exact: bool, payload_hash_match: bool, verify_ok: bool, direct_query_exactness: bool) -> list[str]:
+    actions = []
+    if not surface_exact:
+        actions.append(f"inspect SEAM-HS/1 pixel packing for {case_name}; decoded payload must be byte-exact")
+    if not payload_hash_match or not verify_ok:
+        actions.append(f"inspect SEAM-HS/1 envelope/hash verification for {case_name}")
+    if not direct_query_exactness:
+        actions.append(f"inspect surface query dispatch for {case_name}; embedded MIRL/RC payloads must be directly searchable")
+    return actions
+
+
 def _default_long_context_cases() -> list[dict[str, Any]]:
     return [
         {
@@ -1324,12 +1533,13 @@ def _build_long_context_dsl(config: dict[str, Any]) -> str:
 
 def _dataset_manifest(holdout: bool = False) -> list[dict[str, str]]:
     items = []
-    paths = [LOSSLESS_FIXTURE_PATH, READABLE_FIXTURE_PATH, LONG_CONTEXT_FIXTURE_PATH, AGENT_TASK_FIXTURE_PATH, RETRIEVAL_FIXTURE_PATH, LOSSLESS_DEMO_PATH]
+    paths = [LOSSLESS_FIXTURE_PATH, READABLE_FIXTURE_PATH, SURFACE_FIXTURE_PATH, LONG_CONTEXT_FIXTURE_PATH, AGENT_TASK_FIXTURE_PATH, RETRIEVAL_FIXTURE_PATH, LOSSLESS_DEMO_PATH]
     if holdout:
         paths.extend(
             [
                 _holdout_fixture_path(LOSSLESS_FIXTURE_PATH),
                 _holdout_fixture_path(READABLE_FIXTURE_PATH),
+                _holdout_fixture_path(SURFACE_FIXTURE_PATH),
                 _holdout_fixture_path(LONG_CONTEXT_FIXTURE_PATH),
                 _holdout_fixture_path(AGENT_TASK_FIXTURE_PATH),
                 _holdout_fixture_path(RETRIEVAL_FIXTURE_PATH),
@@ -1362,6 +1572,7 @@ def _fixture_for_family(family: str, holdout: bool) -> Path:
     public_paths = {
         "lossless": LOSSLESS_FIXTURE_PATH,
         "readable": READABLE_FIXTURE_PATH,
+        "surface": SURFACE_FIXTURE_PATH,
         "retrieval": RETRIEVAL_FIXTURE_PATH,
         "embedding": RETRIEVAL_FIXTURE_PATH,
         "long_context": LONG_CONTEXT_FIXTURE_PATH,
@@ -1801,6 +2012,11 @@ def _render_key_metrics(family_name: str, summary: dict[str, Any]) -> str:
         return (
             f"direct_text={float(summary.get('direct_text_exact_rate', 0.0)):.1%} "
             f"direct_read={float(summary.get('direct_read_equivalence_rate', 0.0)):.1%}"
+        )
+    if family_name == "surface":
+        return (
+            f"surface_exact={float(summary.get('surface_exact_rate', 0.0)):.1%} "
+            f"hash={float(summary.get('payload_hash_match_rate', 0.0)):.1%}"
         )
     if family_name == "retrieval":
         nat = float(summary.get('hybrid_recall_at_k', 0.0))

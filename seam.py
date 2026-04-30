@@ -17,6 +17,18 @@ from seam_runtime.lossless import (
     decompress_text_readable,
     query_readable_compressed,
 )
+from seam_runtime.holographic import (
+    HolographicReader,
+    SurfaceArtifact,
+    SurfacePayload,
+    SurfaceQueryResult,
+    SurfaceVerification,
+    context_surface,
+    decode_surface,
+    encode_surface,
+    query_surface,
+    verify_surface,
+)
 from seam_runtime.mirl import IRBatch, MIRLRecord, Pack
 from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel
 from seam_runtime.nl import compile_nl
@@ -85,6 +97,27 @@ def readable_query(machine_text: str, query: str, limit: int = 5) -> ReadableQue
 
 def readable_decompress(machine_text: str) -> str:
     return decompress_text_readable(machine_text)
+
+
+def surface_encode(payload: bytes, output_path: str | Path, mode: str = "rgb24", payload_format: str = "auto") -> SurfaceArtifact:
+    return encode_surface(payload, Path(output_path), mode=mode, payload_format=payload_format)
+
+
+def surface_compile(text: str, output_path: str | Path, mode: str = "rgb24", source_ref: str = "local://input") -> SurfaceArtifact:
+    batch = compile_nl(text, source_ref=source_ref)
+    return encode_surface(batch.to_text().encode("utf-8"), Path(output_path), mode=mode, payload_format="MIRL", source_ref=source_ref)
+
+
+def surface_decode(path: str | Path) -> SurfacePayload:
+    return decode_surface(Path(path))
+
+
+def surface_verify(path: str | Path) -> SurfaceVerification:
+    return verify_surface(Path(path))
+
+
+def surface_query(path: str | Path, query: str, limit: int = 5) -> SurfaceQueryResult:
+    return query_surface(Path(path), query=query, limit=limit)
 
 
 def lossless_benchmark(
