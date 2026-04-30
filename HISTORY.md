@@ -2262,3 +2262,21 @@ Added the automatic source-to-Holographic-Surface flow and the explicit RGBA den
 
 Verification: `python -m py_compile seam_runtime\holographic.py seam_runtime\cli.py seam_runtime\benchmarks.py seam.py Test-Seam-All\test_seam.py` passed; focused surface pytest passed 7 selected tests; `python seam.py benchmark run surface --format pretty` passed with 3/3 cases and 100% exactness/hash; `python seam.py surface compile docs\HOLOGRAPHIC_SURFACE.md --output .seam\tmp\holographic_surface_compile_smoke.seam.png --mode rgb24 --format json` wrote a MIRL payload surface and `python seam.py surface verify .seam\tmp\holographic_surface_compile_smoke.seam.png` passed; full `python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q` passed with 154 tests. The smoke PNG was removed after verification.
 ---END-ENTRY-#112---
+
+---BEGIN-ENTRY-#113---
+id: 113
+date: 2026-04-30T09:34:38Z
+agent: codex
+status: done
+topics: compress, mirl, codec, benchmark, command, roadmap, ledger, status, verify, history, snapshot
+commits: 63d1339
+refs: HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/holographic.py,seam_runtime/cli.py,seam_runtime/benchmarks.py,seam.py,Test-Seam-All/test_seam.py,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md
+supersedes: 112
+tokens: 150
+---
+Post-merge bookkeeping after PR #14 merged the SEAM-HS/1 holographic surface flow into main as merge commit 63d1339. The merge brought `seam surface compile`, direct MIRL/RC surface query, `bw1`/`rgb24`/explicit `rgba32` modes, the `surface` benchmark family, the moved `Test-Seam-All/test_seam.py` suite, and the Holographic Surface docs/roadmap/SOP updates onto `origin/main`.
+
+Post-merge verification initially found derived continuity drift: `python -m tools.history.verify_integrity` and `python -m tools.history.verify_continuity` reported index hash mismatches for entries #109-#112 and snapshot hash mismatches for #110-#112. `python -m tools.history.verify_routing` still passed. This entry records the failure as bookkeeping state before rebuilding derived history artifacts from the merged checkout.
+
+Next step: rebuild `HISTORY_INDEX.md`, write a fresh snapshot covering the HS/1 merge chain, rerun integrity/routing/continuity, and publish the resulting bookkeeping commit.
+---END-ENTRY-#113---
