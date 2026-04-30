@@ -23,6 +23,14 @@ and `HISTORY_INDEX.md`.
 
 ## Stable Decisions
 
+- SEAM is proprietary source-available software. Public repository visibility
+  does not grant open-source rights; commercial, hosted, embedded, derivative,
+  redistribution, or closed-source use is available only with separate written
+  permission through a commercial license.
+  The controlling files are `LICENSE` and `NOTICE`.
+- SEAM accepts contributions only under a contributor grant that lets the
+  project owner keep developing, sublicensing, relicensing, and commercially
+  licensing SEAM without later contributor permission.
 - SQLite is canonical source of truth.
 - Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
 - Document ingest status is canonical SQLite metadata. Source refs, source hashes, extraction status, index status, and deletion state belong in `document_status`, not only in derived vector stores.
@@ -35,6 +43,9 @@ and `HISTORY_INDEX.md`.
 - Holographic surfaces are queryable visual containers for embedded MIRL or `SEAM-RC/1`; they are not a replacement for SQLite canonical truth and are not a claim of free compression.
 - `seam surface compile` is the default source-to-surface operator flow: compile source text into MIRL, then encode MIRL into `SEAM-HS/1` with `rgb24` unless a denser mode is explicitly requested.
 - Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, pass the benchmark gate, and stay separated from publish-only holdout runs.
+- Benchmark evidence proves SEAM value but never expands license rights; hosted,
+  SaaS, commercial, embedded, redistribution, customer-deployment, or
+  closed-source use still requires a separate written commercial license.
 - Compatibility CLI aliases are acceptable during naming transitions.
 - Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
 - Cross-file duplication is disallowed; use pointer cards (`see HISTORY#NNN`).

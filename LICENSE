@@ -1,0 +1,165 @@
+SEAM SOURCE-AVAILABLE LICENSE
+Version 1.0
+
+Copyright 2026 BlackhatShiftey. All rights reserved.
+
+This license governs use of SEAM and any source code, documentation, tests,
+benchmarks, interfaces, designs, or other materials made available in this
+repository, except where a specific file states a different license.
+
+SEAM is source-available software. It is not open-source software under the
+Open Source Initiative definition, and public repository access does not grant
+permission to use SEAM commercially, host SEAM, resell SEAM, embed SEAM in a
+closed product, or operate SEAM for third parties. Commercial use is available
+only through a separate written commercial license from the Project Owner.
+
+1. Definitions
+
+"SEAM" means this software project, including the runtime, command-line tools,
+dashboard, protocols, source code, documentation, tests, benchmarks, visual
+designs, and related materials.
+
+"Project Owner" means BlackhatShiftey or any successor that owns the SEAM
+copyrights.
+
+"You" means any individual or organization receiving or using SEAM.
+
+"Hosted Service" means making SEAM, a modified version of SEAM, or substantially
+similar functionality based on SEAM available to third parties over a network,
+including as software-as-a-service, a hosted API, a managed service, a cloud
+service, or a customer-facing hosted product.
+
+"Commercial Use" means use intended for commercial advantage, monetary
+compensation, revenue generation, business operations for paying customers,
+closed-source product development, paid consulting delivery, resale, or paid
+customer deployment.
+
+"Contribution" means any code, documentation, tests, benchmarks, issue text,
+pull request, patch, design, or other material submitted to the SEAM project.
+
+2. Permission Granted
+
+Subject to this license, you may:
+
+- read and review SEAM source code and documentation;
+- fork SEAM for review, evaluation, or contribution preparation;
+- run SEAM locally for personal, educational, research, or non-commercial
+  evaluation purposes;
+- modify SEAM locally for those permitted purposes;
+- submit Contributions back to the Project Owner; and
+- use SEAM in an open-source project only when that project does not host,
+  resell, commercialize, embed, or expose substantial SEAM functionality to
+  third parties.
+
+These permissions are limited to the purposes stated above. All rights not
+expressly granted are reserved by the Project Owner.
+
+3. Commercial and Hosted Use Is Available by Separate License
+
+Commercial use is welcome only when you have a separate written commercial
+license from the Project Owner. You may not do any of the following without
+that written commercial license:
+
+- offer SEAM, a modified SEAM, or substantially similar SEAM functionality as a
+  Hosted Service;
+- offer SEAM as software-as-a-service, a hosted API, a managed service, a cloud
+  service, or a paid customer-facing service;
+- sell, rent, lease, sublicense, or charge for access to SEAM;
+- use SEAM in a Commercial Use;
+- embed SEAM in a closed-source, proprietary, or commercial product;
+- redistribute SEAM as part of a paid product, paid service, paid deployment, or
+  customer deliverable;
+- use SEAM to provide paid consulting, integration, support, operations, or
+  managed-service work for a third party;
+- remove or obscure license, copyright, ownership, or notice files; or
+- use SEAM to build, operate, or market a competing hosted product or service.
+
+If your use could make money from SEAM, help a customer make money from SEAM,
+or provide SEAM functionality to third parties, you need a separate written
+commercial license from the Project Owner before doing so.
+
+4. Contributions
+
+By submitting a Contribution to SEAM, you represent that you have the right to
+submit it and that it does not knowingly include material you are not allowed to
+license.
+
+You grant the Project Owner a perpetual, worldwide, irrevocable, non-exclusive,
+royalty-free, fully paid-up license to use, reproduce, modify, prepare
+derivative works of, publicly display, publicly perform, distribute, sublicense,
+relicense, and commercially license your Contribution as part of SEAM or related
+SEAM offerings.
+
+This Contribution grant is intended to let the Project Owner keep developing
+SEAM, accept community improvements, protect the project, and offer separate
+commercial licenses without needing additional permission from each contributor.
+
+You keep any copyright you own in your Contribution, but you may not revoke the
+rights granted above after submitting it.
+
+5. Project Owner Rights
+
+The Project Owner may continue to develop, modify, distribute, sublicense,
+relicense, dual-license, commercially license, sell, host, or otherwise exploit
+SEAM and related SEAM offerings without restriction.
+
+Nothing in this license limits the Project Owner's right to add to SEAM, change
+future license terms for future versions, enter into commercial agreements,
+offer paid hosted services, or stop distributing SEAM.
+
+6. Benchmarks and Claims
+
+SEAM benchmark files and benchmark results are covered by this license unless a
+specific file states otherwise.
+
+You may not use SEAM benchmark names, benchmark outputs, claims, reports, or
+project branding to imply endorsement by the Project Owner. Public performance
+claims about SEAM must be supported by reproducible benchmark evidence and must
+not misrepresent SEAM's capabilities, ownership, or license restrictions.
+
+Benchmark evidence does not create any additional license rights. A strong
+benchmark result does not grant permission for Commercial Use or Hosted Service
+use.
+
+7. No Trademark or Branding Rights
+
+This license does not grant rights to use the SEAM name, logos, dashboard
+designs, protocol names, visual identity, trade dress, or branding marks except
+as needed to truthfully identify the unmodified project in permitted evaluation
+or contribution activity.
+
+8. Third-Party Components
+
+Third-party dependencies, libraries, tools, models, datasets, or other materials
+may be governed by their own licenses. This license does not give you rights in
+third-party materials beyond the rights provided by those third parties.
+
+9. Termination
+
+Your rights under this license terminate automatically if you violate its terms.
+After termination, you must stop using SEAM and delete or destroy any copies in
+your possession or control, except copies you are required to retain by law.
+
+The Project Owner may reinstate permissions in writing.
+
+10. No Warranty
+
+SEAM is provided "as is" and "as available", without warranties or conditions of
+any kind, express or implied, including warranties of merchantability, fitness
+for a particular purpose, title, non-infringement, security, accuracy,
+availability, or error-free operation.
+
+11. Limitation of Liability
+
+To the maximum extent permitted by law, the Project Owner and contributors will
+not be liable for any direct, indirect, incidental, special, consequential,
+exemplary, or punitive damages, lost profits, lost revenue, lost data, business
+interruption, or other losses arising from or related to SEAM, this license, or
+any use or inability to use SEAM.
+
+12. Commercial Permission
+
+Commercial, hosted, SaaS, API, managed-service, closed-source, embedded,
+redistribution, resale, customer-deployment, or other paid use requires a
+separate written commercial license from the Project Owner. Contact the Project
+Owner before using SEAM for any commercial, hosted, or customer-facing purpose.

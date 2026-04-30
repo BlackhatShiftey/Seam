@@ -1392,7 +1392,7 @@ claim c1:
                 app.query_one("#cfg-api-key").value = "test-settings-key"
                 app.query_one("#cfg-base-url").value = "https://example.invalid/v1"
                 app.query_one("#cfg-model").value = "test-model"
-                await pilot.click("#btn-apply-api")
+                app._on_btn_apply_api(None)
                 await pilot.pause()
                 self.assertEqual(os.environ.get("SEAM_CHAT_API_KEY"), "test-settings-key")
                 self.assertEqual(os.environ.get("SEAM_CHAT_BASE_URL"), "https://example.invalid/v1")
@@ -1407,6 +1407,161 @@ claim c1:
                     os.environ.pop(key, None)
                 else:
                     os.environ[key] = value
+
+    def test_textual_dashboard_new_layout_keeps_overview_live_and_tabs_chat_results(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        from textual.widgets import TabbedContent
+
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(160, 60)) as pilot:
+                await pilot.pause()
+                tabs = app.query_one("#main-tabs", TabbedContent)
+                overview = app.query_one("#overview-panel")
+                chat = app.query_one("#chat-panel")
+                results = app.query_one("#result-panel")
+
+                self.assertEqual(getattr(overview.parent, "id", None), "right-col")
+                self.assertNotIn("tab-overview", {tab.id for tab in tabs.query("TabPane")})
+                self.assertEqual(getattr(chat.parent, "id", None), "tab-chat")
+                self.assertEqual(getattr(results.parent, "id", None), "live-row")
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_settings_include_surface_and_provider_controls(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        from textual.widgets import TabbedContent
+
+        saved_surface_mode = os.environ.get("SEAM_SURFACE_MODE")
+        saved_openrouter = os.environ.get("OPENROUTER_API_KEY")
+        saved_chat_key = os.environ.get("SEAM_CHAT_API_KEY")
+        saved_chat_base = os.environ.get("SEAM_CHAT_BASE_URL")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(160, 70)) as pilot:
+                await pilot.pause()
+                app.query_one("#main-tabs", TabbedContent).active = "tab-settings"
+                await pilot.pause()
+
+                app.query_one("#cfg-surface-mode").value = "rgba32"
+                app._on_btn_apply_surface(None)
+                await pilot.pause()
+                self.assertEqual(os.environ.get("SEAM_SURFACE_MODE"), "rgba32")
+                self.assertTrue(any("Holographic Surface" in line for line in app.result_lines))
+
+                app.query_one("#cfg-key-openrouter").value = "test-openrouter-key"
+                app._on_btn_use_openrouter(None)
+                await pilot.pause()
+                self.assertEqual(os.environ.get("OPENROUTER_API_KEY"), "test-openrouter-key")
+                self.assertEqual(os.environ.get("SEAM_CHAT_BASE_URL"), "https://openrouter.ai/api/v1")
+                self.assertEqual(app.chat_client.base_url, "https://openrouter.ai/api/v1")
+
+        try:
+            asyncio.run(_check())
+        finally:
+            if saved_surface_mode is None:
+                os.environ.pop("SEAM_SURFACE_MODE", None)
+            else:
+                os.environ["SEAM_SURFACE_MODE"] = saved_surface_mode
+            if saved_openrouter is None:
+                os.environ.pop("OPENROUTER_API_KEY", None)
+            else:
+                os.environ["OPENROUTER_API_KEY"] = saved_openrouter
+            if saved_chat_key is None:
+                os.environ.pop("SEAM_CHAT_API_KEY", None)
+            else:
+                os.environ["SEAM_CHAT_API_KEY"] = saved_chat_key
+            if saved_chat_base is None:
+                os.environ.pop("SEAM_CHAT_BASE_URL", None)
+            else:
+                os.environ["SEAM_CHAT_BASE_URL"] = saved_chat_base
+
+    def test_textual_dashboard_settings_tab_scrolls(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        from textual.widgets import TabbedContent
+
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(100, 30)) as pilot:
+                await pilot.pause()
+                app.query_one("#main-tabs", TabbedContent).active = "tab-settings"
+                await pilot.pause()
+
+                settings_scroll = app.query_one("#settings-scroll")
+                self.assertGreater(settings_scroll.max_scroll_y, 0)
+                settings_scroll.scroll_end(animate=False, force=True, immediate=True)
+                await pilot.pause()
+                self.assertEqual(settings_scroll.scroll_y, settings_scroll.max_scroll_y)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_overview_shows_settings_health_and_pgvector_status(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(120, 36)) as pilot:
+                await pilot.pause()
+                app._record_pgvector_status(
+                    "pgvector status",
+                    "NAME              STATUS\nseam-pgvector    running",
+                    returncode=0,
+                )
+                await pilot.pause()
+
+                overview = app.query_one("#overview-panel")
+                joined = "\n".join(overview._panel_lines)
+                self.assertIn("Live Health Bars", joined)
+                self.assertIn("pgvector", joined)
+                self.assertIn("[green]active[/]", joined)
+                self.assertIn("Settings Paths", joined)
+                self.assertIn("Settings Values", joined)
+                self.assertIn("OpenRouter", joined)
+                self.assertIn("Surface mode", joined)
+
+        asyncio.run(_check())
+
+    def test_textual_dashboard_overview_preserves_manual_scroll_on_refresh(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test(size=(100, 24)) as pilot:
+                await pilot.pause()
+                overview = app.query_one("#overview-panel")
+                self.assertGreater(overview.max_scroll_y, 0)
+                overview.scroll_to(y=2, animate=False, force=True, immediate=True)
+                await pilot.pause()
+                before = overview.scroll_y
+                app._refresh_overview()
+                await pilot.pause()
+                self.assertEqual(overview.scroll_y, before)
+
+        asyncio.run(_check())
+
+    def test_dashboard_shims_still_route_to_current_dashboard(self) -> None:
+        pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+        launcher = Path("scripts/windows/launch_dashboard.ps1").read_text(encoding="utf-8")
+
+        self.assertIn('seam-dash = "seam_runtime.dashboard:main"', pyproject)
+        self.assertIn("python seam.py dashboard", launcher)
+        self.assertIn("seam-dash.exe", launcher)
+        self.assertIn("-m seam_runtime.dashboard", launcher)
 
     def test_textual_dashboard_command_palette_filters_prefix_menus(self) -> None:
         if find_spec("textual") is None:
