@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-04-28
+Last updated: 2026-04-30
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -19,6 +19,7 @@ and `HISTORY_INDEX.md`.
 - `MIRL`: canonical memory IR
 - `PACK`: derived prompt-time context representation
 - `SEAM-LX/1`: exact machine-text envelope for lossless workflows
+- `SEAM-HS/1`: lossless PNG-backed Holographic Surface for visual memory snapshots
 
 ## Stable Decisions
 
@@ -31,6 +32,8 @@ and `HISTORY_INDEX.md`.
 - Lossless claims require exact reconstruction and integrity checks.
 - SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
 - A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.
+- Holographic surfaces are queryable visual containers for embedded MIRL or `SEAM-RC/1`; they are not a replacement for SQLite canonical truth and are not a claim of free compression.
+- `seam surface compile` is the default source-to-surface operator flow: compile source text into MIRL, then encode MIRL into `SEAM-HS/1` with `rgb24` unless a denser mode is explicitly requested.
 - Benchmark claims must be auditable (bundle hash, case hashes, fixture hashes, git SHA), diffed against a prior run, pass the benchmark gate, and stay separated from publish-only holdout runs.
 - Compatibility CLI aliases are acceptable during naming transitions.
 - Agent continuity is protocol-driven (`AGENTS.md`), not model-specific duplicate docs.
@@ -42,6 +45,7 @@ and `HISTORY_INDEX.md`.
 - Direct readability is mandatory for documents, text, images, audio, and video: quotes, table cells, OCR spans, image regions, timestamps, transcript spans, and provenance must be represented in machine-readable records.
 - Opaque payload formats such as SEAM-LX/1 may be retained for exact rebuilds and hash checks, but they must not be the only artifact used for semantic read/query workflows.
 - Future compression interpreters and codecs must optimize intelligence per token while preserving exact detail access through MIRL or a successor SEAM machine language.
+- SEAM-HS/1 may carry MIRL, RC/1, LX/1, or raw bytes in lossless PNG pixels. MIRL and RC/1 payloads are directly queryable from the surface; LX/1 payloads are verify/decode only until converted into a readable payload.
 
 ## Handoff Policy
 
@@ -111,6 +115,10 @@ and `HISTORY_INDEX.md`.
 - API handlers must use existing `SeamRuntime` behavior and public report `to_dict()` methods rather than inventing parallel response fields.
 
 ## Benchmark Publication Policy
+
+Holographic Surface claims must report `surface_exact_rate`, payload hash match
+rate, direct query exactness, and the PNG mode (`bw1`, `rgb24`, or explicit
+`rgba32`).
 
 Published benchmark statements must include:
 

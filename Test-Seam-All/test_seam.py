@@ -37,6 +37,12 @@ from seam_runtime.lossless import (
     decompress_text_readable,
     query_readable_compressed,
 )
+from seam_runtime.holographic import (
+    decode_surface,
+    encode_surface,
+    query_surface,
+    verify_surface,
+)
 from seam_runtime.models import (
     HashEmbeddingModel,
     OpenAICompatibleEmbeddingModel,
@@ -600,6 +606,140 @@ claim c2:
                 if path.exists():
                     path.unlink()
 
+    def test_holographic_surface_rc1_roundtrips_and_queries_directly(self) -> None:
+        text = (
+            'Surface memory: "SEAM-HS/1 stores readable machine language in pixels." '
+            "Direct read does not need OCR, NLP recompilation, or SQLite import."
+        )
+        artifact = compress_text_readable(text, source_ref="unit://surface", tokenizer="char4_approx")
+        surface_path = Path(f"surface_rc1_{uuid4().hex}.seam.png")
+        try:
+            surface = encode_surface(artifact.machine_text.encode("utf-8"), surface_path, mode="rgb24", payload_format="SEAM-RC/1")
+            self.assertEqual(surface.payload_format, "SEAM-RC/1")
+            decoded = decode_surface(surface_path)
+            self.assertEqual(decoded.payload, artifact.machine_text.encode("utf-8"))
+            self.assertTrue(verify_surface(surface_path).ok)
+
+            result = query_surface(surface_path, '"SEAM-HS/1 stores readable machine language in pixels."')
+            self.assertTrue(result.hits)
+            self.assertEqual(result.hits[0]["record_type"], "QUOTE")
+        finally:
+            if surface_path.exists():
+                surface_path.unlink()
+
+    def test_holographic_surface_rgba32_roundtrips_and_queries_directly(self) -> None:
+        text = (
+            'Surface density: "RGBA32 stores four exact channel bytes per pixel." '
+            "SEAM keeps RGB24 as the default and uses RGBA32 only when explicitly requested."
+        )
+        artifact = compress_text_readable(text, source_ref="unit://surface-rgba", tokenizer="char4_approx")
+        surface_path = Path(f"surface_rgba32_{uuid4().hex}.seam.png")
+        try:
+            surface = encode_surface(artifact.machine_text.encode("utf-8"), surface_path, mode="rgba32", payload_format="SEAM-RC/1")
+            self.assertEqual(surface.mode, "rgba32")
+            self.assertEqual(surface.capacity_bytes, surface.width * surface.height * 4)
+            decoded = decode_surface(surface_path)
+            self.assertEqual(decoded.mode, "rgba32")
+            self.assertEqual(decoded.payload, artifact.machine_text.encode("utf-8"))
+            self.assertTrue(verify_surface(surface_path).ok)
+
+            result = query_surface(surface_path, '"RGBA32 stores four exact channel bytes per pixel."')
+            self.assertTrue(result.hits)
+            self.assertEqual(result.hits[0]["record_type"], "QUOTE")
+        finally:
+            if surface_path.exists():
+                surface_path.unlink()
+
+    def test_holographic_surface_mirl_bw1_searches_without_database_import(self) -> None:
+        surface_path = Path(f"surface_mirl_{uuid4().hex}.seam.png")
+        try:
+            mirl_text = compile_dsl(
+                """
+entity project "SEAM" as p1
+claim c1:
+  subject p1
+  predicate holographic_surface
+  object direct_read_memory
+"""
+            ).to_text()
+            encode_surface(mirl_text.encode("utf-8"), surface_path, mode="bw1", payload_format="MIRL")
+            result = query_surface(surface_path, "holographic_surface direct_read_memory")
+            self.assertTrue(result.hits)
+            self.assertEqual(result.hits[0]["record_id"], "c1")
+        finally:
+            if surface_path.exists():
+                surface_path.unlink()
+
+    def test_cli_surface_encode_verify_query_and_decode(self) -> None:
+        source_path = Path(f"surface_source_{uuid4().hex}.seamrc")
+        surface_path = Path(f"surface_cli_{uuid4().hex}.seam.png")
+        decoded_path = Path(f"surface_decoded_{uuid4().hex}.seamrc")
+        try:
+            text = 'CLI note: "surface query reads embedded SEAM-RC/1 directly."'
+            artifact = compress_text_readable(text, source_ref="unit://surface-cli", tokenizer="char4_approx")
+            source_path.write_text(artifact.machine_text, encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                run_cli(["surface", "encode", str(source_path), "--output", str(surface_path), "--mode", "rgb24"])
+            self.assertTrue(surface_path.exists())
+
+            verify_stream = StringIO()
+            with redirect_stdout(verify_stream):
+                run_cli(["surface", "verify", str(surface_path)])
+            self.assertIn("PASS", verify_stream.getvalue())
+
+            query_stream = StringIO()
+            with redirect_stdout(query_stream):
+                run_cli(["surface", "query", str(surface_path), '"surface query reads embedded SEAM-RC/1 directly."'])
+            self.assertIn("Holographic surface query", query_stream.getvalue())
+            self.assertIn("surface query reads embedded SEAM-RC/1 directly", query_stream.getvalue())
+
+            with redirect_stdout(StringIO()):
+                run_cli(["surface", "decode", str(surface_path), "--output", str(decoded_path)])
+            self.assertEqual(decoded_path.read_text(encoding="utf-8"), artifact.machine_text)
+        finally:
+            for path in (source_path, surface_path, decoded_path):
+                if path.exists():
+                    path.unlink()
+
+    def test_cli_surface_compile_builds_mirl_surface_without_import(self) -> None:
+        source_path = Path(f"surface_compile_source_{uuid4().hex}.txt")
+        surface_path = Path(f"surface_compile_{uuid4().hex}.seam.png")
+        try:
+            source_path.write_text(
+                "SEAM should compile automatic holographic memory for behavior and compression.",
+                encoding="utf-8",
+            )
+            stream = StringIO()
+            with redirect_stdout(stream):
+                run_cli(["surface", "compile", str(source_path), "--output", str(surface_path), "--mode", "rgb24"])
+            output = stream.getvalue()
+            self.assertIn("Holographic surface compiled", output)
+            self.assertTrue(surface_path.exists())
+
+            decoded = decode_surface(surface_path)
+            self.assertEqual(decoded.payload_format, "MIRL")
+            self.assertEqual(decoded.mode, "rgb24")
+            self.assertIn("ENT|ent:project:seam|", decoded.text)
+
+            result = query_surface(surface_path, "holographic memory")
+            self.assertTrue(result.hits)
+            self.assertTrue(verify_surface(surface_path).ok)
+        finally:
+            for path in (source_path, surface_path):
+                if path.exists():
+                    path.unlink()
+
+    def test_holographic_surface_rejects_jpeg_for_exact_memory(self) -> None:
+        jpeg_path = Path(f"surface_lossy_{uuid4().hex}.jpg")
+        try:
+            jpeg_path.write_bytes(b"\xff\xd8not-a-real-surface")
+            result = verify_surface(jpeg_path)
+            self.assertFalse(result.ok)
+            self.assertTrue(any("JPEG" in error for error in result.errors))
+        finally:
+            if jpeg_path.exists():
+                jpeg_path.unlink()
+
     def test_cli_lossless_compress_and_decompress_roundtrip(self) -> None:
         source_path = Path(f"lossless_source_{uuid4().hex}.txt")
         compressed_path = Path(f"lossless_machine_{uuid4().hex}.seamlx")
@@ -684,7 +824,7 @@ claim c2:
         try:
             report = runtime.run_benchmark_suite(suite="all", persist=True, bundle_path=bundle_path)
             self.assertEqual(report["summary"]["status"], "PASS")
-            self.assertEqual(report["summary"]["family_count"], 7)
+            self.assertEqual(report["summary"]["family_count"], 8)
             self.assertTrue(bundle_path.exists())
 
             runs = runtime.list_benchmark_runs(limit=1)
@@ -747,6 +887,30 @@ claim c2:
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_text_exact_rate"], 1.0)
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_read_equivalence_rate"], 1.0)
         self.assertEqual(payload["families"]["readable"]["summary"]["direct_query_exactness_rate"], 1.0)
+
+    def test_runtime_surface_benchmark_gates_exact_visual_payloads(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="surface")
+        self.assertEqual(report["summary"]["status"], "PASS")
+        family = report["families"]["surface"]
+        self.assertEqual(family["summary"]["surface_exact_rate"], 1.0)
+        self.assertEqual(family["summary"]["payload_hash_match_rate"], 1.0)
+        self.assertEqual(family["summary"]["direct_query_exactness_rate"], 1.0)
+        self.assertTrue(family["cases"])
+        for case in family["cases"]:
+            self.assertTrue(case["metrics"]["surface_exact"])
+            self.assertTrue(case["metrics"]["payload_hash_match"])
+            self.assertTrue(case["metrics"]["direct_query_exactness"])
+
+    def test_cli_benchmark_surface_json_reports_exact_gate(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli(["benchmark", "run", "surface", "--format", "json"])
+        payload = json.loads(stream.getvalue())
+        self.assertEqual(payload["summary"]["status"], "PASS")
+        self.assertEqual(payload["families"]["surface"]["summary"]["surface_exact_rate"], 1.0)
+        self.assertEqual(payload["families"]["surface"]["summary"]["payload_hash_match_rate"], 1.0)
+        self.assertEqual(payload["families"]["surface"]["summary"]["direct_query_exactness_rate"], 1.0)
 
     def test_benchmark_diff_compares_case_deltas(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -1786,7 +1950,7 @@ class InstallerLinuxTests(unittest.TestCase):
                 os.environ["PATH"] = original_path
 
     def test_linux_installer_sh_delegates_to_python(self) -> None:
-        sh_path = Path(__file__).resolve().parent / "installers" / "install_seam_linux.sh"
+        sh_path = Path(__file__).resolve().parents[1] / "installers" / "install_seam_linux.sh"
         content = sh_path.read_text()
         self.assertTrue(content.startswith("#!/usr/bin/env sh"))
         self.assertIn("python3", content)

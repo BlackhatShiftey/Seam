@@ -7,6 +7,7 @@ It is designed to make benchmark claims inspectable, reproducible, and contribut
 ## Benchmark Families
 
 - `lossless`: exact roundtrip, token savings, byte savings, fluctuation logs, and reversible machine-language search behavior
+- `surface`: `SEAM-HS/1` PNG surface exactness, payload hash verification, and direct embedded MIRL/RC query behavior
 - `retrieval`: hit rate, recall, MRR, nDCG, exact-pack reversibility, and context traceability
 - `embedding`: top-1 correctness and semantic separation margins over the retrieval gold fixtures
 - `long_context`: anchor recall and prompt/summary survival over longer synthetic histories
@@ -43,6 +44,7 @@ Run one family:
 ```powershell
 seam benchmark run retrieval
 seam benchmark run lossless --tokenizer cl100k_base --include-machine-text
+seam benchmark run surface
 ```
 
 Inspect the latest persisted run:

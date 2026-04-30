@@ -13,20 +13,24 @@ Build a glassbox benchmark engine that proves four things at once:
 
 ## Benchmark Families
 
-SEAM tracks six benchmark families:
+SEAM tracks eight benchmark families:
 
 1. `lossless`
-2. `retrieval`
-3. `embedding`
-4. `long_context`
-5. `persistence`
-6. `agent_tasks`
+2. `readable`
+3. `surface`
+4. `retrieval`
+5. `embedding`
+6. `long_context`
+7. `persistence`
+8. `agent_tasks`
 
 ## North-Star Metrics
 
 Track these metrics across releases:
 
 - `lossless_exact_rate`
+- `surface_exact_rate`
+- `payload_hash_match_rate`
 - `token_savings_ratio`
 - `retrieval_quality` via Recall@k, MRR, and nDCG
 - `traceability`
@@ -37,6 +41,8 @@ Track these metrics across releases:
 Release rule:
 
 - no release if lossless exactness drops below 100%
+- no release if `SEAM-HS/1` surface extraction or payload hash matching drops
+  below 100%
 
 ## Phase Rollout
 
@@ -76,6 +82,23 @@ Deliverables:
 - tokenizer-backed retrieval comparisons
 - measured quality deltas across projection styles
 - promotion criteria for derived machine projections
+
+### Phase 3A: Holographic Surface evaluation
+
+Status: implemented for v1
+
+Treat `SEAM-HS/1` as a first-class visual surface layer for immutable directly
+readable memory snapshots. The benchmark proves that MIRL and `SEAM-RC/1`
+payloads survive PNG pixel encoding exactly and remain queryable without OCR,
+natural-language recompilation, or SQLite import.
+
+Deliverables:
+
+- `surface` benchmark family
+- `surface_exact_rate == 1.0`
+- `payload_hash_match_rate == 1.0`
+- direct query checks against embedded MIRL and RC/1 payloads
+- default coverage for `bw1`, `rgb24`, and explicit `rgba32`
 
 ### Phase 4: Improvement loop promotion
 

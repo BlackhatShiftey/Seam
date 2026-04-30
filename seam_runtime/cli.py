@@ -33,6 +33,15 @@ from .lossless import (
     query_readable_compressed,
     render_lossless_benchmark_pretty,
 )
+from .holographic import (
+    SURFACE_MODES,
+    SURFACE_PAYLOAD_FORMATS,
+    context_surface,
+    decode_surface,
+    encode_surface,
+    query_surface,
+    verify_surface,
+)
 from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
 from .agent_memory import render_memory_index, render_memory_records
 from .mirl import IRBatch
@@ -85,6 +94,50 @@ def build_parser() -> argparse.ArgumentParser:
     readable_rebuild_parser = subparsers.add_parser("readable-rebuild", help="Verify and rebuild exact text from SEAM-RC/1")
     readable_rebuild_parser.add_argument("source")
     readable_rebuild_parser.add_argument("--output")
+
+    surface_parser = subparsers.add_parser("surface", help="Read and write SEAM-HS/1 holographic memory surfaces")
+    surface_subparsers = surface_parser.add_subparsers(dest="surface_command", required=True)
+    surface_compile_parser = surface_subparsers.add_parser("compile", help="Compile source text to MIRL and write a SEAM-HS/1 surface")
+    surface_compile_parser.add_argument("source")
+    surface_compile_parser.add_argument("--output", required=True)
+    surface_compile_parser.add_argument("--mode", choices=SURFACE_MODES, default="rgb24")
+    surface_compile_parser.add_argument("--source-ref")
+    surface_compile_parser.add_argument("--ns", default="local.default")
+    surface_compile_parser.add_argument("--scope", default="thread")
+    surface_compile_parser.add_argument("--persist", action="store_true", help="Also persist compiled MIRL records into SQLite")
+    surface_compile_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_encode_parser = surface_subparsers.add_parser("encode", help="Write MIRL/RC/LX bytes into a lossless PNG surface")
+    surface_encode_parser.add_argument("source")
+    surface_encode_parser.add_argument("--output", required=True)
+    surface_encode_parser.add_argument("--mode", choices=SURFACE_MODES, default="rgb24")
+    surface_encode_parser.add_argument("--payload-format", choices=SURFACE_PAYLOAD_FORMATS, default="auto")
+    surface_encode_parser.add_argument("--source-ref")
+    surface_encode_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_decode_parser = surface_subparsers.add_parser("decode", help="Restore the exact payload bytes from a SEAM-HS/1 PNG surface")
+    surface_decode_parser.add_argument("source")
+    surface_decode_parser.add_argument("--output")
+    surface_decode_parser.add_argument("--format", choices=["payload", "json"], default="payload")
+    surface_verify_parser = surface_subparsers.add_parser("verify", help="Verify SEAM-HS/1 envelope and payload hash")
+    surface_verify_parser.add_argument("source")
+    surface_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_query_parser = surface_subparsers.add_parser("query", help="Query embedded MIRL or SEAM-RC/1 directly from a surface")
+    surface_query_parser.add_argument("source")
+    surface_query_parser.add_argument("query")
+    surface_query_parser.add_argument("--limit", type=int, default=5)
+    surface_query_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_search_parser = surface_subparsers.add_parser("search", help="Rank embedded MIRL or SEAM-RC/1 hits directly from a surface")
+    surface_search_parser.add_argument("source")
+    surface_search_parser.add_argument("query")
+    surface_search_parser.add_argument("--limit", type=int, default=5)
+    surface_search_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_context_parser = surface_subparsers.add_parser("context", help="Build context directly from a SEAM-HS/1 surface")
+    surface_context_parser.add_argument("source")
+    surface_context_parser.add_argument("--query", required=True)
+    surface_context_parser.add_argument("--budget", type=int, default=1200)
+    surface_context_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_import_parser = surface_subparsers.add_parser("import", help="Persist embedded MIRL or machine artifact metadata into SQLite")
+    surface_import_parser.add_argument("source")
+    surface_import_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     lossless_decompress_parser = subparsers.add_parser("lossless-decompress", aliases=["decompress-doc"], help="Restore a SEAM lossless document back to exact text")
     lossless_decompress_parser.add_argument("source")
@@ -339,6 +392,58 @@ def run_cli(argv: list[str] | None = None) -> None:
             return
         _print_text(text)
         return
+    if args.command == "surface":
+        if args.surface_command == "encode":
+            payload = Path(args.source).read_bytes() if args.source != "-" else sys.stdin.buffer.read()
+            artifact = encode_surface(
+                payload,
+                output_path=Path(args.output),
+                mode=args.mode,
+                payload_format=args.payload_format,
+                source_ref=args.source_ref or args.source,
+            )
+            if args.format == "json":
+                print(json.dumps(artifact.to_dict(), indent=2))
+                return
+            _print_text(_render_surface_artifact_pretty(artifact.to_dict()))
+            return
+        if args.surface_command == "decode":
+            payload = decode_surface(Path(args.source))
+            if args.output:
+                Path(args.output).write_bytes(payload.payload)
+                print(args.output)
+                return
+            if args.format == "json":
+                print(json.dumps(payload.to_dict(include_payload=True), indent=2))
+                return
+            buffer = getattr(sys.stdout, "buffer", None)
+            if buffer is None:
+                print(payload.text)
+            else:
+                buffer.write(payload.payload)
+                buffer.write(b"\n")
+            return
+        if args.surface_command == "verify":
+            result = verify_surface(Path(args.source)).to_dict()
+            if args.format == "json":
+                print(json.dumps(result, indent=2))
+                return
+            _print_text(_render_surface_verify_pretty(result))
+            return
+        if args.surface_command in {"query", "search"}:
+            result = query_surface(Path(args.source), args.query, limit=args.limit).to_dict()
+            if args.format == "json":
+                print(json.dumps(result, indent=2))
+                return
+            _print_text(_render_surface_query_pretty(result))
+            return
+        if args.surface_command == "context":
+            payload = context_surface(Path(args.source), query=args.query, budget=args.budget)
+            if args.format == "json":
+                print(json.dumps(payload, indent=2))
+                return
+            _print_text(_render_surface_context_pretty(payload))
+            return
     if args.command in {"lossless-decompress", "decompress-doc"}:
         machine_text = _read_text_source(args.source)
         text = decompress_text_lossless(machine_text)
@@ -459,6 +564,52 @@ def run_cli(argv: list[str] | None = None) -> None:
             print(_render_ingest_report(report.to_dict()))
             return
         print(runtime.compile_nl(text, source_ref=args.source_ref or args.source, ns=args.ns, scope=args.scope).to_text())
+        return
+    if args.command == "surface" and args.surface_command == "compile":
+        text = _read_text_source(args.source)
+        source_ref = args.source_ref or args.source
+        batch = runtime.compile_nl(text, source_ref=source_ref, ns=args.ns, scope=args.scope)
+        artifact = encode_surface(
+            batch.to_text().encode("utf-8"),
+            output_path=Path(args.output),
+            mode=args.mode,
+            payload_format="MIRL",
+            source_ref=source_ref,
+        )
+        report: dict[str, object] = {
+            "surface": artifact.to_dict(),
+            "payload_format": "MIRL",
+            "record_count": len(batch.records),
+            "source_ref": source_ref,
+            "stored_ids": [],
+        }
+        if args.persist:
+            persist_report = runtime.persist_ir(batch).to_dict()
+            report["stored_ids"] = persist_report.get("stored_ids", [])
+            report["persist"] = persist_report
+        if args.format == "json":
+            print(json.dumps(report, indent=2))
+            return
+        _print_text(_render_surface_compile_pretty(report))
+        return
+    if args.command == "surface" and args.surface_command == "import":
+        payload = decode_surface(Path(args.source))
+        if payload.payload_format == "MIRL":
+            report = runtime.persist_ir(IRBatch.from_text(payload.text)).to_dict()
+            report["surface"] = payload.to_dict()
+        else:
+            artifact_id = runtime.store.write_machine_artifact(
+                source_type="surface.import",
+                source_id=args.source,
+                artifact=payload.to_dict(include_payload=True),
+                roundtrip_ok=True,
+                metadata={"family": "surface", "payload_format": payload.payload_format},
+            )
+            report = {"artifact_id": artifact_id, "surface": payload.to_dict()}
+        if args.format == "json":
+            print(json.dumps(report, indent=2))
+            return
+        _print_text(_render_surface_import_pretty(report))
         return
     if args.command in {"compile-nl", "remember"}:
         batch = runtime.compile_nl(args.text, source_ref=args.source_ref)
@@ -775,6 +926,101 @@ def _render_readable_query_pretty(payload: dict[str, object]) -> str:
         if reasons:
             lines.append(f"   reasons={reasons}")
         lines.append(f"   {str(hit.get('text', '')).rstrip()}")
+    return "\n".join(lines)
+
+
+def _render_surface_artifact_pretty(payload: dict[str, object]) -> str:
+    return "\n".join(
+        [
+            "Holographic surface written",
+            f"Path: {payload.get('path')}",
+            f"Mode: {payload.get('mode')}",
+            f"Payload: {payload.get('payload_format')} {payload.get('payload_bytes')} bytes",
+            f"SHA256: {payload.get('payload_sha256')}",
+            f"Surface: {payload.get('width')}x{payload.get('height')} {payload.get('surface_bytes')} bytes",
+        ]
+    )
+
+
+def _render_surface_compile_pretty(payload: dict[str, object]) -> str:
+    surface = payload.get("surface", {})
+    surface_payload = surface if isinstance(surface, dict) else {}
+    stored_ids = payload.get("stored_ids", [])
+    lines = [
+        "Holographic surface compiled",
+        f"Source: {payload.get('source_ref')}",
+        f"Path: {surface_payload.get('path')}",
+        f"Mode: {surface_payload.get('mode')}",
+        f"Payload: MIRL {surface_payload.get('payload_bytes')} bytes",
+        f"Records: {payload.get('record_count')}",
+        f"SHA256: {surface_payload.get('payload_sha256')}",
+        f"Stored ids: {', '.join(str(item) for item in stored_ids) if stored_ids else '(not persisted)'}",
+    ]
+    return "\n".join(lines)
+
+
+def _render_surface_verify_pretty(payload: dict[str, object]) -> str:
+    lines = [
+        f"Holographic surface verify: {payload.get('status')}",
+        f"Path: {payload.get('path')}",
+        f"Mode: {payload.get('mode')}",
+        f"Payload: {payload.get('payload_format')} {payload.get('payload_bytes')} bytes",
+        f"SHA256: {payload.get('payload_sha256')}",
+    ]
+    errors = payload.get("errors", [])
+    if errors:
+        lines.append("Errors:")
+        lines.extend(f"- {error}" for error in errors)
+    return "\n".join(lines)
+
+
+def _render_surface_query_pretty(payload: dict[str, object]) -> str:
+    lines = [
+        "Holographic surface query",
+        f"Source: {payload.get('source_path')}",
+        f"Payload: {payload.get('payload_format')}",
+        f"Query: {payload.get('query')}",
+    ]
+    hits = payload.get("hits", [])
+    if not hits:
+        lines.append("No direct surface hits.")
+        return "\n".join(lines)
+    for index, hit in enumerate(hits, start=1):
+        lines.append(f"{index}. {hit.get('record_type')} {hit.get('record_id')} score={hit.get('score')}")
+        reasons = ", ".join(str(reason) for reason in hit.get("reasons", []))
+        if reasons:
+            lines.append(f"   reasons={reasons}")
+        lines.append(f"   {str(hit.get('text', '')).rstrip()}")
+    return "\n".join(lines)
+
+
+def _render_surface_context_pretty(payload: dict[str, object]) -> str:
+    context = payload.get("context", {})
+    lines = [
+        "Holographic surface context",
+        f"Source: {payload.get('source_path')}",
+        f"Payload: {payload.get('payload_format')}",
+        f"Query: {payload.get('query')}",
+    ]
+    if isinstance(context, dict) and "payload" in context:
+        lines.append(json.dumps(context["payload"], indent=2))
+    elif isinstance(context, dict) and "snippets" in context:
+        lines.extend(str(snippet) for snippet in context.get("snippets", []))
+    else:
+        lines.append(json.dumps(context, indent=2))
+    return "\n".join(lines)
+
+
+def _render_surface_import_pretty(payload: dict[str, object]) -> str:
+    surface = payload.get("surface", {})
+    lines = [
+        "Holographic surface import complete",
+        f"Payload: {surface.get('payload_format') if isinstance(surface, dict) else '(unknown)'}",
+    ]
+    if "stored_ids" in payload:
+        lines.append(f"Stored ids: {', '.join(str(item) for item in payload.get('stored_ids', []))}")
+    if "artifact_id" in payload:
+        lines.append(f"Artifact id: {payload.get('artifact_id')}")
     return "\n".join(lines)
 
 

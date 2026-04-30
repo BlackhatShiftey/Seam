@@ -36,7 +36,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m pip install -e ".[dash]"
-.\.venv\Scripts\python.exe -m pytest test_seam.py tools\history\test_history_tools.py
+.\.venv\Scripts\python.exe -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py
 .\.venv\Scripts\python.exe seam.py doctor
 ```
 
@@ -48,7 +48,7 @@ python3 -m venv .venv
 ./.venv/bin/python -m pip install --upgrade pip
 ./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python -m pip install -e ".[dash]"
-./.venv/bin/python -m pytest test_seam.py tools/history/test_history_tools.py
+./.venv/bin/python -m pytest Test-Seam-All/test_seam.py tools/history/test_history_tools.py
 ./.venv/bin/python seam.py doctor
 ```
 

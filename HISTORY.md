@@ -2205,3 +2205,60 @@ Post-merge continuity initially failed with derived HISTORY_INDEX.md and latest 
 
 Verification before this entry: PR #13 CI test-and-benchmark passed, local `python -m pytest test_seam.py tools/history/test_history_tools.py -q` passed with 146 tests before merge, and `gh pr view 13` reported merged at 2026-04-30T06:10:08Z with merge commit d9645f9. Verification target: rerun index rebuild, snapshot write, and `python -m tools.history.verify_continuity` after this entry.
 ---END-ENTRY-#109---
+
+---BEGIN-ENTRY-#110---
+id: 110
+date: 2026-04-30T09:03:51Z
+agent: codex
+status: done
+topics: compress, mirl, codec, benchmark, command, roadmap, ledger, status, verify, history
+commits: none
+refs: seam_runtime/holographic.py,seam_runtime/cli.py,seam_runtime/benchmarks.py,seam.py,Test-Seam-All/test_seam.py,ROADMAP.md,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,docs/MIRL_V1.md,docs/ledgers/runtime/compression.md,benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 091
+tokens: 249
+---
+Implemented SEAM-HS/1 Holographic Surface as a functional lossless visual memory layer.
+- Added `seam_runtime/holographic.py` with stdlib PNG encode/decode/verify/query/context behavior, supporting `rgb24` and `bw1` modes, exact payload SHA-256 verification, direct MIRL/RC query dispatch, and JPEG rejection for exact memory.
+- Added `seam surface encode|decode|verify|query|search|context|import` CLI commands and exported surface helpers from `seam.py`.
+- Added the `surface` benchmark family with HS/1 RGB and BW fixtures over embedded SEAM-RC/1 and MIRL payloads. The gate records `surface_exact_rate`, `payload_hash_match_rate`, and `direct_query_exactness_rate`, all required to stay at 1.0.
+- Moved the primary regression suite from root `test_seam.py` to `Test-Seam-All/test_seam.py` per operator instruction, updated CI/setup/code-layout references, and fixed the installer test's repo-root lookup after the move.
+- Updated ROADMAP, MIRL docs, Holographic Surface architecture/SOP docs, benchmark docs, runtime compression ledger, project status, and repo ledger. Added a connector-verified `Codex Integration Draft` companion section to the referenced Google Doc.
+
+Verification: `python -m py_compile seam_runtime\holographic.py seam_runtime\cli.py seam_runtime\benchmarks.py seam.py Test-Seam-All\test_seam.py` passed; focused surface pytest passed 5 selected tests; `python seam.py benchmark run surface --format pretty` passed with 2/2 cases and 100% exactness/hash; full `python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q` passed with 152 tests. `git diff --check` passed with only CRLF conversion warnings.
+---END-ENTRY-#110---
+
+---BEGIN-ENTRY-#111---
+id: 111
+date: 2026-04-30T09:06:05Z
+agent: codex
+status: done
+topics: command, compress, verify, history, snapshot
+commits: none
+refs: seam_runtime/cli.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 110
+tokens: 150
+---
+Follow-up fix after HS/1 implementation verification: a manual Windows smoke of `python seam.py surface context <surface> --query ...` exposed a pretty-output UnicodeEncodeError when an embedded RC/1 payload carried a UTF-8 BOM from a PowerShell-created source file. Updated the new surface CLI pretty-output paths to use the existing UTF-8 `_print_text` helper instead of raw `print`, matching the readable-query path.
+
+Verification after the fix: `python -m py_compile seam_runtime\cli.py` passed; the same `surface context` smoke succeeded and returned embedded RC snippets directly from the PNG; `python seam.py benchmark run surface --format pretty` passed with 2/2 cases and 100% exactness/hash; full `python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q` passed with 152 tests; `git diff --check` passed with only CRLF conversion warnings.
+---END-ENTRY-#111---
+
+---BEGIN-ENTRY-#112---
+id: 112
+date: 2026-04-30T09:21:44Z
+agent: codex
+status: done
+topics: compress, mirl, codec, benchmark, command, roadmap, ledger, status, verify, history, snapshot
+commits: none
+refs: seam_runtime/holographic.py,seam_runtime/cli.py,seam_runtime/benchmarks.py,seam.py,Test-Seam-All/test_seam.py,ROADMAP.md,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,docs/MIRL_V1.md,docs/ledgers/runtime/compression.md,benchmarks/SEAM_BENCHMARK_BLUEPRINT_V1.md,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 111
+tokens: 276
+---
+Added the automatic source-to-Holographic-Surface flow and the explicit RGBA density mode requested after HS/1 landed.
+- Added `rgba32` to `seam_runtime/holographic.py`, using PNG color type 6 and four exact channel bytes per pixel while keeping `rgb24` as the default.
+- Added `seam surface compile <source> --output <file.seam.png>` to compile source text into MIRL and immediately encode the MIRL bytes into a SEAM-HS/1 PNG without requiring SQLite import. `--persist` is available when the compiled MIRL should also become active SQLite memory.
+- Added public `surface_compile(...)` in `seam.py`, default benchmark coverage for `rgba32`, and regression tests for RGBA exact query plus source-to-MIRL surface compile.
+- Updated roadmap/status/ledger/docs to document the automatic flow and the density tradeoff: RGBA increases raw channel capacity from 3 to 4 bytes per pixel, but alpha channels are more likely to be modified by image tools, so it stays opt-in.
+
+Verification: `python -m py_compile seam_runtime\holographic.py seam_runtime\cli.py seam_runtime\benchmarks.py seam.py Test-Seam-All\test_seam.py` passed; focused surface pytest passed 7 selected tests; `python seam.py benchmark run surface --format pretty` passed with 3/3 cases and 100% exactness/hash; `python seam.py surface compile docs\HOLOGRAPHIC_SURFACE.md --output .seam\tmp\holographic_surface_compile_smoke.seam.png --mode rgb24 --format json` wrote a MIRL payload surface and `python seam.py surface verify .seam\tmp\holographic_surface_compile_smoke.seam.png` passed; full `python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q` passed with 154 tests. The smoke PNG was removed after verification.
+---END-ENTRY-#112---
