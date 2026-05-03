@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-04-30
+Last updated: 2026-05-03
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -23,6 +23,25 @@ and `HISTORY_INDEX.md`.
 
 ## Stable Decisions
 
+- SEAM is proprietary source-available software. Public repository visibility
+  does not grant open-source rights; commercial, hosted, embedded, derivative,
+  redistribution, or closed-source use is available only with separate written
+  permission through a commercial license. The controlling files are `LICENSE`
+  and `NOTICE`; `COMMERCIAL_LICENSE.md` is the plain-language commercial-use
+  boundary.
+- SEAM accepts contributions only under a contributor grant that lets the
+  project owner keep developing, sublicensing, relicensing, and commercially
+  licensing SEAM without later contributor permission. The contributor-facing
+  summary lives in `CONTRIBUTING.md`.
+- Security-sensitive reports should be handled privately through `SECURITY.md`;
+  do not disclose private data, credentials, customer data, or exploit details
+  in public issues.
+- `docs/PROTECTION_MODEL.md` documents the public/private repo split and must
+  not be added to the mandatory startup read list unless the task touches
+  licensing, contribution policy, repo protection, or public/private separation.
+- Protection-only changes must not silently alter runtime behavior, package
+  metadata, CLI commands, installer behavior, dashboard behavior, API behavior,
+  benchmark behavior, or history tooling behavior.
 - SQLite is canonical source of truth.
 - Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
 - Document ingest status is canonical SQLite metadata. Source refs, source hashes, extraction status, index status, and deletion state belong in `document_status`, not only in derived vector stores.
