@@ -68,9 +68,13 @@ except ImportError:  # pragma: no cover - optional server extra
     TestClient = None
 
 
+TEST_ARTIFACT_DIR = Path("test_seam")
+
+
 class SeamTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.db_path = Path(f"test_seam_{uuid4().hex}.db")
+        TEST_ARTIFACT_DIR.mkdir(exist_ok=True)
+        self.db_path = TEST_ARTIFACT_DIR / f"test_seam_{uuid4().hex}.db"
 
     def tearDown(self) -> None:
         try:

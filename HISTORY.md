@@ -2398,3 +2398,31 @@ tokens: 161
 ---
 Post-merge bookkeeping after PR #16 merged dashboard settings health Overview and SEAM source-available license policy into main as merge commit 4363298. The merge brought the custom SEAM Source-Available License and NOTICE files, README/ledger/project-status policy alignment, the expanded Textual dashboard Settings surface, live Overview health bars for database/pgvector/API/config/settings paths, pgvector Status-to-Overview updates, Settings and Overview scroll fixes, seam-dash/shim coverage, and dashboard regression tests onto origin/main. CI test-and-benchmark passed before merge; local pre-merge verification passed with python -m py_compile seam_runtime\dashboard.py Test-Seam-All\test_seam.py, python -m pytest Test-Seam-All\test_seam.py tools\history\test_history_tools.py -q with 160 passed, python seam.py dashboard --run reload --no-clear, git diff --check, verify_integrity, and verify_continuity. The normal gh merge path was blocked by the base-branch policy after CI passed, so PR #16 was merged with gh pr merge --admin.
 ---END-ENTRY-#121---
+
+---BEGIN-ENTRY-#122---
+id: 122
+date: 2026-05-01T05:07:06Z
+agent: codex
+status: done
+topics: compress, mirl, roadmap, ledger, status, verify, history, snapshot
+commits: none
+refs: ROADMAP.md,PROJECT_STATUS.md,REPO_LEDGER.md,docs/ledgers/runtime/compression.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 121
+tokens: 196
+---
+Added the functional visual-memory roadmap target requested by the operator. ROADMAP.md now defines the end-to-end loop: documents compile into directly readable MIRL/RC machine language, that payload packs into SEAM-HS/1 PNG image surfaces, stored surfaces remain addressable as a surface library, and query/search/context reads the embedded machine-language payload directly from the image surface without restoring the original document or requiring prior SQLite import. Added Track G for document-to-machine-language compilation, stored surface library, direct image-surface query, and surface-store benchmarks, then moved those items into the current priority order. Updated PROJECT_STATUS.md, REPO_LEDGER.md, and docs/ledgers/runtime/compression.md so the stable architecture is clear: SQLite stays canonical for active imported memory, stored .seam.png artifacts are portable directly readable surfaces with metadata/hash rows, and PACK remains derived prompt-time context rather than the raw image store. Verification before history append: git diff --check passed with CRLF warnings only. Follow-up verification rebuilds the index, writes a snapshot, and runs integrity/routing/continuity checks.
+---END-ENTRY-#122---
+
+---BEGIN-ENTRY-#123---
+id: 123
+date: 2026-05-02T14:26:46Z
+agent: codex
+status: done
+topics: verify, windows, history, snapshot
+commits: none
+refs: .gitignore,docs/CODE_LAYOUT.md,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 122
+tokens: 152
+---
+Routed new per-test SQLite artifacts out of the repo root. The active test source in test_seam_all/test_seam.py now creates test_seam/ before assigning self.db_path and writes new test_seam_<uuid>.db files inside that ignored folder. .gitignore now ignores test_seam/ explicitly, and docs/CODE_LAYOUT.md records the folder as the local artifact sink. Moved 38 existing root-level test_seam_*.db leftovers into test_seam/; root-level test_seam_*.db count is now 0. Verification: python -m pytest test_seam_all/test_seam.py::SeamTests::test_runtime_persist_search_trace -q passed with 1 passed, and the root count stayed 0 after the run. Note: the worktree already had concurrent uncommitted test-suite reorganization state before this change: tracked Test-Seam-All/test_seam.py is deleted and test_seam_all/ is untracked, so this entry records the change against the current local active test source without reverting that reorganization.
+---END-ENTRY-#123---

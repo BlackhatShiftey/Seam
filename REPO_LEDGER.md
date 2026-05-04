@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -57,6 +57,7 @@ and `HISTORY_INDEX.md`.
 - Opaque payload formats such as SEAM-LX/1 may be retained for exact rebuilds and hash checks, but they must not be the only artifact used for semantic read/query workflows.
 - Future compression interpreters and codecs must optimize intelligence per token while preserving exact detail access through MIRL or a successor SEAM machine language.
 - SEAM-HS/1 may carry MIRL, RC/1, LX/1, or raw bytes in lossless PNG pixels. MIRL and RC/1 payloads are directly queryable from the surface; LX/1 payloads are verify/decode only until converted into a readable payload.
+- The planned surface library stores `.seam.png` artifacts as addressable visual memory surfaces with SQLite metadata, hashes, verification state, and lookup fields. Queries should read embedded MIRL/RC payloads directly from the lossless image bytes in memory; PACK remains derived prompt-time context and must not become the raw image store.
 
 ## Handoff Policy
 

@@ -1,7 +1,56 @@
 # SEAM Improvement Roadmap & SOP Blueprint
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-05-01
 **Status:** Active planning document. This is the living roadmap for SEAM development beyond the stable v1 core.
+
+## 2026-05-01 Functional Visual Memory Target
+
+The next roadmap target is making the full SEAM visual-memory loop functional:
+
+```
+documents -> directly readable machine language -> SEAM-HS/1 image surfaces -> stored surface library -> direct image-surface query/context
+```
+
+This target is not just "save a screenshot." The image is the storage envelope
+for SEAM machine language. The useful data inside the image must stay readable
+by SEAM without restoring the original document, running OCR on the rendered
+image, or importing the payload into SQLite first.
+
+Required behavior:
+
+- Document compression emits directly readable MIRL or `SEAM-RC/1` records with
+  quote spans, headings, table cells, entities, claims, references, source
+  hashes, and provenance.
+- Surface packing stores that machine-language payload in a lossless
+  `SEAM-HS/1` PNG using `rgb24` by default or explicit `rgba32` for higher
+  channel density.
+- Surface storage keeps the generated `.seam.png` artifacts addressable as a
+  surface library, with SQLite metadata for artifact path, payload format,
+  PNG mode, source hash, payload hash, verification status, and import/query
+  status.
+- Direct read must decode the PNG pixel payload in memory, verify the payload
+  hash, and answer query/search/context requests from the embedded MIRL or
+  `SEAM-RC/1` records without rebuilding the original document.
+- SQLite remains canonical for active imported memory. Stored surfaces are
+  portable, immutable, directly readable artifacts; PACK remains derived
+  prompt-time context, not the owner of raw image bytes.
+- Benchmark proof must cover document-to-machine-language exactness,
+  machine-language-to-surface hash preservation, stored-surface lookup, and
+  direct query exactness.
+
+SOP:
+
+1. Build a document compiler path that converts source documents into
+   directly readable MIRL/RC records before any surface packing.
+2. Add a surface library/store command that writes `.seam.png` files under a
+   controlled artifact directory and records metadata in SQLite.
+3. Add surface lookup commands for list, verify, query, search, context, import,
+   and repair/rebuild-from-source when source material is still available.
+4. Keep raw original documents optional and operator-controlled. They are
+   useful for audits and rebuilds, but they must not be required for direct
+   query once a verified MIRL/RC surface exists.
+5. Add benchmark fixtures that prove exact answers can be read from the stored
+   image surface itself.
 
 ## 2026-04-30 Holographic Surface Integration
 
@@ -507,12 +556,57 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 ---
 
+## Track G — Functional Visual Memory System
+
+History pointer: see `HISTORY#112` and `HISTORY#113` for the first HS/1
+surface flow.
+
+### G1: Document-to-Machine-Language Compiler
+
+**What:** Convert documents into directly readable MIRL or `SEAM-RC/1` records
+that preserve facts, quote spans, headings, table cells, references, and source
+provenance.
+
+**Gate:** SEAM can answer detail questions from the emitted machine language
+without opening the original document.
+
+### G2: Stored Surface Library
+
+**What:** Add a managed library for `.seam.png` surfaces. The PNG stores the
+payload bytes; SQLite stores only metadata, hashes, status, and lookup fields.
+
+**Gate:** A stored surface can be listed, verified, queried, searched, used for
+context, imported, and audited by hash.
+
+### G3: Direct Image-Surface Query
+
+**What:** Make the stored image artifact itself a readable memory source.
+Queries decode PNG pixels into MIRL/RC bytes in memory, verify hashes, then run
+the normal parser/search/context path.
+
+**Gate:** Query/search/context works from a stored surface path or surface id
+without OCR, source-document restoration, or prior SQLite import.
+
+### G4: Surface Store Benchmarks
+
+**What:** Add benchmark cases for the full functional loop:
+document -> machine language -> surface -> stored surface -> direct answer.
+
+**Gate:** `surface_exact_rate`, `payload_hash_match_rate`, stored-surface lookup
+rate, and direct query exactness all stay at 100% for release-blocking fixtures.
+
+---
+
 ## Recommended Course — Priority Order
 
 Work these in sequence. Each track has a clear gate before moving on.
 
 ```
-Phase 1 (Now — foundational polish)
+Phase 1 (Now — functional visual memory + foundational polish)
+├── G1: Document-to-machine-language compiler
+├── G2: Stored surface library
+├── G3: Direct image-surface query
+├── G4: Surface store benchmarks
 ├── B1: Command naming audit + aliases
 ├── B3: README consolidation
 └── C2: Benchmark diff tooling (done; see HISTORY#092)

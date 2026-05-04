@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 ## Current State
 
@@ -41,6 +41,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Keep maintenance, security, context, and runtime facts logically routed for AI search without duplicating chronology
 - Make compression produce directly readable AI-native machine language, with opaque byte payloads used only as optional reconstruction/integrity backing layers
 - Treat SEAM-HS/1 Holographic Surface as a queryable visual snapshot layer for MIRL/RC payloads, not as free compression or a replacement for SQLite truth
+- Make the full functional visual-memory loop shippable: documents compile into directly readable MIRL/RC, MIRL/RC packs into SEAM-HS/1 PNG surfaces, stored surfaces remain addressable by metadata/hash, and query/context can read the embedded payload directly from the image surface without restoring the original document
 - Keep roadmap execution tied to history entries and supersedes chains
 - Turn the competitive plan into shippable surfaces: finish README/install polish, graph/vector/mix retrieval hardening, agent bridge docs, and benchmark coverage without breaking existing CLI aliases
 - Continue feature delivery without reintroducing duplicated continuity text

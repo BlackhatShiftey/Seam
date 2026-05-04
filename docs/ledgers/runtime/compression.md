@@ -82,6 +82,16 @@ before or without import.
 
 ## Next Safe Implementation Step
 
-Broaden `SEAM-RC/1` from text into document/table/image/audio/video compilers.
+Broaden `SEAM-RC/1` from text into document/table/image/audio/video compilers,
+then make stored `SEAM-HS/1` image surfaces a first-class runtime source.
 Each compiler should emit directly readable records first, then use
 reconstruction payloads only for audit or rebuild requests.
+
+For the document/image-surface path, the safe sequence is:
+
+1. Compile source documents into directly readable MIRL/RC records.
+2. Pack those records into lossless `.seam.png` surfaces.
+3. Store the surfaces as addressable artifacts with SQLite metadata and hashes.
+4. Query/search/context by reading the embedded machine-language payload from
+   the surface image itself, without restoring the original document and without
+   requiring prior SQLite import.
