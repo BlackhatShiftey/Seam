@@ -1,0 +1,25 @@
+# SEAM code ownership
+#
+# This file is a review-routing hint for GitHub. It does not change runtime
+# behavior, packaging, imports, CLI commands, dashboard behavior, or tests.
+
+* @BlackhatShiftey
+
+# Core legal and project-control files
+/LICENSE @BlackhatShiftey
+/NOTICE @BlackhatShiftey
+/COMMERCIAL_LICENSE.md @BlackhatShiftey
+/CONTRIBUTING.md @BlackhatShiftey
+/SECURITY.md @BlackhatShiftey
+/REPO_LEDGER.md @BlackhatShiftey
+/PROJECT_STATUS.md @BlackhatShiftey
+/AGENTS.md @BlackhatShiftey
+
+# Runtime, agent protocol, history, and benchmark surfaces
+/seam.py @BlackhatShiftey
+/seam_runtime/ @BlackhatShiftey
+/tools/history/ @BlackhatShiftey
+/HISTORY.md @BlackhatShiftey
+/HISTORY_INDEX.md @BlackhatShiftey
+/docs/CODE_LAYOUT.md @BlackhatShiftey
+/docs/PROTECTION_MODEL.md @BlackhatShiftey
