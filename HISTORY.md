@@ -2426,3 +2426,17 @@ tokens: 152
 ---
 Routed new per-test SQLite artifacts out of the repo root. The active test source in test_seam_all/test_seam.py now creates test_seam/ before assigning self.db_path and writes new test_seam_<uuid>.db files inside that ignored folder. .gitignore now ignores test_seam/ explicitly, and docs/CODE_LAYOUT.md records the folder as the local artifact sink. Moved 38 existing root-level test_seam_*.db leftovers into test_seam/; root-level test_seam_*.db count is now 0. Verification: python -m pytest test_seam_all/test_seam.py::SeamTests::test_runtime_persist_search_trace -q passed with 1 passed, and the root count stayed 0 after the run. Note: the worktree already had concurrent uncommitted test-suite reorganization state before this change: tracked Test-Seam-All/test_seam.py is deleted and test_seam_all/ is untracked, so this entry records the change against the current local active test source without reverting that reorganization.
 ---END-ENTRY-#123---
+
+---BEGIN-ENTRY-#124---
+id: 124
+date: 2026-05-04T07:47:17Z
+agent: codex
+status: done
+topics: verify, history, snapshot, ledger, protocol, audit
+commits: f0ea59b,191076f,df22163
+refs: .gitignore,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,REPO_LEDGER.md,ROADMAP.md,docs/CODE_LAYOUT.md,docs/ledgers/runtime/compression.md,test_seam_all/test_seam.py,.github/CODEOWNERS,COMMERCIAL_LICENSE.md,CONTRIBUTING.md,SECURITY.md,docs/PROTECTION_MODEL.md
+supersedes: 123
+tokens: 175
+---
+Merged the already-published repo-protection PR changes from origin/main with the local visual-memory roadmap and test-artifact routing updates, then prepared the combined main branch for push. Local commit f0ea59b preserved the test suite move to test_seam_all/test_seam.py, routed generated test databases into ignored test_seam/, and recorded the functional visual-memory roadmap/status/ledger updates. Merge commit 191076f integrated PR #17 / origin/main commit df22163, including CODEOWNERS, commercial license boundary docs, contribution policy, security policy, protection model docs, and the merged REPO_LEDGER.md policy text. Conflict resolution kept both the repo-protection policy facts and the SEAM-HS/1 stored-surface architecture facts, and updated the ledger timestamp to 2026-05-04. Verification: candidate-file secret scan found no matches; HISTORY_INDEX.md was rebuilt; snapshot 20260504-074729-codex.json was written; verify_integrity, verify_routing, verify_continuity, and git diff --check passed with CRLF warnings only; py_compile passed; pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q passed with 160 tests.
+---END-ENTRY-#124---
