@@ -2440,3 +2440,17 @@ tokens: 175
 ---
 Merged the already-published repo-protection PR changes from origin/main with the local visual-memory roadmap and test-artifact routing updates, then prepared the combined main branch for push. Local commit f0ea59b preserved the test suite move to test_seam_all/test_seam.py, routed generated test databases into ignored test_seam/, and recorded the functional visual-memory roadmap/status/ledger updates. Merge commit 191076f integrated PR #17 / origin/main commit df22163, including CODEOWNERS, commercial license boundary docs, contribution policy, security policy, protection model docs, and the merged REPO_LEDGER.md policy text. Conflict resolution kept both the repo-protection policy facts and the SEAM-HS/1 stored-surface architecture facts, and updated the ledger timestamp to 2026-05-04. Verification: candidate-file secret scan found no matches; HISTORY_INDEX.md was rebuilt; snapshot 20260504-074729-codex.json was written; verify_integrity, verify_routing, verify_continuity, and git diff --check passed with CRLF warnings only; py_compile passed; pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q passed with 160 tests.
 ---END-ENTRY-#124---
+
+---BEGIN-ENTRY-#125---
+id: 125
+date: 2026-05-04T07:53:59Z
+agent: codex
+status: done
+topics: verify, history, snapshot, windows, audit
+commits: pending
+refs: .github/workflows/ci.yml,docs/CODE_LAYOUT.md,docs/setup.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 124
+tokens: 139
+---
+Fixed the CI path fallout from moving the primary regression suite to test_seam_all/test_seam.py. The pushed commit 1eb8f62 triggered GitHub Actions run 25307387290, which failed in the Run tests step because .github/workflows/ci.yml still referenced the retired Test-Seam-All/test_seam.py path and collected 0 tests. Updated the CI workflow to run python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py, and updated active setup/code-layout docs to the same path. Active-doc/workflow scan found no remaining Test-Seam-All test path references; historical HISTORY.md entries were left append-only. Verification: py_compile for test_seam_all/test_seam.py and tools/history/test_history_tools.py passed; python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q passed with 160 tests; git diff --check passed with CRLF warnings only; candidate-file secret scan found no matches.
+---END-ENTRY-#125---

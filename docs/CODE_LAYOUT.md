@@ -7,7 +7,7 @@ not have to infer what works from directory names alone.
 
 - `seam_runtime/` - packaged runtime, dashboard, storage, retrieval, model, and benchmark code.
 - `seam.py` - console entrypoint module for `seam` and `seam-benchmark`.
-- `Test-Seam-All/test_seam.py` - primary regression suite. Local `test_seam_*.db`
+- `test_seam_all/test_seam.py` - primary regression suite. Local `test_seam_*.db`
   artifacts live in `test_seam/` and remain ignored.
 
 ## Active Tooling
