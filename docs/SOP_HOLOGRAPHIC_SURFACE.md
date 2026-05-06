@@ -56,6 +56,20 @@ source path when available. If no valid source remains, repair records the
 failure in SQLite so future query attempts do not silently trust a missing or
 corrupt artifact.
 
+## Gate Stored Surfaces
+
+```powershell
+python seam.py benchmark run surface
+python seam.py benchmark run all --output benchmark-release.json
+python seam.py benchmark gate benchmark-release.json
+```
+
+The surface benchmark stores each fixture in a temporary surface library,
+removes the original output path before querying the stored surface, removes the
+redundant copy, repairs it from the recorded source path, and queries the
+repaired copy. The release gate runs across all benchmark families; stored
+lookup, stored query, repair, and repair-query rates must all stay at 100%.
+
 ## Decode For Audit
 
 ```powershell

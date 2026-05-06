@@ -117,6 +117,10 @@ The `surface` benchmark family requires:
 - `surface_exact_rate == 1.0`
 - `payload_hash_match_rate == 1.0`
 - `direct_query_exactness_rate == 1.0`
+- `stored_lookup_rate == 1.0`
+- `stored_query_exactness_rate == 1.0`
+- `repair_success_rate == 1.0`
+- `repair_query_exactness_rate == 1.0`
 
-Any pixel-packing, envelope, or query-dispatch change that drops exactness below
-100% is release-blocking.
+Any pixel-packing, envelope, stored-library lookup, redundant-copy repair, or
+query-dispatch change that drops exactness below 100% is release-blocking.

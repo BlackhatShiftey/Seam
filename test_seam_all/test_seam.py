@@ -1102,11 +1102,20 @@ claim c1:
         self.assertEqual(family["summary"]["surface_exact_rate"], 1.0)
         self.assertEqual(family["summary"]["payload_hash_match_rate"], 1.0)
         self.assertEqual(family["summary"]["direct_query_exactness_rate"], 1.0)
+        self.assertEqual(family["summary"]["stored_lookup_rate"], 1.0)
+        self.assertEqual(family["summary"]["stored_query_exactness_rate"], 1.0)
+        self.assertEqual(family["summary"]["repair_success_rate"], 1.0)
+        self.assertEqual(family["summary"]["repair_query_exactness_rate"], 1.0)
         self.assertTrue(family["cases"])
         for case in family["cases"]:
             self.assertTrue(case["metrics"]["surface_exact"])
             self.assertTrue(case["metrics"]["payload_hash_match"])
             self.assertTrue(case["metrics"]["direct_query_exactness"])
+            self.assertTrue(case["metrics"]["stored_lookup"])
+            self.assertTrue(case["metrics"]["stored_query_exactness"])
+            self.assertTrue(case["metrics"]["repair_ok"])
+            self.assertTrue(case["metrics"]["repair_query_exactness"])
+            self.assertTrue(case["trace"]["stored_surface"]["original_removed_before_stored_query"])
 
     def test_cli_benchmark_surface_json_reports_exact_gate(self) -> None:
         stream = StringIO()
@@ -1117,6 +1126,10 @@ claim c1:
         self.assertEqual(payload["families"]["surface"]["summary"]["surface_exact_rate"], 1.0)
         self.assertEqual(payload["families"]["surface"]["summary"]["payload_hash_match_rate"], 1.0)
         self.assertEqual(payload["families"]["surface"]["summary"]["direct_query_exactness_rate"], 1.0)
+        self.assertEqual(payload["families"]["surface"]["summary"]["stored_lookup_rate"], 1.0)
+        self.assertEqual(payload["families"]["surface"]["summary"]["stored_query_exactness_rate"], 1.0)
+        self.assertEqual(payload["families"]["surface"]["summary"]["repair_success_rate"], 1.0)
+        self.assertEqual(payload["families"]["surface"]["summary"]["repair_query_exactness_rate"], 1.0)
 
     def test_benchmark_diff_compares_case_deltas(self) -> None:
         runtime = SeamRuntime(self.db_path)

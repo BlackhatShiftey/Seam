@@ -2524,3 +2524,35 @@ tokens: 92
 ---
 Merged the HS/1 surface repair branch into local main. Feature commit 4d0a435 added seam surface repair hs:<id>, redundant copy verification/restoration, failure-state updates in SQLite, tests for repair success and failure, and docs/status/roadmap updates. Merge commit 414f883 integrated codex/hs1-surface-repair into main with no conflicts. Verification before merge passed with 165 local tests, surface benchmark 4/4 PASS, and history integrity/routing/continuity checks. This entry records the local merge before the next stored-surface benchmark branch.
 ---END-ENTRY-#130---
+
+---BEGIN-ENTRY-#131---
+id: 131
+date: 2026-05-06T11:38:49Z
+agent: codex
+status: done
+topics: benchmark, codec, compress, mirl, verify, history, snapshot, ledger, status, roadmap
+commits: none
+refs: seam_runtime/benchmarks.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,PROJECT_STATUS.md,REPO_LEDGER.md,ROADMAP.md
+supersedes: 130
+tokens: 314
+---
+Built the stored-surface benchmark slice on `codex/hs1-stored-surface-benchmark` after the HS/1 repair merge.
+
+Changes:
+- `seam_runtime/benchmarks.py` now exercises the stored surface library inside the `surface` benchmark family. Each HS/1 fixture is encoded, registered in a temporary SQLite surface library with a redundant `SurfaceFileAdapter` copy, queried after deleting the original output path, then repaired after deleting the redundant copy and queried again.
+- The default benchmark gate now requires `stored_lookup_rate`, `stored_query_exactness_rate`, `repair_success_rate`, and `repair_query_exactness_rate` to remain at 1.0 alongside existing surface exactness/hash/direct-query gates.
+- `test_seam_all/test_seam.py` asserts the new stored lookup, stored query, repair, and repaired-query metrics plus the original-output deletion trace.
+- `docs/HOLOGRAPHIC_SURFACE.md`, `docs/SOP_HOLOGRAPHIC_SURFACE.md`, `PROJECT_STATUS.md`, `REPO_LEDGER.md`, and `ROADMAP.md` now document the stored-surface benchmark gate and the private repo/user-artifact boundary.
+
+Verification:
+- PASS: `python -m compileall seam_runtime\\benchmarks.py`.
+- PASS: `python -m unittest test_seam_all.test_seam.SeamTests.test_runtime_surface_benchmark_gates_exact_visual_payloads test_seam_all.test_seam.SeamTests.test_cli_benchmark_surface_json_reports_exact_gate`.
+- PASS: `python seam.py benchmark run all --output <temp>` followed by `python seam.py benchmark gate <temp>`; 23/23 benchmark cases passed and 45/45 gate checks passed.
+- PASS: `python -m unittest test_seam_all.test_seam`; 139 tests passed. Existing ResourceWarning noise appeared during dashboard/Textual-related tests but did not fail the suite.
+
+Recorded failure and correction:
+- A first check ran `benchmark gate` against a surface-only bundle. The surface family itself passed, but the default gate correctly failed because it requires all benchmark families. The SOP was corrected to show `benchmark run surface` for the focused check and `benchmark run all --output ...` before the release gate.
+
+Next:
+- Review, commit, and merge `codex/hs1-stored-surface-benchmark` when ready.
+---END-ENTRY-#131---
