@@ -148,8 +148,9 @@ and `HISTORY_INDEX.md`.
 ## Benchmark Publication Policy
 
 Holographic Surface claims must report `surface_exact_rate`, payload hash match
-rate, direct query exactness, and the PNG mode (`bw1`, `rgb`/`rgb24`,
-explicit `rgba32`, or explicit `rgba64`).
+rate, direct query exactness, stored surface lookup, stored surface query after
+original-output deletion, repair success, repair query exactness, and the PNG
+mode (`bw1`, `rgb`/`rgb24`, explicit `rgba32`, or explicit `rgba64`).
 
 Published benchmark statements must include:
 

@@ -36,7 +36,8 @@ Required behavior:
   prompt-time context, not the owner of raw image bytes.
 - Benchmark proof must cover document-to-machine-language exactness,
   machine-language-to-surface hash preservation, stored-surface lookup, and
-  direct query exactness.
+  direct query exactness, including stored query after original-output deletion
+  and repaired redundant-copy query.
 
 SOP:
 
@@ -59,6 +60,10 @@ SOP:
    query once a verified MIRL/RC surface exists.
 5. Add benchmark fixtures that prove exact answers can be read from the stored
    image surface itself.
+   - 2026-05-06 status: `codex/hs1-stored-surface-benchmark` extends the
+     release-blocking surface family with stored lookup, stored query after
+     original-output deletion, redundant-copy repair, and repaired-copy query
+     rates at 100%.
 
 ## 2026-04-30 Holographic Surface Integration
 
@@ -602,8 +607,12 @@ without OCR, source-document restoration, or prior SQLite import.
 **What:** Add benchmark cases for the full functional loop:
 document -> machine language -> surface -> stored surface -> direct answer.
 
+**Status:** Implemented 2026-05-06 on `codex/hs1-stored-surface-benchmark`.
+
 **Gate:** `surface_exact_rate`, `payload_hash_match_rate`, stored-surface lookup
-rate, and direct query exactness all stay at 100% for release-blocking fixtures.
+rate, stored-surface query rate after original-output deletion, repair success
+rate, repaired-copy query rate, and direct query exactness all stay at 100% for
+release-blocking fixtures.
 
 ---
 

@@ -30,6 +30,8 @@ from .holographic import (
     verify_surface,
 )
 from .models import HashEmbeddingModel, cosine
+from .storage import SQLiteStore
+from .surface_adapters import SurfaceFileAdapter
 from .vector import INDEXABLE_KINDS, SQLiteVectorIndex
 
 if TYPE_CHECKING:
@@ -79,6 +81,10 @@ DEFAULT_BENCHMARK_GATE_POLICY: dict[str, Any] = {
             "surface_exact_rate": {"minimum": 1.0},
             "payload_hash_match_rate": {"minimum": 1.0},
             "direct_query_exactness_rate": {"minimum": 1.0},
+            "stored_lookup_rate": {"minimum": 1.0},
+            "stored_query_exactness_rate": {"minimum": 1.0},
+            "repair_success_rate": {"minimum": 1.0},
+            "repair_query_exactness_rate": {"minimum": 1.0},
         },
         "retrieval": {
             "pass_rate": {"minimum": 1.0},
@@ -697,6 +703,7 @@ def _run_surface_family(
     cases: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="seam-bench-surface-") as temp_dir:
         temp_root = Path(temp_dir)
+        surface_store = SQLiteStore(temp_root / "surface-library.db")
         for config in _load_json_fixture(fixture_path, _default_surface_cases(), require_exists=require_fixture):
             payload_bytes, payload_format = _surface_case_payload(config)
             surface_path = temp_root / f"{config['name']}.seam.png"
@@ -713,6 +720,18 @@ def _run_surface_family(
             payload_hash_match = decoded.payload_sha256 == hashlib.sha256(payload_bytes).hexdigest()
             query_checks = _surface_query_checks(surface_path, config)
             direct_query_exactness = all(item["ok"] for item in query_checks)
+            stored_trace = _surface_stored_query_and_repair_checks(
+                surface_store,
+                artifact.to_dict(),
+                surface_path,
+                source_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+                config=config,
+                artifact_dir=temp_root / "stored-surfaces" / str(config["name"]),
+            )
+            stored_lookup = bool(stored_trace["stored_lookup"])
+            stored_query_exactness = bool(stored_trace["stored_query_exactness"])
+            repair_ok = bool(stored_trace["repair_ok"])
+            repair_query_exactness = bool(stored_trace["repair_query_exactness"])
             artifact_id = None
             if persist:
                 artifact_id = runtime.store.write_machine_artifact(
@@ -727,12 +746,29 @@ def _run_surface_family(
                 )
             case = {
                 "case_id": config["name"],
-                "status": "PASS" if surface_exact and payload_hash_match and verification.ok and direct_query_exactness else "FAIL",
+                "status": (
+                    "PASS"
+                    if (
+                        surface_exact
+                        and payload_hash_match
+                        and verification.ok
+                        and direct_query_exactness
+                        and stored_lookup
+                        and stored_query_exactness
+                        and repair_ok
+                        and repair_query_exactness
+                    )
+                    else "FAIL"
+                ),
                 "metrics": {
                     "roundtrip_match": surface_exact,
                     "surface_exact": surface_exact,
                     "payload_hash_match": payload_hash_match,
                     "direct_query_exactness": direct_query_exactness,
+                    "stored_lookup": stored_lookup,
+                    "stored_query_exactness": stored_query_exactness,
+                    "repair_ok": repair_ok,
+                    "repair_query_exactness": repair_query_exactness,
                     "payload_bytes": artifact.payload_bytes,
                     "surface_bytes": artifact.surface_bytes,
                     "capacity_bytes": artifact.capacity_bytes,
@@ -742,10 +778,30 @@ def _run_surface_family(
                     "artifact": artifact.to_dict(),
                     "verification": verification.to_dict(),
                     "query_checks": query_checks,
+                    "stored_surface": stored_trace,
                     "payload": decoded.to_dict(include_payload=include_payload),
                 },
-                "debug_flags": _surface_flags(surface_exact, payload_hash_match, verification.ok, direct_query_exactness),
-                "improvement_loop": _surface_actions(config["name"], surface_exact, payload_hash_match, verification.ok, direct_query_exactness),
+                "debug_flags": _surface_flags(
+                    surface_exact,
+                    payload_hash_match,
+                    verification.ok,
+                    direct_query_exactness,
+                    stored_lookup,
+                    stored_query_exactness,
+                    repair_ok,
+                    repair_query_exactness,
+                ),
+                "improvement_loop": _surface_actions(
+                    config["name"],
+                    surface_exact,
+                    payload_hash_match,
+                    verification.ok,
+                    direct_query_exactness,
+                    stored_lookup,
+                    stored_query_exactness,
+                    repair_ok,
+                    repair_query_exactness,
+                ),
             }
             if artifact_id is not None:
                 case["artifact_id"] = artifact_id
@@ -757,6 +813,10 @@ def _run_surface_family(
         "surface_exact_rate": _ratio(sum(1 for case in cases if case["metrics"]["surface_exact"]), len(cases)),
         "payload_hash_match_rate": _ratio(sum(1 for case in cases if case["metrics"]["payload_hash_match"]), len(cases)),
         "direct_query_exactness_rate": _ratio(sum(1 for case in cases if case["metrics"]["direct_query_exactness"]), len(cases)),
+        "stored_lookup_rate": _ratio(sum(1 for case in cases if case["metrics"]["stored_lookup"]), len(cases)),
+        "stored_query_exactness_rate": _ratio(sum(1 for case in cases if case["metrics"]["stored_query_exactness"]), len(cases)),
+        "repair_success_rate": _ratio(sum(1 for case in cases if case["metrics"]["repair_ok"]), len(cases)),
+        "repair_query_exactness_rate": _ratio(sum(1 for case in cases if case["metrics"]["repair_query_exactness"]), len(cases)),
         "avg_capacity_used_ratio": _average(case["metrics"]["capacity_used_ratio"] for case in cases),
     }
     return {
@@ -1416,7 +1476,93 @@ def _surface_query_checks(surface_path: Path, config: dict[str, Any]) -> list[di
     return checks
 
 
-def _surface_flags(surface_exact: bool, payload_hash_match: bool, verify_ok: bool, direct_query_exactness: bool) -> list[str]:
+def _surface_stored_query_and_repair_checks(
+    surface_store: SQLiteStore,
+    artifact: dict[str, object],
+    surface_path: Path,
+    *,
+    source_sha256: str,
+    config: dict[str, Any],
+    artifact_dir: Path,
+) -> dict[str, Any]:
+    surface_bytes = surface_path.read_bytes()
+    surface_sha256 = hashlib.sha256(surface_bytes).hexdigest()
+    artifact_payload = dict(artifact)
+    redundant = SurfaceFileAdapter(artifact_dir).store_copy(surface_path, surface_sha256)
+    artifact_payload["original_path"] = artifact_payload.get("path")
+    artifact_payload["path"] = redundant.artifact_path
+    artifact_payload["surface_sha256"] = redundant.surface_sha256
+    stored = surface_store.write_surface_artifact(
+        artifact_payload,
+        source_ref=str(artifact_payload.get("source_ref", "")),
+        source_sha256=source_sha256,
+        verification_status="PASS",
+        metadata={
+            "stored_by": "surface benchmark",
+            "redundant_copy": redundant.to_dict(),
+        },
+    )
+
+    surface_id = str(stored["surface_id"])
+    surface_path.unlink()
+    original_removed = not surface_path.exists()
+    stored_after_delete = surface_store.read_surface_artifact(surface_id)
+    stored_path = Path(str(stored_after_delete["artifact_path"]))
+    stored_lookup = (
+        stored_path.exists()
+        and str(stored_after_delete["surface_sha256"]) == redundant.surface_sha256
+        and str(stored_after_delete["surface_id"]) == surface_id
+    )
+    stored_query_checks = _surface_query_checks(stored_path, config) if stored_lookup and original_removed else []
+    stored_query_exactness = stored_lookup and original_removed and all(item["ok"] for item in stored_query_checks)
+
+    surface_path.write_bytes(surface_bytes)
+    if stored_path.exists():
+        stored_path.unlink()
+    repair = SurfaceFileAdapter(stored_path.parent).repair_copy(
+        stored_path,
+        surface_sha256=redundant.surface_sha256,
+        source_path=surface_path,
+    )
+    repair_ok = repair.status == "PASS"
+    repaired = surface_store.update_surface_artifact_state(
+        surface_id,
+        artifact_path=repair.artifact_path,
+        verification_status="PASS" if repair_ok else "FAIL",
+        query_status=str(stored_after_delete["query_status"]) if repair_ok else "unavailable",
+        metadata={"last_benchmark_repair": repair.to_dict()},
+    )
+    repaired_path = Path(str(repaired["artifact_path"]))
+    repair_query_checks = _surface_query_checks(repaired_path, config) if repair_ok and repaired_path.exists() else []
+    repair_query_exactness = repair_ok and all(item["ok"] for item in repair_query_checks)
+
+    return {
+        "surface_id": surface_id,
+        "stored_lookup": stored_lookup,
+        "original_removed_before_stored_query": original_removed,
+        "stored_query_exactness": stored_query_exactness,
+        "repair_ok": repair_ok,
+        "repair_query_exactness": repair_query_exactness,
+        "stored_path": str(stored_path),
+        "stored_row": stored_after_delete,
+        "redundant_copy": redundant.to_dict(),
+        "stored_query_checks": stored_query_checks,
+        "repair": repair.to_dict(),
+        "repaired_row": repaired,
+        "repair_query_checks": repair_query_checks,
+    }
+
+
+def _surface_flags(
+    surface_exact: bool,
+    payload_hash_match: bool,
+    verify_ok: bool,
+    direct_query_exactness: bool,
+    stored_lookup: bool,
+    stored_query_exactness: bool,
+    repair_ok: bool,
+    repair_query_exactness: bool,
+) -> list[str]:
     flags = []
     if not surface_exact:
         flags.append("surface_decode_mismatch")
@@ -1426,10 +1572,28 @@ def _surface_flags(surface_exact: bool, payload_hash_match: bool, verify_ok: boo
         flags.append("surface_verify_failed")
     if not direct_query_exactness:
         flags.append("surface_direct_query_failed")
+    if not stored_lookup:
+        flags.append("surface_stored_lookup_failed")
+    if not stored_query_exactness:
+        flags.append("surface_stored_query_failed")
+    if not repair_ok:
+        flags.append("surface_repair_failed")
+    if not repair_query_exactness:
+        flags.append("surface_repair_query_failed")
     return flags
 
 
-def _surface_actions(case_name: str, surface_exact: bool, payload_hash_match: bool, verify_ok: bool, direct_query_exactness: bool) -> list[str]:
+def _surface_actions(
+    case_name: str,
+    surface_exact: bool,
+    payload_hash_match: bool,
+    verify_ok: bool,
+    direct_query_exactness: bool,
+    stored_lookup: bool,
+    stored_query_exactness: bool,
+    repair_ok: bool,
+    repair_query_exactness: bool,
+) -> list[str]:
     actions = []
     if not surface_exact:
         actions.append(f"inspect SEAM-HS/1 pixel packing for {case_name}; decoded payload must be byte-exact")
@@ -1437,6 +1601,12 @@ def _surface_actions(case_name: str, surface_exact: bool, payload_hash_match: bo
         actions.append(f"inspect SEAM-HS/1 envelope/hash verification for {case_name}")
     if not direct_query_exactness:
         actions.append(f"inspect surface query dispatch for {case_name}; embedded MIRL/RC payloads must be directly searchable")
+    if not stored_lookup:
+        actions.append(f"inspect surface library metadata lookup for {case_name}; stored hs:<hash> IDs must resolve to verified PNG copies")
+    if not stored_query_exactness:
+        actions.append(f"inspect stored surface query path for {case_name}; direct answers must survive deletion of the original output path")
+    if not repair_ok or not repair_query_exactness:
+        actions.append(f"inspect surface repair path for {case_name}; repaired redundant copies must be hash-safe and directly queryable")
     return actions
 
 
