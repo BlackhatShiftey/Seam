@@ -2510,3 +2510,17 @@ tokens: 171
 ---
 Added the HS/1 surface repair slice on codex/hs1-surface-repair. New surface repair verifies the stored redundant artifact path, restores it from the recorded original source path when the stored copy is missing or hash-mismatched, and updates SQLite surface_artifacts with last_repair metadata, verification status, and query availability. The CLI now exposes seam surface repair hs:<id> with JSON and pretty output. Repair failure is explicit: if no valid source remains, the surface row is marked verification_status=FAIL and query_status=unavailable rather than silently trusting a missing artifact. Updated HS/1 docs, SOP, PROJECT_STATUS, and ROADMAP. Verification: py_compile for changed repair modules passed; focused surface pytest passed with 15 tests; full python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q passed with 165 tests; python seam.py benchmark run surface --format json passed with 4/4 cases and surface_exact_rate, payload_hash_match_rate, and direct_query_exactness_rate all 1.0.
 ---END-ENTRY-#129---
+
+---BEGIN-ENTRY-#130---
+id: 130
+date: 2026-05-06T11:27:31Z
+agent: codex
+status: done
+topics: compress, mirl, codec, command, benchmark, verify, history, snapshot, status
+commits: 4d0a435,414f883
+refs: HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 129
+tokens: 92
+---
+Merged the HS/1 surface repair branch into local main. Feature commit 4d0a435 added seam surface repair hs:<id>, redundant copy verification/restoration, failure-state updates in SQLite, tests for repair success and failure, and docs/status/roadmap updates. Merge commit 414f883 integrated codex/hs1-surface-repair into main with no conflicts. Verification before merge passed with 165 local tests, surface benchmark 4/4 PASS, and history integrity/routing/continuity checks. This entry records the local merge before the next stored-surface benchmark branch.
+---END-ENTRY-#130---
