@@ -2482,3 +2482,17 @@ tokens: 222
 ---
 Completed the HS/1 adapter redundancy and pixel-mode coverage follow-up on codex/hs1-surface-adapters. Added a SurfaceFileAdapter that creates hash-named redundant PNG copies under .seam/surfaces/ or SEAM_SURFACE_DIR by default, with --artifact-dir and --no-copy controls for surface store, compile --store, and encode --store. SQLite surface_artifacts rows now point at the durable redundant copy unless no-copy is explicitly requested, so stored-ID query/verify/decode/context can survive deletion or movement of the original output path. Extended the pixel mode adapters from bw1/rgb24/rgba32 to include rgb as a canonical rgb24 alias and rgba64 as a 16-bit-per-channel RGBA adapter storing 8 exact channel bytes per pixel. Updated the PNG writer/reader to emit/read 16-bit RGBA surfaces, added unit coverage for rgba64 and rgb alias behavior, added rgba64 to the public surface benchmark family, and updated dashboard validation plus docs/status/ledger/roadmap text. Verification: py_compile for changed runtime/test modules passed; focused surface pytest passed 13 tests; python seam.py benchmark run surface --format json passed with 4/4 cases, surface_exact_rate 1.0, payload_hash_match_rate 1.0, and direct_query_exactness_rate 1.0; full python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q passed with 163 tests.
 ---END-ENTRY-#127---
+
+---BEGIN-ENTRY-#128---
+id: 128
+date: 2026-05-06T09:47:15Z
+agent: codex
+status: done
+topics: compress, mirl, codec, command, benchmark, verify, history, snapshot, ledger, status
+commits: 10a6336,f754fc7
+refs: HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 127
+tokens: 124
+---
+Merged the HS/1 surface adapter branch into local main. Feature commit 10a6336 added the complete adapter slice: bw1, rgb/rgb24, rgba32, and rgba64 pixel modes; redundant file-backed surface copies under .seam/surfaces or SEAM_SURFACE_DIR; SQLite surface_artifacts metadata; store/list/show and stored-ID query/verify/decode/context/import CLI flows; dashboard/docs/status/ledger updates; and regression/benchmark coverage. Merge commit f754fc7 integrated codex/hs1-surface-adapters into main with no conflicts. Pre-merge verification already passed: focused surface pytest 13 tests, surface benchmark 4/4 PASS with exact/hash/query rates 1.0, full pytest 163 tests, verify_integrity, verify_routing, and verify_continuity. This entry records the local merge state before final post-merge continuity verification and bookkeeping commit.
+---END-ENTRY-#128---
