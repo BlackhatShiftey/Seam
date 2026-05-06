@@ -90,9 +90,12 @@ python seam.py benchmark run surface
 Only lossless PNG surfaces are exact memory artifacts in v1. Lossy formats such
 as JPEG are rejected for exact read workflows.
 
-`rgb24` is the default density mode. `rgba32` is supported for explicit
-higher-density surfaces because it stores four channel bytes per pixel, but the
-alpha channel is easier for image tooling to alter, strip, or normalize.
+`rgb24` is the default density mode, and `rgb` is accepted as an alias.
+`rgba32` is supported for explicit higher-density surfaces because it stores
+four channel bytes per pixel. `rgba64` is supported for explicit 16-bit RGBA
+surfaces because it stores eight channel bytes per pixel. Alpha-channel modes
+are easier for image tooling to alter, strip, or normalize, so verify after any
+tooling touch.
 
 ## Record Kinds
 

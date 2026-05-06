@@ -127,6 +127,27 @@ class SQLiteStore:
                     machine_text text,
                     created_at text not null
                 );
+                create table if not exists surface_artifacts (
+                    surface_id text primary key,
+                    artifact_path text not null unique,
+                    mode text not null,
+                    payload_format text not null,
+                    source_ref text,
+                    source_sha256 text,
+                    payload_sha256 text not null,
+                    surface_sha256 text not null,
+                    payload_bytes integer not null,
+                    surface_bytes integer not null,
+                    width integer not null,
+                    height integer not null,
+                    capacity_bytes integer not null,
+                    verification_status text not null,
+                    query_status text not null,
+                    import_status text not null,
+                    metadata_json text not null,
+                    created_at text not null,
+                    updated_at text not null
+                );
                 create table if not exists benchmark_runs (
                     run_id text primary key,
                     requested_suite text,
@@ -166,6 +187,8 @@ class SQLiteStore:
                 create index if not exists idx_ir_edges_src on ir_edges (src_id);
                 create index if not exists idx_ir_edges_dst on ir_edges (dst_id);
                 create index if not exists idx_machine_artifacts_source on machine_artifacts (source_type, source_id);
+                create index if not exists idx_surface_artifacts_payload on surface_artifacts (payload_sha256);
+                create index if not exists idx_surface_artifacts_source on surface_artifacts (source_ref);
                 create index if not exists idx_benchmark_cases_family on benchmark_cases (family);
                 create unique index if not exists idx_projection_record_kind on projection_index (record_id, projection_kind);
                 """
@@ -181,6 +204,7 @@ class SQLiteStore:
             scopes = connection.execute("select count(distinct scope) from ir_records").fetchone()[0]
             benchmark_runs = connection.execute("select count(*) from benchmark_runs").fetchone()[0]
             machine_artifacts = connection.execute("select count(*) from machine_artifacts").fetchone()[0]
+            surface_artifacts = connection.execute("select count(*) from surface_artifacts").fetchone()[0]
         return {
             "total_records": total_records,
             "vector_entries": vector_entries,
@@ -189,6 +213,7 @@ class SQLiteStore:
             "scopes": scopes,
             "benchmark_runs": benchmark_runs,
             "machine_artifacts": machine_artifacts,
+            "surface_artifacts": surface_artifacts,
         }
 
     def list_namespaces(self, limit: int = 100) -> list[str]:
@@ -463,6 +488,92 @@ class SQLiteStore:
             "created_at": row["created_at"],
         }
 
+    def write_surface_artifact(
+        self,
+        artifact: dict[str, object],
+        *,
+        source_ref: str | None = None,
+        source_sha256: str | None = None,
+        verification_status: str = "PASS",
+        import_status: str = "not_imported",
+        metadata: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        now = utc_now()
+        artifact_path = str(Path(str(artifact.get("path", ""))).expanduser().resolve())
+        surface_sha256 = str(artifact.get("surface_sha256") or _file_sha256(artifact_path))
+        surface_id = f"hs:{surface_sha256[:16]}"
+        payload_format = str(artifact.get("payload_format", "bytes"))
+        query_status = "direct_queryable" if payload_format in {"MIRL", "SEAM-RC/1"} else "verify_only"
+        merged_metadata = dict(metadata or {})
+        merged_metadata["artifact"] = dict(artifact)
+        with closing(self._connect()) as connection:
+            existing = connection.execute("select created_at from surface_artifacts where surface_id = ?", (surface_id,)).fetchone()
+            created_at = existing["created_at"] if existing else now
+            connection.execute(
+                """
+                insert or replace into surface_artifacts
+                (surface_id, artifact_path, mode, payload_format, source_ref, source_sha256,
+                 payload_sha256, surface_sha256, payload_bytes, surface_bytes, width, height,
+                 capacity_bytes, verification_status, query_status, import_status,
+                 metadata_json, created_at, updated_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    surface_id,
+                    artifact_path,
+                    str(artifact.get("mode", "")),
+                    payload_format,
+                    source_ref if source_ref is not None else str(artifact.get("source_ref", "")),
+                    source_sha256,
+                    str(artifact.get("payload_sha256", "")),
+                    surface_sha256,
+                    int(artifact.get("payload_bytes", 0)),
+                    int(artifact.get("surface_bytes", 0)),
+                    int(artifact.get("width", 0)),
+                    int(artifact.get("height", 0)),
+                    int(artifact.get("capacity_bytes", 0)),
+                    verification_status,
+                    query_status,
+                    import_status,
+                    json.dumps(merged_metadata, sort_keys=True, separators=(",", ":")),
+                    created_at,
+                    now,
+                ),
+            )
+            connection.commit()
+        return self.read_surface_artifact(surface_id)
+
+    def read_surface_artifact(self, surface_ref: str) -> dict[str, object]:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                select * from surface_artifacts
+                where surface_id = ? or artifact_path = ?
+                """,
+                (surface_ref, str(Path(surface_ref).expanduser().resolve())),
+            ).fetchone()
+        if row is None:
+            raise KeyError(surface_ref)
+        return _surface_artifact_row(row)
+
+    def list_surface_artifacts(self, limit: int = 20) -> list[dict[str, object]]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "select * from surface_artifacts order by updated_at desc limit ?",
+                (limit,),
+            ).fetchall()
+        return [_surface_artifact_row(row) for row in rows]
+
+    def update_surface_import_status(self, surface_ref: str, import_status: str) -> dict[str, object]:
+        current = self.read_surface_artifact(surface_ref)
+        with closing(self._connect()) as connection:
+            connection.execute(
+                "update surface_artifacts set import_status = ?, updated_at = ? where surface_id = ?",
+                (import_status, utc_now(), current["surface_id"]),
+            )
+            connection.commit()
+        return self.read_surface_artifact(str(current["surface_id"]))
+
     def write_projection(
         self,
         record_id: str,
@@ -610,4 +721,32 @@ def _document_status_row(row: sqlite3.Row) -> dict[str, object]:
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
+
+
+def _surface_artifact_row(row: sqlite3.Row) -> dict[str, object]:
+    return {
+        "surface_id": row["surface_id"],
+        "artifact_path": row["artifact_path"],
+        "mode": row["mode"],
+        "payload_format": row["payload_format"],
+        "source_ref": row["source_ref"],
+        "source_sha256": row["source_sha256"],
+        "payload_sha256": row["payload_sha256"],
+        "surface_sha256": row["surface_sha256"],
+        "payload_bytes": row["payload_bytes"],
+        "surface_bytes": row["surface_bytes"],
+        "width": row["width"],
+        "height": row["height"],
+        "capacity_bytes": row["capacity_bytes"],
+        "verification_status": row["verification_status"],
+        "query_status": row["query_status"],
+        "import_status": row["import_status"],
+        "metadata": json.loads(row["metadata_json"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _file_sha256(path: str) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 

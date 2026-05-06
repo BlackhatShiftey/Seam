@@ -724,7 +724,7 @@ if (
                                 yield Button("Apply Embedding Settings", id="btn-apply-embed", classes="settings-btn")
                                 yield Static("Holographic Surface", classes="settings-section")
                                 yield Label("Default PNG mode  (SEAM_SURFACE_MODE)", classes="settings-label")
-                                yield Input(value=os.environ.get("SEAM_SURFACE_MODE", "rgb24"), placeholder="rgb24, bw1, or explicit rgba32", id="cfg-surface-mode", classes="settings-input")
+                                yield Input(value=os.environ.get("SEAM_SURFACE_MODE", "rgb24"), placeholder="rgb24, bw1, rgba32, or rgba64", id="cfg-surface-mode", classes="settings-input")
                                 yield Button("Apply Surface Settings", id="btn-apply-surface", classes="settings-btn")
                                 yield Static("── Database ────────────────────────────────", classes="settings-section")
                                 yield Label("DB Path  (SEAM_DB_PATH)", classes="settings-label")
@@ -1527,8 +1527,8 @@ if (
         @on(Button.Pressed, "#btn-apply-surface")
         def _on_btn_apply_surface(self, _: Button.Pressed) -> None:  # pragma: no cover
             mode = self.query_one("#cfg-surface-mode", Input).value.strip().lower()
-            if mode and mode not in {"bw1", "rgb24", "rgba32"}:
-                self._push_result("Settings", "Surface mode must be bw1, rgb24, or rgba32.")
+            if mode and mode not in {"bw1", "rgb", "rgb24", "rgba32", "rgba64"}:
+                self._push_result("Settings", "Surface mode must be bw1, rgb24, rgba32, or rgba64.")
                 return
             changed = self._set_env_fields({"SEAM_SURFACE_MODE": mode})
             msg = f"Applied Holographic Surface settings: {', '.join(changed)}" if changed else "Nothing changed."

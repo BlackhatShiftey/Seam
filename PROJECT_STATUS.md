@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-01
+Last updated: 2026-05-06
 
 ## Current State
 
@@ -11,6 +11,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - lossless SEAM-LX/1 compression with integrity verification
 - SEAM-HS/1 Holographic Surface PNG snapshots with automatic source-to-MIRL surface compile, direct MIRL/RC query, verify, decode, context, and import commands
+- HS/1 surface library adapters in progress on `codex/hs1-surface-adapters`: stored surface metadata, stable `hs:<hash>` IDs, list/show, and direct query/verify/decode/context by stored ID
 - benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
 - optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
 - PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
@@ -28,7 +29,8 @@ SEAM is operating as a local machine-first memory runtime with:
 - Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
 - RAG efficiency surface: `seam ingest <path> --persist`, `seam memory search`, `seam memory get`, `seam retrieve --mode mix`, document status rows, vector source-hash cache/stale checks, and `seam mcp serve` stdio bridge
-- Holographic Surface surface commands: `seam surface compile|encode|decode|verify|query|search|context|import`; `bw1`, `rgb24`, and explicit `rgba32`; `surface` benchmark exactness gate
+- Holographic Surface surface commands: `seam surface compile|encode|decode|verify|query|search|context|import`; `bw1`, `rgb`/`rgb24`, explicit `rgba32`, and explicit `rgba64`; `surface` benchmark exactness gate
+- Holographic Surface library commands: `seam surface store|list|show`, plus `compile --store` and `encode --store` for SQLite metadata registration without committing generated user artifacts
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
 - Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
 - Token-bounded context loading via history snapshots and `tools.history.build_context_pack`
@@ -42,6 +44,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Make compression produce directly readable AI-native machine language, with opaque byte payloads used only as optional reconstruction/integrity backing layers
 - Treat SEAM-HS/1 Holographic Surface as a queryable visual snapshot layer for MIRL/RC payloads, not as free compression or a replacement for SQLite truth
 - Make the full functional visual-memory loop shippable: documents compile into directly readable MIRL/RC, MIRL/RC packs into SEAM-HS/1 PNG surfaces, stored surfaces remain addressable by metadata/hash, and query/context can read the embedded payload directly from the image surface without restoring the original document
+- Keep this private GitHub repo as the source-of-truth home for runtime files while leaving generated/operator user surfaces out of git unless deliberately promoted as fixtures or docs assets; future user-file sets belong in a separate repo
 - Keep roadmap execution tied to history entries and supersedes chains
 - Turn the competitive plan into shippable surfaces: finish README/install polish, graph/vector/mix retrieval hardening, agent bridge docs, and benchmark coverage without breaking existing CLI aliases
 - Continue feature delivery without reintroducing duplicated continuity text

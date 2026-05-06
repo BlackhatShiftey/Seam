@@ -17,7 +17,7 @@ from .retrieval import search_batch
 
 SURFACE_MAGIC = "SEAM-HS/1"
 SURFACE_MAGIC_BYTES = b"SEAM-HS/1\n"
-SURFACE_MODES = ("bw1", "rgb24", "rgba32")
+SURFACE_MODES = ("bw1", "rgb", "rgb24", "rgba32", "rgba64")
 SURFACE_PAYLOAD_FORMATS = ("auto", "MIRL", "SEAM-RC/1", "SEAM-LX/1", "bytes")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -34,6 +34,7 @@ class SurfaceArtifact:
     height: int
     capacity_bytes: int
     overhead_bytes: int
+    source_ref: str = ""
 
     @property
     def capacity_used_ratio(self) -> float:
@@ -55,6 +56,7 @@ class SurfaceArtifact:
             "capacity_bytes": self.capacity_bytes,
             "overhead_bytes": self.overhead_bytes,
             "capacity_used_ratio": round(self.capacity_used_ratio, 6),
+            "source_ref": self.source_ref,
         }
 
 
@@ -160,6 +162,7 @@ def encode_surface(
     payload_format: str = "auto",
     source_ref: str | None = None,
 ) -> SurfaceArtifact:
+    mode = _normalize_surface_mode(mode)
     if mode not in SURFACE_MODES:
         raise ValueError(f"Unsupported holographic surface mode: {mode}")
     resolved_format = _detect_payload_format(payload) if payload_format == "auto" else payload_format
@@ -178,10 +181,10 @@ def encode_surface(
     }
     header = json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
     container = SURFACE_MAGIC_BYTES + struct.pack(">I", len(header)) + header + payload
-    width, height, pixels, color_type, capacity_bytes = _container_to_pixels(container, mode)
+    width, height, pixels, color_type, bit_depth, capacity_bytes = _container_to_pixels(container, mode)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    _write_png(output_path, width=width, height=height, color_type=color_type, pixel_bytes=pixels)
+    _write_png(output_path, width=width, height=height, color_type=color_type, bit_depth=bit_depth, pixel_bytes=pixels)
     return SurfaceArtifact(
         path=str(output_path),
         mode=mode,
@@ -193,6 +196,7 @@ def encode_surface(
         height=height,
         capacity_bytes=capacity_bytes,
         overhead_bytes=len(container) - len(payload),
+        source_ref=source_ref or "",
     )
 
 
@@ -200,7 +204,7 @@ def decode_surface(path: Path) -> SurfacePayload:
     path = Path(path)
     if path.suffix.lower() in {".jpg", ".jpeg"}:
         raise ValueError("SEAM-HS/1 refuses lossy JPEG surfaces for exact memory")
-    width, height, color_type, pixel_bytes = _read_png(path)
+    width, height, color_type, bit_depth, pixel_bytes = _read_png(path)
     if color_type in {2, 6}:
         container = pixel_bytes
     elif color_type == 0:
@@ -216,7 +220,7 @@ def decode_surface(path: Path) -> SurfacePayload:
     return SurfacePayload(
         payload=payload,
         metadata=metadata,
-        mode=str(metadata["mode"]),
+        mode=_normalize_surface_mode(str(metadata["mode"])),
         payload_format=str(metadata["payload_format"]),
         payload_sha256=expected_sha,
         payload_bytes=int(metadata["payload_bytes"]),
@@ -242,6 +246,30 @@ def verify_surface(path: Path) -> SurfaceVerification:
         actual_sha256=actual_sha,
         errors=[] if actual_sha == payload.payload_sha256 else ["payload hash mismatch"],
     )
+
+
+def inspect_surface(path: Path) -> dict[str, object]:
+    payload = decode_surface(path)
+    path = Path(path)
+    surface_bytes = path.stat().st_size
+    capacity_bytes = _capacity_bytes(payload.width, payload.height, payload.mode)
+    return {
+        "format": SURFACE_MAGIC,
+        "path": str(path),
+        "mode": payload.mode,
+        "payload_format": payload.payload_format,
+        "payload_bytes": payload.payload_bytes,
+        "payload_sha256": payload.payload_sha256,
+        "surface_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "surface_bytes": surface_bytes,
+        "width": payload.width,
+        "height": payload.height,
+        "capacity_bytes": capacity_bytes,
+        "overhead_bytes": None,
+        "capacity_used_ratio": round(payload.payload_bytes / capacity_bytes, 6) if capacity_bytes else 0.0,
+        "source_ref": str(payload.metadata.get("source_ref", "")),
+        "metadata": dict(payload.metadata),
+    }
 
 
 def query_surface(path: Path, query: str, limit: int = 5) -> SurfaceQueryResult:
@@ -323,22 +351,41 @@ def _looks_like_mirl(payload: bytes) -> bool:
     return all(line.split("|", 2)[0] in {"RAW", "SPAN", "ENT", "CLM", "EVT", "REL", "STA", "SYM", "PACK", "FLOW", "PROV", "META"} for line in lines)
 
 
-def _container_to_pixels(container: bytes, mode: str) -> tuple[int, int, bytes, int, int]:
-    if mode in {"rgb24", "rgba32"}:
-        channels = 4 if mode == "rgba32" else 3
-        color_type = 6 if mode == "rgba32" else 2
+def _normalize_surface_mode(mode: str) -> str:
+    return "rgb24" if mode == "rgb" else mode
+
+
+def _container_to_pixels(container: bytes, mode: str) -> tuple[int, int, bytes, int, int, int]:
+    mode = _normalize_surface_mode(mode)
+    if mode in {"rgb24", "rgba32", "rgba64"}:
+        channels = 8 if mode == "rgba64" else 4 if mode == "rgba32" else 3
+        color_type = 6 if mode in {"rgba32", "rgba64"} else 2
+        bit_depth = 16 if mode == "rgba64" else 8
         total_pixels = max(1, math.ceil(len(container) / channels))
         width = max(1, math.ceil(math.sqrt(total_pixels)))
         height = math.ceil(total_pixels / width)
         capacity_bytes = width * height * channels
-        return width, height, container.ljust(capacity_bytes, b"\x00"), color_type, capacity_bytes
+        return width, height, container.ljust(capacity_bytes, b"\x00"), color_type, bit_depth, capacity_bytes
     bit_count = len(container) * 8
     width = max(1, math.ceil(math.sqrt(bit_count)))
     height = math.ceil(bit_count / width)
     capacity_bits = width * height
     bits = "".join(f"{byte:08b}" for byte in container).ljust(capacity_bits, "0")
     pixels = bytes(255 if bit == "1" else 0 for bit in bits)
-    return width, height, pixels, 0, capacity_bits // 8
+    return width, height, pixels, 0, 8, capacity_bits // 8
+
+
+def _capacity_bytes(width: int, height: int, mode: str) -> int:
+    mode = _normalize_surface_mode(mode)
+    if mode == "rgba64":
+        return width * height * 8
+    if mode == "rgba32":
+        return width * height * 4
+    if mode == "rgb24":
+        return width * height * 3
+    if mode == "bw1":
+        return (width * height) // 8
+    return 0
 
 
 def _parse_container(container: bytes) -> tuple[dict[str, Any], bytes]:
@@ -360,26 +407,27 @@ def _parse_container(container: bytes) -> tuple[dict[str, Any], bytes]:
     return metadata, payload
 
 
-def _write_png(path: Path, width: int, height: int, color_type: int, pixel_bytes: bytes) -> None:
+def _write_png(path: Path, width: int, height: int, color_type: int, bit_depth: int, pixel_bytes: bytes) -> None:
     channels = 4 if color_type == 6 else 3 if color_type == 2 else 1
-    stride = width * channels
+    bytes_per_sample = 2 if bit_depth == 16 else 1
+    stride = width * channels * bytes_per_sample
     expected = stride * height
     if len(pixel_bytes) != expected:
         raise ValueError(f"Pixel payload has {len(pixel_bytes)} bytes, expected {expected}")
     raw = b"".join(b"\x00" + pixel_bytes[row * stride : (row + 1) * stride] for row in range(height))
     png = bytearray(PNG_SIGNATURE)
-    png.extend(_png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0)))
+    png.extend(_png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, bit_depth, color_type, 0, 0, 0)))
     png.extend(_png_chunk(b"IDAT", zlib.compress(raw, level=9)))
     png.extend(_png_chunk(b"IEND", b""))
     path.write_bytes(bytes(png))
 
 
-def _read_png(path: Path) -> tuple[int, int, int, bytes]:
+def _read_png(path: Path) -> tuple[int, int, int, int, bytes]:
     data = path.read_bytes()
     if not data.startswith(PNG_SIGNATURE):
         raise ValueError("SEAM-HS/1 only supports lossless PNG surfaces")
     offset = len(PNG_SIGNATURE)
-    width = height = color_type = None
+    width = height = color_type = bit_depth = None
     idat = bytearray()
     while offset < len(data):
         length = struct.unpack(">I", data[offset : offset + 4])[0]
@@ -392,23 +440,26 @@ def _read_png(path: Path) -> tuple[int, int, int, bytes]:
         offset += 12 + length
         if chunk_type == b"IHDR":
             width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(">IIBBBBB", chunk_data)
-            if bit_depth != 8 or compression != 0 or filter_method != 0 or interlace != 0:
+            if bit_depth not in {8, 16} or compression != 0 or filter_method != 0 or interlace != 0:
                 raise ValueError("Unsupported PNG encoding for SEAM-HS/1")
             if color_type not in {0, 2, 6}:
                 raise ValueError(f"Unsupported PNG color type for SEAM-HS/1: {color_type}")
+            if bit_depth == 16 and color_type != 6:
+                raise ValueError("SEAM-HS/1 16-bit surfaces require RGBA color type")
         elif chunk_type == b"IDAT":
             idat.extend(chunk_data)
         elif chunk_type == b"IEND":
             break
-    if width is None or height is None or color_type is None:
+    if width is None or height is None or color_type is None or bit_depth is None:
         raise ValueError("PNG is missing IHDR metadata")
     channels = 4 if color_type == 6 else 3 if color_type == 2 else 1
-    stride = width * channels
+    bytes_per_pixel = channels * (2 if bit_depth == 16 else 1)
+    stride = width * bytes_per_pixel
     raw = zlib.decompress(bytes(idat))
-    return width, height, color_type, _unfilter_png(raw, width, height, channels, stride)
+    return width, height, color_type, bit_depth, _unfilter_png(raw, width, height, bytes_per_pixel, stride)
 
 
-def _unfilter_png(raw: bytes, width: int, height: int, channels: int, stride: int) -> bytes:
+def _unfilter_png(raw: bytes, width: int, height: int, bytes_per_pixel: int, stride: int) -> bytes:
     rows = []
     offset = 0
     previous = bytearray(stride)
@@ -418,9 +469,9 @@ def _unfilter_png(raw: bytes, width: int, height: int, channels: int, stride: in
         row = bytearray(raw[offset : offset + stride])
         offset += stride
         for i in range(stride):
-            left = row[i - channels] if i >= channels else 0
+            left = row[i - bytes_per_pixel] if i >= bytes_per_pixel else 0
             up = previous[i]
-            upper_left = previous[i - channels] if i >= channels else 0
+            upper_left = previous[i - bytes_per_pixel] if i >= bytes_per_pixel else 0
             if filter_type == 1:
                 row[i] = (row[i] + left) & 0xFF
             elif filter_type == 2:

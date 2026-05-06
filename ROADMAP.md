@@ -22,8 +22,8 @@ Required behavior:
   quote spans, headings, table cells, entities, claims, references, source
   hashes, and provenance.
 - Surface packing stores that machine-language payload in a lossless
-  `SEAM-HS/1` PNG using `rgb24` by default or explicit `rgba32` for higher
-  channel density.
+  `SEAM-HS/1` PNG using `rgb24` by default or explicit `rgba32` / `rgba64`
+  for higher channel density.
 - Surface storage keeps the generated `.seam.png` artifacts addressable as a
   surface library, with SQLite metadata for artifact path, payload format,
   PNG mode, source hash, payload hash, verification status, and import/query
@@ -44,6 +44,10 @@ SOP:
    directly readable MIRL/RC records before any surface packing.
 2. Add a surface library/store command that writes `.seam.png` files under a
    controlled artifact directory and records metadata in SQLite.
+   - 2026-05-06 status: first adapter slice in progress on
+     `codex/hs1-surface-adapters`: `surface store|list|show`,
+     `compile --store`, `encode --store`, stable `hs:<hash>` IDs, and direct
+     path resolution for stored-ID verify/query/search/context/decode/import.
 3. Add surface lookup commands for list, verify, query, search, context, import,
    and repair/rebuild-from-source when source material is still available.
 4. Keep raw original documents optional and operator-controlled. They are
@@ -64,9 +68,9 @@ snapshots:
   the normal parser, query, search, or context path.
 - No OCR, natural-language recompilation, or SQLite import is required for
   direct surface query/context workflows.
-- v1 supports `bw1` proof mode, `rgb24` default density mode, and explicit
-  `rgba32` high-density mode. JPEG and other lossy formats are rejected for
-  exact memory.
+- v1 supports `bw1` proof mode, `rgb24`/`rgb` default density mode, explicit
+  `rgba32` high-density mode, and explicit 16-bit `rgba64`. JPEG and other
+  lossy formats are rejected for exact memory.
 - The automatic operator flow is `seam surface compile <source> --output
   <file.seam.png>`: compile source text into MIRL, then encode the MIRL bytes
   into a PNG surface using `rgb24` unless a denser mode is requested.
@@ -82,11 +86,13 @@ SOP:
 2. Encode existing RC/1 or MIRL with `seam surface encode <input> --output <file.seam.png> --mode rgb24`.
 3. Use `--mode rgba32` only for explicit higher channel density; it stores 4
    bytes per pixel but alpha channels are easier for image tooling to mutate.
-4. Verify with `seam surface verify <file.seam.png>`.
-5. Query without import using `seam surface query`, `seam surface search`, or
+4. Use `--mode rgba64` only when 16-bit RGBA density is required; it stores 8
+   bytes per pixel and should be verified after any image-tooling touch.
+5. Verify with `seam surface verify <file.seam.png>`.
+6. Query without import using `seam surface query`, `seam surface search`, or
    `seam surface context`.
-6. Import only when the snapshot should become active SQLite memory.
-7. Gate changes with `seam benchmark run surface`.
+7. Import only when the snapshot should become active SQLite memory.
+8. Gate changes with `seam benchmark run surface`.
 
 ## 2026-04-28 Competitive Integration Update
 
