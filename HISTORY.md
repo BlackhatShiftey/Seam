@@ -2556,3 +2556,55 @@ Recorded failure and correction:
 Next:
 - Review, commit, and merge `codex/hs1-stored-surface-benchmark` when ready.
 ---END-ENTRY-#131---
+
+---BEGIN-ENTRY-#132---
+id: 132
+date: 2026-05-06T11:51:48Z
+agent: codex
+status: done
+topics: benchmark, codec, compress, mirl, verify, history, snapshot, ledger, status, roadmap
+commits: d8cfb2c,d8cfb2c
+refs: seam_runtime/benchmarks.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,PROJECT_STATUS.md,REPO_LEDGER.md,ROADMAP.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 131
+tokens: 174
+---
+Merged the stored-surface benchmark branch into local `main`.
+
+Changes landed:
+- Commit `d8cfb2c` (`Add stored HS/1 surface benchmark gate`) adds stored-library lookup, stored query after original-output deletion, redundant-copy repair, and repaired-copy query checks to the release-blocking `surface` benchmark family.
+- Merge commit `8dd2ec3` (`Merge HS/1 stored surface benchmark`) brings that branch into `main`.
+
+Verification carried from the branch before merge:
+- PASS: `python -m compileall seam_runtime\\benchmarks.py`.
+- PASS: targeted surface benchmark tests.
+- PASS: full benchmark release gate with 23/23 cases and 45/45 gate checks.
+- PASS: `python -m unittest test_seam_all.test_seam` with 139 tests passed.
+
+Recorded failure and correction:
+- The first staging command used shell-style `&&`; PowerShell rejected it before staging or committing. The same stage/commit was rerun with native PowerShell sequencing and succeeded.
+
+Next:
+- Push `main` when remote publication is desired.
+---END-ENTRY-#132---
+
+---BEGIN-ENTRY-#133---
+id: 133
+date: 2026-05-06T11:52:04Z
+agent: codex
+status: done
+topics: history, integrity, verify, snapshot, benchmark
+commits: d8cfb2c,8dd2ec3
+refs: HISTORY.md,HISTORY_INDEX.md
+supersedes: 132
+tokens: 78
+---
+Correction for HISTORY#132 bookkeeping.
+
+The `HISTORY#132` body correctly identified branch commit `d8cfb2c` and merge commit `8dd2ec3`, but its structured `commits` field accidentally repeated `d8cfb2c`. This append-only correction records the intended commit chain without rewriting the prior entry.
+
+Correct commits:
+- `d8cfb2c` Add stored HS/1 surface benchmark gate
+- `8dd2ec3` Merge HS/1 stored surface benchmark
+
+Verification status is unchanged from HISTORY#132.
+---END-ENTRY-#133---
