@@ -48,6 +48,10 @@ SOP:
      `codex/hs1-surface-adapters`: `surface store|list|show`,
      `compile --store`, `encode --store`, stable `hs:<hash>` IDs, and direct
      path resolution for stored-ID verify/query/search/context/decode/import.
+   - 2026-05-06 follow-up: `codex/hs1-surface-repair` adds
+     `surface repair hs:<id>` to verify stored redundant copies, restore them
+     from the original source path when hash-safe, and mark unrecoverable
+     surfaces unavailable in SQLite.
 3. Add surface lookup commands for list, verify, query, search, context, import,
    and repair/rebuild-from-source when source material is still available.
 4. Keep raw original documents optional and operator-controlled. They are

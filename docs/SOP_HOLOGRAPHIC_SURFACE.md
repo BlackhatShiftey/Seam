@@ -45,11 +45,16 @@ They do not use OCR, natural-language recompilation, or SQLite import.
 python seam.py --db seam.db surface store input.seam.png
 python seam.py --db seam.db surface list
 python seam.py --db seam.db surface show hs:<surface-id>
+python seam.py --db seam.db surface repair hs:<surface-id>
 ```
 
 The library stores metadata and hashes only. PNG artifacts remain
 operator-controlled files at their recorded paths; keep generated user artifacts
 out of the runtime repo unless they are deliberate fixtures or docs assets.
+Repair verifies the redundant copy and restores it from the recorded original
+source path when available. If no valid source remains, repair records the
+failure in SQLite so future query attempts do not silently trust a missing or
+corrupt artifact.
 
 ## Decode For Audit
 

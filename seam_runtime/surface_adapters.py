@@ -26,6 +26,26 @@ class SurfaceFileCopy:
         }
 
 
+@dataclass(frozen=True)
+class SurfaceFileRepair:
+    artifact_path: str
+    source_path: str | None
+    surface_sha256: str
+    status: str
+    action: str
+    errors: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "artifact_path": self.artifact_path,
+            "source_path": self.source_path,
+            "surface_sha256": self.surface_sha256,
+            "status": self.status,
+            "action": self.action,
+            "errors": list(self.errors),
+        }
+
+
 class SurfaceFileAdapter:
     """File-backed adapter for redundant SEAM-HS/1 artifact copies."""
 
@@ -54,6 +74,77 @@ class SurfaceFileAdapter:
             surface_sha256=actual_sha,
             copied=copied,
             source_path=str(source),
+        )
+
+    def repair_copy(
+        self,
+        artifact_path: str | Path,
+        *,
+        surface_sha256: str,
+        source_path: str | Path | None = None,
+    ) -> SurfaceFileRepair:
+        artifact = Path(artifact_path).expanduser().resolve()
+        if artifact.exists():
+            actual = _file_sha256(artifact)
+            if actual == surface_sha256:
+                return SurfaceFileRepair(
+                    artifact_path=str(artifact),
+                    source_path=str(Path(source_path).expanduser().resolve()) if source_path else None,
+                    surface_sha256=surface_sha256,
+                    status="PASS",
+                    action="verified_existing",
+                )
+            artifact_status = f"stored artifact hash mismatch: expected {surface_sha256}, got {actual}"
+        else:
+            artifact_status = "stored artifact missing"
+
+        if source_path is None:
+            return SurfaceFileRepair(
+                artifact_path=str(artifact),
+                source_path=None,
+                surface_sha256=surface_sha256,
+                status="FAIL",
+                action="repair_failed",
+                errors=(artifact_status, "no repair source available"),
+            )
+        source = Path(source_path).expanduser().resolve()
+        if not source.exists():
+            return SurfaceFileRepair(
+                artifact_path=str(artifact),
+                source_path=str(source),
+                surface_sha256=surface_sha256,
+                status="FAIL",
+                action="repair_failed",
+                errors=(artifact_status, f"repair source missing: {source}"),
+            )
+        source_sha = _file_sha256(source)
+        if source_sha != surface_sha256:
+            return SurfaceFileRepair(
+                artifact_path=str(artifact),
+                source_path=str(source),
+                surface_sha256=surface_sha256,
+                status="FAIL",
+                action="repair_failed",
+                errors=(artifact_status, f"repair source hash mismatch: expected {surface_sha256}, got {source_sha}"),
+            )
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, artifact)
+        repaired_sha = _file_sha256(artifact)
+        if repaired_sha != surface_sha256:
+            return SurfaceFileRepair(
+                artifact_path=str(artifact),
+                source_path=str(source),
+                surface_sha256=surface_sha256,
+                status="FAIL",
+                action="repair_failed",
+                errors=(artifact_status, f"repaired artifact hash mismatch: expected {surface_sha256}, got {repaired_sha}"),
+            )
+        return SurfaceFileRepair(
+            artifact_path=str(artifact),
+            source_path=str(source),
+            surface_sha256=surface_sha256,
+            status="PASS",
+            action="repaired_from_source",
         )
 
 

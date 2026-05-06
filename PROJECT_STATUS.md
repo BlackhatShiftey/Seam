@@ -30,7 +30,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
 - RAG efficiency surface: `seam ingest <path> --persist`, `seam memory search`, `seam memory get`, `seam retrieve --mode mix`, document status rows, vector source-hash cache/stale checks, and `seam mcp serve` stdio bridge
 - Holographic Surface surface commands: `seam surface compile|encode|decode|verify|query|search|context|import`; `bw1`, `rgb`/`rgb24`, explicit `rgba32`, and explicit `rgba64`; `surface` benchmark exactness gate
-- Holographic Surface library commands: `seam surface store|list|show`, plus `compile --store` and `encode --store` for SQLite metadata registration without committing generated user artifacts
+- Holographic Surface library commands: `seam surface store|list|show|repair`, plus `compile --store` and `encode --store` for SQLite metadata registration, redundant file-backed copies, and repair of missing/corrupt stored copies without committing generated user artifacts
 - Durable history protocol (`AGENTS.md`, `HISTORY.md`, `HISTORY_INDEX.md`)
 - Active/inactive separation: `docs/CODE_LAYOUT.md` maps live vs archived paths; `.rgignore` gates code search
 - Token-bounded context loading via history snapshots and `tools.history.build_context_pack`
