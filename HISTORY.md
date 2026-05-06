@@ -2496,3 +2496,17 @@ tokens: 124
 ---
 Merged the HS/1 surface adapter branch into local main. Feature commit 10a6336 added the complete adapter slice: bw1, rgb/rgb24, rgba32, and rgba64 pixel modes; redundant file-backed surface copies under .seam/surfaces or SEAM_SURFACE_DIR; SQLite surface_artifacts metadata; store/list/show and stored-ID query/verify/decode/context/import CLI flows; dashboard/docs/status/ledger updates; and regression/benchmark coverage. Merge commit f754fc7 integrated codex/hs1-surface-adapters into main with no conflicts. Pre-merge verification already passed: focused surface pytest 13 tests, surface benchmark 4/4 PASS with exact/hash/query rates 1.0, full pytest 163 tests, verify_integrity, verify_routing, and verify_continuity. This entry records the local merge state before final post-merge continuity verification and bookkeeping commit.
 ---END-ENTRY-#128---
+
+---BEGIN-ENTRY-#129---
+id: 129
+date: 2026-05-06T09:52:19Z
+agent: codex
+status: done
+topics: compress, mirl, codec, command, benchmark, verify, history, snapshot, status
+commits: pending
+refs: seam_runtime/surface_adapters.py,seam_runtime/storage.py,seam_runtime/cli.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,PROJECT_STATUS.md,ROADMAP.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 128
+tokens: 171
+---
+Added the HS/1 surface repair slice on codex/hs1-surface-repair. New surface repair verifies the stored redundant artifact path, restores it from the recorded original source path when the stored copy is missing or hash-mismatched, and updates SQLite surface_artifacts with last_repair metadata, verification status, and query availability. The CLI now exposes seam surface repair hs:<id> with JSON and pretty output. Repair failure is explicit: if no valid source remains, the surface row is marked verification_status=FAIL and query_status=unavailable rather than silently trusting a missing artifact. Updated HS/1 docs, SOP, PROJECT_STATUS, and ROADMAP. Verification: py_compile for changed repair modules passed; focused surface pytest passed with 15 tests; full python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q passed with 165 tests; python seam.py benchmark run surface --format json passed with 4/4 cases and surface_exact_rate, payload_hash_match_rate, and direct_query_exactness_rate all 1.0.
+---END-ENTRY-#129---

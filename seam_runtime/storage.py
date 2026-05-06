@@ -574,6 +574,46 @@ class SQLiteStore:
             connection.commit()
         return self.read_surface_artifact(str(current["surface_id"]))
 
+    def update_surface_artifact_state(
+        self,
+        surface_ref: str,
+        *,
+        artifact_path: str | None = None,
+        verification_status: str | None = None,
+        query_status: str | None = None,
+        import_status: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        current = self.read_surface_artifact(surface_ref)
+        merged_metadata = dict(current["metadata"])
+        if metadata:
+            merged_metadata.update(metadata)
+        next_artifact_path = artifact_path or str(current["artifact_path"])
+        with closing(self._connect()) as connection:
+            connection.execute(
+                """
+                update surface_artifacts
+                set artifact_path = ?,
+                    verification_status = ?,
+                    query_status = ?,
+                    import_status = ?,
+                    metadata_json = ?,
+                    updated_at = ?
+                where surface_id = ?
+                """,
+                (
+                    str(Path(next_artifact_path).expanduser().resolve()),
+                    verification_status or str(current["verification_status"]),
+                    query_status or str(current["query_status"]),
+                    import_status or str(current["import_status"]),
+                    json.dumps(merged_metadata, sort_keys=True, separators=(",", ":")),
+                    utc_now(),
+                    str(current["surface_id"]),
+                ),
+            )
+            connection.commit()
+        return self.read_surface_artifact(str(current["surface_id"]))
+
     def write_projection(
         self,
         record_id: str,

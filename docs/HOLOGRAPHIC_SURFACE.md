@@ -78,6 +78,7 @@ seam surface import memory.seam.png --db seam.db
 seam surface store memory.seam.png --db seam.db
 seam surface list --db seam.db
 seam surface show hs:<surface-id> --db seam.db
+seam surface repair hs:<surface-id> --db seam.db
 seam surface query hs:<surface-id> "behavior" --db seam.db
 ```
 
@@ -93,6 +94,12 @@ choose a different private surface library root or `--no-copy` only when the
 given path is already durable. Stored entries point to operator-controlled
 artifact paths; generated `.seam.png` user artifacts are not committed to the
 runtime repo unless they are deliberate fixtures or documentation assets.
+
+`surface repair hs:<id>` audits the stored redundant copy. If that copy is
+missing or has the wrong hash, SEAM restores it from the original source path
+recorded during `--store` when that source is still available and hash-matches
+the stored surface. Failed repairs mark the SQLite entry as `verification=FAIL`
+and `query=unavailable` instead of pretending the surface remains queryable.
 
 `surface compile` is the automatic source-to-surface path: source text is
 compiled into MIRL, then the MIRL bytes are encoded into `SEAM-HS/1`. `rgb24`

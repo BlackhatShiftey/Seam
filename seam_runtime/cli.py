@@ -159,6 +159,10 @@ def build_parser() -> argparse.ArgumentParser:
     surface_show_parser = surface_subparsers.add_parser("show", help="Show one stored SEAM-HS/1 surface library entry")
     surface_show_parser.add_argument("surface_ref")
     surface_show_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_repair_parser = surface_subparsers.add_parser("repair", help="Verify or restore a stored SEAM-HS/1 redundant surface copy")
+    surface_repair_parser.add_argument("surface_ref")
+    surface_repair_parser.add_argument("--source", help="Override repair source path")
+    surface_repair_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     lossless_decompress_parser = subparsers.add_parser("lossless-decompress", aliases=["decompress-doc"], help="Restore a SEAM lossless document back to exact text")
     lossless_decompress_parser.add_argument("source")
@@ -514,6 +518,14 @@ def run_cli(argv: list[str] | None = None) -> None:
                 print(json.dumps(row, indent=2))
                 return
             _print_text(_render_surface_library_entry_pretty(row))
+            return
+        if args.surface_command == "repair":
+            runtime = SeamRuntime(args.db)
+            result = _repair_surface_library_entry(runtime, args.surface_ref, source_override=args.source)
+            if args.format == "json":
+                print(json.dumps(result, indent=2))
+                return
+            _print_text(_render_surface_repair_pretty(result))
             return
     if args.command in {"lossless-decompress", "decompress-doc"}:
         machine_text = _read_text_source(args.source)
@@ -1000,6 +1012,39 @@ def _store_surface_library_entry(
     )
 
 
+def _repair_surface_library_entry(runtime: SeamRuntime, surface_ref: str, source_override: str | None = None) -> dict[str, object]:
+    row = runtime.store.read_surface_artifact(surface_ref)
+    source_path = source_override or _surface_repair_source(row)
+    repair = SurfaceFileAdapter(Path(str(row["artifact_path"])).parent).repair_copy(
+        str(row["artifact_path"]),
+        surface_sha256=str(row["surface_sha256"]),
+        source_path=source_path,
+    )
+    verification_status = "PASS" if repair.status == "PASS" else "FAIL"
+    query_status = str(row["query_status"]) if repair.status == "PASS" else "unavailable"
+    updated = runtime.store.update_surface_artifact_state(
+        surface_ref,
+        artifact_path=repair.artifact_path,
+        verification_status=verification_status,
+        query_status=query_status,
+        metadata={"last_repair": repair.to_dict()},
+    )
+    return {"repair": repair.to_dict(), "surface": updated}
+
+
+def _surface_repair_source(row: dict[str, object]) -> str | None:
+    metadata = row.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return None
+    redundant = metadata.get("redundant_copy")
+    if isinstance(redundant, dict) and redundant.get("source_path"):
+        return str(redundant["source_path"])
+    artifact = metadata.get("artifact")
+    if isinstance(artifact, dict) and artifact.get("original_path"):
+        return str(artifact["original_path"])
+    return None
+
+
 def _write_text_output(target: str, text: str) -> None:
     if target == "-":
         _print_text(text)
@@ -1196,6 +1241,28 @@ def _render_surface_library_list_pretty(rows: list[dict[str, object]]) -> str:
             f"- {row.get('surface_id')} {row.get('payload_format')} {row.get('mode')} "
             f"{row.get('verification_status')} {row.get('query_status')} {row.get('artifact_path')}"
         )
+    return "\n".join(lines)
+
+
+def _render_surface_repair_pretty(payload: dict[str, object]) -> str:
+    repair = payload.get("repair", {})
+    surface = payload.get("surface", {})
+    repair_payload = repair if isinstance(repair, dict) else {}
+    surface_payload = surface if isinstance(surface, dict) else {}
+    lines = [
+        "Holographic surface repair",
+        f"ID: {surface_payload.get('surface_id')}",
+        f"Status: {repair_payload.get('status')}",
+        f"Action: {repair_payload.get('action')}",
+        f"Path: {repair_payload.get('artifact_path')}",
+        f"Source: {repair_payload.get('source_path') or '(none)'}",
+        f"Verification: {surface_payload.get('verification_status')}",
+        f"Query: {surface_payload.get('query_status')}",
+    ]
+    errors = repair_payload.get("errors", [])
+    if errors:
+        lines.append("Errors:")
+        lines.extend(f"- {error}" for error in errors)
     return "\n".join(lines)
 
 

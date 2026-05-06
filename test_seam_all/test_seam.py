@@ -811,6 +811,102 @@ claim c1:
                         child.unlink()
                 artifact_dir.rmdir()
 
+    def test_cli_surface_repair_restores_missing_redundant_copy(self) -> None:
+        source_path = Path(f"surface_repair_source_{uuid4().hex}.seamrc")
+        surface_path = Path(f"surface_repair_{uuid4().hex}.seam.png")
+        artifact_dir = TEST_ARTIFACT_DIR / f"repair_surfaces_{uuid4().hex}"
+        try:
+            text = 'Repair note: "surface repair rebuilds the redundant copy."'
+            artifact = compress_text_readable(text, source_ref="unit://surface-repair", tokenizer="char4_approx")
+            source_path.write_text(artifact.machine_text, encoding="utf-8")
+
+            encode_stream = StringIO()
+            with redirect_stdout(encode_stream):
+                run_cli([
+                    "--db",
+                    str(self.db_path),
+                    "surface",
+                    "encode",
+                    str(source_path),
+                    "--output",
+                    str(surface_path),
+                    "--store",
+                    "--artifact-dir",
+                    str(artifact_dir),
+                    "--format",
+                    "json",
+                ])
+            payload = json.loads(encode_stream.getvalue())
+            surface_id = payload["library"]["surface_id"]
+            stored_path = Path(payload["library"]["artifact_path"])
+            self.assertTrue(stored_path.exists())
+            stored_path.unlink()
+            self.assertFalse(stored_path.exists())
+
+            repair_stream = StringIO()
+            with redirect_stdout(repair_stream):
+                run_cli(["--db", str(self.db_path), "surface", "repair", surface_id, "--format", "json"])
+            repaired = json.loads(repair_stream.getvalue())
+            self.assertEqual(repaired["repair"]["status"], "PASS")
+            self.assertEqual(repaired["repair"]["action"], "repaired_from_source")
+            self.assertTrue(stored_path.exists())
+            self.assertEqual(repaired["surface"]["verification_status"], "PASS")
+
+            surface_path.unlink()
+            query_stream = StringIO()
+            with redirect_stdout(query_stream):
+                run_cli(["--db", str(self.db_path), "surface", "query", surface_id, '"surface repair rebuilds the redundant copy."'])
+            self.assertIn("surface repair rebuilds the redundant copy", query_stream.getvalue())
+        finally:
+            for path in (source_path, surface_path):
+                if path.exists():
+                    path.unlink()
+            if artifact_dir.exists():
+                for child in artifact_dir.glob("*"):
+                    if child.is_file():
+                        child.unlink()
+                artifact_dir.rmdir()
+
+    def test_cli_surface_repair_marks_failure_without_source(self) -> None:
+        source_path = Path(f"surface_repair_fail_source_{uuid4().hex}.seamrc")
+        surface_path = Path(f"surface_repair_fail_{uuid4().hex}.seam.png")
+        try:
+            text = 'Repair failure note: "missing sources cannot repair."'
+            artifact = compress_text_readable(text, source_ref="unit://surface-repair-fail", tokenizer="char4_approx")
+            source_path.write_text(artifact.machine_text, encoding="utf-8")
+
+            encode_stream = StringIO()
+            with redirect_stdout(encode_stream):
+                run_cli([
+                    "--db",
+                    str(self.db_path),
+                    "surface",
+                    "encode",
+                    str(source_path),
+                    "--output",
+                    str(surface_path),
+                    "--store",
+                    "--no-copy",
+                    "--format",
+                    "json",
+                ])
+            payload = json.loads(encode_stream.getvalue())
+            surface_id = payload["library"]["surface_id"]
+            source_path.unlink()
+            surface_path.unlink()
+
+            repair_stream = StringIO()
+            with redirect_stdout(repair_stream):
+                run_cli(["--db", str(self.db_path), "surface", "repair", surface_id, "--format", "json"])
+            repaired = json.loads(repair_stream.getvalue())
+            self.assertEqual(repaired["repair"]["status"], "FAIL")
+            self.assertEqual(repaired["surface"]["verification_status"], "FAIL")
+            self.assertEqual(repaired["surface"]["query_status"], "unavailable")
+        finally:
+            for path in (source_path, surface_path):
+                if path.exists():
+                    path.unlink()
+
     def test_cli_surface_compile_builds_mirl_surface_without_import(self) -> None:
         source_path = Path(f"surface_compile_source_{uuid4().hex}.txt")
         surface_path = Path(f"surface_compile_{uuid4().hex}.seam.png")
