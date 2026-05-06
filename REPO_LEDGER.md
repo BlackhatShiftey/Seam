@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-05-04
+Last updated: 2026-05-06
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -23,10 +23,14 @@ and `HISTORY_INDEX.md`.
 
 ## Stable Decisions
 
-- SEAM is proprietary source-available software. Public repository visibility
-  does not grant open-source rights; commercial, hosted, embedded, derivative,
-  redistribution, or closed-source use is available only with separate written
-  permission through a commercial license.
+- This GitHub repo is the private source-of-truth home for SEAM runtime,
+  tooling, docs, tests, and repo-owned fixtures. A separate repo will hold
+  user-file surfaces or user-facing file sets when that workflow is created.
+- SEAM is proprietary source-available software if any repo or artifact is
+  later made public. Public repository visibility does not grant open-source
+  rights; commercial, hosted, embedded, derivative, redistribution, or
+  closed-source use is available only with separate written permission through
+  a commercial license.
   The controlling files are `LICENSE` and `NOTICE`; `COMMERCIAL_LICENSE.md`
   is the plain-language commercial-use boundary.
 - SEAM accepts contributions only under a contributor grant that lets the
@@ -69,6 +73,10 @@ and `HISTORY_INDEX.md`.
 - Future compression interpreters and codecs must optimize intelligence per token while preserving exact detail access through MIRL or a successor SEAM machine language.
 - SEAM-HS/1 may carry MIRL, RC/1, LX/1, or raw bytes in lossless PNG pixels. MIRL and RC/1 payloads are directly queryable from the surface; LX/1 payloads are verify/decode only until converted into a readable payload.
 - The planned surface library stores `.seam.png` artifacts as addressable visual memory surfaces with SQLite metadata, hashes, verification state, and lookup fields. Queries should read embedded MIRL/RC payloads directly from the lossless image bytes in memory; PACK remains derived prompt-time context and must not become the raw image store.
+- The private runtime repo stores source and metadata code for surface-library
+  adapters, not generated operator/user `.seam.png` artifacts by default.
+  Generated surface files stay operator-controlled unless explicitly promoted
+  as repo-owned fixtures or documentation assets.
 
 ## Handoff Policy
 
@@ -140,8 +148,8 @@ and `HISTORY_INDEX.md`.
 ## Benchmark Publication Policy
 
 Holographic Surface claims must report `surface_exact_rate`, payload hash match
-rate, direct query exactness, and the PNG mode (`bw1`, `rgb24`, or explicit
-`rgba32`).
+rate, direct query exactness, and the PNG mode (`bw1`, `rgb`/`rgb24`,
+explicit `rgba32`, or explicit `rgba64`).
 
 Published benchmark statements must include:
 

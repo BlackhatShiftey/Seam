@@ -37,8 +37,9 @@ artifact directly.
 Supported v1 modes:
 
 - `bw1`: proof mode using black/white pixels as bits
-- `rgb24`: density mode using RGB channel bytes directly
+- `rgb24` / `rgb`: density mode using RGB channel bytes directly
 - `rgba32`: explicit high-density mode using RGBA channel bytes directly
+- `rgba64`: explicit 16-bit RGBA mode using 8 exact channel bytes per pixel
 
 Direct-read behavior:
 
@@ -51,30 +52,56 @@ Direct-read behavior:
 SQLite remains the canonical long-term store. Holographic surfaces are portable,
 immutable, directly readable snapshots and transport artifacts.
 
+The surface library adapter stores verified surface metadata in SQLite without
+copying PNG bytes into the database. By default, `surface store`, `compile
+--store`, and `encode --store` also create a redundant hash-named PNG copy under
+`.seam/surfaces/` or `SEAM_SURFACE_DIR`, so stored-ID query still works if the
+original output path is moved. Stored entries receive stable `hs:<hash>` IDs,
+keep artifact paths, source refs, payload/surface hashes, PNG mode,
+verification state, queryability, and import state. Direct-read commands can use
+either a file path or a stored surface ID.
+
 ## Commands
 
 ```powershell
 seam surface compile input.txt --output memory.seam.png --mode rgb24
+seam surface compile input.txt --output memory.seam.png --mode rgb
 seam surface encode input.seamrc --output memory.seam.png --mode rgb24
 seam surface encode input.seamrc --output memory.seam.png --mode rgba32
+seam surface encode input.seamrc --output memory.seam.png --mode rgba64
 seam surface decode memory.seam.png --output restored.seamrc
 seam surface verify memory.seam.png
 seam surface query memory.seam.png "behavior"
 seam surface search memory.seam.png "stable compression"
 seam surface context memory.seam.png --query "agent behavior" --budget 1200
 seam surface import memory.seam.png --db seam.db
+seam surface store memory.seam.png --db seam.db
+seam surface list --db seam.db
+seam surface show hs:<surface-id> --db seam.db
+seam surface query hs:<surface-id> "behavior" --db seam.db
 ```
 
 `surface query`, `surface search`, and `surface context` read the embedded
 machine-language payload from the image in memory. They do not require database
 import first.
 
+`surface store` records an existing verified surface in the SQLite surface
+library. `surface compile --store` and `surface encode --store` write the PNG
+and store its metadata in one step. The default redundant file adapter copies
+the PNG into `.seam/surfaces/<surface-sha>.seam.png`; use `--artifact-dir` to
+choose a different private surface library root or `--no-copy` only when the
+given path is already durable. Stored entries point to operator-controlled
+artifact paths; generated `.seam.png` user artifacts are not committed to the
+runtime repo unless they are deliberate fixtures or documentation assets.
+
 `surface compile` is the automatic source-to-surface path: source text is
 compiled into MIRL, then the MIRL bytes are encoded into `SEAM-HS/1`. `rgb24`
 is the default because it survives ordinary PNG tooling more predictably.
 `rgba32` stores 4 bytes per pixel instead of 3, increasing raw channel density
 by about 33%, but it must stay explicit because alpha channels are more likely
-to be rewritten or stripped by image editors and optimization tools.
+to be rewritten or stripped by image editors and optimization tools. `rgba64`
+stores 8 bytes per pixel as a 16-bit-per-channel RGBA PNG and should be used
+only when that density is worth the higher tooling-compatibility risk.
 
 ## Benchmark Gate
 

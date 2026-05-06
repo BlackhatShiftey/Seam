@@ -654,6 +654,43 @@ claim c2:
             if surface_path.exists():
                 surface_path.unlink()
 
+    def test_holographic_surface_rgba64_roundtrips_and_queries_directly(self) -> None:
+        text = (
+            'Surface density: "RGBA64 stores eight exact channel bytes per pixel." '
+            "SEAM uses RGBA64 only when 16-bit channel density is explicitly requested."
+        )
+        artifact = compress_text_readable(text, source_ref="unit://surface-rgba64", tokenizer="char4_approx")
+        surface_path = Path(f"surface_rgba64_{uuid4().hex}.seam.png")
+        try:
+            surface = encode_surface(artifact.machine_text.encode("utf-8"), surface_path, mode="rgba64", payload_format="SEAM-RC/1")
+            self.assertEqual(surface.mode, "rgba64")
+            self.assertEqual(surface.capacity_bytes, surface.width * surface.height * 8)
+            decoded = decode_surface(surface_path)
+            self.assertEqual(decoded.mode, "rgba64")
+            self.assertEqual(decoded.payload, artifact.machine_text.encode("utf-8"))
+            self.assertTrue(verify_surface(surface_path).ok)
+
+            result = query_surface(surface_path, '"RGBA64 stores eight exact channel bytes per pixel."')
+            self.assertTrue(result.hits)
+            self.assertEqual(result.hits[0]["record_type"], "QUOTE")
+        finally:
+            if surface_path.exists():
+                surface_path.unlink()
+
+    def test_holographic_surface_rgb_alias_uses_rgb24_adapter(self) -> None:
+        text = 'Surface alias: "rgb selects the RGB24 adapter."'
+        artifact = compress_text_readable(text, source_ref="unit://surface-rgb-alias", tokenizer="char4_approx")
+        surface_path = Path(f"surface_rgb_alias_{uuid4().hex}.seam.png")
+        try:
+            surface = encode_surface(artifact.machine_text.encode("utf-8"), surface_path, mode="rgb", payload_format="SEAM-RC/1")
+            self.assertEqual(surface.mode, "rgb24")
+            decoded = decode_surface(surface_path)
+            self.assertEqual(decoded.mode, "rgb24")
+            self.assertEqual(decoded.payload, artifact.machine_text.encode("utf-8"))
+        finally:
+            if surface_path.exists():
+                surface_path.unlink()
+
     def test_holographic_surface_mirl_bw1_searches_without_database_import(self) -> None:
         surface_path = Path(f"surface_mirl_{uuid4().hex}.seam.png")
         try:
@@ -704,6 +741,75 @@ claim c1:
             for path in (source_path, surface_path, decoded_path):
                 if path.exists():
                     path.unlink()
+
+    def test_cli_surface_store_list_show_and_query_by_library_id(self) -> None:
+        source_path = Path(f"surface_library_source_{uuid4().hex}.seamrc")
+        surface_path = Path(f"surface_library_{uuid4().hex}.seam.png")
+        artifact_dir = TEST_ARTIFACT_DIR / f"surfaces_{uuid4().hex}"
+        try:
+            text = 'Library note: "stored surfaces stay directly queryable by id."'
+            artifact = compress_text_readable(text, source_ref="unit://surface-library", tokenizer="char4_approx")
+            source_path.write_text(artifact.machine_text, encoding="utf-8")
+
+            encode_stream = StringIO()
+            with redirect_stdout(encode_stream):
+                run_cli([
+                    "--db",
+                    str(self.db_path),
+                    "surface",
+                    "encode",
+                    str(source_path),
+                    "--output",
+                    str(surface_path),
+                    "--store",
+                    "--artifact-dir",
+                    str(artifact_dir),
+                    "--format",
+                    "json",
+                ])
+            payload = json.loads(encode_stream.getvalue())
+            library = payload["library"]
+            surface_id = library["surface_id"]
+            self.assertTrue(surface_id.startswith("hs:"))
+            self.assertEqual(library["verification_status"], "PASS")
+            self.assertEqual(library["query_status"], "direct_queryable")
+
+            list_stream = StringIO()
+            with redirect_stdout(list_stream):
+                run_cli(["--db", str(self.db_path), "surface", "list", "--format", "json"])
+            listed = json.loads(list_stream.getvalue())["surfaces"]
+            self.assertEqual([row["surface_id"] for row in listed], [surface_id])
+
+            show_stream = StringIO()
+            with redirect_stdout(show_stream):
+                run_cli(["--db", str(self.db_path), "surface", "show", surface_id, "--format", "json"])
+            shown = json.loads(show_stream.getvalue())
+            self.assertNotEqual(shown["artifact_path"], str(surface_path.resolve()))
+            self.assertTrue(Path(shown["artifact_path"]).exists())
+
+            surface_path.unlink()
+
+            query_stream = StringIO()
+            with redirect_stdout(query_stream):
+                run_cli([
+                    "--db",
+                    str(self.db_path),
+                    "surface",
+                    "query",
+                    surface_id,
+                    '"stored surfaces stay directly queryable by id."',
+                ])
+            self.assertIn("Holographic surface query", query_stream.getvalue())
+            self.assertIn("stored surfaces stay directly queryable by id", query_stream.getvalue())
+        finally:
+            for path in (source_path, surface_path):
+                if path.exists():
+                    path.unlink()
+            if artifact_dir.exists():
+                for child in artifact_dir.glob("*"):
+                    if child.is_file():
+                        child.unlink()
+                artifact_dir.rmdir()
 
     def test_cli_surface_compile_builds_mirl_surface_without_import(self) -> None:
         source_path = Path(f"surface_compile_source_{uuid4().hex}.txt")

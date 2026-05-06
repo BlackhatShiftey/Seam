@@ -8,6 +8,7 @@ surfaces.
 ```powershell
 python seam.py surface compile input.txt --output input.seam.png --mode rgb24
 python seam.py surface verify input.seam.png
+python seam.py --db seam.db surface compile input.txt --output input.seam.png --mode rgb24 --store
 ```
 
 This is the automatic flow: source text is compiled into MIRL, then MIRL is
@@ -20,6 +21,7 @@ unless `--persist` is supplied.
 python seam.py readable-compress input.txt --output input.seamrc
 python seam.py surface encode input.seamrc --output input.seam.png --mode rgb24
 python seam.py surface verify input.seam.png
+python seam.py --db seam.db surface encode input.seamrc --output input.seam.png --mode rgb24 --store
 ```
 
 Expected result: verification reports `PASS` and shows `payload_format:
@@ -31,10 +33,23 @@ SEAM-RC/1`.
 python seam.py surface query input.seam.png "exact phrase or topic"
 python seam.py surface search input.seam.png "stable compression"
 python seam.py surface context input.seam.png --query "agent behavior" --budget 1200
+python seam.py --db seam.db surface query hs:<surface-id> "exact phrase or topic"
 ```
 
 These commands read embedded MIRL or `SEAM-RC/1` from PNG pixel data in memory.
 They do not use OCR, natural-language recompilation, or SQLite import.
+
+## Store And Inspect A Surface Library Entry
+
+```powershell
+python seam.py --db seam.db surface store input.seam.png
+python seam.py --db seam.db surface list
+python seam.py --db seam.db surface show hs:<surface-id>
+```
+
+The library stores metadata and hashes only. PNG artifacts remain
+operator-controlled files at their recorded paths; keep generated user artifacts
+out of the runtime repo unless they are deliberate fixtures or docs assets.
 
 ## Decode For Audit
 
@@ -59,8 +74,11 @@ artifact metadata so the original surface contract remains auditable.
 - Use PNG for v1 exact surfaces.
 - Do not use JPEG or other lossy formats for exact SEAM memory.
 - Prefer `rgb24` for default density and `bw1` for proof/debug fixtures.
+- `rgb` is accepted as an alias for the canonical `rgb24` adapter.
 - Use `rgba32` only when the extra channel density is worth the operational
   risk; it stores 4 bytes per pixel but alpha channels are often modified by
   image tooling.
+- Use `rgba64` only when 16-bit RGBA density is required; it stores 8 bytes per
+  pixel and has the highest risk of image tooling rewriting channel data.
 - Treat the surface as a queryable snapshot, not as the replacement for SQLite
   canonical storage.

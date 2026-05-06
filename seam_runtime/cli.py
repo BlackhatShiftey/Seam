@@ -39,6 +39,7 @@ from .holographic import (
     context_surface,
     decode_surface,
     encode_surface,
+    inspect_surface,
     query_surface,
     verify_surface,
 )
@@ -46,6 +47,7 @@ from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_repor
 from .agent_memory import render_memory_index, render_memory_records
 from .mirl import IRBatch
 from .runtime import SeamRuntime
+from .surface_adapters import SurfaceFileAdapter
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -105,6 +107,9 @@ def build_parser() -> argparse.ArgumentParser:
     surface_compile_parser.add_argument("--ns", default="local.default")
     surface_compile_parser.add_argument("--scope", default="thread")
     surface_compile_parser.add_argument("--persist", action="store_true", help="Also persist compiled MIRL records into SQLite")
+    surface_compile_parser.add_argument("--store", action="store_true", help="Record the generated surface in the SQLite surface library")
+    surface_compile_parser.add_argument("--artifact-dir", help="Directory for redundant stored surface copies")
+    surface_compile_parser.add_argument("--no-copy", action="store_true", help="Store metadata against the output path without creating a redundant copy")
     surface_compile_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
     surface_encode_parser = surface_subparsers.add_parser("encode", help="Write MIRL/RC/LX bytes into a lossless PNG surface")
     surface_encode_parser.add_argument("source")
@@ -112,6 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
     surface_encode_parser.add_argument("--mode", choices=SURFACE_MODES, default="rgb24")
     surface_encode_parser.add_argument("--payload-format", choices=SURFACE_PAYLOAD_FORMATS, default="auto")
     surface_encode_parser.add_argument("--source-ref")
+    surface_encode_parser.add_argument("--store", action="store_true", help="Record the generated surface in the SQLite surface library")
+    surface_encode_parser.add_argument("--artifact-dir", help="Directory for redundant stored surface copies")
+    surface_encode_parser.add_argument("--no-copy", action="store_true", help="Store metadata against the output path without creating a redundant copy")
     surface_encode_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
     surface_decode_parser = surface_subparsers.add_parser("decode", help="Restore the exact payload bytes from a SEAM-HS/1 PNG surface")
     surface_decode_parser.add_argument("source")
@@ -138,6 +146,19 @@ def build_parser() -> argparse.ArgumentParser:
     surface_import_parser = surface_subparsers.add_parser("import", help="Persist embedded MIRL or machine artifact metadata into SQLite")
     surface_import_parser.add_argument("source")
     surface_import_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_store_parser = surface_subparsers.add_parser("store", help="Record an existing SEAM-HS/1 surface in the SQLite surface library")
+    surface_store_parser.add_argument("source")
+    surface_store_parser.add_argument("--source-ref")
+    surface_store_parser.add_argument("--source-sha256")
+    surface_store_parser.add_argument("--artifact-dir", help="Directory for redundant stored surface copies")
+    surface_store_parser.add_argument("--no-copy", action="store_true", help="Store metadata against the source path without creating a redundant copy")
+    surface_store_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_list_parser = surface_subparsers.add_parser("list", help="List stored SEAM-HS/1 surface library entries")
+    surface_list_parser.add_argument("--limit", type=int, default=20)
+    surface_list_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    surface_show_parser = surface_subparsers.add_parser("show", help="Show one stored SEAM-HS/1 surface library entry")
+    surface_show_parser.add_argument("surface_ref")
+    surface_show_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
     lossless_decompress_parser = subparsers.add_parser("lossless-decompress", aliases=["decompress-doc"], help="Restore a SEAM lossless document back to exact text")
     lossless_decompress_parser.add_argument("source")
@@ -395,20 +416,34 @@ def run_cli(argv: list[str] | None = None) -> None:
     if args.command == "surface":
         if args.surface_command == "encode":
             payload = Path(args.source).read_bytes() if args.source != "-" else sys.stdin.buffer.read()
+            source_ref = args.source_ref or args.source
             artifact = encode_surface(
                 payload,
                 output_path=Path(args.output),
                 mode=args.mode,
                 payload_format=args.payload_format,
-                source_ref=args.source_ref or args.source,
+                source_ref=source_ref,
             )
+            output_payload = artifact.to_dict()
+            if args.store:
+                runtime = SeamRuntime(args.db)
+                output_payload["library"] = _store_surface_library_entry(
+                    runtime,
+                    output_payload,
+                    source_ref=source_ref,
+                    source_sha256=_sha256_file(args.source),
+                    stored_by="surface encode",
+                    artifact_dir=args.artifact_dir,
+                    copy_artifact=not args.no_copy,
+                )
             if args.format == "json":
-                print(json.dumps(artifact.to_dict(), indent=2))
+                print(json.dumps(output_payload, indent=2))
                 return
-            _print_text(_render_surface_artifact_pretty(artifact.to_dict()))
+            _print_text(_render_surface_artifact_pretty(output_payload))
             return
         if args.surface_command == "decode":
-            payload = decode_surface(Path(args.source))
+            runtime = SeamRuntime(args.db) if not Path(args.source).exists() else None
+            payload = decode_surface(_resolve_surface_path(args.source, runtime))
             if args.output:
                 Path(args.output).write_bytes(payload.payload)
                 print(args.output)
@@ -424,25 +459,61 @@ def run_cli(argv: list[str] | None = None) -> None:
                 buffer.write(b"\n")
             return
         if args.surface_command == "verify":
-            result = verify_surface(Path(args.source)).to_dict()
+            runtime = SeamRuntime(args.db) if not Path(args.source).exists() else None
+            result = verify_surface(_resolve_surface_path(args.source, runtime)).to_dict()
             if args.format == "json":
                 print(json.dumps(result, indent=2))
                 return
             _print_text(_render_surface_verify_pretty(result))
             return
         if args.surface_command in {"query", "search"}:
-            result = query_surface(Path(args.source), args.query, limit=args.limit).to_dict()
+            runtime = SeamRuntime(args.db) if not Path(args.source).exists() else None
+            result = query_surface(_resolve_surface_path(args.source, runtime), args.query, limit=args.limit).to_dict()
             if args.format == "json":
                 print(json.dumps(result, indent=2))
                 return
             _print_text(_render_surface_query_pretty(result))
             return
         if args.surface_command == "context":
-            payload = context_surface(Path(args.source), query=args.query, budget=args.budget)
+            runtime = SeamRuntime(args.db) if not Path(args.source).exists() else None
+            payload = context_surface(_resolve_surface_path(args.source, runtime), query=args.query, budget=args.budget)
             if args.format == "json":
                 print(json.dumps(payload, indent=2))
                 return
             _print_text(_render_surface_context_pretty(payload))
+            return
+        if args.surface_command == "store":
+            runtime = SeamRuntime(args.db)
+            artifact = inspect_surface(Path(args.source))
+            row = _store_surface_library_entry(
+                runtime,
+                artifact,
+                source_ref=args.source_ref or str(artifact.get("source_ref", "")),
+                source_sha256=args.source_sha256,
+                stored_by="surface store",
+                artifact_dir=args.artifact_dir,
+                copy_artifact=not args.no_copy,
+            )
+            if args.format == "json":
+                print(json.dumps(row, indent=2))
+                return
+            _print_text(_render_surface_library_entry_pretty(row))
+            return
+        if args.surface_command == "list":
+            runtime = SeamRuntime(args.db)
+            rows = runtime.store.list_surface_artifacts(limit=args.limit)
+            if args.format == "json":
+                print(json.dumps({"surfaces": rows}, indent=2))
+                return
+            _print_text(_render_surface_library_list_pretty(rows))
+            return
+        if args.surface_command == "show":
+            runtime = SeamRuntime(args.db)
+            row = runtime.store.read_surface_artifact(args.surface_ref)
+            if args.format == "json":
+                print(json.dumps(row, indent=2))
+                return
+            _print_text(_render_surface_library_entry_pretty(row))
             return
     if args.command in {"lossless-decompress", "decompress-doc"}:
         machine_text = _read_text_source(args.source)
@@ -583,6 +654,16 @@ def run_cli(argv: list[str] | None = None) -> None:
             "source_ref": source_ref,
             "stored_ids": [],
         }
+        if args.store:
+            report["library"] = _store_surface_library_entry(
+                runtime,
+                artifact.to_dict(),
+                source_ref=source_ref,
+                source_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                stored_by="surface compile",
+                artifact_dir=args.artifact_dir,
+                copy_artifact=not args.no_copy,
+            )
         if args.persist:
             persist_report = runtime.persist_ir(batch).to_dict()
             report["stored_ids"] = persist_report.get("stored_ids", [])
@@ -593,7 +674,8 @@ def run_cli(argv: list[str] | None = None) -> None:
         _print_text(_render_surface_compile_pretty(report))
         return
     if args.command == "surface" and args.surface_command == "import":
-        payload = decode_surface(Path(args.source))
+        surface_path = _resolve_surface_path(args.source, runtime)
+        payload = decode_surface(surface_path)
         if payload.payload_format == "MIRL":
             report = runtime.persist_ir(IRBatch.from_text(payload.text)).to_dict()
             report["surface"] = payload.to_dict()
@@ -606,6 +688,10 @@ def run_cli(argv: list[str] | None = None) -> None:
                 metadata={"family": "surface", "payload_format": payload.payload_format},
             )
             report = {"artifact_id": artifact_id, "surface": payload.to_dict()}
+        try:
+            report["library"] = runtime.store.update_surface_import_status(args.source, "imported")
+        except KeyError:
+            pass
         if args.format == "json":
             print(json.dumps(report, indent=2))
             return
@@ -864,6 +950,56 @@ def _read_text_source(source: str) -> str:
     return Path(source).read_bytes().decode("utf-8")
 
 
+def _sha256_file(source: str) -> str | None:
+    if source == "-":
+        return None
+    path = Path(source)
+    if not path.exists() or not path.is_file():
+        return None
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _resolve_surface_path(surface_ref: str, runtime: SeamRuntime | None = None) -> Path:
+    path = Path(surface_ref)
+    if path.exists():
+        return path
+    if runtime is None:
+        runtime = SeamRuntime()
+    return Path(str(runtime.store.read_surface_artifact(surface_ref)["artifact_path"]))
+
+
+def _store_surface_library_entry(
+    runtime: SeamRuntime,
+    artifact: dict[str, object],
+    *,
+    source_ref: str | None,
+    source_sha256: str | None,
+    stored_by: str,
+    artifact_dir: str | None = None,
+    copy_artifact: bool = True,
+    import_status: str = "not_imported",
+) -> dict[str, object]:
+    artifact_payload = dict(artifact)
+    metadata: dict[str, object] = {"stored_by": stored_by}
+    if copy_artifact:
+        redundant = SurfaceFileAdapter(artifact_dir).store_copy(
+            str(artifact_payload["path"]),
+            str(artifact_payload.get("surface_sha256") or ""),
+        )
+        metadata["redundant_copy"] = redundant.to_dict()
+        artifact_payload["original_path"] = artifact_payload.get("path")
+        artifact_payload["path"] = redundant.artifact_path
+        artifact_payload["surface_sha256"] = redundant.surface_sha256
+    return runtime.store.write_surface_artifact(
+        artifact_payload,
+        source_ref=source_ref,
+        source_sha256=source_sha256,
+        verification_status="PASS",
+        import_status=import_status,
+        metadata=metadata,
+    )
+
+
 def _write_text_output(target: str, text: str) -> None:
     if target == "-":
         _print_text(text)
@@ -930,16 +1066,18 @@ def _render_readable_query_pretty(payload: dict[str, object]) -> str:
 
 
 def _render_surface_artifact_pretty(payload: dict[str, object]) -> str:
-    return "\n".join(
-        [
-            "Holographic surface written",
-            f"Path: {payload.get('path')}",
-            f"Mode: {payload.get('mode')}",
-            f"Payload: {payload.get('payload_format')} {payload.get('payload_bytes')} bytes",
-            f"SHA256: {payload.get('payload_sha256')}",
-            f"Surface: {payload.get('width')}x{payload.get('height')} {payload.get('surface_bytes')} bytes",
-        ]
-    )
+    lines = [
+        "Holographic surface written",
+        f"Path: {payload.get('path')}",
+        f"Mode: {payload.get('mode')}",
+        f"Payload: {payload.get('payload_format')} {payload.get('payload_bytes')} bytes",
+        f"SHA256: {payload.get('payload_sha256')}",
+        f"Surface: {payload.get('width')}x{payload.get('height')} {payload.get('surface_bytes')} bytes",
+    ]
+    library = payload.get("library")
+    if isinstance(library, dict):
+        lines.append(f"Library id: {library.get('surface_id')}")
+    return "\n".join(lines)
 
 
 def _render_surface_compile_pretty(payload: dict[str, object]) -> str:
@@ -956,6 +1094,9 @@ def _render_surface_compile_pretty(payload: dict[str, object]) -> str:
         f"SHA256: {surface_payload.get('payload_sha256')}",
         f"Stored ids: {', '.join(str(item) for item in stored_ids) if stored_ids else '(not persisted)'}",
     ]
+    library = payload.get("library")
+    if isinstance(library, dict):
+        lines.append(f"Library id: {library.get('surface_id')}")
     return "\n".join(lines)
 
 
@@ -1021,6 +1162,40 @@ def _render_surface_import_pretty(payload: dict[str, object]) -> str:
         lines.append(f"Stored ids: {', '.join(str(item) for item in payload.get('stored_ids', []))}")
     if "artifact_id" in payload:
         lines.append(f"Artifact id: {payload.get('artifact_id')}")
+    library = payload.get("library")
+    if isinstance(library, dict):
+        lines.append(f"Library id: {library.get('surface_id')}")
+        lines.append(f"Import status: {library.get('import_status')}")
+    return "\n".join(lines)
+
+
+def _render_surface_library_entry_pretty(payload: dict[str, object]) -> str:
+    return "\n".join(
+        [
+            "Holographic surface library entry",
+            f"ID: {payload.get('surface_id')}",
+            f"Path: {payload.get('artifact_path')}",
+            f"Mode: {payload.get('mode')}",
+            f"Payload: {payload.get('payload_format')} {payload.get('payload_bytes')} bytes",
+            f"Payload SHA256: {payload.get('payload_sha256')}",
+            f"Surface SHA256: {payload.get('surface_sha256')}",
+            f"Verification: {payload.get('verification_status')}",
+            f"Query: {payload.get('query_status')}",
+            f"Import: {payload.get('import_status')}",
+            f"Source: {payload.get('source_ref') or '(none)'}",
+        ]
+    )
+
+
+def _render_surface_library_list_pretty(rows: list[dict[str, object]]) -> str:
+    if not rows:
+        return "No stored holographic surfaces."
+    lines = ["Holographic surface library"]
+    for row in rows:
+        lines.append(
+            f"- {row.get('surface_id')} {row.get('payload_format')} {row.get('mode')} "
+            f"{row.get('verification_status')} {row.get('query_status')} {row.get('artifact_path')}"
+        )
     return "\n".join(lines)
 
 

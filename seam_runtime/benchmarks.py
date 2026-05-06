@@ -1365,6 +1365,19 @@ claim c2:
                 "explicitly requested",
             ],
         },
+        {
+            "name": "hs1_rc1_direct_query_rgba64",
+            "payload_kind": "readable",
+            "mode": "rgba64",
+            "text": (
+                'Surface density note: "RGBA64 stores eight exact channel bytes per pixel." '
+                "SEAM uses RGBA64 only when 16-bit channel density is explicitly requested."
+            ),
+            "queries": [
+                '"RGBA64 stores eight exact channel bytes per pixel."',
+                "16-bit channel density",
+            ],
+        },
     ]
 
 

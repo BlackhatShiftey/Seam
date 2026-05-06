@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 125
-total_tokens: ~14829
-latest_id: 125
+total_entries: 127
+total_tokens: ~15235
+latest_id: 127
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,8 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 127 | 2026-05-06 | done | 80771ff871bfdc7f | compress,mirl,codec,command,+ | 126 |
+| 126 | 2026-05-06 | done | cf26f8370d21a2e1 | compress,mirl,codec,command,+ | 125 |
 | 125 | 2026-05-04 | done | 661239113b1a7939 | verify,history,snapshot,windows,+ | 124 |
 | 124 | 2026-05-04 | done | 8261bcfb5fb29028 | verify,history,snapshot,ledger,+ | 123 |
 | 123 | 2026-05-02 | done | e4b57958392ef4f1 | verify,windows,history,snapshot | 122 |
@@ -142,15 +144,15 @@ compact: true
 - alias: count=2 latest=#033, #002
 - animation: count=4 latest=#068, #052, #032, #028
 - audit: count=3 latest=#125, #124, #086
-- benchmark: count=28 latest=#116, #113, #112, #110, #096
+- benchmark: count=29 latest=#127, #116, #113, #112, #110
 - bundle: count=2 latest=#015, #008
 - chat: count=13 latest=#074, #073, #072, #071, #069
 - chroma: count=2 latest=#017, #001
 - classification: count=2 latest=#087, #086
-- codec: count=6 latest=#113, #112, #110, #088, #018
-- command: count=41 latest=#114, #113, #112, #111, #110
+- codec: count=8 latest=#127, #126, #113, #112, #110
+- command: count=43 latest=#127, #126, #114, #113, #112
 - compile: count=12 latest=#047, #046, #043, #042, #041
-- compress: count=17 latest=#122, #114, #113, #112, #111
+- compress: count=19 latest=#127, #126, #122, #114, #113
 - dashboard: count=51 latest=#121, #120, #119, #118, #115
 - diff: count=3 latest=#093, #092, #037
 - docker: count=2 latest=#085, #084
@@ -161,16 +163,16 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
 - handoff: count=2 latest=#075, #025
-- history: count=79 latest=#125, #124, #123, #122, #121
+- history: count=81 latest=#127, #126, #125, #124, #123
 - holdout: count=3 latest=#093, #092, #036
 - installer: count=9 latest=#100, #099, #063, #035, #021
 - integrity: count=4 latest=#103, #102, #101, #048
-- ledger: count=20 latest=#124, #122, #121, #117, #116
+- ledger: count=22 latest=#127, #126, #124, #122, #121
 - lexical: count=1 latest=#004
 - linux: count=2 latest=#021, #014
 - lx1: count=4 latest=#088, #018, #011, #006
 - mcp: count=2 latest=#099, #064
-- mirl: count=13 latest=#122, #113, #112, #110, #090
+- mirl: count=15 latest=#127, #126, #122, #113, #112
 - multi-agent: count=4 latest=#079, #064, #048, #009
 - naming: count=4 latest=#033, #024, #009, #002
 - persist: count=18 latest=#047, #044, #042, #036, #032
@@ -187,17 +189,17 @@ compact: true
 - search: count=11 latest=#088, #077, #047, #046, #041
 - security: count=1 latest=#100
 - session: count=3 latest=#027, #025, #019
-- snapshot: count=76 latest=#125, #124, #123, #122, #121
-- status: count=33 latest=#122, #120, #114, #113, #112
+- snapshot: count=78 latest=#127, #126, #125, #124, #123
+- status: count=35 latest=#127, #126, #122, #120, #114
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=24 latest=#121, #120, #119, #118, #115
 - vector: count=18 latest=#099, #066, #044, #038, #034
-- verify: count=69 latest=#125, #124, #123, #122, #121
+- verify: count=71 latest=#127, #126, #125, #124, #123
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 105
+- done: 107
 - planned: 20

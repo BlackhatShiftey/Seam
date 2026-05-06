@@ -2454,3 +2454,31 @@ tokens: 139
 ---
 Fixed the CI path fallout from moving the primary regression suite to test_seam_all/test_seam.py. The pushed commit 1eb8f62 triggered GitHub Actions run 25307387290, which failed in the Run tests step because .github/workflows/ci.yml still referenced the retired Test-Seam-All/test_seam.py path and collected 0 tests. Updated the CI workflow to run python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py, and updated active setup/code-layout docs to the same path. Active-doc/workflow scan found no remaining Test-Seam-All test path references; historical HISTORY.md entries were left append-only. Verification: py_compile for test_seam_all/test_seam.py and tools/history/test_history_tools.py passed; python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q passed with 160 tests; git diff --check passed with CRLF warnings only; candidate-file secret scan found no matches.
 ---END-ENTRY-#125---
+
+---BEGIN-ENTRY-#126---
+id: 126
+date: 2026-05-06T06:40:36Z
+agent: codex
+status: done
+topics: compress, mirl, codec, command, verify, history, snapshot, ledger, status
+commits: pending
+refs: seam_runtime/holographic.py,seam_runtime/storage.py,seam_runtime/cli.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,ROADMAP.md,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 125
+tokens: 184
+---
+Added the first HS/1 surface-library adapter slice on branch codex/hs1-surface-adapters. The runtime now inspects SEAM-HS/1 PNG surfaces into metadata, persists surface_artifacts rows in SQLite with stable hs:<surface-hash> IDs, payload/surface hashes, source refs, verification/query/import status, and surface counts in stats. CLI support now includes surface store, surface list, surface show, compile --store, encode --store, and stored-ID resolution for decode, verify, query, search, context, and import. Updated Holographic Surface docs/SOP, ROADMAP, PROJECT_STATUS, and REPO_LEDGER to reflect private-runtime repo boundaries: GitHub remains the source-of-truth home for repo files, but generated operator/user .seam.png artifacts stay out of this runtime repo unless deliberately promoted as fixtures or docs assets; future user-file sets belong in a separate repo. Verification: python -m py_compile seam_runtime\holographic.py seam_runtime\storage.py seam_runtime\cli.py test_seam_all\test_seam.py passed; python -m pytest test_seam_all\test_seam.py -q -k surface passed with 11 tests; python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q passed with 161 tests.
+---END-ENTRY-#126---
+
+---BEGIN-ENTRY-#127---
+id: 127
+date: 2026-05-06T08:00:47Z
+agent: codex
+status: done
+topics: compress, mirl, codec, command, benchmark, verify, history, snapshot, ledger, status
+commits: pending
+refs: .gitignore,seam_runtime/holographic.py,seam_runtime/surface_adapters.py,seam_runtime/benchmarks.py,seam_runtime/storage.py,seam_runtime/cli.py,seam_runtime/dashboard.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFACE.md,docs/SOP_HOLOGRAPHIC_SURFACE.md,docs/MIRL_V1.md,ROADMAP.md,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 126
+tokens: 222
+---
+Completed the HS/1 adapter redundancy and pixel-mode coverage follow-up on codex/hs1-surface-adapters. Added a SurfaceFileAdapter that creates hash-named redundant PNG copies under .seam/surfaces/ or SEAM_SURFACE_DIR by default, with --artifact-dir and --no-copy controls for surface store, compile --store, and encode --store. SQLite surface_artifacts rows now point at the durable redundant copy unless no-copy is explicitly requested, so stored-ID query/verify/decode/context can survive deletion or movement of the original output path. Extended the pixel mode adapters from bw1/rgb24/rgba32 to include rgb as a canonical rgb24 alias and rgba64 as a 16-bit-per-channel RGBA adapter storing 8 exact channel bytes per pixel. Updated the PNG writer/reader to emit/read 16-bit RGBA surfaces, added unit coverage for rgba64 and rgb alias behavior, added rgba64 to the public surface benchmark family, and updated dashboard validation plus docs/status/ledger/roadmap text. Verification: py_compile for changed runtime/test modules passed; focused surface pytest passed 13 tests; python seam.py benchmark run surface --format json passed with 4/4 cases, surface_exact_rate 1.0, payload_hash_match_rate 1.0, and direct_query_exactness_rate 1.0; full python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q passed with 163 tests.
+---END-ENTRY-#127---
