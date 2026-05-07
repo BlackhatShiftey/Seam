@@ -21,7 +21,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#135` with a fresh `.seam/snapshots/` file written after this status refresh.
+- Latest continuity handoff is `HISTORY#136`. Snapshot JSON files are local derived artifacts, so a fresh Linux clone should regenerate the resume snapshot with the command in `docs/setup.md` before running continuity verification.
 - A fresh Linux clone should run the repo-local setup in `docs/setup.md`, then verify `python -m tools.history.verify_integrity`, `python -m tools.history.verify_routing`, and `python -m tools.history.verify_continuity` before starting new work.
 - Next work should continue from the functional visual-memory loop and Agent Compiler roadmap, not from the already-merged HS/1 adapter/repair/benchmark branches.
 

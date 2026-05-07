@@ -71,6 +71,7 @@ git rev-parse HEAD
 git rev-parse origin/main
 ./.venv/bin/python -m tools.history.verify_integrity
 ./.venv/bin/python -m tools.history.verify_routing
+./.venv/bin/python -m tools.history.write_snapshot --agent codex --entries 136,135,134 --token-budget 1800
 ./.venv/bin/python -m tools.history.verify_continuity
 ./.venv/bin/python -m tools.history.build_context_pack --latest 5 --token-budget 1800
 ```
@@ -80,8 +81,10 @@ Healthy resume state:
 - `main...origin/main` has no ahead/behind marker.
 - `HEAD` and `origin/main` print the same SHA.
 - Integrity, routing, and continuity all report `OK`.
-- The latest context pack includes the newest `HISTORY.md` entry and points to
-  the current `.seam/snapshots/` handoff.
+- `write_snapshot` creates a local `.seam/snapshots/` handoff for the latest
+  tracked history entries. Snapshot JSON files are intentionally ignored, so
+  this step is required on a fresh clone.
+- The latest context pack includes the newest `HISTORY.md` entry.
 
 Then read:
 

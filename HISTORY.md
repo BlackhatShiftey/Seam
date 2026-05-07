@@ -2635,3 +2635,58 @@ Verification planned before push:
 - Run integrity, routing, and continuity checks.
 - Confirm clean status after bookkeeping commit.
 ---END-ENTRY-#134---
+
+---BEGIN-ENTRY-#135---
+id: 135
+date: 2026-05-07T05:08:26Z
+agent: codex
+status: done
+topics: status, roadmap, linux, history, snapshot, verify, protocol, handoff
+commits: 9714b81
+refs: PROJECT_STATUS.md,ROADMAP.md,docs/setup.md,README.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 134
+tokens: 193
+---
+Updated the repo handoff for a fresh Linux resume after the origin sync.
+
+Changes:
+- PROJECT_STATUS.md now names the current resume point, removes stale branch-only HS/1 adapter wording, and points next work toward the functional visual-memory loop plus Agent Compiler roadmap.
+- ROADMAP.md now records the HS/1 surface adapter, repair, and stored-surface benchmark work as merged to main instead of in-progress branch work.
+- docs/setup.md now includes a fresh Linux resume checklist: fetch, status, HEAD/origin comparison, integrity, routing, continuity, and latest context-pack commands.
+- README.md links directly to the Linux resume checklist.
+
+Verification:
+- PASS: git diff --check before the docs commit, with expected Windows LF/CRLF warnings only.
+- PASS: candidate-file secret/session-link scan found no real secrets; only documented environment-variable placeholders for OpenRouter chat setup appeared.
+
+Next:
+- On the fresh Linux OS, clone/pull main, run the repo-local Linux setup in docs/setup.md, then run the resume checks before editing.
+---END-ENTRY-#135---
+
+---BEGIN-ENTRY-#136---
+id: 136
+date: 2026-05-07T05:09:41Z
+agent: codex
+status: done
+topics: status, roadmap, linux, history, snapshot, verify, protocol, handoff
+commits: 9714b81
+refs: PROJECT_STATUS.md,docs/setup.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 135
+tokens: 201
+---
+Corrected the fresh Linux resume procedure after confirming `.seam/snapshots/*.json` is intentionally ignored by git.
+
+Changes:
+- PROJECT_STATUS.md now points to HISTORY#136 as the tracked resume handoff and states that snapshot JSON is regenerated locally on a fresh clone.
+- docs/setup.md now runs `tools.history.write_snapshot --entries 136,135,134` before `verify_continuity`, so a clean Linux clone can recreate the local snapshot required by the continuity gate.
+
+Why:
+- HISTORY#135 correctly updated status and setup direction, but the first resume wording implied an ignored `.seam/snapshots/` JSON would arrive through git pull. It will not; `.gitignore` keeps snapshot payloads local. The tracked history/index plus local snapshot regeneration are the portable handoff.
+
+Verification:
+- PASS: confirmed `.gitignore` ignores `.seam/snapshots/*.json` and only tracks `.seam/snapshots/.gitkeep`.
+- PASS: integrity, routing, and continuity passed locally with the regenerated snapshot before this correction.
+
+Next:
+- Fresh Linux should clone/pull main, install locally, run the resume checklist in docs/setup.md, then continue from PROJECT_STATUS.md and the latest context pack.
+---END-ENTRY-#136---
