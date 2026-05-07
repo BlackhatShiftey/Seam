@@ -2690,3 +2690,35 @@ Verification:
 Next:
 - Fresh Linux should clone/pull main, install locally, run the resume checklist in docs/setup.md, then continue from PROJECT_STATUS.md and the latest context pack.
 ---END-ENTRY-#136---
+
+---BEGIN-ENTRY-#137---
+id: 137
+date: 2026-05-07T05:44:52Z
+agent: codex
+status: done
+topics: dashboard, tui, command, chat, roadmap, status, history, snapshot, verify, protocol
+commits: dbeae57
+refs: seam_runtime/cli.py,test_seam_all/test_seam.py,experimental/webui,PROJECT_STATUS.md,ROADMAP.md,docs/CODE_LAYOUT.md,README.md,docs/setup.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 136
+tokens: 280
+---
+Recorded the dashboard and CLI product direction, and landed the first implementation slice.
+
+Changes:
+- Preserved the user's IDE-like dashboard prototype under `experimental/webui/` as the visual target for the future browser REST API GUI.
+- Scrubbed key-looking demo strings into explicit local placeholders and documented that the WebUI prototype is not packaged runtime behavior yet.
+- Updated PROJECT_STATUS.md, ROADMAP.md, docs/CODE_LAYOUT.md, README.md, and docs/setup.md so future agents know the target is an IDE-like web dashboard plus a first-class agent CLI.
+- Added `seam shell` / `seam chat`, an interactive REPL-style memory shell with `/remember`, `/search`, `/context`, `/stats`, `/doctor`, `/help`, and `/exit` commands. Natural text defaults to prompt-ready context retrieval.
+- Added a CI-testable `seam shell --once ...` path and regression coverage.
+
+Verification:
+- PASS: `python -m py_compile seam_runtime\cli.py test_seam_all\test_seam.py`.
+- PASS: `python -m unittest test_seam_all.test_seam.SeamTests.test_cli_shell_once_remembers_searches_and_contextualizes`.
+- PASS: `python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q` with 166 tests.
+- PASS: `git diff --check`, with expected Windows LF/CRLF warnings only.
+- PASS: candidate-file secret/session-link scan found no real secrets.
+
+Next:
+- Promote `seam shell` toward a Gemini/Claude/Codex-style CLI by adding model routing, explicit tool-call confirmation, command history, project context loading, and session persistence.
+- Promote `experimental/webui/` by splitting the prototype into a real web app and wiring it to the existing FastAPI endpoints before packaging it as the browser dashboard.
+---END-ENTRY-#137---
