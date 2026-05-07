@@ -59,6 +59,38 @@ sudo apt-get update
 sudo apt-get install -y python3-venv
 ```
 
+## Resume Current Repo State On Fresh Linux
+
+After cloning and running the Linux repo-local development install above, use
+these checks before making changes:
+
+```bash
+git fetch origin
+git status --branch --short
+git rev-parse HEAD
+git rev-parse origin/main
+./.venv/bin/python -m tools.history.verify_integrity
+./.venv/bin/python -m tools.history.verify_routing
+./.venv/bin/python -m tools.history.verify_continuity
+./.venv/bin/python -m tools.history.build_context_pack --latest 5 --token-budget 1800
+```
+
+Healthy resume state:
+
+- `main...origin/main` has no ahead/behind marker.
+- `HEAD` and `origin/main` print the same SHA.
+- Integrity, routing, and continuity all report `OK`.
+- The latest context pack includes the newest `HISTORY.md` entry and points to
+  the current `.seam/snapshots/` handoff.
+
+Then read:
+
+1. `PROJECT_STATUS.md`
+2. `REPO_LEDGER.md`
+3. `HISTORY_INDEX.md`
+4. `docs/CODE_LAYOUT.md`
+5. `docs/DATA_ROUTING.md` for history, routing, audit, or context-budget work
+
 ## First Memory Flow
 
 ```powershell

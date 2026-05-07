@@ -1,6 +1,6 @@
 # SEAM Improvement Roadmap & SOP Blueprint
 
-**Last updated:** 2026-05-01
+**Last updated:** 2026-05-07
 **Status:** Active planning document. This is the living roadmap for SEAM development beyond the stable v1 core.
 
 ## 2026-05-01 Functional Visual Memory Target
@@ -45,14 +45,10 @@ SOP:
    directly readable MIRL/RC records before any surface packing.
 2. Add a surface library/store command that writes `.seam.png` files under a
    controlled artifact directory and records metadata in SQLite.
-   - 2026-05-06 status: first adapter slice in progress on
-     `codex/hs1-surface-adapters`: `surface store|list|show`,
-     `compile --store`, `encode --store`, stable `hs:<hash>` IDs, and direct
-     path resolution for stored-ID verify/query/search/context/decode/import.
-   - 2026-05-06 follow-up: `codex/hs1-surface-repair` adds
-     `surface repair hs:<id>` to verify stored redundant copies, restore them
-     from the original source path when hash-safe, and mark unrecoverable
-     surfaces unavailable in SQLite.
+   - 2026-05-07 status: landed on `main`. `surface store|list|show|repair`,
+     `compile --store`, `encode --store`, stable `hs:<hash>` IDs, redundant
+     file-backed copies, and stored-ID verify/query/search/context/decode/import
+     are available from the source-of-truth branch.
 3. Add surface lookup commands for list, verify, query, search, context, import,
    and repair/rebuild-from-source when source material is still available.
 4. Keep raw original documents optional and operator-controlled. They are
@@ -60,10 +56,19 @@ SOP:
    query once a verified MIRL/RC surface exists.
 5. Add benchmark fixtures that prove exact answers can be read from the stored
    image surface itself.
-   - 2026-05-06 status: `codex/hs1-stored-surface-benchmark` extends the
-     release-blocking surface family with stored lookup, stored query after
-     original-output deletion, redundant-copy repair, and repaired-copy query
-     rates at 100%.
+   - 2026-05-07 status: landed on `main`. The release-blocking surface family
+     includes stored lookup, stored query after original-output deletion,
+     redundant-copy repair, and repaired-copy query rates at 100%.
+
+Next resume target:
+
+- Continue with the document compiler path for directly readable MIRL/RC records
+  from richer source documents, then keep proving that direct query/context can
+  read from stored HS/1 image surfaces without requiring the original document.
+- Start the Agent Compiler workstream in `docs/roadmap/AGENT_COMPILER.md` when
+  working on Claude/Codex/Gemini/Cursor/Aider operating skills. The goal is not
+  one-off prompt patches; it is generated, benchmarked, auditable agent adapters
+  from canonical SEAM protocol.
 
 ## 2026-04-30 Holographic Surface Integration
 
@@ -607,7 +612,7 @@ without OCR, source-document restoration, or prior SQLite import.
 **What:** Add benchmark cases for the full functional loop:
 document -> machine language -> surface -> stored surface -> direct answer.
 
-**Status:** Implemented 2026-05-06 on `codex/hs1-stored-surface-benchmark`.
+**Status:** Implemented and merged to `main` on 2026-05-06.
 
 **Gate:** `surface_exact_rate`, `payload_hash_match_rate`, stored-surface lookup
 rate, stored-surface query rate after original-output deletion, repair success

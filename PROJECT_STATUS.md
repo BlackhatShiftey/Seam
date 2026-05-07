@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-06
+Last updated: 2026-05-07
 
 ## Current State
 
@@ -11,12 +11,19 @@ SEAM is operating as a local machine-first memory runtime with:
 - Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - lossless SEAM-LX/1 compression with integrity verification
 - SEAM-HS/1 Holographic Surface PNG snapshots with automatic source-to-MIRL surface compile, direct MIRL/RC query, verify, decode, context, and import commands
-- HS/1 surface library adapters in progress on `codex/hs1-surface-adapters`: stored surface metadata, stable `hs:<hash>` IDs, list/show, and direct query/verify/decode/context by stored ID
+- HS/1 surface library adapters landed on `main`: stored surface metadata, stable `hs:<hash>` IDs, list/show/repair, redundant file-backed copies, and direct query/verify/decode/context/import by stored ID
 - benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
 - optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
 - PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
 - Competitive RAG/install polish in progress on `codex/competitive-rag-install-polish`: one-line private install docs, product-first README, document status tracking, progressive memory search/get, `retrieve --mode vector|graph|hybrid|mix`, stdio agent bridge, and vector stale-index reporting
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
+
+## Current Resume Point
+
+- `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
+- Latest continuity handoff is `HISTORY#135` with a fresh `.seam/snapshots/` file written after this status refresh.
+- A fresh Linux clone should run the repo-local setup in `docs/setup.md`, then verify `python -m tools.history.verify_integrity`, `python -m tools.history.verify_routing`, and `python -m tools.history.verify_continuity` before starting new work.
+- Next work should continue from the functional visual-memory loop and Agent Compiler roadmap, not from the already-merged HS/1 adapter/repair/benchmark branches.
 
 ## What Is Stable
 
@@ -47,6 +54,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Keep this private GitHub repo as the source-of-truth home for runtime files while leaving generated/operator user surfaces out of git unless deliberately promoted as fixtures or docs assets; future user-file sets belong in a separate repo
 - Keep roadmap execution tied to history entries and supersedes chains
 - Turn the competitive plan into shippable surfaces: finish README/install polish, graph/vector/mix retrieval hardening, agent bridge docs, and benchmark coverage without breaking existing CLI aliases
+- Build the Agent Compiler workstream from `docs/roadmap/AGENT_COMPILER.md`: compile canonical SEAM protocol into model-specific adapters, benchmark those adapters, and audit installed local skills before applying changes.
 - Continue feature delivery without reintroducing duplicated continuity text
 - Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
 - Roadmap planned items (#028–#047) are open except benchmark holdout suites (#036/C1), benchmark diff tooling (#037/C2), and REST API surface (#046/E3), which are implemented: dashboard animations, benchmark progress bars, sparkline graphs, command terminology audit, BEIR/MTEB benchmarks, Claude tool set, auto-compression pipeline, batch compile, PgVector migration helper, multi-tenant namespacing
@@ -69,6 +77,8 @@ SEAM is operating as a local machine-first memory runtime with:
 When resuming:
 
 1. Read `PROJECT_STATUS.md`.
-2. Read `AGENTS.md`.
+2. Read `REPO_LEDGER.md`.
 3. Read `HISTORY_INDEX.md`.
-4. Pull only required `HISTORY.md` entries by index offsets.
+4. Read `docs/CODE_LAYOUT.md`.
+5. Read `docs/DATA_ROUTING.md` when the task touches history, ledgers, maintenance records, routing, context budget, or auditability.
+6. Pull only required `HISTORY.md` entries by index offsets or with `python -m tools.history.build_context_pack`.

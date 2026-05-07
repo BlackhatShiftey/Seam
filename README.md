@@ -100,6 +100,7 @@ claude-mem comparison, retrieval mode details, and agent bridge notes.
 ## Setup Details
 
 - Command cookbook: [docs/setup.md](docs/setup.md)
+- Fresh Linux resume checks: [docs/setup.md#resume-current-repo-state-on-fresh-linux](docs/setup.md#resume-current-repo-state-on-fresh-linux)
 - Installer reference: [installers/README.md](installers/README.md)
 - Troubleshooting: [docs/errors.md](docs/errors.md)
 - Task runbooks: [docs/howto/README.md](docs/howto/README.md)
