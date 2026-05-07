@@ -2722,3 +2722,104 @@ Next:
 - Promote `seam shell` toward a Gemini/Claude/Codex-style CLI by adding model routing, explicit tool-call confirmation, command history, project context loading, and session persistence.
 - Promote `experimental/webui/` by splitting the prototype into a real web app and wiring it to the existing FastAPI endpoints before packaging it as the browser dashboard.
 ---END-ENTRY-#137---
+
+---BEGIN-ENTRY-#138---
+id: 138
+date: 2026-05-07T06:42:19Z
+agent: claude
+status: done
+topics: mcp, multi-agent, command, doctor, verify, history, snapshot, protocol, benchmark, status
+commits: none
+refs: seam_runtime/mcp.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 137
+tokens: 653
+---
+Expanded the seam mcp serve bridge from 3 to 10 agent-safe tools so AI agents can use SEAM memory, surface library, doctor smoke checks, store stats, document listing, prompt-ready context, and benchmark history without spawning the CLI.
+
+Changes (active runtime only):
+- seam_runtime/mcp.py: added seam_stats, seam_documents, seam_context, seam_doctor, seam_surface_list, seam_surface_show, seam_benchmark_latest as thin wrappers over existing SeamRuntime/SQLiteStore methods. Each tool mirrors an existing CLI command or FastAPI endpoint - no parallel runtime behavior.
+- TOOL_DESCRIPTIONS expanded so the bridge ready line announces all 10 tools.
+- seam_doctor wraps cli._build_doctor_report via a request-time lazy import (cli already lazy-imports the bridge, so no module-level cycle).
+- seam_doctor strips the pgvector.error field before returning to MCP callers because psycopg connection errors can echo DSN-shaped strings; the CLI doctor still surfaces full errors to the human operator at the terminal. The redacted result sets pgvector.error_redacted=true so callers know one field was suppressed.
+- Limits clamped: seam_documents and seam_surface_list cap limit to [1, 200]; seam_benchmark_latest caps to [1, 50]. seam_context defaults match the existing FastAPI /context handler (budget=5, pack_budget=512, lens=rag, mode=context).
+- No new filesystem access surfaces: surface_show only resolves via SQLiteStore.read_surface_artifact, which queries surface_id or registered artifact_path - an agent cannot read arbitrary files through this tool.
+- No env or .env reads added; pgvector DSN remains read by cli._check_pgvector inside the in-memory doctor runtime, never echoed to MCP.
+
+Tests added (test_seam_all/test_seam.py):
+- test_mcp_bridge_exposes_stats_documents_context_and_doctor_tools: ingests a record, then exercises seam_stats, seam_documents, seam_context, and seam_doctor end-to-end. Asserts seam_doctor result has no pgvector.error key (redaction gate). Asserts seam_context with empty query raises ValueError.
+- test_mcp_bridge_surface_list_show_and_benchmark_latest_handle_empty_state: confirms empty-state shapes for seam_surface_list and seam_benchmark_latest, that seam_surface_show raises KeyError on unknown ref, that missing surface_ref raises ValueError, and that an unknown tool name raises ValueError.
+
+Verification:
+- PASS: python -m py_compile seam_runtime/mcp.py test_seam_all/test_seam.py.
+- PASS: focused MCP tests (3/3): test_mcp_bridge_dispatches_memory_tools, test_mcp_bridge_exposes_stats_documents_context_and_doctor_tools, test_mcp_bridge_surface_list_show_and_benchmark_latest_handle_empty_state.
+- PASS: full SeamTests suite, 142/142 (139 prior + 3 new). Existing dashboard/Textual ResourceWarnings unchanged.
+- PASS: seam mcp serve smoke check via empty stdin returns ready line announcing all 10 tools.
+- PASS: seam mcp serve real JSONL round-trip via {seam_stats, seam_doctor} requests; both return type=result and seam_doctor pgvector dict has no error field on a host without SEAM_PGVECTOR_DSN.
+
+Risks:
+- _build_doctor_report is still a private symbol on cli.py. Lazy import works today but a future cli refactor could break it; eventual cleanup is to extract seam_runtime/doctor.py. Documented inline so the next agent can pick it up.
+
+Next MCP tools to consider:
+- seam_surface_query: load a surface PNG by registered hs:<id> and call holographic.query_surface; needs path-from-store-only safety and an explicit confirmation contract before exposing to agents.
+- seam_surface_decode: same constraints as surface_query, but returns decoded MIRL/RC payload.
+- seam_benchmark_run: behind explicit confirm flag; would let an agent trigger a non-holdout benchmark; agent cost/safety policy needed first.
+- seam_index_status: vector index staleness reporting from the orchestrator, useful for agents that need to decide whether to call retrieve --mode mix.
+- Eventually extract _build_doctor_report into seam_runtime/doctor.py so MCP and CLI share a public smoke API instead of a lazy private import.
+---END-ENTRY-#138---
+
+---BEGIN-ENTRY-#139---
+id: 139
+date: 2026-05-07T07:05:57Z
+agent: claude
+status: done
+topics: mcp, multi-agent, command, doctor, verify, history, snapshot, protocol
+commits: none
+refs: seam_runtime/mcp.py,seam_runtime/doctor.py,seam_runtime/cli.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 138
+tokens: 951
+---
+Second MCP slice: applied anthropic-skills mcp-builder discipline to seam mcp serve, added two read-only HS/1 surface tools, and paid down the lazy-private-import debt from HISTORY#138.
+
+Changes:
+- New module seam_runtime/doctor.py exposes public build_doctor_report() and check_pgvector(). Same logic that previously lived as private helpers _build_doctor_report and _check_pgvector inside cli.py.
+- seam_runtime/cli.py now imports build_doctor_report and check_pgvector from doctor.py. Two single-line aliases preserve the prior internal names so the rest of cli.py is unchanged.
+- seam_runtime/mcp.py:
+  - Imports build_doctor_report directly from .doctor; the request-time lazy import from cli is gone.
+  - New tool seam_surface_query: thin wrapper over holographic.query_surface, resolving the surface PNG via runtime.store.read_surface_artifact and the strict canonical hs:<hex> pattern. Returns SurfaceQueryResult.to_dict.
+  - New tool seam_surface_decode: thin wrapper over holographic.decode_surface, returning SurfacePayload metadata plus a truncated payload_text (default 4096 chars, max 65536, set 0 for metadata-only). Avoids dumping multi-MB MIRL/RC payloads into agent context.
+  - All surface-ref-taking tools now require canonical hs:<hex> at the MCP boundary. SQLiteStore.read_surface_artifact still accepts paths for CLI use, but agent-facing MCP rejects path-shaped refs before they reach storage. Defense in depth.
+  - List-style tools (seam_documents, seam_surface_list, seam_benchmark_latest) now wrap results in {key, count, limit, has_more} per mcp-builder pagination guidance. The original list is still available under the named key, so callers that only read result[key] keep working.
+  - Added TOOL_METADATA: structured per-tool {description, input_schema, annotations} map. Annotations follow the MCP best-practices vocabulary (readOnlyHint, destructiveHint, idempotentHint, openWorldHint). seam_ingest is the only writer (readOnlyHint=False); all others are read-only.
+  - Ready line emits both tools (back-compat name->str map) and tool_metadata. Existing JSONL clients that read tools keep working; new clients can read tool_metadata for schemas + annotations.
+  - Errors are now actionable: unknown ref includes 'Use seam_surface_list to discover registered surfaces'; missing artifact file includes 'Use the SEAM CLI seam surface repair'; unknown tool name lists known tools.
+
+Safety preserved:
+- No new filesystem-access surface. seam_surface_query/decode load PNGs only via paths the user explicitly registered in the surface library.
+- DSN redaction in seam_doctor unchanged (HISTORY#138).
+- TOOL_METADATA annotations are hints to agents, not security gates. Real safety stays in the dispatch handlers (regex pattern + storage-level KeyError + bridge-boundary exception envelope).
+- Pagination wrappers do not load full datasets; they wrap whatever runtime.store returned with the requested limit.
+
+Tests added (test_seam_all/test_seam.py):
+- test_mcp_bridge_ready_line_announces_tool_metadata_with_annotations: starts the bridge with empty stdin, parses the ready line, asserts tools and tool_metadata both present, asserts seam_surface_query annotations show readOnlyHint=True / destructiveHint=False, asserts the input_schema pattern is ^hs:[0-9a-f]+$, and asserts seam_ingest is the lone non-read-only tool.
+- test_mcp_bridge_surface_query_and_decode_use_registered_hs_refs_only: encodes a real SEAM-RC/1 surface via the existing CLI surface encode --store flow, then exercises seam_surface_query (asserts hits), seam_surface_decode with truncate_text=32 (asserts truncated text and payload_text_truncated=true), seam_surface_decode with truncate_text=0 (asserts payload_text=null), path-shaped surface_ref rejection (ValueError with hs: hint), and missing-artifact FileNotFoundError pointing at seam surface repair.
+
+Tests updated:
+- test_mcp_bridge_surface_list_show_and_benchmark_latest_handle_empty_state: rewritten to assert the new pagination wrapper shape and to exercise both the path-shaped rejection path (ValueError) and the unknown-but-valid-shape path (KeyError with seam_surface_list hint).
+
+Verification:
+- PASS: python -m py_compile seam_runtime/doctor.py seam_runtime/cli.py seam_runtime/mcp.py test_seam_all/test_seam.py.
+- PASS: focused MCP tests (5/5): memory, stats+documents+context+doctor, list+show+benchmark empty-state, ready-line metadata, surface_query+surface_decode end-to-end.
+- PASS: full SeamTests suite, 144/144 (142 prior + 2 new). Pre-existing dashboard/Textual ResourceWarnings unchanged.
+- PASS: seam mcp serve real JSONL round-trip: ready line announces all 12 tools with both tools and tool_metadata; unknown hs:<hex> returns actionable error envelope; path-shaped /etc/passwd rejected at MCP boundary before reaching storage.
+
+Risks:
+- TOOL_METADATA is hand-written. If a future tool is added without a metadata entry, the ready line still works but agents lose schema/annotation visibility for that tool. A future improvement is to validate at module import that every TOOL_DESCRIPTIONS key has a corresponding TOOL_METADATA entry; deferred to keep this slice tight.
+- The cli.py aliases (_build_doctor_report = build_doctor_report) remain because internal cli call sites still use the underscored names. A sweep to rename those references is a routine follow-up but unrelated to the MCP slice.
+
+Next MCP tools to consider:
+- seam_surface_verify: thin wrapper over holographic.verify_surface for agents that want exactness checks before trusting a surface.
+- seam_surface_context: holographic.context_surface returns a packed prompt-ready context derived directly from a surface PNG without restoring the source.
+- seam_index_status: vector-staleness reporting from the orchestrator so agents can decide whether to call retrieve --mode mix or to ingest first.
+- seam_retrieve with explicit mode={vector,graph,hybrid,mix}: full retrieval surface beyond the basic memory_search wrapper.
+- Eventually validate that TOOL_DESCRIPTIONS keys == TOOL_METADATA keys at module import.
+---END-ENTRY-#139---

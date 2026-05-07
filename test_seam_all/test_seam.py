@@ -239,6 +239,203 @@ claim c1:
         full = dispatch_tool(runtime, {"tool": "seam_memory_get", "arguments": {"ids": [record_id], "timeline": True}})
         self.assertTrue(full["result"]["records"])
 
+    def test_mcp_bridge_exposes_stats_documents_context_and_doctor_tools(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        dispatch_tool(
+            runtime,
+            {
+                "tool": "seam_ingest",
+                "arguments": {
+                    "text": "SEAM MCP context covers stats and doctor smoke checks for agents.",
+                    "source_ref": "unit://mcp-context",
+                },
+            },
+        )
+
+        stats = dispatch_tool(runtime, {"tool": "seam_stats", "arguments": {}})
+        self.assertEqual(stats["type"], "result")
+        self.assertIn("total_records", stats["result"])
+        self.assertGreater(stats["result"]["total_records"], 0)
+
+        documents = dispatch_tool(runtime, {"tool": "seam_documents", "arguments": {"limit": 5}})
+        rows = documents["result"]["documents"]
+        self.assertTrue(rows)
+        self.assertEqual(rows[0]["source_ref"], "unit://mcp-context")
+
+        context = dispatch_tool(
+            runtime,
+            {
+                "tool": "seam_context",
+                "arguments": {"query": "doctor smoke checks", "budget": 3, "pack_budget": 256},
+            },
+        )
+        self.assertEqual(context["result"]["query"], "doctor smoke checks")
+        self.assertIn("pack", context["result"])
+        self.assertIn("candidates", context["result"])
+
+        doctor = dispatch_tool(runtime, {"tool": "seam_doctor", "arguments": {}})
+        self.assertIn(doctor["result"]["status"], {"PASS", "FAIL"})
+        pgvector = doctor["result"].get("pgvector", {})
+        # MCP-facing doctor must never leak DSN-shaped error strings.
+        self.assertNotIn("error", pgvector)
+        self.assertIn("dependencies", doctor["result"])
+
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_context", "arguments": {"query": ""}})
+
+    def test_mcp_bridge_surface_list_show_and_benchmark_latest_handle_empty_state(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+
+        empty_surfaces = dispatch_tool(runtime, {"tool": "seam_surface_list", "arguments": {"limit": 5}})
+        self.assertEqual(empty_surfaces["result"]["surfaces"], [])
+        self.assertEqual(empty_surfaces["result"]["count"], 0)
+        self.assertEqual(empty_surfaces["result"]["limit"], 5)
+        self.assertFalse(empty_surfaces["result"]["has_more"])
+
+        # Path-shaped or non-hex refs are rejected by MCP-side validation,
+        # tighter than the storage-level lookup which also accepts paths.
+        with self.assertRaises(ValueError) as path_ctx:
+            dispatch_tool(
+                runtime,
+                {"tool": "seam_surface_show", "arguments": {"surface_ref": "/etc/passwd"}},
+            )
+        self.assertIn("hs:", str(path_ctx.exception))
+
+        # Valid hs:<hex> shape but unknown ref returns an actionable KeyError.
+        with self.assertRaises(KeyError) as missing_ctx:
+            dispatch_tool(
+                runtime,
+                {"tool": "seam_surface_show", "arguments": {"surface_ref": "hs:00deadbeef"}},
+            )
+        self.assertIn("seam_surface_list", str(missing_ctx.exception))
+
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_surface_show", "arguments": {}})
+
+        empty_benchmarks = dispatch_tool(runtime, {"tool": "seam_benchmark_latest", "arguments": {}})
+        self.assertEqual(empty_benchmarks["result"]["runs"], [])
+        self.assertEqual(empty_benchmarks["result"]["limit"], 1)
+        self.assertFalse(empty_benchmarks["result"]["has_more"])
+
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_unknown_tool", "arguments": {}})
+
+    def test_mcp_bridge_ready_line_announces_tool_metadata_with_annotations(self) -> None:
+        from seam_runtime.mcp import run_stdio_bridge
+
+        runtime = SeamRuntime(self.db_path)
+        output = StringIO()
+        run_stdio_bridge(runtime, input_stream=StringIO(""), output_stream=output)
+
+        ready_line = json.loads(output.getvalue().splitlines()[0])
+        self.assertEqual(ready_line["type"], "ready")
+        # Backwards-compatible name->description map stays intact for old clients.
+        self.assertIn("seam_surface_query", ready_line["tools"])
+        # New structured metadata exposes annotations + input schemas.
+        metadata = ready_line["tool_metadata"]
+        surface_query_meta = metadata["seam_surface_query"]
+        self.assertTrue(surface_query_meta["annotations"]["readOnlyHint"])
+        self.assertFalse(surface_query_meta["annotations"]["destructiveHint"])
+        self.assertEqual(
+            surface_query_meta["input_schema"]["surface_ref"]["pattern"],
+            "^hs:[0-9a-f]+$",
+        )
+        # seam_ingest is the one new tool that writes; readOnlyHint must be False.
+        self.assertFalse(metadata["seam_ingest"]["annotations"]["readOnlyHint"])
+
+    def test_mcp_bridge_surface_query_and_decode_use_registered_hs_refs_only(self) -> None:
+        source_path = Path(f"mcp_surface_source_{uuid4().hex}.seamrc")
+        surface_path = Path(f"mcp_surface_{uuid4().hex}.seam.png")
+        artifact_dir = TEST_ARTIFACT_DIR / f"mcp_surfaces_{uuid4().hex}"
+        try:
+            text = 'MCP surface fixture: "agents query stored holographic surfaces by hs:<id> only."'
+            artifact = compress_text_readable(text, source_ref="unit://mcp-surface", tokenizer="char4_approx")
+            source_path.write_text(artifact.machine_text, encoding="utf-8")
+
+            encode_stream = StringIO()
+            with redirect_stdout(encode_stream):
+                run_cli([
+                    "--db", str(self.db_path),
+                    "surface", "encode", str(source_path),
+                    "--output", str(surface_path),
+                    "--store", "--artifact-dir", str(artifact_dir),
+                    "--format", "json",
+                ])
+            surface_id = json.loads(encode_stream.getvalue())["library"]["surface_id"]
+            self.assertTrue(surface_id.startswith("hs:"))
+
+            runtime = SeamRuntime(self.db_path)
+
+            query = dispatch_tool(
+                runtime,
+                {
+                    "tool": "seam_surface_query",
+                    "arguments": {
+                        "surface_ref": surface_id,
+                        "query": "agents query stored holographic",
+                        "limit": 3,
+                    },
+                },
+            )
+            self.assertEqual(query["type"], "result")
+            self.assertEqual(query["result"]["query"], "agents query stored holographic")
+            self.assertTrue(query["result"]["hits"])
+
+            decoded = dispatch_tool(
+                runtime,
+                {
+                    "tool": "seam_surface_decode",
+                    "arguments": {"surface_ref": surface_id, "truncate_text": 32},
+                },
+            )
+            self.assertEqual(decoded["type"], "result")
+            self.assertIsNotNone(decoded["result"]["payload_text"])
+            self.assertLessEqual(len(decoded["result"]["payload_text"]), 32)
+            self.assertTrue(decoded["result"]["payload_text_truncated"])
+
+            metadata_only = dispatch_tool(
+                runtime,
+                {
+                    "tool": "seam_surface_decode",
+                    "arguments": {"surface_ref": surface_id, "truncate_text": 0},
+                },
+            )
+            self.assertIsNone(metadata_only["result"]["payload_text"])
+            self.assertFalse(metadata_only["result"]["payload_text_truncated"])
+
+            # Path-shaped surface_ref must be rejected by MCP-side validation.
+            with self.assertRaises(ValueError) as ctx:
+                dispatch_tool(
+                    runtime,
+                    {
+                        "tool": "seam_surface_query",
+                        "arguments": {"surface_ref": str(surface_path.resolve()), "query": "x"},
+                    },
+                )
+            self.assertIn("hs:", str(ctx.exception))
+
+            # If the registered surface file is missing, the tool raises an
+            # actionable FileNotFoundError pointing at `seam surface repair`.
+            surface_path.unlink()
+            artifact_path = Path(runtime.store.read_surface_artifact(surface_id)["artifact_path"])
+            if artifact_path.exists():
+                artifact_path.unlink()
+            with self.assertRaises(FileNotFoundError) as repair_ctx:
+                dispatch_tool(
+                    runtime,
+                    {"tool": "seam_surface_query", "arguments": {"surface_ref": surface_id, "query": "x"}},
+                )
+            self.assertIn("seam surface repair", str(repair_ctx.exception))
+        finally:
+            for path in (source_path, surface_path):
+                if path.exists():
+                    path.unlink()
+            if artifact_dir.exists():
+                for child in artifact_dir.glob("*"):
+                    if child.is_file():
+                        child.unlink()
+                artifact_dir.rmdir()
+
     def test_symbol_promotion_and_pack_compaction(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl(
