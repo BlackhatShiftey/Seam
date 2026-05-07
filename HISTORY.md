@@ -2608,3 +2608,30 @@ Correct commits:
 
 Verification status is unchanged from HISTORY#132.
 ---END-ENTRY-#133---
+
+---BEGIN-ENTRY-#134---
+id: 134
+date: 2026-05-07T03:06:28Z
+agent: codex
+status: done
+topics: history, roadmap, verify, snapshot, protocol
+commits: 8791576,5b710bb
+refs: docs/roadmap/AGENT_COMPILER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 133
+tokens: 140
+---
+Merged `origin/main` into local `main` before pushing repo state for operator system reset.
+
+Changes landed from remote:
+- Remote commit `8791576` added `docs/roadmap/AGENT_COMPILER.md`, a planned major workstream for compiling canonical SEAM protocol into model-specific agent adapters.
+
+Local sync result:
+- Merge commit `5b710bb` (`Merge origin/main before repo sync`) incorporated the remote roadmap file into the local `main` line that already contains the HS/1 adapter, repair, and stored-surface benchmark work.
+- Local `main` is now ahead of `origin/main` and ready for final verification/push.
+
+Verification planned before push:
+- Rebuild `HISTORY_INDEX.md`.
+- Write a fresh snapshot.
+- Run integrity, routing, and continuity checks.
+- Confirm clean status after bookkeeping commit.
+---END-ENTRY-#134---
