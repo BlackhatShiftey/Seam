@@ -22,6 +22,9 @@ not have to infer what works from directory names alone.
 - `experimental/` - live experimental modules. These may be imported by active
   code or tests, so they are not archived. Treat them as less stable than
   `seam_runtime/`, but not dead code.
+- `experimental/webui/` - active IDE-like browser dashboard prototype and
+  visual target for the future REST API GUI. It is not wired into packaged
+  runtime behavior yet.
 
 ## Inactive Code
 

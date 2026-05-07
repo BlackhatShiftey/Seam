@@ -162,6 +162,73 @@ presentation polish:
 ## Track A — Dashboard & UI Enhancement
 History pointer: see `HISTORY#047` (interactive TUI baseline) and `HISTORY#024` (dashboard review stabilization).
 
+### A-Web: IDE-Like Browser Dashboard / REST API GUI
+
+**What:** Make the browser dashboard feel like an IDE/operator workspace, using
+the prototype in `experimental/webui/` as the visual target. The shell should
+keep an activity bar, explorer/files view, tabbed main editor/workspace, agent
+pane, terminal/command surface, memory view, ingest view, benchmark view,
+settings, and status bar.
+
+**Role:** This is the future REST API GUI, not a replacement for the stable
+Textual terminal dashboard yet. Textual remains the terminal-first dashboard;
+the web dashboard becomes the richer browser surface served by or alongside
+`seam serve`.
+
+**Current prototype:** `experimental/webui/seam-dashboard-prototype.html`
+contains the IDE-like SEAM dashboard mockup and supporting assets. It currently
+uses demo state and must be wired to real SEAM endpoints before runtime
+promotion.
+
+**SOP:**
+1. Keep the prototype under `experimental/webui/` until it has real API wiring,
+   local build/test commands, and no CDN/Babel runtime dependency.
+2. Split the single-file prototype into a maintainable app shell, API client,
+   state stores, panes, and shared visual tokens.
+3. Wire first to existing REST endpoints: `/health`, `/stats`, `/compile`,
+   `/search`, `/context`, `/persist`, and `/lossless-compress`.
+4. Add backend endpoints only when the GUI needs behavior that the REST API
+   cannot currently provide: ingest file, benchmark run/gate, surface
+   list/show/query/repair, event logs, and model/chat routing.
+5. Keep secrets local. API keys and bearer tokens must be entered through local
+   environment/config surfaces and must not be committed.
+6. Package only after verification proves browser UI state matches real SEAM
+   runtime state.
+
+**Gate:** `seam serve` or a dedicated `seam web` command can open the IDE-like
+dashboard, connect to a local SEAM API, show real health/stats/search/context
+data, run at least one compile-or-search workflow, and pass browser smoke tests
+without breaking `seam dashboard`.
+
+### A-CLI: First-Class Agent CLI
+
+**What:** Turn `seam` into a CLI product in the same family as Gemini CLI,
+Claude Code, and Codex CLI: an interactive shell that can remember, retrieve,
+reason over local SEAM memory, call SEAM tools, and eventually route model
+requests without losing the existing precise subcommand surface.
+
+**Current status:** `seam shell` / `seam chat` is the first slice. It provides a
+REPL-style memory shell with slash commands for remember, search, context,
+stats, doctor, and exit. Natural text defaults to prompt-ready context
+retrieval.
+
+**SOP:**
+1. Keep existing `seam <subcommand>` behavior stable for scripts.
+2. Make `seam shell` the interactive operator entrypoint.
+3. Preserve slash commands as first-class controls: `/remember`, `/search`,
+   `/context`, `/stats`, `/doctor`, `/exit`, then add `/model`, `/tools`,
+   `/surface`, `/benchmark`, and `/web`.
+4. Add model routing only after local memory/tool execution is stable. Provider
+   keys must stay in local env/config, never in repo files.
+5. Add command history, session transcript persistence, explicit tool-call
+   confirmation, and project context loading from `AGENTS.md`/status/history.
+6. Reuse the same runtime and REST/MCP surfaces; do not fork SEAM behavior into
+   a separate CLI-only runtime.
+
+**Gate:** A user can run `seam shell`, ask or paste natural text, persist useful
+memory, retrieve context, inspect stats/health, and exit cleanly. The scripted
+path `seam shell --once ...` must remain testable in CI.
+
 ### A1: NL→MIRL Compilation Animation
 
 **What:** When a user runs `compile <text>` in the dashboard, show a live animation of the compilation process — text being parsed, records appearing one by one with their type labels (ENT, CLM, REL, ACT, OBJ) before the final summary.

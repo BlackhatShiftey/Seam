@@ -302,6 +302,21 @@ def build_parser() -> argparse.ArgumentParser:
     context_parser.add_argument("--vector-path", "--chroma-path", dest="vector_path", default=".seam_chroma")
     context_parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
 
+    shell_parser = subparsers.add_parser(
+        "shell",
+        aliases=["chat"],
+        help="Start an interactive SEAM memory shell",
+    )
+    shell_parser.add_argument(
+        "--once",
+        action="append",
+        default=[],
+        help="Run one shell command non-interactively and exit; may be repeated",
+    )
+    shell_parser.add_argument("--budget", type=int, default=5)
+    shell_parser.add_argument("--pack-budget", type=int, default=512)
+    shell_parser.add_argument("--retrieval-mode", choices=["vector", "graph", "hybrid", "mix"], default="mix")
+
     dashboard_parser = subparsers.add_parser("dashboard", help="Launch the runtime-connected terminal dashboard")
     dashboard_parser.add_argument("--snapshot", action="store_true", help="Render one dashboard frame and exit")
     dashboard_parser.add_argument("--run", dest="dashboard_commands", action="append", default=[], help="Run a dashboard command non-interactively")
@@ -807,6 +822,15 @@ def run_cli(argv: list[str] | None = None) -> None:
         )
         _print_retrieval_output(payload, output_format=args.format, renderer=render_context_pretty)
         return
+    if args.command in {"shell", "chat"}:
+        _run_agent_shell(
+            runtime,
+            once=args.once,
+            budget=args.budget,
+            pack_budget=args.pack_budget,
+            retrieval_mode=args.retrieval_mode,
+        )
+        return
     if args.command == "dashboard":
         run_dashboard(
             runtime,
@@ -924,6 +948,117 @@ def run_cli(argv: list[str] | None = None) -> None:
 
 def _split_ids(text: str) -> list[str]:
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def _run_agent_shell(
+    runtime: SeamRuntime,
+    *,
+    once: list[str] | None = None,
+    budget: int = 5,
+    pack_budget: int = 512,
+    retrieval_mode: str = "mix",
+) -> None:
+    commands = list(once or [])
+    if commands:
+        for command in commands:
+            response = _handle_shell_command(
+                runtime,
+                command,
+                budget=budget,
+                pack_budget=pack_budget,
+                retrieval_mode=retrieval_mode,
+            )
+            if response is not None:
+                print(response)
+        return
+
+    print("SEAM shell. Type /help for commands, /exit to quit.")
+    while True:
+        try:
+            raw = input("seam> ")
+        except EOFError:
+            print()
+            return
+        response = _handle_shell_command(
+            runtime,
+            raw,
+            budget=budget,
+            pack_budget=pack_budget,
+            retrieval_mode=retrieval_mode,
+        )
+        if response == "__exit__":
+            return
+        if response:
+            print(response)
+
+
+def _handle_shell_command(
+    runtime: SeamRuntime,
+    raw: str,
+    *,
+    budget: int,
+    pack_budget: int,
+    retrieval_mode: str,
+) -> str | None:
+    text = raw.strip()
+    if not text:
+        return None
+    if text in {"/exit", "/quit", "exit", "quit"}:
+        return "__exit__"
+    if text in {"/help", "?"}:
+        return "\n".join(
+            [
+                "SEAM shell commands:",
+                "  /remember <text>  compile and persist memory",
+                "  /search <query>   search compact memory records",
+                "  /context <query>  build prompt-ready context",
+                "  /stats            show store stats",
+                "  /doctor           run install/runtime smoke checks",
+                "  /exit             quit",
+                "Natural text without a slash runs /context.",
+            ]
+        )
+
+    command, _, argument = text.partition(" ")
+    if command == "/remember":
+        if not argument.strip():
+            return "Usage: /remember <text>"
+        batch = runtime.compile_nl(argument.strip(), source_ref="shell://remember")
+        report = runtime.persist_ir(batch).to_dict()
+        stored = report.get("stored_ids", [])
+        return f"remembered {len(stored)} records: {', '.join(stored[:6])}"
+
+    if command == "/search":
+        query = argument.strip()
+        if not query:
+            return "Usage: /search <query>"
+        payload = runtime.memory_search(query, budget=budget)
+        return render_memory_index(payload)
+
+    if command == "/context" or not text.startswith("/"):
+        query = argument.strip() if command == "/context" else text
+        if not query:
+            return "Usage: /context <query>"
+        orchestrator = RetrievalOrchestrator(runtime)
+        rag_payload = orchestrator.rag(
+            query,
+            budget=budget,
+            mode=retrieval_mode,
+            include_trace=False,
+        ).to_dict()
+        if isinstance(rag_payload.get("pack"), dict):
+            rag_payload["pack"]["budget"] = pack_budget
+        payload = build_context_payload(rag_payload, view="prompt")
+        return render_context_pretty(payload)
+
+    if command == "/stats":
+        stats = runtime.store.get_stats()
+        return "\n".join(f"{key}: {value}" for key, value in sorted(stats.items()))
+
+    if command == "/doctor":
+        return _render_doctor_report(_build_doctor_report())
+
+    return f"Unknown shell command: {command}. Type /help."
 
 
 def _confirm_holdout_run() -> None:

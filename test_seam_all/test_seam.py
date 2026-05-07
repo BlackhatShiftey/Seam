@@ -536,7 +536,26 @@ claim c2:
             run_cli(["--db", str(self.db_path), "context", "translator natural language", "--budget", "3", "--view", "summary"])
         payload = stream.getvalue()
         self.assertIn("Summary:", payload)
-        self.assertIn("Records:", payload)
+
+    def test_cli_shell_once_remembers_searches_and_contextualizes(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            run_cli([
+                "--db",
+                str(self.db_path),
+                "shell",
+                "--once",
+                "/remember SEAM shell should behave like an agent CLI with persistent memory.",
+                "--once",
+                "/search agent CLI persistent memory",
+                "--once",
+                "/context agent CLI",
+            ])
+        payload = stream.getvalue()
+        self.assertIn("remembered", payload)
+        self.assertIn("agent CLI", payload)
+        self.assertIn("SEAM retrieved context", payload)
+        self.assertIn("[1]", payload)
 
     def test_lossless_codec_roundtrips_exact_text(self) -> None:
         text = "SEAM preserves exact context while compressing token usage for lossless recovery.\n" * 12

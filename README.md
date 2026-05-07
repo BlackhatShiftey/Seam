@@ -71,6 +71,7 @@ seam memory search "durable memory"
 seam memory get clm:1,sta:ent:project:seam --timeline
 seam retrieve "durable memory" --mode mix --trace
 seam context "durable memory" --retrieval-mode mix --view evidence
+seam shell
 seam index
 seam reindex
 seam dashboard

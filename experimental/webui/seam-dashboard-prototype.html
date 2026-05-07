@@ -1,0 +1,2681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEAM — Dashboard</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+
+    :root {
+      --bg-deep:    #050b1e;
+      --bg-panel:   #08132a;
+      --bg-sunk:    #020613;
+      --bg-hover:   #0d1f3c;
+      --bg-active:  #112240;
+      --blue-deep:  #2f63ff;
+      --blue:       #4f8cfb;
+      --blue-soft:  #66b8ff;
+      --blue-fog:   #5fc8ff;
+      --ice:        #a6fcff;
+      --ice-pale:   #bfefff;
+      --cyan:       #7fe0ff;
+      --cyan-bright:#8df6ff;
+      --mint:       #7efdb9;
+      --mint-dim:   #4bc08a;
+      --gold:       #f4d676;
+      --gold-dim:   #b9a04a;
+      --bloom:      #d391ff;
+      --violet:     #9b6cff;
+      --red:        #ff6b6b;
+      --grid-dim:   #1a2540;
+      --grid-mid:   #274063;
+      --text:       #bfefff;
+      --muted:      #5a7a9a;
+      --border:     rgba(79,140,251,0.18);
+      --border-bright: rgba(127,224,255,0.28);
+      --font: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-deep);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* scanlines overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.018) 0,
+        rgba(255,255,255,0.018) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    #root { height: 100vh; display: flex; flex-direction: column; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── SEAM SVG logo mark ───────────────────────────────────────────────────
+const SeamMark = ({ size = 20 }) =>
+<svg width={size} height={size} viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="112" fill="#071015" />
+    <rect x="76" y="92" width="360" height="328" rx="48" fill="#09161C" stroke="#1C3A34" strokeWidth="10" />
+    <path d="M76 160H436" stroke="#173129" strokeWidth="10" />
+    <circle cx="122" cy="126" r="10" fill="#72F1B8" />
+    <circle cx="154" cy="126" r="10" fill="#FFBF69" />
+    <circle cx="186" cy="126" r="10" fill="#C9FFE8" opacity="0.9" />
+    <path d="M166 202C166 187.641 177.641 176 192 176H246V244H212C201.507 244 193 252.507 193 263V266C193 276.493 201.507 285 212 285H246V336H192C177.641 336 166 324.359 166 310V202Z" fill="#0F261F" />
+    <path d="M346 202C346 187.641 334.359 176 320 176H266V244H300C310.493 244 319 252.507 319 263V266C319 276.493 310.493 285 300 285H266V336H320C334.359 336 346 324.359 346 310V202Z" fill="#0F261F" />
+    <path d="M246 176H266V336H246V176Z" fill="#72F1B8" />
+    <path d="M246 222H266V287H246V222Z" fill="#FFBF69" />
+    <path d="M128 374H384" stroke="#173129" strokeWidth="6" strokeLinecap="round" />
+    <path d="M140 358H228" stroke="#72F1B8" strokeWidth="8" strokeLinecap="round" />
+    <path d="M284 358H372" stroke="#FFBF69" strokeWidth="8" strokeLinecap="round" />
+  </svg>;
+
+
+// ── Activity bar icons ───────────────────────────────────────────────────
+const icons = {
+  explorer:
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="13" y="3" width="8" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="13" y="11" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="3" y="16" width="8" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>,
+
+  ingest:
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3v12M7 10l5 5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 17v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>,
+
+  memory:
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="8" width="18" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M7 8V5M12 8V5M17 8V5M7 16v3M12 16v3M17 16v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="6" y="10" width="2.5" height="4" rx="0.5" fill="currentColor" opacity="0.5" />
+      <rect x="10.75" y="10" width="2.5" height="4" rx="0.5" fill="currentColor" opacity="0.5" />
+      <rect x="15.5" y="10" width="2.5" height="4" rx="0.5" fill="currentColor" opacity="0.5" />
+    </svg>,
+
+  agent:
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 19c0-3.314 3.582-6 8-6s8 2.686 8 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="19" cy="5" r="2.5" fill="currentColor" opacity="0.4" />
+      <circle cx="19" cy="5" r="1" fill="#7efdb9" />
+    </svg>,
+
+  benchmark:
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <polyline points="3,17 8,12 12,14 17,8 21,10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="3" y1="20" x2="21" y2="20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>,
+
+  settings:
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+
+};
+
+// ── File tree data ────────────────────────────────────────────────────────
+const fileTree = [
+{ id: 'seam_runtime', name: 'seam_runtime', type: 'folder', children: [
+  { id: 'cli', name: 'cli.py', type: 'file', lang: 'py', active: true },
+  { id: 'dashboard', name: 'dashboard.py', type: 'file', lang: 'py' },
+  { id: 'storage', name: 'storage.py', type: 'file', lang: 'py' },
+  { id: 'mirl', name: 'mirl.py', type: 'file', lang: 'py' },
+  { id: 'retrieval', name: 'retrieval.py', type: 'file', lang: 'py' },
+  { id: 'runtime', name: 'runtime.py', type: 'file', lang: 'py' },
+  { id: 'ui_folder', name: 'ui', type: 'folder', children: [
+    { id: 'theme', name: 'theme.py', type: 'file', lang: 'py' },
+    { id: 'animations', name: 'animations.py', type: 'file', lang: 'py' },
+    { id: 'bars', name: 'bars.py', type: 'file', lang: 'py' }]
+  }]
+},
+{ id: 'branding', name: 'branding', type: 'folder', children: [
+  { id: 'retro_svg', name: 'seam-mark-retro.svg', type: 'file', lang: 'svg' },
+  { id: 'retro_html', name: 'seam-retro-preview.html', type: 'file', lang: 'html' },
+  { id: 'retro_dir', name: 'retro-direction.md', type: 'file', lang: 'md' }]
+},
+{ id: 'docs', name: 'docs', type: 'folder', children: [
+  { id: 'readme', name: 'README.md', type: 'file', lang: 'md' },
+  { id: 'roadmap', name: 'ROADMAP.md', type: 'file', lang: 'md' },
+  { id: 'spec', name: 'SEAM_SPEC_V0.1.md', type: 'file', lang: 'md' }]
+},
+{ id: 'seam_py', name: 'seam.py', type: 'file', lang: 'py' },
+{ id: 'requirements', name: 'requirements.txt', type: 'file', lang: 'txt' }];
+
+
+// ── Editor tab content ────────────────────────────────────────────────────
+const editorContent = {
+  cli: {
+    name: 'cli.py',
+    lines: [
+    { n: 1, t: 'comment', v: '"""SEAM CLI — operator surface for the MIRL runtime."""' },
+    { n: 2, t: 'blank' },
+    { n: 3, t: 'kw', v: 'from __future__ import', rest: ' annotations' },
+    { n: 4, t: 'import', v: 'import', rest: ' click, sys, pathlib' },
+    { n: 5, t: 'import', v: 'from', rest: ' .runtime import SeamRuntime' },
+    { n: 6, t: 'import', v: 'from', rest: ' .storage import SeamDB' },
+    { n: 7, t: 'blank' },
+    { n: 8, t: 'decorator', v: '@click.group()' },
+    { n: 9, t: 'def', v: 'def', name: ' cli', rest: '(ctx: click.Context) -> None:' },
+    { n: 10, t: 'str', v: '    """SEAM operator shell."""' },
+    { n: 11, t: 'blank' },
+    { n: 12, t: 'decorator', v: '@cli.command()' },
+    { n: 13, t: 'decorator', v: '@click.argument("query")' },
+    { n: 14, t: 'decorator', v: '@click.option("--mode", default="mix")' },
+    { n: 15, t: 'decorator', v: '@click.option("--budget", default=8, type=int)' },
+    { n: 16, t: 'def', v: 'def', name: ' retrieve', rest: '(query: str, mode: str, budget: int) -> None:' },
+    { n: 17, t: 'str', v: '    """Retrieve context from the MIRL store."""' },
+    { n: 18, t: 'plain', v: '    rt = SeamRuntime.from_config()' },
+    { n: 19, t: 'plain', v: '    pack = rt.retrieve(query, mode=mode, budget=budget)' },
+    { n: 20, t: 'plain', v: '    click.echo(pack.render())' },
+    { n: 21, t: 'blank' },
+    { n: 22, t: 'decorator', v: '@cli.command()' },
+    { n: 23, t: 'decorator', v: '@click.argument("path", type=click.Path(exists=True))' },
+    { n: 24, t: 'decorator', v: '@click.option("--persist/--no-persist", default=True)' },
+    { n: 25, t: 'def', v: 'def', name: ' ingest', rest: '(path: str, persist: bool) -> None:' },
+    { n: 26, t: 'str', v: '    """Ingest a file into MIRL memory."""' },
+    { n: 27, t: 'plain', v: '    rt = SeamRuntime.from_config()' },
+    { n: 28, t: 'plain', v: '    result = rt.ingest(pathlib.Path(path), persist=persist)' },
+    { n: 29, t: 'plain', v: '    click.echo(f"[ok] {result.record_count} records ingested")' }]
+
+  },
+  dashboard: {
+    name: 'dashboard.py',
+    lines: [
+    { n: 1, t: 'comment', v: '"""SEAM Textual dashboard — operator runtime view."""' },
+    { n: 2, t: 'blank' },
+    { n: 3, t: 'import', v: 'from', rest: ' textual.app import App, ComposeResult' },
+    { n: 4, t: 'import', v: 'from', rest: ' textual.widgets import Header, Footer, Log' },
+    { n: 5, t: 'blank' },
+    { n: 6, t: 'kw', v: 'class', rest: ' SeamDashboard(App):' },
+    { n: 7, t: 'str', v: '    """Main dashboard application."""' },
+    { n: 8, t: 'plain', v: '    CSS_PATH = "dashboard.css"' }]
+
+  },
+  readme: {
+    name: 'README.md',
+    lines: [
+    { n: 1, t: 'md-h1', v: '# SEAM' },
+    { n: 2, t: 'blank' },
+    { n: 3, t: 'plain', v: 'Give your local AI agent persistent memory in one command.' },
+    { n: 4, t: 'blank' },
+    { n: 5, t: 'md-h2', v: '## Install' },
+    { n: 6, t: 'blank' },
+    { n: 7, t: 'plain', v: '```bash' },
+    { n: 8, t: 'str', v: 'gh repo clone BlackhatShiftey/Seam Seam && cd Seam' },
+    { n: 9, t: 'str', v: 'sh ./installers/install_seam_linux.sh' },
+    { n: 10, t: 'plain', v: '```' },
+    { n: 11, t: 'blank' },
+    { n: 12, t: 'md-h2', v: '## Core Commands' },
+    { n: 13, t: 'blank' },
+    { n: 14, t: 'plain', v: '```powershell' },
+    { n: 15, t: 'str', v: 'seam ingest path\\to\\file.txt --persist' },
+    { n: 16, t: 'str', v: 'seam memory search "durable memory"' },
+    { n: 17, t: 'str', v: 'seam retrieve "durable memory" --mode mix --trace' },
+    { n: 18, t: 'str', v: 'seam dashboard' },
+    { n: 19, t: 'plain', v: '```' }]
+
+  }
+};
+
+// ── Config file editor content ─────────────────────────────────────────────
+Object.assign(editorContent, {
+  'docker-compose': {
+    name: 'docker-compose.yaml',
+    lines: [
+      { n:1,  t:'comment', v:'# SEAM docker-compose configuration' },
+      { n:2,  t:'blank' },
+      { n:3,  t:'kw',      v:'version:', rest:' "3.9"' },
+      { n:4,  t:'blank' },
+      { n:5,  t:'kw',      v:'services:' },
+      { n:6,  t:'plain',   v:'  seam-runtime:' },
+      { n:7,  t:'plain',   v:'    image: ghcr.io/blackhatshiftey/seam:latest' },
+      { n:8,  t:'plain',   v:'    container_name: seam-runtime' },
+      { n:9,  t:'plain',   v:'    restart: unless-stopped' },
+      { n:10, t:'plain',   v:'    ports:' },
+      { n:11, t:'str',     v:'      - "8765:8765"' },
+      { n:12, t:'plain',   v:'    volumes:' },
+      { n:13, t:'str',     v:'      - ./data/seam:/root/.local/share/seam' },
+      { n:14, t:'plain',   v:'    environment:' },
+      { n:15, t:'str',     v:'      - SEAM_LOG_LEVEL=INFO' },
+      { n:16, t:'str',     v:'      - SEAM_MAX_BUDGET=8' },
+      { n:17, t:'str',     v:'      - SEAM_HOST=0.0.0.0' },
+      { n:18, t:'str',     v:'      - SEAM_PORT=8765' },
+    ]
+  },
+  'config-toml': {
+    name: 'config.toml',
+    lines: [
+      { n:1,  t:'comment', v:'# SEAM runtime configuration' },
+      { n:2,  t:'blank' },
+      { n:3,  t:'kw',      v:'[runtime]' },
+      { n:4,  t:'plain',   v:'retrieval_default_mode = ', rest: '"mix"' },
+      { n:5,  t:'plain',   v:'retrieval_default_budget = 8' },
+      { n:6,  t:'plain',   v:'pack_max_tokens = 4096' },
+      { n:7,  t:'plain',   v:'ingest_chunk_size = 512' },
+      { n:8,  t:'blank' },
+      { n:9,  t:'kw',      v:'[database]' },
+      { n:10, t:'plain',   v:'path = ', rest: '"~/.local/share/seam/state/seam.db"' },
+      { n:11, t:'plain',   v:'wal_mode = true' },
+      { n:12, t:'plain',   v:'cache_kb = 65536' },
+      { n:13, t:'plain',   v:'timeout = 30' },
+      { n:14, t:'blank' },
+      { n:15, t:'kw',      v:'[vector]' },
+      { n:16, t:'plain',   v:'backends = ', rest: '["sqlite", "chroma"]' },
+      { n:17, t:'plain',   v:'embed_model = ', rest: '"text-embedding-3-small"' },
+      { n:18, t:'plain',   v:'sbert_device = ', rest: '"cpu"' },
+      { n:19, t:'blank' },
+      { n:20, t:'kw',      v:'[benchmark]' },
+      { n:21, t:'plain',   v:'holdout_gate = ', rest: '"strict"' },
+    ]
+  },
+  'dot-env': {
+    name: '.env',
+    lines: [
+      { n:1,  t:'comment', v:'# SEAM environment variables' },
+      { n:2,  t:'blank' },
+      { n:3,  t:'str',     v:'ANTHROPIC_API_KEY=<local-anthropic-api-key>' },
+      { n:4,  t:'str',     v:'OPENAI_API_KEY=' },
+      { n:5,  t:'str',     v:'GEMINI_API_KEY=' },
+      { n:6,  t:'blank' },
+      { n:7,  t:'str',     v:'SEAM_DB_PATH=~/.local/share/seam/state/seam.db' },
+      { n:8,  t:'str',     v:'SEAM_LOG_LEVEL=INFO' },
+      { n:9,  t:'str',     v:'SEAM_MAX_BUDGET=8' },
+      { n:10, t:'str',     v:'SEAM_HOST=127.0.0.1' },
+      { n:11, t:'str',     v:'SEAM_PORT=8765' },
+      { n:12, t:'str',     v:'SEAM_API_TOKEN=<local-seam-api-token>' },
+    ]
+  },
+});
+
+// ── Terminal lines ─────────────────────────────────────────────────────────
+const initialTermLines = [
+{ id: 0, kind: 'system', text: 'SEAM terminal session — v0.1.0 — May 1, 2026' },
+{ id: 1, kind: 'system', text: '─────────────────────────────────────────────' },
+{ id: 2, kind: 'prompt', text: 'seam doctor' },
+{ id: 3, kind: 'ok', text: '[ok] SQLite store: ~/.local/share/seam/state/seam.db' },
+{ id: 4, kind: 'ok', text: '[ok] vector index: chroma+sqlite — 1.4M records' },
+{ id: 5, kind: 'ok', text: '[ok] MIRL runtime: compiled, no drift' },
+{ id: 6, kind: 'info', text: '[info] sbert embeddings: text-embedding-3-small' },
+{ id: 7, kind: 'prompt', text: 'seam memory search "persistent agent memory" --budget 5' },
+{ id: 8, kind: 'ok', text: '[ok] 5 records retrieved — hit@5: 0.91' },
+{ id: 9, kind: 'plain', text: '  clm:1  @SEAM persistent local memory runtime for agents' },
+{ id: 10, kind: 'plain', text: '  sta:ent:project:seam  #memory #mirl #sqlite' },
+{ id: 11, kind: 'plain', text: '  clm:4  >relates_to: agent_bridge, context_pack' },
+{ id: 12, kind: 'prompt', text: 'seam retrieve "persistent agent memory" --mode mix --budget 5' },
+{ id: 13, kind: 'info', text: '[info] vector leg: 3 candidates | graph leg: 2 candidates' },
+{ id: 14, kind: 'ok', text: '[ok] context pack: 5 entries, 1 symbol expansion, 842 tokens' }];
+
+
+// ── Agent messages ─────────────────────────────────────────────────────────
+const initialAgentMessages = [
+{ id: 0, role: 'system', text: 'SEAM Agent — connected to MIRL runtime' },
+{ id: 1, role: 'assistant', text: 'Ready. I have access to your MIRL memory store with 1.4M records. How can I help?' },
+{ id: 2, role: 'user', text: 'Summarize what SEAM does' },
+{ id: 3, role: 'assistant', text: 'SEAM is a **local memory runtime** for AI agents. It:\n\n• Stores durable MIRL records in SQLite\n• Retrieves context with lexical, graph, temporal, and vector signals\n• Exposes a CLI, REST API, and Textual dashboard\n• Gates benchmark claims before treating them as real progress\n\nThe core idea: SQLite is the canonical source of truth; vector stores are acceleration layers, not the source.' }];
+
+
+// ── Syntax-colored line renderer ──────────────────────────────────────────
+const S = {
+  comment: { color: '#5a7a9a', fontStyle: 'italic' },
+  kw: { color: '#9b6cff' },
+  def: { color: '#9b6cff' },
+  defName: { color: '#7fe0ff' },
+  rest: { color: '#bfefff' },
+  str: { color: '#7efdb9' },
+  decorator: { color: '#f4d676' },
+  import: { color: '#9b6cff' },
+  plain: { color: '#bfefff' },
+  blank: { color: 'transparent' },
+  'md-h1': { color: '#a6fcff', fontWeight: 600 },
+  'md-h2': { color: '#7fe0ff', fontWeight: 600 }
+};
+
+function CodeLine({ line }) {
+  if (line.t === 'blank') return <div style={{ height: 8 }} />;
+  if (line.t === 'def') return (
+    <div>
+      <span style={S.kw}>{line.v}</span>
+      <span style={S.defName}>{line.name}</span>
+      <span style={S.rest}>{line.rest}</span>
+    </div>);
+
+  if (line.t === 'kw') return (
+    <div><span style={S.kw}>{line.v}</span><span style={S.rest}>{line.rest}</span></div>);
+
+  if (line.t === 'import') return (
+    <div><span style={S.import}>{line.v}</span><span style={S.rest}>{line.rest}</span></div>);
+
+  return <div style={S[line.t] || S.plain}>{line.v}</div>;
+}
+
+// ── FileTree node ─────────────────────────────────────────────────────────
+function FileNode({ node, depth, openFile, activeFile, openFolders, toggleFolder }) {
+  const isOpen = openFolders.has(node.id);
+  const isActive = activeFile === node.id;
+
+  if (node.type === 'folder') {
+    return (
+      <div>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '3px 8px 3px ' + (8 + depth * 14) + 'px',
+            cursor: 'pointer', color: '#7fe0ff',
+            background: isOpen ? 'rgba(79,140,251,0.06)' : 'transparent',
+            userSelect: 'none'
+          }}
+          onClick={() => toggleFolder(node.id)}>
+          
+          <span style={{ fontSize: 10, color: '#4f8cfb', width: 10 }}>{isOpen ? '▾' : '▸'}</span>
+          <span style={{ fontSize: 11 }}>{node.name}</span>
+        </div>
+        {isOpen && node.children && node.children.map((child) =>
+        <FileNode key={child.id} node={child} depth={depth + 1}
+        openFile={openFile} activeFile={activeFile}
+        openFolders={openFolders} toggleFolder={toggleFolder} />
+        )}
+      </div>);
+
+  }
+
+  const extColors = { py: '#9b6cff', svg: '#7fe0ff', html: '#f4d676', md: '#7efdb9', txt: '#bfefff', toml: '#f4d676' };
+  const dotColor = extColors[node.lang] || '#bfefff';
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '3px 8px 3px ' + (20 + depth * 14) + 'px',
+        cursor: 'pointer',
+        background: isActive ? 'rgba(127,224,255,0.1)' : 'transparent',
+        color: isActive ? '#a6fcff' : '#8090b0',
+        borderLeft: isActive ? '2px solid #7fe0ff' : '2px solid transparent'
+      }}
+      onClick={() => openFile(node.id)}>
+      
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+      <span style={{ fontSize: 12 }}>{node.name}</span>
+    </div>);
+
+}
+
+// ── Terminal line renderer ────────────────────────────────────────────────
+function TermLine({ line }) {
+  const styles = {
+    system: { color: '#274063', fontStyle: 'italic' },
+    prompt: { color: '#7fe0ff' },
+    ok: { color: '#7efdb9' },
+    info: { color: '#9b6cff' },
+    warn: { color: '#f4d676' },
+    error: { color: '#ff6b6b' },
+    plain: { color: '#8090b0' }
+  };
+  const prefix = line.kind === 'prompt' ? <span style={{ color: '#4f8cfb' }}>❯ </span> : null;
+  return (
+    <div style={{ ...styles[line.kind], lineHeight: 1.6, padding: '1px 0' }}>
+      {prefix}{line.text}
+    </div>);
+
+}
+
+// ── Agent message renderer ────────────────────────────────────────────────
+function AgentMsg({ msg }) {
+  if (msg.role === 'system') return (
+    <div style={{ color: '#274063', fontSize: 11, fontStyle: 'italic', marginBottom: 4 }}>
+      {msg.text}
+    </div>);
+
+  const isUser = msg.role === 'user';
+  return (
+    <div style={{
+      marginBottom: 14,
+      display: 'flex', flexDirection: 'column',
+      alignItems: isUser ? 'flex-end' : 'flex-start'
+    }}>
+      <div style={{
+        fontSize: 10, color: '#4f8cfb', marginBottom: 3,
+        textTransform: 'uppercase', letterSpacing: '0.08em',
+        textAlign: isUser ? 'right' : 'left'
+      }}>
+        {isUser ? 'You' : 'SEAM Agent'}
+      </div>
+      <div style={{
+        maxWidth: '90%',
+        background: isUser ? 'rgba(79,140,251,0.15)' : 'rgba(8,19,42,0.9)',
+        border: isUser ? '1px solid rgba(79,140,251,0.3)' : '1px solid rgba(127,224,255,0.12)',
+        borderRadius: isUser ? '10px 10px 2px 10px' : '10px 10px 10px 2px',
+        padding: '8px 12px',
+        fontSize: 12.5,
+        color: isUser ? '#a6fcff' : '#bfefff',
+        lineHeight: 1.6,
+        whiteSpace: 'pre-wrap'
+      }}>
+        {msg.text}
+      </div>
+    </div>);
+
+}
+
+// ── Status bar ────────────────────────────────────────────────────────────
+function StatusBar() {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const fmt = (t) => t.toLocaleTimeString('en-US', { hour12: false });
+
+  return (
+    <div style={{
+      height: 24, background: '#020b1f',
+      borderTop: '1px solid rgba(47,99,255,0.25)',
+      display: 'flex', alignItems: 'center',
+      padding: '0 12px', gap: 16,
+      fontSize: 11, color: '#4f8cfb',
+      flexShrink: 0
+    }}>
+      <span style={{ color: '#7efdb9', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7efdb9', display: 'inline-block', boxShadow: '0 0 6px #7efdb9' }} />
+        MIRL connected
+      </span>
+      <span>seam@v0.1.0</span>
+      <span>1.4M memory records stored</span>
+      <span>Top-5 recall accuracy: 91%</span>
+      <div style={{ flex: 1 }} />
+      <span>Python 3.12</span>
+      <span>UTF-8</span>
+      <span style={{ color: '#7fe0ff' }}>{fmt(time)}</span>
+    </div>);
+
+}
+
+// ── Metrics panel ─────────────────────────────────────────────────────────
+function MetricsPanel() {
+  const metrics = [
+  { label: 'Memory records stored', value: '1.4M', color: '#7fe0ff', bar: 0.72, hint: 'Total MIRL records persisted in SQLite' },
+  { label: 'Database size on disk', value: '2.2 GB', color: '#9b6cff', bar: 0.44, hint: 'seam.db + vector indexes combined' },
+  { label: 'Recall accuracy (top 5)', value: '91%', color: '#7efdb9', bar: 0.91, hint: 'How often the right memory appears in top 5 results' },
+  { label: 'Vector index coverage', value: '99.2%', color: '#7efdb9', bar: 0.992, hint: 'Records with an up-to-date vector embedding' },
+  { label: 'Read / Write throughput', value: '4.1k / 2.3k ops/s', color: '#f4d676', bar: 0.6, hint: 'Live database operations per second' }];
+
+  return (
+    <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(47,99,255,0.15)' }}>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4f8cfb', marginBottom: 10 }}>Runtime Health</div>
+      {metrics.map((m) =>
+      <div key={m.label} style={{ marginBottom: 10 }} title={m.hint}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
+            <span style={{ color: '#8090b0' }}>{m.label}</span>
+            <span style={{ color: m.color, fontWeight: 500 }}>{m.value}</span>
+          </div>
+          <div style={{ height: 3, background: '#1a2540', borderRadius: 2 }}>
+            <div style={{ height: '100%', width: m.bar * 100 + '%', background: m.color, borderRadius: 2, boxShadow: `0 0 6px ${m.color}80`, transition: 'width 1s ease' }} />
+          </div>
+        </div>
+      )}
+    </div>);
+
+}
+
+// ── Settings panel ────────────────────────────────────────────────────────
+function SettingsPanel({ onClose, onOpenFile }) {
+  const [activeSection, setActiveSection] = useState('api');
+  const sections = [
+  { id: 'api', label: 'API Keys' },
+  { id: 'env', label: 'Environment' },
+  { id: 'db', label: 'Database' },
+  { id: 'docker', label: 'Docker' },
+  { id: 'seam', label: 'seam config' }];
+
+  const configs = {
+    api: [
+    { key: 'ANTHROPIC_API_KEY',  value: '<local-anthropic-api-key>', hint: 'Claude agent bridge' },
+    { key: 'OPENAI_API_KEY',     value: '', hint: 'Optional — GPT models' },
+    { key: 'GEMINI_API_KEY',     value: '', hint: 'Optional — Gemini models' },
+    { key: 'SEAM_API_TOKEN',     value: '<local-seam-api-token>', hint: 'Bearer token for REST API' },
+    { key: 'PGVECTOR_URL',       value: '', hint: 'PostgreSQL connection string (if using pgvector)' }],
+
+    env: [
+    { key: 'SEAM_DB_PATH',        value: '~/.local/share/seam/state/seam.db', hint: 'SQLite canonical store path' },
+    { key: 'SEAM_VECTOR_BACKEND', value: ['sqlite','chroma'], hint: 'Acceleration layers on top of SQLite', type: 'multiselect', options: [
+      { id: 'sqlite',   label: 'SQLite',   desc: 'Canonical store — always on',     locked: true  },
+      { id: 'chroma',   label: 'Chroma',   desc: 'Local vector acceleration',       locked: false },
+      { id: 'pgvector', label: 'pgvector', desc: 'PostgreSQL vector acceleration',  locked: false },
+    ]},
+    { key: 'SEAM_EMBED_MODEL',    value: 'text-embedding-3-small', hint: 'Embedding model for vector indexing', type: 'select', options: [
+      'text-embedding-3-small','text-embedding-3-large','text-embedding-ada-002','local/sbert','local/e5-large',
+    ]},
+    { key: 'SEAM_LOG_LEVEL',      value: 'INFO', hint: 'Logging verbosity', type: 'select', options: ['DEBUG','INFO','WARNING','ERROR'] },
+    { key: 'SEAM_MAX_BUDGET',     value: '8',    hint: 'Default token budget for context packs' },
+    { key: 'SEAM_WATCH_PATH',     value: '~/projects/seam-watch/', hint: 'Directory auto-ingest agent monitors for new files' },
+    { key: 'SEAM_WATCH_EXTS',     value: '.md,.py,.txt,.json,.yaml,.toml', hint: 'Comma-separated file extensions to auto-ingest' },
+    { key: 'SEAM_WATCH_INTERVAL', value: '5', hint: 'Seconds between directory scans (auto-ingest polling interval)' },
+    { key: 'SEAM_HOST',           value: '127.0.0.1', hint: 'REST API bind address' },
+    { key: 'SEAM_PORT',           value: '8765', hint: 'REST API port' }],
+
+    db: [
+    { key: 'SEAM_DB_PATH',         value: '~/.local/share/seam/state/seam.db', hint: 'Path to the SQLite canonical store' },
+    { key: 'SEAM_DB_WAL_MODE',     value: 'enabled', hint: 'Write-Ahead Logging — enables concurrent reads', type: 'select', options: ['enabled','disabled'] },
+    { key: 'SEAM_DB_CACHE_KB',     value: '65536', hint: 'SQLite page cache size in KB (64MB default)' },
+    { key: 'SEAM_DB_TIMEOUT',      value: '30', hint: 'Connection timeout in seconds' },
+    { key: 'SEAM_DB_BACKUP_PATH',  value: '~/.local/share/seam/backups/', hint: 'Rolling backup directory' },
+    { key: 'SEAM_DB_BACKUP_KEEP',  value: '7', hint: 'Number of daily backups to retain' },
+    { key: 'SEAM_DB_VACUUM_SCHED', value: 'nightly', hint: 'Vacuum schedule', type: 'select', options: ['nightly','weekly','manual','disabled'] },
+    { key: 'PGVECTOR_URL',         value: '', hint: 'PostgreSQL connection string (pgvector acceleration layer)' }],
+
+    docker: [
+    { key: 'SEAM_IMAGE',          value: 'ghcr.io/blackhatshiftey/seam:latest', hint: 'Container image tag' },
+    { key: 'SEAM_CONTAINER_NAME', value: 'seam-runtime', hint: 'docker-compose service name' },
+    { key: 'DB_VOLUME',           value: './data/seam:/root/.local/share/seam', hint: 'Persistent volume mount for SQLite' },
+    { key: 'PORT_BINDING',        value: '8765:8765', hint: 'REST API host:container port mapping' },
+    { key: 'RESTART_POLICY',      value: 'unless-stopped', hint: 'Container restart behavior', type: 'select', options: ['unless-stopped','always','on-failure','no'] },
+    { key: 'SEAM_DOCKER_ENV',     value: 'production', hint: 'Runtime environment profile', type: 'select', options: ['production','development','test'] },
+    { key: 'COMPOSE_FILE',        value: './docker-compose.yaml', hint: 'Path to compose file' }],
+
+    seam: [
+    { key: 'retrieval_default_mode',   value: 'mix',    hint: 'Default retrieval strategy', type: 'select', options: ['mix','vector','graph','hybrid','lexical'] },
+    { key: 'retrieval_default_budget', value: '8',      hint: 'Default token budget for context packs' },
+    { key: 'benchmark_holdout_gate',   value: 'strict', hint: 'Gate mode for benchmark claims', type: 'select', options: ['strict','relaxed','off'] },
+    { key: 'ingest_chunk_size',        value: '512',    hint: 'Token chunk size for ingestion' },
+    { key: 'pack_max_tokens',          value: '4096',   hint: 'Max tokens per context pack' },
+    { key: 'sbert_device',             value: 'cpu',    hint: 'Device for local embeddings', type: 'select', options: ['cpu','cuda','mps'] }]
+
+  };
+  const rows = configs[activeSection] || [];
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 100,
+      background: 'rgba(2,9,19,0.92)', backdropFilter: 'blur(4px)',
+      display: 'flex', flexDirection: 'column'
+    }}>
+      {/* Header */}
+      <div style={{
+        height: 40, background: '#020913', borderBottom: '1px solid rgba(47,99,255,0.2)',
+        display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0
+      }}>
+        <span style={{ color: '#4f8cfb', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Settings</span>
+        <div style={{ flex: 1 }} />
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#5a7a9a', cursor: 'pointer', fontSize: 18 }}>×</button>
+      </div>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Sidebar */}
+        <div style={{ width: 160, background: '#020b1e', borderRight: '1px solid rgba(47,99,255,0.12)', flexShrink: 0, paddingTop: 8 }}>
+          {sections.map((s) =>
+          <div key={s.id} onClick={() => setActiveSection(s.id)} style={{
+            padding: '7px 16px', fontSize: 12, cursor: 'pointer',
+            color: activeSection === s.id ? '#7fe0ff' : '#5a7a9a',
+            background: activeSection === s.id ? 'rgba(127,224,255,0.07)' : 'transparent',
+            borderLeft: activeSection === s.id ? '2px solid #7fe0ff' : '2px solid transparent'
+          }}>{s.label}</div>
+          )}
+        </div>
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#4f8cfb', marginBottom: 14 }}>
+            {sections.find((s) => s.id === activeSection)?.label}
+          </div>
+          {rows.map((row) =>
+          <div key={row.key} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ color: '#7fe0ff', fontSize: 11 }}>{row.key}</span>
+                <span style={{ color: '#274063', fontSize: 10, fontStyle: 'italic' }}>{row.hint}</span>
+              </div>
+
+              {row.type === 'multiselect' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {row.options.map(opt => {
+                    const [selected, setSelected] = React.useState(row.value.includes(opt.id));
+                    return (
+                      <div key={opt.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '7px 10px', borderRadius: 6,
+                        background: selected ? 'rgba(127,224,255,0.07)' : 'rgba(8,19,42,0.6)',
+                        border: `1px solid ${selected ? 'rgba(127,224,255,0.25)' : 'rgba(47,99,255,0.15)'}`,
+                        cursor: opt.locked ? 'default' : 'pointer',
+                        transition: 'all 0.15s',
+                      }} onClick={() => !opt.locked && setSelected(v => !v)}>
+                        <div style={{
+                          width: 28, height: 15, borderRadius: 8, flexShrink: 0, position: 'relative',
+                          background: selected ? '#7fe0ff' : '#1a2540',
+                          border: `1px solid ${selected ? '#7fe0ff' : '#274063'}`,
+                          transition: 'background 0.2s',
+                          opacity: opt.locked ? 0.5 : 1,
+                        }}>
+                          <div style={{
+                            position: 'absolute', top: 1, left: selected ? 13 : 1,
+                            width: 11, height: 11, borderRadius: '50%',
+                            background: selected ? '#020b1e' : '#274063',
+                            transition: 'left 0.2s',
+                          }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, color: selected ? '#a6fcff' : '#5a7a9a', fontWeight: selected ? 500 : 400 }}>{opt.label}</span>
+                            {opt.locked && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(127,224,255,0.08)', color: '#4f8cfb', border: '1px solid rgba(79,140,251,0.2)' }}>canonical · always on</span>}
+                            {!opt.locked && selected && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(126,253,185,0.08)', color: '#7efdb9', border: '1px solid rgba(126,253,185,0.2)' }}>acceleration layer</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#274063', marginTop: 1 }}>{opt.desc}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: 9, color: '#274063', fontStyle: 'italic', paddingLeft: 2 }}>
+                    SQLite is always the source of truth. Chroma and pgvector are optional rebuild-able acceleration layers.
+                  </div>
+                </div>
+              ) : row.type === 'select' ? (
+                <select defaultValue={row.value} style={{
+                  width: '100%', background: '#030d20',
+                  border: '1px solid rgba(47,99,255,0.2)', borderRadius: 5,
+                  padding: '6px 10px', color: '#a6fcff',
+                  fontSize: 12, fontFamily: 'var(--font)', outline: 'none',
+                  cursor: 'pointer', appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%234f8cfb' strokeWidth='1.5' strokeLinecap='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+                  paddingRight: 28,
+                }}>
+                  {row.options.map(opt => (
+                    <option key={opt} value={opt} style={{ background: '#030d20', color: '#a6fcff' }}>{opt}</option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input
+                    defaultValue={row.value}
+                    type={row.key.toLowerCase().includes('key') || row.key.toLowerCase().includes('token') ? 'password' : 'text'}
+                    style={{
+                      flex: 1, background: '#030d20',
+                      border: '1px solid rgba(47,99,255,0.2)', borderRadius: 5,
+                      padding: '6px 10px', color: '#bfefff',
+                      fontSize: 12, fontFamily: 'var(--font)', outline: 'none',
+                    }} />
+                  {(String(row.value).endsWith('.yaml') || String(row.value).endsWith('.toml') || String(row.value).endsWith('.env') || String(row.value).endsWith('.db')) && (
+                    <button
+                      onClick={() => {
+                        const fileMap = {
+                          'docker-compose.yaml': 'docker-compose',
+                          'config.toml': 'config-toml',
+                          '.env': 'dot-env',
+                        };
+                        const fname = String(row.value).split('/').pop();
+                        const tabId = fileMap[fname];
+                        if (tabId && onOpenFile) { onOpenFile(tabId); onClose(); }
+                      }}
+                      title="Open in editor"
+                      style={{
+                        flexShrink: 0, padding: '5px 8px', borderRadius: 5,
+                        background: 'rgba(79,140,251,0.1)', border: '1px solid rgba(79,140,251,0.25)',
+                        color: '#4f8cfb', cursor: 'pointer', fontSize: 10, fontFamily: 'var(--font)',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M18 2l4 4-9 9H9v-4l9-9z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      edit
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <button style={{
+            marginTop: 8, padding: '7px 18px',
+            background: 'rgba(79,140,251,0.15)', border: '1px solid rgba(79,140,251,0.3)',
+            borderRadius: 5, color: '#7fe0ff', fontSize: 12, fontFamily: 'var(--font)',
+            cursor: 'pointer'
+          }}>Save changes</button>
+        </div>
+      </div>
+    </div>);
+
+}
+
+// ── File system browser ────────────────────────────────────────────────────
+const systemPaths = [
+{ id: 'home', name: '~  (home)', type: 'folder', children: [
+  { id: 'local_share', name: '.local/share/seam/', type: 'folder', children: [
+    { id: 'seam_db', name: 'seam.db', type: 'dbfile', size: '2.2 GB' },
+    { id: 'backups', name: 'backups/', type: 'folder', children: [
+      { id: 'bk1', name: 'seam-2026-04-28.db', type: 'dbfile', size: '2.1 GB' },
+      { id: 'bk2', name: 'seam-2026-04-27.db', type: 'dbfile', size: '2.0 GB' }]
+    },
+    { id: 'vectors', name: 'vectors.sqlite', type: 'dbfile', size: '860 MB' },
+    { id: 'logs', name: 'seam.log', type: 'file', lang: 'txt' }]
+  },
+  { id: 'proj', name: 'projects/Seam/', type: 'folder', children: [
+    { id: 'srt', name: 'seam_runtime/', type: 'folder', children: [] },
+    { id: 'srpy', name: 'seam.py', type: 'file', lang: 'py' },
+    { id: 'rq', name: 'requirements.txt', type: 'file', lang: 'txt' }]
+  }]
+},
+{ id: 'sys_etc', name: '/etc/seam/', type: 'folder', children: [
+  { id: 'cfg', name: 'config.toml', type: 'file', lang: 'toml' },
+  { id: 'envf', name: '.env', type: 'file', lang: 'txt' }]
+},
+{ id: 'sys_tmp', name: '/tmp/', type: 'folder', children: [
+  { id: 'pack1', name: 'seam-pack-a1b2c3.tmp', type: 'file', lang: 'txt' }]
+}];
+
+
+function FsNode({ node, depth, openFolders, toggleFolder }) {
+  const isOpen = openFolders.has(node.id);
+  if (node.type === 'folder') {
+    return (
+      <div>
+        <div onClick={() => toggleFolder(node.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: `3px 8px 3px ${8 + depth * 14}px`,
+          cursor: 'pointer', color: '#7fe0ff', userSelect: 'none',
+          background: isOpen ? 'rgba(79,140,251,0.05)' : 'transparent'
+        }}>
+          <span style={{ fontSize: 10, color: '#4f8cfb', width: 10 }}>{isOpen ? '▾' : '▸'}</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#4f8cfb" strokeWidth="1.5" />
+          </svg>
+          <span style={{ fontSize: 11 }}>{node.name}</span>
+        </div>
+        {isOpen && node.children && node.children.map((c) =>
+        <FsNode key={c.id} node={c} depth={depth + 1} openFolders={openFolders} toggleFolder={toggleFolder} />
+        )}
+      </div>);
+
+  }
+  const isDb = node.type === 'dbfile';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: `3px 8px 3px ${20 + depth * 14}px`,
+      color: isDb ? '#f4d676' : '#8090b0', fontSize: 12
+    }}>
+      {isDb ?
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="8" ry="3" stroke="#f4d676" strokeWidth="1.5" /><path d="M4 6v6c0 1.657 3.582 3 8 3s8-1.343 8-3V6" stroke="#f4d676" strokeWidth="1.5" /><path d="M4 12v6c0 1.657 3.582 3 8 3s8-1.343 8-3v-6" stroke="#f4d676" strokeWidth="1.5" /></svg> :
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#274063', flexShrink: 0, display: 'inline-block' }} />
+      }
+      <span>{node.name}</span>
+      {node.size && <span style={{ marginLeft: 'auto', color: '#274063', fontSize: 10 }}>{node.size}</span>}
+    </div>);
+
+}
+
+// ── Model options ─────────────────────────────────────────────────────────
+const MODEL_OPTIONS = [
+{ id: 'claude-haiku', label: 'Claude Haiku 3.5', provider: 'Anthropic', color: '#d391ff' },
+{ id: 'claude-sonnet', label: 'Claude Sonnet 3.7', provider: 'Anthropic', color: '#d391ff' },
+{ id: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI', color: '#7efdb9' },
+{ id: 'gpt-4o-mini', label: 'GPT-4o mini', provider: 'OpenAI', color: '#7efdb9' },
+{ id: 'gemini-2.0', label: 'Gemini 2.0 Flash', provider: 'Google', color: '#7fe0ff' },
+{ id: 'ollama-llama', label: 'Llama 3.3 (local)', provider: 'Ollama', color: '#f4d676' },
+{ id: 'ollama-mistral', label: 'Mistral (local)', provider: 'Ollama', color: '#f4d676' }];
+
+
+// ── Ingest Panel ─────────────────────────────────────────────────────────
+const ingestStages = ['Select files', 'Parse & chunk', 'Compile MIRL', 'Embed vectors', 'Persist to DB'];
+
+function IngestPanel({ width, onOpenSettings }) {
+  const [files, setFiles] = useState([
+    { id: 'f1', name: 'README.md',          size: '7.2 KB',  status: 'done',    stage: 4, records: 12 },
+    { id: 'f2', name: 'ROADMAP.md',         size: '25.6 KB', status: 'running', stage: 2, records: 0  },
+    { id: 'f3', name: 'SEAM_SPEC_V0.1.md',  size: '24.8 KB', status: 'queued',  stage: 0, records: 0  },
+    { id: 'f4', name: 'HISTORY.md',         size: '116 KB',  status: 'queued',  stage: 0, records: 0  },
+  ]);
+  const [dragOver, setDragOver] = useState(false);
+  const [batchMode, setBatchMode] = useState('persist');
+  const [autoMode, setAutoMode] = useState(false);
+  const [autoLog, setAutoLog] = useState([]);
+  const [watchPath, setWatchPath] = useState('~/projects/seam-watch/');
+  const autoRef = useRef(null);
+
+  // Auto-ingest loop
+  useEffect(() => {
+    if (!autoMode) {
+      if (autoRef.current) clearInterval(autoRef.current);
+      return;
+    }
+    setAutoLog(prev => [...prev, { t: new Date().toLocaleTimeString('en-US',{hour12:false}), msg: `Auto-ingest active — watching ${watchPath}`, kind: 'info' }]);
+    autoRef.current = setInterval(() => {
+      // Simulate agent finding and auto-ingesting data
+      const actions = [
+        'Agent retrieved 3 new MIRL records from context — auto-persisting',
+        'New file detected: agent_output.json — queuing for ingest',
+        'Vector index sync triggered — 12 new embeddings',
+        'Memory consolidation: 4 duplicate records merged',
+        'Auto-ingest: clm:51–clm:56 persisted to SQLite',
+      ];
+      const msg = actions[Math.floor(Math.random() * actions.length)];
+      setAutoLog(prev => [...prev.slice(-19), { t: new Date().toLocaleTimeString('en-US',{hour12:false}), msg, kind: 'ok' }]);
+      // Occasionally mark a queued file as running then done
+      setFiles(prev => {
+        const queued = prev.find(f => f.status === 'queued');
+        if (queued) return prev.map(f => f.id === queued.id ? { ...f, status: 'running', stage: 1 } : f);
+        const running = prev.find(f => f.status === 'running');
+        if (running) return prev.map(f => f.id === running.id ? { ...f, status: 'done', stage: 5, records: Math.floor(Math.random()*20)+5 } : f);
+        return prev;
+      });
+    }, 2200);
+    return () => clearInterval(autoRef.current);
+  }, [autoMode]);
+
+  const statusColor = { done: '#7efdb9', running: '#7fe0ff', queued: '#274063', error: '#ff6b6b' };
+  const statusLabel = { done: 'done', running: 'ingesting', queued: 'queued', error: 'error' };
+
+  const addDemoFile = () => {
+    const names = ['agent_memory.py', 'benchmarks.py', 'storage.py', 'mirl.py', 'cli.py', 'runtime.py'];
+    const name = names[Math.floor(Math.random() * names.length)];
+    setFiles(prev => [...prev, { id: 'f' + Date.now(), name, size: (Math.random() * 60 + 2).toFixed(1) + ' KB', status: 'queued', stage: 0, records: 0 }]);
+  };
+
+  const removeFile = (id) => setFiles(prev => prev.filter(f => f.id !== id));
+
+  const runAll = () => setFiles(prev => prev.map(f => f.status === 'queued' ? { ...f, status: 'running', stage: 1 } : f));
+
+  const totalRecords = files.reduce((s, f) => s + f.records, 0);
+  const done = files.filter(f => f.status === 'done').length;
+  const running = files.filter(f => f.status === 'running').length;
+
+  return (
+    <div style={{ width, flexShrink: 0, overflow: 'hidden', transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)', background: '#030d20', borderRight: '1px solid rgba(47,99,255,0.15)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '7px 12px 0', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#4f8cfb', borderBottom: '1px solid rgba(47,99,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span>Ingest</span>
+        <span style={{ color: '#7efdb9', fontSize: 9 }}>{done}/{files.length} done · {totalRecords} records</span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* Auto-ingest banner */}
+        <div style={{
+          margin: '8px 12px 4px',
+          padding: '8px 10px',
+          borderRadius: 7,
+          background: autoMode ? 'rgba(126,253,185,0.07)' : 'rgba(8,19,42,0.6)',
+          border: `1px solid ${autoMode ? 'rgba(126,253,185,0.25)' : 'rgba(47,99,255,0.15)'}`,
+          transition: 'all 0.2s',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Auto toggle */}
+            <div onClick={() => setAutoMode(v => !v)} style={{
+              width: 34, height: 18, borderRadius: 9, flexShrink: 0, position: 'relative',
+              background: autoMode ? '#7efdb9' : '#1a2540',
+              border: `1px solid ${autoMode ? '#7efdb9' : '#274063'}`,
+              cursor: 'pointer', transition: 'background 0.2s',
+            }}>
+              <div style={{
+                position: 'absolute', top: 2, left: autoMode ? 16 : 2,
+                width: 12, height: 12, borderRadius: '50%',
+                background: autoMode ? '#020b1e' : '#274063',
+                transition: 'left 0.2s',
+              }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: autoMode ? '#7efdb9' : '#5a7a9a', fontWeight: autoMode ? 500 : 400 }}>Auto-ingest</span>
+                {autoMode && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(126,253,185,0.1)', color: '#7efdb9', border: '1px solid rgba(126,253,185,0.2)', animation: 'pulse 1.5s ease-in-out infinite' }}>● live</span>}
+              </div>
+              <div style={{ fontSize: 9, color: '#274063', marginTop: 1 }}>
+                Agent automatically ingests &amp; persists new data to DB
+              </div>
+              {/* Watch path row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, padding: '4px 6px', background: 'rgba(8,19,42,0.6)', borderRadius: 4, border: '1px solid rgba(47,99,255,0.12)' }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#4f8cfb" strokeWidth="1.5"/>
+                </svg>
+                <input
+                  value={watchPath}
+                  onChange={e => setWatchPath(e.target.value)}
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: autoMode ? '#7fe0ff' : '#5a7a9a', fontSize: 10, fontFamily: 'var(--font)', minWidth: 0 }}
+                />
+                <button
+                  onClick={() => onOpenSettings && onOpenSettings('env')}
+                  title="Open in settings"
+                  style={{ background: 'none', border: 'none', color: '#274063', cursor: 'pointer', fontSize: 10, fontFamily: 'var(--font)', padding: '0 2px', flexShrink: 0 }}
+                >⚙</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Auto log */}
+          {autoMode && autoLog.length > 0 && (
+            <div style={{ marginTop: 8, borderTop: '1px solid rgba(126,253,185,0.1)', paddingTop: 6, maxHeight: 80, overflowY: 'auto' }}>
+              {autoLog.slice(-5).map((l, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, fontSize: 9, lineHeight: 1.5 }}>
+                  <span style={{ color: '#274063', flexShrink: 0 }}>{l.t}</span>
+                  <span style={{ color: l.kind === 'ok' ? '#7efdb9' : '#4f8cfb' }}>{l.msg}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Drop zone */}
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); addDemoFile(); }}
+          onClick={addDemoFile}
+          style={{
+            margin: '6px 12px 8px', borderRadius: 8, cursor: 'pointer',
+            border: `1px dashed ${dragOver ? '#7fe0ff' : 'rgba(79,140,251,0.25)'}`,
+            background: dragOver ? 'rgba(127,224,255,0.06)' : 'rgba(8,19,42,0.5)',
+            padding: '14px 12px', textAlign: 'center',
+            transition: 'all 0.15s',
+          }}>
+          <div style={{ fontSize: 11, color: dragOver ? '#7fe0ff' : '#4f6888', marginBottom: 3 }}>
+            {dragOver ? 'Drop to add' : '+ Drop files or click to add'}
+          </div>
+          <div style={{ fontSize: 9, color: '#274063' }}>txt · md · py · json · yaml · toml · any text file</div>
+        </div>
+
+        {/* Batch options */}
+        <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 9, color: '#4f6888', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Mode</span>
+          {['persist', 'dry-run', 'reindex'].map(m => (
+            <button key={m} onClick={() => setBatchMode(m)} style={{
+              padding: '2px 8px', fontSize: 9, borderRadius: 3, cursor: 'pointer', fontFamily: 'var(--font)',
+              background: batchMode === m ? 'rgba(127,224,255,0.1)' : 'transparent',
+              border: `1px solid ${batchMode === m ? 'rgba(127,224,255,0.3)' : 'rgba(47,99,255,0.15)'}`,
+              color: batchMode === m ? '#7fe0ff' : '#4f6888',
+            }}>{m}</button>
+          ))}
+          <div style={{ flex: 1 }} />
+          <button onClick={runAll} style={{
+            padding: '3px 10px', fontSize: 9, borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--font)',
+            background: 'rgba(126,253,185,0.1)', border: '1px solid rgba(126,253,185,0.3)', color: '#7efdb9',
+          }}>▶ Run all</button>
+        </div>
+
+        {/* Pipeline stages legend */}
+        <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto' }}>
+          {ingestStages.map((s, i) => (
+            <React.Fragment key={s}>
+              <div style={{ fontSize: 8, color: '#274063', whiteSpace: 'nowrap', padding: '2px 4px' }}>{i + 1}. {s}</div>
+              {i < ingestStages.length - 1 && <span style={{ color: '#1a2540', fontSize: 8 }}>›</span>}
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div style={{ borderTop: '1px solid rgba(47,99,255,0.08)' }} />
+
+        {/* File list */}
+        {files.map(f => (
+          <div key={f.id} style={{ padding: '8px 12px', borderBottom: '1px solid rgba(47,99,255,0.07)' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,140,251,0.04)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor[f.status], flexShrink: 0, boxShadow: f.status === 'running' ? `0 0 5px ${statusColor[f.status]}` : 'none' }} />
+              <span style={{ fontSize: 11, color: f.status === 'done' ? '#bfefff' : f.status === 'running' ? '#7fe0ff' : '#5a7a9a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+              <span style={{ fontSize: 9, color: '#274063', flexShrink: 0 }}>{f.size}</span>
+              <button onClick={() => removeFile(f.id)} style={{ background: 'none', border: 'none', color: '#274063', cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
+            </div>
+
+            {/* Stage pipeline bar */}
+            <div style={{ display: 'flex', gap: 2, marginBottom: 3 }}>
+              {ingestStages.map((s, i) => (
+                <div key={s} title={s} style={{
+                  flex: 1, height: 3, borderRadius: 1,
+                  background: i < f.stage ? '#7efdb9' : i === f.stage && f.status === 'running' ? '#7fe0ff' : '#1a2540',
+                  boxShadow: i === f.stage && f.status === 'running' ? '0 0 4px #7fe0ff' : 'none',
+                  transition: 'background 0.3s',
+                }} />
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#274063' }}>
+              <span style={{ color: statusColor[f.status] }}>{statusLabel[f.status]}{f.status === 'running' ? ` — ${ingestStages[f.stage]}` : ''}</span>
+              {f.records > 0 && <span style={{ color: '#7efdb9' }}>{f.records} MIRL records</span>}
+            </div>
+          </div>
+        ))}
+
+        {files.length === 0 && (
+          <div style={{ padding: '20px 12px', textAlign: 'center', color: '#274063', fontSize: 11 }}>No files queued</div>
+        )}
+
+        {/* Summary footer */}
+        {files.length > 0 && (
+          <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(47,99,255,0.08)', fontSize: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888', marginBottom: 3 }}>
+              <span>Files queued</span><span style={{ color: '#bfefff' }}>{files.length}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888', marginBottom: 3 }}>
+              <span>Completed</span><span style={{ color: '#7efdb9' }}>{done}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888', marginBottom: 3 }}>
+              <span>Running</span><span style={{ color: '#7fe0ff' }}>{running}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888' }}>
+              <span>MIRL records written</span><span style={{ color: '#7efdb9' }}>{totalRecords}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Memory Panel ─────────────────────────────────────────────────────────
+const memoryRecords = [
+  { id: 'clm:1',        tag: '@', kind: 'entity',   text: 'SEAM persistent local memory runtime for agents', score: 0.97, age: '2m ago',  status: 'indexed' },
+  { id: 'clm:4',        tag: '#', kind: 'claim',    text: 'SQLite is the canonical source of truth; vector stores are acceleration layers', score: 0.94, age: '4m ago',  status: 'indexed' },
+  { id: 'sta:ent:seam', tag: '~', kind: 'state',    text: 'project:seam active — benchmark suite passing, vector sync at 99.2%', score: 0.91, age: '6m ago',  status: 'indexed' },
+  { id: 'clm:12',       tag: '!', kind: 'event',    text: 'Refinement agent 4 flagged contradiction cluster in model_v3', score: 0.88, age: '11m ago', status: 'indexed' },
+  { id: 'clm:17',       tag: '>', kind: 'relation',  text: 'agent_bridge relates_to: mcp_serve, context_pack, stdio_bridge', score: 0.85, age: '18m ago', status: 'indexed' },
+  { id: 'clm:22',       tag: '^', kind: 'evidence',  text: 'benchmark gate: hit@5=0.91 verified against holdout fixtures sha:a3f9', score: 0.83, age: '22m ago', status: 'indexed' },
+  { id: 'clm:29',       tag: '%', kind: 'source',   text: 'source: SEAM_SPEC_V0.1.md — MIRL record schema definition', score: 0.79, age: '31m ago', status: 'indexed' },
+  { id: 'clm:33',       tag: '=', kind: 'alias',    text: 'PACK aliases: context_pack = token-bounded MIRL view for agent prompt', score: 0.76, age: '45m ago', status: 'indexed' },
+];
+
+const writeQueue = [
+  { id: 'wq:001', op: 'WRITE',  text: 'Ingesting README.md — compiling 12 MIRL records',   progress: 0.72, status: 'writing' },
+  { id: 'wq:002', op: 'INDEX',  text: 'Vector embedding 8 new records via text-embedding-3-small', progress: 0.45, status: 'writing' },
+  { id: 'wq:003', op: 'STORE',  text: 'Persisting context pack clm:44–clm:49 to SQLite',   progress: 0.91, status: 'writing' },
+  { id: 'wq:004', op: 'QUEUE',  text: 'Pending: ingest ROADMAP.md (scheduled)',             progress: 0,    status: 'pending' },
+  { id: 'wq:005', op: 'QUEUE',  text: 'Pending: reindex graph edges for clm:1–clm:20',     progress: 0,    status: 'pending' },
+];
+
+const provenanceNodes = [
+  { id: 'n1', x: 120, y: 60,  label: 'README.md',      color: '#f4d676', type: 'source' },
+  { id: 'n2', x: 280, y: 40,  label: 'clm:1 @SEAM',    color: '#a6fcff', type: 'entity' },
+  { id: 'n3', x: 260, y: 120, label: 'clm:4 #SQLite',  color: '#7fe0ff', type: 'claim' },
+  { id: 'n4', x: 420, y: 70,  label: 'sta:ent:seam',   color: '#7efdb9', type: 'state' },
+  { id: 'n5', x: 400, y: 150, label: 'clm:12 !event',  color: '#f4d676', type: 'event' },
+  { id: 'n6', x: 540, y: 100, label: 'agent_bridge',   color: '#d391ff', type: 'relation' },
+  { id: 'n7', x: 160, y: 150, label: 'SPEC_V0.1.md',   color: '#f4d676', type: 'source' },
+  { id: 'n8', x: 320, y: 190, label: 'clm:22 ^bench',  color: '#d391ff', type: 'evidence' },
+];
+
+const provenanceEdges = [
+  { from: 'n1', to: 'n2' }, { from: 'n1', to: 'n3' },
+  { from: 'n2', to: 'n4' }, { from: 'n3', to: 'n4' },
+  { from: 'n4', to: 'n6' }, { from: 'n5', to: 'n6' },
+  { from: 'n7', to: 'n3' }, { from: 'n7', to: 'n8' },
+  { from: 'n8', to: 'n4' }, { from: 'n2', to: 'n5' },
+];
+
+const tagColors = { '@': '#a6fcff', '#': '#7fe0ff', '!': '#f4d676', '>': '#9b6cff', '~': '#7efdb9', '^': '#d391ff', '%': '#66b8ff', '=': '#8df6ff' };
+
+function ProvenanceGraph({ nodes, edges, highlight, onHover }) {
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  return (
+    <svg width="100%" height="220" viewBox="0 0 640 220" style={{ display: 'block' }}>
+      <defs>
+        <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="#1a2540" />
+        </marker>
+      </defs>
+      {/* edges */}
+      {edges.map((e, i) => {
+        const a = nodeMap[e.from], b = nodeMap[e.to];
+        if (!a || !b) return null;
+        const isHot = highlight === e.from || highlight === e.to;
+        return (
+          <line key={i}
+            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+            stroke={isHot ? '#4f8cfb' : '#1a2540'}
+            strokeWidth={isHot ? 1.5 : 1}
+            strokeOpacity={isHot ? 0.8 : 0.4}
+            markerEnd="url(#arrow)"
+          />
+        );
+      })}
+      {/* nodes */}
+      {nodes.map(n => {
+        const isHot = highlight === n.id;
+        return (
+          <g key={n.id} onMouseEnter={() => onHover(n.id)} onMouseLeave={() => onHover(null)} style={{ cursor: 'pointer' }}>
+            <circle cx={n.x} cy={n.y} r={isHot ? 22 : 18}
+              fill={isHot ? n.color + '22' : '#08132a'}
+              stroke={n.color}
+              strokeWidth={isHot ? 2 : 1}
+              style={{ filter: isHot ? `drop-shadow(0 0 6px ${n.color})` : 'none', transition: 'all 0.15s' }}
+            />
+            <text x={n.x} y={n.y + 1} textAnchor="middle" dominantBaseline="middle"
+              fontSize="8" fill={n.color} fontFamily="JetBrains Mono, monospace" fontWeight="500">
+              {n.label.length > 10 ? n.label.slice(0, 10) + '…' : n.label}
+            </text>
+            <text x={n.x} y={n.y + 30} textAnchor="middle" fontSize="7" fill="#274063" fontFamily="JetBrains Mono, monospace">
+              {n.type}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function MemoryPanel({ width }) {
+  const [tab, setTab] = useState('records');
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  // animate write queue progress
+  useEffect(() => {
+    const t = setInterval(() => setTick(v => v + 1), 1200);
+    return () => clearInterval(t);
+  }, []);
+
+  const memStats = [
+    { label: 'Total records',       value: '1,412,048', color: '#7fe0ff' },
+    { label: 'Indexed today',        value: '2,847',     color: '#7efdb9' },
+    { label: 'Pending write queue',  value: '5',         color: '#f4d676' },
+    { label: 'Graph edges',          value: '841,203',   color: '#9b6cff' },
+    { label: 'Avg retrieval latency',value: '38 ms',     color: '#7efdb9' },
+    { label: 'Last compaction',      value: '03:00 UTC', color: '#66b8ff' },
+    { label: 'Vector drift',         value: '0.8%',      color: '#7efdb9' },
+    { label: 'Contradiction flags',  value: '3 active',  color: '#f4d676' },
+  ];
+
+  const tabs = ['records', 'writing', 'graph', 'stats'];
+
+  return (
+    <div style={{ width, flexShrink: 0, overflow: 'hidden', transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)', background: '#030d20', borderRight: '1px solid rgba(47,99,255,0.15)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '7px 12px 0', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#4f8cfb', borderBottom: '1px solid rgba(47,99,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span>Memory</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#7efdb9', boxShadow: '0 0 5px #7efdb9', display: 'inline-block' }} />
+          <span style={{ color: '#7efdb9', fontSize: 9 }}>live</span>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(47,99,255,0.1)', flexShrink: 0 }}>
+        {tabs.map(t => (
+          <div key={t} onClick={() => setTab(t)} style={{
+            flex: 1, textAlign: 'center', padding: '5px 0', fontSize: 9,
+            textTransform: 'uppercase', letterSpacing: '0.07em', cursor: 'pointer',
+            color: tab === t ? '#7fe0ff' : '#274063',
+            borderBottom: tab === t ? '2px solid #7fe0ff' : '2px solid transparent',
+          }}>{t}</div>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* ── Records tab ── */}
+        {tab === 'records' && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '2px 12px 6px', fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Recent memories stored by agent</div>
+            {memoryRecords.map(r => (
+              <div key={r.id} style={{ padding: '6px 12px', borderBottom: '1px solid rgba(47,99,255,0.07)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,140,251,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, color: tagColors[r.tag] || '#7fe0ff', width: 12, flexShrink: 0, fontWeight: 700 }}>{r.tag}</span>
+                  <span style={{ fontSize: 10, color: '#4f8cfb', flexShrink: 0 }}>{r.id}</span>
+                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: 9, color: '#7efdb9' }}>{(r.score * 100).toFixed(0)}%</span>
+                  <span style={{ fontSize: 9, color: '#274063' }}>{r.age}</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#8090b0', lineHeight: 1.4, paddingLeft: 18 }}>{r.text}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, paddingLeft: 18 }}>
+                  <div style={{ height: 2, flex: 1, background: '#1a2540', borderRadius: 1 }}>
+                    <div style={{ height: '100%', width: (r.score * 100) + '%', background: tagColors[r.tag] || '#7fe0ff', borderRadius: 1 }} />
+                  </div>
+                  <span style={{ fontSize: 8, color: '#274063', flexShrink: 0 }}>{r.kind}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Writing tab ── */}
+        {tab === 'writing' && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '2px 12px 6px', fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Active writes &amp; pending queue</div>
+            {writeQueue.map((w, i) => {
+              const liveProgress = w.status === 'writing' ? Math.min(1, w.progress + ((tick * 0.04) % (1 - w.progress))) : w.progress;
+              return (
+                <div key={w.id} style={{ padding: '8px 12px', borderBottom: '1px solid rgba(47,99,255,0.07)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: w.status === 'writing' ? 'rgba(127,224,255,0.1)' : 'rgba(39,64,99,0.3)', color: w.status === 'writing' ? '#7fe0ff' : '#274063', letterSpacing: '0.06em' }}>{w.op}</span>
+                    <span style={{ fontSize: 9, color: w.status === 'writing' ? '#7efdb9' : '#274063' }}>{w.status === 'writing' ? '● writing' : '○ queued'}</span>
+                    <div style={{ flex: 1 }} />
+                    <span style={{ fontSize: 9, color: '#4f8cfb' }}>{w.id}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8090b0', lineHeight: 1.4, marginBottom: 5 }}>{w.text}</div>
+                  <div style={{ height: 3, background: '#1a2540', borderRadius: 2 }}>
+                    <div style={{ height: '100%', width: (liveProgress * 100) + '%', background: w.status === 'writing' ? '#7efdb9' : '#274063', borderRadius: 2, transition: 'width 0.8s ease', boxShadow: w.status === 'writing' ? '0 0 6px #7efdb980' : 'none' }} />
+                  </div>
+                  {w.status === 'writing' && <div style={{ fontSize: 9, color: '#7efdb9', marginTop: 2, textAlign: 'right' }}>{(liveProgress * 100).toFixed(0)}%</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Graph tab ── */}
+        {tab === 'graph' && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '2px 12px 6px', fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Provenance graph — hover nodes to trace</div>
+            <div style={{ padding: '0 8px', background: '#020b1e', borderTop: '1px solid rgba(47,99,255,0.08)', borderBottom: '1px solid rgba(47,99,255,0.08)' }}>
+              <ProvenanceGraph nodes={provenanceNodes} edges={provenanceEdges} highlight={hoveredNode} onHover={setHoveredNode} />
+            </div>
+            <div style={{ padding: '8px 12px' }}>
+              <div style={{ fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Node legend</div>
+              {[['@','entity','#a6fcff'],['#','claim','#7fe0ff'],['!','event','#f4d676'],['>','relation','#9b6cff'],['~','state','#7efdb9'],['^','evidence','#d391ff'],['%','source','#66b8ff']].map(([tag, kind, color]) => (
+                <div key={tag} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                  <span style={{ fontWeight: 700, color, fontSize: 11, width: 12 }}>{tag}</span>
+                  <span style={{ color: '#5a7a9a', fontSize: 10 }}>{kind}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Stats tab ── */}
+        {tab === 'stats' && (
+          <div style={{ padding: '10px 12px' }}>
+            <div style={{ fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Memory subsystem stats</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {memStats.map(s => (
+                <div key={s.label} style={{ background: '#020b1e', border: '1px solid rgba(47,99,255,0.12)', borderRadius: 6, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 9, color: '#4f6888', marginBottom: 3, lineHeight: 1.3 }}>{s.label}</div>
+                  <div style={{ fontSize: 13, color: s.color, fontWeight: 500 }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 14, fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Retrieval modes active</div>
+            {[
+              { mode: 'vector',  pct: 0.68, color: '#9b6cff', ops: '1.1k ops/s' },
+              { mode: 'graph',   pct: 0.21, color: '#7fe0ff', ops: '320 ops/s' },
+              { mode: 'lexical', pct: 0.08, color: '#f4d676', ops: '130 ops/s' },
+              { mode: 'mix',     pct: 0.03, color: '#7efdb9', ops: '48 ops/s' },
+            ].map(r => (
+              <div key={r.mode} style={{ marginBottom: 7 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                  <span style={{ color: r.color }}>{r.mode}</span>
+                  <span style={{ color: '#5a7a9a' }}>{r.ops}</span>
+                </div>
+                <div style={{ height: 3, background: '#1a2540', borderRadius: 2 }}>
+                  <div style={{ height: '100%', width: (r.pct * 100) + '%', background: r.color, borderRadius: 2 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Benchmark Panel ───────────────────────────────────────────────────────
+const benchmarkSuites = [
+  { id: 'hit5',    name: 'Recall hit@5',         value: 0.91, prev: 0.88, unit: '',    status: 'pass', history: [0.74,0.79,0.82,0.85,0.87,0.88,0.91],
+    what: 'Top-5 retrieval accuracy', how: 'Queries holdout set of 500 known records; measures how often the correct record appears in the top 5 results returned by the mix retrieval mode.',
+    breakdown: [{ label:'vector leg', v:0.89 },{ label:'graph leg', v:0.86 },{ label:'lexical leg', v:0.78 },{ label:'mix (final)', v:0.91 }],
+    runHistory: [
+      { date:'2026-04-28', value:0.88, hash:'b22d1f', status:'PASS' },
+      { date:'2026-04-27', value:0.87, hash:'a91c3e', status:'PASS' },
+      { date:'2026-04-26', value:0.85, hash:'f04b12', status:'PASS' },
+      { date:'2026-04-25', value:0.83, hash:'d38a09', status:'PASS' },
+    ]},
+  { id: 'hit10',   name: 'Recall hit@10',        value: 0.96, prev: 0.94, unit: '',    status: 'pass', history: [0.80,0.84,0.88,0.91,0.93,0.94,0.96],
+    what: 'Top-10 retrieval accuracy', how: 'Same holdout set as hit@5; measures correct record appearance in top 10. Higher budget allows more graph traversal edges.',
+    breakdown: [{ label:'vector leg', v:0.94 },{ label:'graph leg', v:0.91 },{ label:'lexical leg', v:0.84 },{ label:'mix (final)', v:0.96 }],
+    runHistory: [
+      { date:'2026-04-28', value:0.94, hash:'c19e44', status:'PASS' },
+      { date:'2026-04-27', value:0.93, hash:'b82d44', status:'PASS' },
+      { date:'2026-04-26', value:0.91, hash:'a74f01', status:'PASS' },
+    ]},
+  { id: 'latency', name: 'Retrieval latency',    value: 38,   prev: 44,   unit: 'ms',  status: 'pass', history: [72,61,55,50,47,44,38],
+    what: 'End-to-end retrieval time (ms)', how: 'Median wall-clock time from query submission to context pack delivery. Measured over 1000 queries against the live SQLite store with warm vector cache.',
+    breakdown: [{ label:'sqlite lookup', v:8 },{ label:'vector search', v:18 },{ label:'graph walk', v:7 },{ label:'pack assembly', v:5 }],
+    runHistory: [
+      { date:'2026-04-28', value:44, hash:'e12f73', status:'PASS' },
+      { date:'2026-04-27', value:47, hash:'d44a88', status:'PASS' },
+      { date:'2026-04-26', value:50, hash:'c91e02', status:'PASS' },
+    ]},
+  { id: 'ingest',  name: 'Ingest throughput',    value: 312,  prev: 290,  unit: '/s',  status: 'pass', history: [180,210,240,265,280,290,312],
+    what: 'MIRL records ingested per second', how: 'Batch ingest of a 10 MB mixed corpus (Python, Markdown, JSON). Measures full pipeline: parse → chunk → compile MIRL → embed → persist to SQLite.',
+    breakdown: [{ label:'parse+chunk', v:890 },{ label:'compile MIRL', v:520 },{ label:'embed vectors', v:380 },{ label:'persist SQLite', v:312 }],
+    runHistory: [
+      { date:'2026-04-28', value:290, hash:'b82d44', status:'PASS' },
+      { date:'2026-04-27', value:280, hash:'a3f9c1', status:'PASS' },
+      { date:'2026-04-26', value:265, hash:'f00b21', status:'PASS' },
+    ]},
+  { id: 'compress',name: 'Compression ratio',    value: 12.4, prev: 11.8, unit: 'x',  status: 'pass', history: [8.2,9.1,10.0,10.8,11.2,11.8,12.4],
+    what: 'MIRL-LZ compression ratio vs raw text', how: 'Ratio of raw source bytes to MIRL-compiled + ZSTD-compressed archive. Tested on a 500 MB mixed corpus. Higher is better.',
+    breakdown: [{ label:'MIRL compile', v:3.1 },{ label:'ZSTD-M codec', v:4.0 },{ label:'dedup+merge', v:12.4 }],
+    runHistory: [
+      { date:'2026-04-28', value:11.8, hash:'c19e44', status:'PASS' },
+      { date:'2026-04-27', value:11.2, hash:'a91c3e', status:'PASS' },
+    ]},
+  { id: 'drift',   name: 'Vector drift',         value: 0.8,  prev: 1.2,  unit: '%',  status: 'pass', history: [3.1,2.6,2.1,1.7,1.4,1.2,0.8],
+    what: '% of records with stale vector embeddings', how: 'Compares vector index to canonical SQLite store. A record is "drifted" if its embedding is older than its last MIRL update. Lower is better.',
+    breakdown: [{ label:'total records', v:1412048 },{ label:'drifted', v:11297 },{ label:'lag > 60s', v:2840 }],
+    runHistory: [
+      { date:'2026-04-28', value:1.2, hash:'f00b21', status:'PASS' },
+      { date:'2026-04-27', value:1.4, hash:'d38a09', status:'PASS' },
+    ]},
+  { id: 'contra',  name: 'Contradiction rate',   value: 0.21, prev: 0.19, unit: '%',  status: 'warn', history: [0.10,0.12,0.14,0.17,0.18,0.19,0.21],
+    what: '% of claim records with detected contradictions', how: 'Runs contradiction detector over all # (claim) MIRL records. Flags record pairs where content asserts conflicting facts. Threshold: 0.20% triggers warn.',
+    breakdown: [{ label:'total claims', v:284109 },{ label:'flagged pairs', v:596 },{ label:'confirmed contra', v:596 }],
+    runHistory: [
+      { date:'2026-04-28', value:0.19, hash:'d44a88', status:'PASS' },
+      { date:'2026-04-27', value:0.18, hash:'c91e02', status:'PASS' },
+      { date:'2026-04-26', value:0.17, hash:'b82d44', status:'PASS' },
+    ]},
+  { id: 'pack',    name: 'Pack token efficiency', value: 0.87, prev: 0.85, unit: '',   status: 'pass', history: [0.71,0.75,0.78,0.81,0.83,0.85,0.87],
+    what: 'Ratio of useful tokens in context pack vs budget', how: 'Measures what fraction of the token budget in a PACK is filled with records that scored above the relevance threshold (0.70). Closer to 1.0 is better.',
+    breakdown: [{ label:'budget (tokens)', v:4096 },{ label:'used', v:3564 },{ label:'above threshold', v:3101 }],
+    runHistory: [
+      { date:'2026-04-28', value:0.85, hash:'e12f73', status:'PASS' },
+      { date:'2026-04-27', value:0.83, hash:'d38a09', status:'PASS' },
+    ]},
+];
+
+const dbHealthStats = [
+  { label: 'WAL size',        value: '12 MB',   color: '#7efdb9', ok: true  },
+  { label: 'Integrity check', value: 'OK',      color: '#7efdb9', ok: true  },
+  { label: 'Fragmentation',   value: '2.1%',    color: '#7efdb9', ok: true  },
+  { label: 'Page cache hit',  value: '98.4%',   color: '#7efdb9', ok: true  },
+  { label: 'Deadlocks',       value: '0',       color: '#7efdb9', ok: true  },
+  { label: 'Slow queries',    value: '3',       color: '#f4d676', ok: false },
+  { label: 'Index coverage',  value: '99.2%',   color: '#7efdb9', ok: true  },
+  { label: 'Last vacuum',     value: '03:00 UTC',color: '#66b8ff',ok: true  },
+];
+
+const runLog = [
+  { time: '10:42:31', suite: 'hit@5',    result: 'PASS', delta: '+3.4%',  hash: 'a3f9c1' },
+  { time: '10:42:28', suite: 'latency',  result: 'PASS', delta: '-13.6%', hash: 'b82d44' },
+  { time: '10:42:25', suite: 'ingest',   result: 'PASS', delta: '+7.6%',  hash: 'c91e02' },
+  { time: '10:42:20', suite: 'contra',   result: 'WARN', delta: '+10.5%', hash: 'd44a88' },
+  { time: '10:41:55', suite: 'compress', result: 'PASS', delta: '+5.1%',  hash: 'e12f73' },
+  { time: '10:41:40', suite: 'drift',    result: 'PASS', delta: '-33.3%', hash: 'f00b21' },
+];
+
+function SparkLine({ data, color, width = 120, height = 32 }) {
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((v - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', overflow: 'visible' }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={pts.split(' ').pop().split(',')[0]} cy={pts.split(' ').pop().split(',')[1]} r="2.5" fill={color} />
+    </svg>
+  );
+}
+
+function BenchmarkPanel({ width }) {
+  const [tab, setTab] = useState('overview');
+  const [selected, setSelected] = useState(null);
+  const tabs = ['overview', 'db health', 'run log'];
+
+  const passCount = benchmarkSuites.filter(b => b.status === 'pass').length;
+  const warnCount = benchmarkSuites.filter(b => b.status === 'warn').length;
+
+  return (
+    <div style={{ width, flexShrink: 0, overflow: 'hidden', transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)', background: '#030d20', borderRight: '1px solid rgba(47,99,255,0.15)', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '7px 12px 0', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#4f8cfb', borderBottom: '1px solid rgba(47,99,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span>Benchmarks</span>
+        <div style={{ display: 'flex', gap: 6, fontSize: 9 }}>
+          <span style={{ color: '#7efdb9' }}>{passCount} pass</span>
+          {warnCount > 0 && <span style={{ color: '#f4d676' }}>{warnCount} warn</span>}
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid rgba(47,99,255,0.1)', flexShrink: 0 }}>
+        {tabs.map(t => (
+          <div key={t} onClick={() => setTab(t)} style={{
+            flex: 1, textAlign: 'center', padding: '5px 0', fontSize: 9,
+            textTransform: 'uppercase', letterSpacing: '0.07em', cursor: 'pointer',
+            color: tab === t ? '#7fe0ff' : '#274063',
+            borderBottom: tab === t ? '2px solid #7fe0ff' : '2px solid transparent',
+          }}>{t}</div>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* ── Overview tab ── */}
+        {tab === 'overview' && (
+          <div>
+            {/* Summary bar */}
+            <div style={{ display: 'flex', padding: '8px 12px', gap: 8, borderBottom: '1px solid rgba(47,99,255,0.08)' }}>
+              {[
+                { label: 'Suites', value: benchmarkSuites.length, color: '#7fe0ff' },
+                { label: 'Passing', value: passCount, color: '#7efdb9' },
+                { label: 'Warnings', value: warnCount, color: '#f4d676' },
+                { label: 'Failing', value: 0, color: '#ff6b6b' },
+              ].map(s => (
+                <div key={s.label} style={{ flex: 1, background: '#020b1e', border: '1px solid rgba(47,99,255,0.1)', borderRadius: 5, padding: '5px 6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 13, color: s.color, fontWeight: 600 }}>{s.value}</div>
+                  <div style={{ fontSize: 8, color: '#274063', textTransform: 'uppercase', marginTop: 1 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Benchmark cards */}
+            {benchmarkSuites.map(b => {
+              const isUp = b.value > b.prev;
+              const isGoodUp = !['latency','drift','contra'].includes(b.id);
+              const improved = isGoodUp ? isUp : !isUp;
+              const deltaAbs = Math.abs(((b.value - b.prev) / b.prev) * 100).toFixed(1);
+              const isSelected = selected === b.id;
+              return (
+                <div key={b.id} onClick={() => setSelected(isSelected ? null : b.id)}
+                  style={{ padding: '8px 12px', borderBottom: '1px solid rgba(47,99,255,0.07)', cursor: 'pointer', background: isSelected ? 'rgba(79,140,251,0.06)' : 'transparent', transition: 'background 0.1s' }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(79,140,251,0.04)'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.status === 'pass' ? '#7efdb9' : '#f4d676', flexShrink: 0, boxShadow: b.status === 'pass' ? '0 0 4px #7efdb9' : '0 0 4px #f4d676' }} />
+                    <span style={{ fontSize: 11, color: '#bfefff', flex: 1 }}>{b.name}</span>
+                    <span style={{ fontSize: 12, color: b.status === 'pass' ? '#7fe0ff' : '#f4d676', fontWeight: 600 }}>{b.value}{b.unit}</span>
+                    <span style={{ fontSize: 9, color: improved ? '#7efdb9' : '#ff6b6b' }}>{improved ? '▲' : '▼'} {deltaAbs}%</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <SparkLine data={b.history} color={b.status === 'pass' ? '#4f8cfb' : '#f4d676'} width={100} height={28} />
+                    <div style={{ fontSize: 9, color: '#274063' }}>prev: {b.prev}{b.unit}</div>
+                  </div>
+                  {isSelected && (
+                    <div style={{ marginTop: 6, padding: '6px 8px', background: '#020b1e', borderRadius: 5, border: '1px solid rgba(47,99,255,0.12)' }}>
+                      <div style={{ fontSize: 9, color: '#4f8cfb', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Run details</div>
+                      {[
+                        ['Suite ID', b.id],
+                        ['Status', b.status.toUpperCase()],
+                        ['Current', `${b.value}${b.unit}`],
+                        ['Previous', `${b.prev}${b.unit}`],
+                        ['Change', `${improved ? '+' : '-'}${deltaAbs}%`],
+                        ['Runs tracked', b.history.length],
+                      ].map(([k, v]) => (
+                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                          <span style={{ color: '#4f6888' }}>{k}</span>
+                          <span style={{ color: '#bfefff' }}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── DB Health tab ── */}
+        {tab === 'db health' && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '2px 12px 6px', fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Database integrity & performance</div>
+
+            {/* Health score */}
+            <div style={{ margin: '0 12px 10px', padding: '10px', background: '#020b1e', border: '1px solid rgba(126,253,185,0.15)', borderRadius: 8, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, color: '#7efdb9', fontWeight: 600, lineHeight: 1 }}>98.4<span style={{ fontSize: 14 }}>%</span></div>
+              <div style={{ fontSize: 9, color: '#4f6888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 3 }}>Overall DB Health Score</div>
+              <div style={{ height: 4, background: '#1a2540', borderRadius: 2, marginTop: 8 }}>
+                <div style={{ height: '100%', width: '98.4%', background: 'linear-gradient(90deg, #7efdb9, #4f8cfb)', borderRadius: 2, boxShadow: '0 0 8px #7efdb960' }} />
+              </div>
+            </div>
+
+            {dbHealthStats.map(s => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid rgba(47,99,255,0.06)' }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0, marginRight: 8 }} />
+                <span style={{ fontSize: 11, color: '#8090b0', flex: 1 }}>{s.label}</span>
+                <span style={{ fontSize: 11, color: s.color, fontWeight: 500 }}>{s.value}</span>
+              </div>
+            ))}
+
+            <div style={{ padding: '10px 12px' }}>
+              <div style={{ fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Query performance distribution</div>
+              {[
+                { range: '< 10 ms',   pct: 0.62, color: '#7efdb9' },
+                { range: '10–50 ms',  pct: 0.29, color: '#7fe0ff' },
+                { range: '50–100 ms', pct: 0.07, color: '#f4d676' },
+                { range: '> 100 ms',  pct: 0.02, color: '#ff6b6b' },
+              ].map(r => (
+                <div key={r.range} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: '#5a7a9a' }}>{r.range}</span>
+                    <span style={{ color: r.color }}>{(r.pct * 100).toFixed(0)}%</span>
+                  </div>
+                  <div style={{ height: 3, background: '#1a2540', borderRadius: 2 }}>
+                    <div style={{ height: '100%', width: (r.pct * 100) + '%', background: r.color, borderRadius: 2 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Run Log tab ── */}
+        {tab === 'run log' && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '2px 12px 6px', fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Recent benchmark runs — hash-verified</div>
+            {runLog.map((r, i) => (
+              <div key={i} style={{ padding: '7px 12px', borderBottom: '1px solid rgba(47,99,255,0.07)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 9, color: '#274063', width: 44, flexShrink: 0 }}>{r.time}</span>
+                <span style={{ fontSize: 10, color: '#7fe0ff', width: 70, flexShrink: 0 }}>{r.suite}</span>
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                  background: r.result === 'PASS' ? 'rgba(126,253,185,0.1)' : 'rgba(244,214,118,0.1)',
+                  color: r.result === 'PASS' ? '#7efdb9' : '#f4d676',
+                  border: `1px solid ${r.result === 'PASS' ? 'rgba(126,253,185,0.2)' : 'rgba(244,214,118,0.2)'}`,
+                }}>{r.result}</span>
+                <span style={{ fontSize: 10, color: r.delta.startsWith('+') && !['contra'].includes(r.suite) ? '#7efdb9' : r.delta.startsWith('-') && ['latency','drift'].includes(r.suite) ? '#7efdb9' : '#f4d676', flex: 1 }}>{r.delta}</span>
+                <span style={{ fontSize: 8, color: '#274063', fontFamily: 'monospace' }}>#{r.hash}</span>
+              </div>
+            ))}
+            <div style={{ padding: '10px 12px' }}>
+              <button style={{ width: '100%', padding: '6px', background: 'rgba(79,140,251,0.08)', border: '1px solid rgba(79,140,251,0.2)', borderRadius: 5, color: '#4f8cfb', fontSize: 10, fontFamily: 'var(--font)', cursor: 'pointer' }}>
+                ▶ Run full benchmark suite
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── BenchmarkFullView ─────────────────────────────────────────────────────
+function CyberBarChart({ data, color, maxVal }) {
+  return (
+    <svg width="100%" height="120" viewBox={`0 0 ${data.length * 36} 120`} preserveAspectRatio="none" style={{ display: 'block' }}>
+      <defs>
+        <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.9"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0.1"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      {data.map((v, i) => {
+        const h = (v / maxVal) * 100;
+        const x = i * 36 + 4;
+        return (
+          <g key={i} filter="url(#glow)">
+            <rect x={x} y={120 - h} width={28} height={h}
+              fill={`url(#grad-${color.replace('#','')})`}
+              stroke={color} strokeWidth="1" rx="2"/>
+            <line x1={x} y1={120-h} x2={x+28} y2={120-h} stroke={color} strokeWidth="1.5" opacity="0.8"/>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function CyberSparkFull({ data, color, width=300, height=60 }) {
+  const min = Math.min(...data), max = Math.max(...data), range = max-min || 1;
+  const pts = data.map((v,i) => {
+    const x = (i/(data.length-1))*(width-8)+4;
+    const y = height - ((v-min)/range)*(height-12) - 6;
+    return `${x},${y}`;
+  }).join(' ');
+  const areaBottom = height;
+  const firstPt = pts.split(' ')[0];
+  const lastPt = pts.split(' ').pop();
+  const [lx] = lastPt.split(',');
+  const [fx] = firstPt.split(',');
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display:'block', overflow:'visible' }}>
+      <defs>
+        <linearGradient id={`sparkfill-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+        <filter id="sparkglow">
+          <feGaussianBlur stdDeviation="1.5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <polygon points={`${pts} ${lx},${areaBottom} ${fx},${areaBottom}`}
+        fill={`url(#sparkfill-${color.replace('#','')})`}/>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2"
+        strokeLinejoin="round" strokeLinecap="round" filter="url(#sparkglow)"/>
+      {data.map((v,i) => {
+        const x = (i/(data.length-1))*(width-8)+4;
+        const y = height - ((v-min)/range)*(height-12) - 6;
+        return <circle key={i} cx={x} cy={y} r={i===data.length-1?3.5:1.5} fill={color} opacity={i===data.length-1?1:0.4}/>;
+      })}
+    </svg>
+  );
+}
+
+function BenchmarkFullView() {
+  const [selected, setSelected] = React.useState(null);
+  const [tab, setTab] = React.useState('charts');
+  const passCount = benchmarkSuites.filter(b => b.status === 'pass').length;
+  const warnCount = benchmarkSuites.filter(b => b.status === 'warn').length;
+  return (
+    <div style={{ height:'100%', overflowY:'auto', background:'var(--bg-deep)', color:'var(--text)' }}>
+      <div style={{ padding:'20px 28px 0', borderBottom:'1px solid rgba(47,99,255,0.12)' }}>
+        <div style={{ display:'flex', alignItems:'flex-end', gap:16, marginBottom:16 }}>
+          <div>
+            <div style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'0.14em', color:'#4f8cfb', marginBottom:4 }}>SEAM / Benchmarks</div>
+            <div style={{ fontSize:22, color:'#a6fcff', fontWeight:600 }}>Performance Suite</div>
+          </div>
+          <div style={{ flex:1 }} />
+          <div style={{ display:'flex', gap:12 }}>
+            {[{v:passCount,l:'PASSING',c:'#7efdb9'},{v:warnCount,l:'WARN',c:'#f4d676'},{v:0,l:'FAILING',c:'#ff6b6b'}].map(s=>(
+              <div key={s.l} style={{ textAlign:'center', padding:'8px 16px', background:'rgba(8,19,42,0.8)', border:`1px solid ${s.c}30`, borderRadius:8 }}>
+                <div style={{ fontSize:24, color:s.c, fontWeight:600, lineHeight:1, filter:`drop-shadow(0 0 8px ${s.c})` }}>{s.v}</div>
+                <div style={{ fontSize:9, color:'#274063', textTransform:'uppercase', letterSpacing:'0.1em', marginTop:3 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display:'flex' }}>
+          {['charts','records','table','run log'].map(t=>(
+            <div key={t} onClick={()=>setTab(t)} style={{ padding:'7px 18px', fontSize:11, cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.08em', color:tab===t?'#7fe0ff':'#274063', borderBottom:tab===t?'2px solid #7fe0ff':'2px solid transparent' }}>{t}</div>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding:'24px 28px' }}>
+
+        {tab === 'charts' && (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:16 }}>
+            {benchmarkSuites.map(b => {
+              const isGoodUp = !['latency','drift','contra'].includes(b.id);
+              const improved = isGoodUp ? b.value>b.prev : b.value<b.prev;
+              const delta = Math.abs(((b.value-b.prev)/b.prev)*100).toFixed(1);
+              const c = b.status==='pass' ? '#4f8cfb' : '#f4d676';
+              const isSel = selected === b.id;
+              return (
+                <div key={b.id} onClick={()=>setSelected(isSel?null:b.id)} style={{ background:'rgba(8,19,42,0.9)', border:`1px solid ${isSel?c:'rgba(47,99,255,0.15)'}`, borderRadius:10, padding:'16px', cursor:'pointer', boxShadow:isSel?`0 0 20px ${c}30`:'none', transition:'all 0.2s' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                    <span style={{ width:7, height:7, borderRadius:'50%', background:b.status==='pass'?'#7efdb9':'#f4d676', boxShadow:`0 0 6px ${b.status==='pass'?'#7efdb9':'#f4d676'}` }}/>
+                    <span style={{ fontSize:11, color:'#8090b0', flex:1, textTransform:'uppercase', letterSpacing:'0.06em' }}>{b.name}</span>
+                    <span style={{ fontSize:9, color:improved?'#7efdb9':'#ff6b6b' }}>{improved?'▲':'▼'} {delta}%</span>
+                  </div>
+                  <div style={{ fontSize:9, color:'#4f8cfb', marginBottom:10, fontStyle:'italic' }}>{b.what}</div>
+                  <div style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:12 }}>
+                    <span style={{ fontSize:32, color:c, fontWeight:600, lineHeight:1, filter:`drop-shadow(0 0 10px ${c})` }}>{b.value}</span>
+                    <span style={{ fontSize:13, color:'#4f6888' }}>{b.unit}</span>
+                    <span style={{ fontSize:10, color:'#274063', marginLeft:4 }}>prev {b.prev}{b.unit}</span>
+                  </div>
+                  <CyberSparkFull data={b.history} color={c} width={280} height={52}/>
+                  <div style={{ marginTop:8, height:3, background:'#1a2540', borderRadius:2 }}>
+                    <div style={{ height:'100%', width:'85%', background:c, borderRadius:2, boxShadow:`0 0 6px ${c}` }}/>
+                  </div>
+                  {isSel && (
+                    <div style={{ marginTop:12, padding:'10px', background:'#020b1e', borderRadius:6, border:'1px solid rgba(47,99,255,0.15)' }}>
+                      <div style={{ fontSize:9, color:'#274063', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:5 }}>How it's measured</div>
+                      <div style={{ fontSize:11, color:'#8090b0', lineHeight:1.6, marginBottom:10 }}>{b.how}</div>
+                      <div style={{ fontSize:9, color:'#274063', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:6 }}>Breakdown</div>
+                      {b.breakdown.map((br,i) => (
+                        <div key={i} style={{ marginBottom:5 }}>
+                          <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:2 }}>
+                            <span style={{ color:'#5a7a9a' }}>{br.label}</span>
+                            <span style={{ color:c, fontWeight:500 }}>{typeof br.v === 'number' && br.v > 100 ? br.v.toLocaleString() : br.v}{b.unit}</span>
+                          </div>
+                          <div style={{ height:3, background:'#1a2540', borderRadius:2 }}>
+                            <div style={{ height:'100%', width: br.v <= 1 ? `${br.v*100}%` : '70%', background:c, borderRadius:2, opacity:0.7 }}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'records' && (
+          <div>
+            {benchmarkSuites.map(b => {
+              const c = b.status==='pass'?'#4f8cfb':'#f4d676';
+              const improved = !['latency','drift','contra'].includes(b.id)?b.value>b.prev:b.value<b.prev;
+              const delta = Math.abs(((b.value-b.prev)/b.prev)*100).toFixed(1);
+              return (
+                <div key={b.id} style={{ marginBottom:24 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, paddingBottom:8, borderBottom:'1px solid rgba(47,99,255,0.1)' }}>
+                    <span style={{ width:8, height:8, borderRadius:'50%', background:b.status==='pass'?'#7efdb9':'#f4d676', boxShadow:`0 0 5px ${b.status==='pass'?'#7efdb9':'#f4d676'}` }}/>
+                    <span style={{ fontSize:14, color:'#a6fcff', fontWeight:500 }}>{b.name}</span>
+                    <span style={{ fontSize:11, color:c, fontWeight:600 }}>{b.value}{b.unit}</span>
+                    <span style={{ fontSize:9, color:improved?'#7efdb9':'#ff6b6b' }}>{improved?'▲':'▼'}{delta}%</span>
+                    <div style={{ flex:1 }}/>
+                    <span style={{ fontSize:9, padding:'1px 6px', borderRadius:3, background:b.status==='pass'?'rgba(126,253,185,0.1)':'rgba(244,214,118,0.1)', color:b.status==='pass'?'#7efdb9':'#f4d676', border:`1px solid ${b.status==='pass'?'rgba(126,253,185,0.2)':'rgba(244,214,118,0.2)'}` }}>{b.status.toUpperCase()}</span>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:10 }}>
+                    <div style={{ background:'rgba(8,19,42,0.7)', borderRadius:8, padding:'10px 12px', border:'1px solid rgba(47,99,255,0.1)' }}>
+                      <div style={{ fontSize:9, color:'#4f8cfb', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:4 }}>What is measured</div>
+                      <div style={{ fontSize:11, color:'#bfefff', lineHeight:1.5 }}>{b.what}</div>
+                    </div>
+                    <div style={{ background:'rgba(8,19,42,0.7)', borderRadius:8, padding:'10px 12px', border:'1px solid rgba(47,99,255,0.1)' }}>
+                      <div style={{ fontSize:9, color:'#4f8cfb', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:4 }}>Methodology</div>
+                      <div style={{ fontSize:11, color:'#8090b0', lineHeight:1.5 }}>{b.how}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    <div style={{ background:'rgba(8,19,42,0.7)', borderRadius:8, padding:'10px 12px', border:'1px solid rgba(47,99,255,0.1)' }}>
+                      <div style={{ fontSize:9, color:'#4f8cfb', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:8 }}>Breakdown</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))', gap:6 }}>
+                        {b.breakdown.map((br,i) => (
+                          <div key={i} style={{ background:'rgba(2,9,19,0.6)', borderRadius:6, padding:'7px 10px', border:'1px solid rgba(47,99,255,0.08)' }}>
+                            <div style={{ fontSize:9, color:'#4f6888', marginBottom:3 }}>{br.label}</div>
+                            <div style={{ fontSize:15, color:c, fontWeight:600 }}>{typeof br.v === 'number' && br.v > 100 ? br.v.toLocaleString() : br.v}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ background:'rgba(8,19,42,0.7)', borderRadius:8, padding:'10px 12px', border:'1px solid rgba(47,99,255,0.1)' }}>
+                      <div style={{ fontSize:9, color:'#4f8cfb', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:8 }}>Previous runs</div>
+                      {b.runHistory.map((r,i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderBottom:i<b.runHistory.length-1?'1px solid rgba(47,99,255,0.07)':'none' }}>
+                          <span style={{ width:5, height:5, borderRadius:'50%', background:r.status==='PASS'?'#7efdb9':'#f4d676', flexShrink:0 }}/>
+                          <span style={{ fontSize:10, color:'#4f6888', flex:1 }}>{r.date}</span>
+                          <span style={{ fontSize:11, color:c, fontWeight:500 }}>{r.value}{b.unit}</span>
+                          <span style={{ fontSize:8, color:'#274063', fontFamily:'monospace' }}>#{r.hash}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'table' && (
+          <div style={{ background:'rgba(8,19,42,0.6)', borderRadius:10, border:'1px solid rgba(47,99,255,0.12)', overflow:'hidden' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 90px 90px 90px 80px 60px', padding:'8px 16px', borderBottom:'1px solid rgba(47,99,255,0.12)', fontSize:9, textTransform:'uppercase', letterSpacing:'0.1em', color:'#274063' }}>
+              <span>Suite</span><span style={{textAlign:'right'}}>Current</span><span style={{textAlign:'right'}}>Previous</span><span style={{textAlign:'right'}}>Change</span><span style={{textAlign:'center'}}>Status</span><span style={{textAlign:'right'}}>Runs</span>
+            </div>
+            {benchmarkSuites.map((b,i) => {
+              const delta = ((b.value-b.prev)/b.prev*100).toFixed(1);
+              const improved = !['latency','drift','contra'].includes(b.id)?b.value>b.prev:b.value<b.prev;
+              return (
+                <div key={b.id} style={{ display:'grid', gridTemplateColumns:'1fr 90px 90px 90px 80px 60px', padding:'10px 16px', borderBottom:i<benchmarkSuites.length-1?'1px solid rgba(47,99,255,0.07)':'none' }}>
+                  <div><div style={{ color:'#bfefff', fontSize:12 }}>{b.name}</div><div style={{ fontSize:9, color:'#274063', marginTop:1 }}>{b.what}</div></div>
+                  <span style={{ textAlign:'right', color:'#7fe0ff', fontWeight:500, fontSize:12, alignSelf:'center' }}>{b.value}{b.unit}</span>
+                  <span style={{ textAlign:'right', color:'#4f6888', fontSize:12, alignSelf:'center' }}>{b.prev}{b.unit}</span>
+                  <span style={{ textAlign:'right', color:improved?'#7efdb9':'#ff6b6b', fontSize:12, alignSelf:'center' }}>{improved?'+':''}{delta}%</span>
+                  <span style={{ textAlign:'center', alignSelf:'center' }}><span style={{ padding:'1px 6px', borderRadius:3, fontSize:9, background:b.status==='pass'?'rgba(126,253,185,0.1)':'rgba(244,214,118,0.1)', color:b.status==='pass'?'#7efdb9':'#f4d676', border:`1px solid ${b.status==='pass'?'rgba(126,253,185,0.2)':'rgba(244,214,118,0.2)'}` }}>{b.status.toUpperCase()}</span></span>
+                  <span style={{ textAlign:'right', color:'#274063', fontSize:12, alignSelf:'center' }}>{b.runHistory.length+b.history.length}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'run log' && (
+          <div style={{ background:'rgba(8,19,42,0.6)', borderRadius:10, border:'1px solid rgba(47,99,255,0.12)', overflow:'hidden' }}>
+            <div style={{ padding:'10px 16px', borderBottom:'1px solid rgba(47,99,255,0.1)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span style={{ fontSize:9, textTransform:'uppercase', letterSpacing:'0.1em', color:'#274063' }}>Recent runs — hash-verified</span>
+              <button style={{ padding:'4px 12px', background:'rgba(126,253,185,0.08)', border:'1px solid rgba(126,253,185,0.2)', borderRadius:5, color:'#7efdb9', fontSize:10, fontFamily:'var(--font)', cursor:'pointer' }}>▶ Run all suites</button>
+            </div>
+            {runLog.map((r,i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom:i<runLog.length-1?'1px solid rgba(47,99,255,0.07)':'none' }}>
+                <span style={{ fontSize:10, color:'#274063', width:56, flexShrink:0 }}>{r.time}</span>
+                <span style={{ fontSize:11, color:'#7fe0ff', width:90, flexShrink:0 }}>{r.suite}</span>
+                <span style={{ fontSize:9, padding:'2px 7px', borderRadius:4, flexShrink:0, background:r.result==='PASS'?'rgba(126,253,185,0.1)':'rgba(244,214,118,0.1)', color:r.result==='PASS'?'#7efdb9':'#f4d676', border:`1px solid ${r.result==='PASS'?'rgba(126,253,185,0.2)':'rgba(244,214,118,0.2)'}` }}>{r.result}</span>
+                <span style={{ fontSize:11, color:'#bfefff', flex:1 }}>{r.delta}</span>
+                <span style={{ fontSize:9, color:'#274063', fontFamily:'monospace' }}>#{r.hash}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+
+// ── MemoryFullView ─────────────────────────────────────────────────────────
+function MemoryFullView() {
+  const [tab, setTab] = useState('graph');
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(()=>setTick(v=>v+1),800); return ()=>clearInterval(t); },[]);
+
+  return (
+    <div style={{ height:'100%', overflowY:'auto', background:'var(--bg-deep)', color:'var(--text)' }}>
+      {/* Header */}
+      <div style={{ padding:'20px 28px 0', borderBottom:'1px solid rgba(47,99,255,0.12)' }}>
+        <div style={{ display:'flex', alignItems:'flex-end', gap:16, marginBottom:16 }}>
+          <div>
+            <div style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'0.14em', color:'#9b6cff', marginBottom:4 }}>SEAM / Memory</div>
+            <div style={{ fontSize:22, color:'#a6fcff', fontWeight:600, letterSpacing:'0.04em' }}>Provenance &amp; Memory Store</div>
+          </div>
+          <div style={{ flex:1 }} />
+          <div style={{ display:'flex', gap:10 }}>
+            {[{v:'1.4M',l:'Records',c:'#7fe0ff'},{v:'841K',l:'Graph Edges',c:'#9b6cff'},{v:'91%',l:'Recall Acc.',c:'#7efdb9'},{v:'38ms',l:'Avg Latency',c:'#f4d676'}].map(s=>(
+              <div key={s.l} style={{ textAlign:'center', padding:'7px 14px', background:'rgba(8,19,42,0.8)', border:`1px solid ${s.c}30`, borderRadius:8 }}>
+                <div style={{ fontSize:20, color:s.c, fontWeight:600, lineHeight:1, filter:`drop-shadow(0 0 6px ${s.c})` }}>{s.v}</div>
+                <div style={{ fontSize:9, color:'#274063', textTransform:'uppercase', letterSpacing:'0.09em', marginTop:3 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display:'flex', gap:0 }}>
+          {['graph','records','write queue','stats'].map(t=>(
+            <div key={t} onClick={()=>setTab(t)} style={{
+              padding:'7px 18px', fontSize:11, cursor:'pointer', textTransform:'uppercase', letterSpacing:'0.08em',
+              color:tab===t?'#9b6cff':'#274063',
+              borderBottom:tab===t?'2px solid #9b6cff':'2px solid transparent',
+            }}>{t}</div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding:'24px 28px' }}>
+
+        {/* ── Provenance Graph ── */}
+        {tab === 'graph' && (
+          <div>
+            <div style={{ fontSize:10, color:'#274063', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:12 }}>
+              Provenance graph — hover nodes to trace edges · {provenanceNodes.length} nodes · {provenanceEdges.length} edges
+            </div>
+            <div style={{ background:'rgba(2,6,19,0.95)', border:'1px solid rgba(47,99,255,0.15)', borderRadius:12, padding:'20px', overflow:'hidden', position:'relative' }}>
+              {/* Scanline effect */}
+              <div style={{ position:'absolute', inset:0, background:'repeating-linear-gradient(to bottom, rgba(255,255,255,0.012) 0, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 4px)', pointerEvents:'none' }}/>
+              {/* Big provenance graph */}
+              <svg width="100%" height="340" viewBox="0 0 900 340" style={{ display:'block', overflow:'visible' }}>
+                <defs>
+                  <marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="#274063"/>
+                  </marker>
+                  <filter id="nodeglow">
+                    <feGaussianBlur stdDeviation="3" result="blur"/>
+                    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                </defs>
+                {/* Grid lines */}
+                {[0,1,2,3,4,5,6,7,8].map(i=>(
+                  <line key={`v${i}`} x1={i*112.5} y1={0} x2={i*112.5} y2={340} stroke="#0d1f3c" strokeWidth="1"/>
+                ))}
+                {[0,1,2,3,4].map(i=>(
+                  <line key={`h${i}`} x1={0} y1={i*85} x2={900} y2={i*85} stroke="#0d1f3c" strokeWidth="1"/>
+                ))}
+                {/* Scale nodes for full view */}
+                {provenanceEdges.map((e,i) => {
+                  const scale = 1.6;
+                  const a = provenanceNodes.find(n=>n.id===e.from);
+                  const b = provenanceNodes.find(n=>n.id===e.to);
+                  if (!a||!b) return null;
+                  const ax=a.x*scale, ay=a.y*scale+20, bx=b.x*scale, by=b.y*scale+20;
+                  const isHot = hoveredNode===e.from||hoveredNode===e.to;
+                  return (
+                    <line key={i} x1={ax} y1={ay} x2={bx} y2={by}
+                      stroke={isHot?'#4f8cfb':'#1a2540'} strokeWidth={isHot?2:1}
+                      strokeOpacity={isHot?0.9:0.5} markerEnd="url(#arrow2)"
+                      style={{transition:'stroke 0.2s'}}/>
+                  );
+                })}
+                {provenanceNodes.map(n => {
+                  const scale=1.6;
+                  const cx=n.x*scale, cy=n.y*scale+20;
+                  const isHot=hoveredNode===n.id;
+                  const pulse = isHot ? 1 + Math.sin(tick*0.8)*0.08 : 1;
+                  return (
+                    <g key={n.id} onMouseEnter={()=>setHoveredNode(n.id)} onMouseLeave={()=>setHoveredNode(null)} style={{cursor:'pointer'}}>
+                      {isHot && <circle cx={cx} cy={cy} r={36*pulse} fill="none" stroke={n.color} strokeWidth="1" opacity="0.15"/>}
+                      <circle cx={cx} cy={cy} r={isHot?28:22}
+                        fill={isHot?n.color+'22':'#08132a'}
+                        stroke={n.color} strokeWidth={isHot?2:1.5}
+                        filter={isHot?'url(#nodeglow)':'none'}
+                        style={{transition:'all 0.15s'}}/>
+                      <text x={cx} y={cy-2} textAnchor="middle" dominantBaseline="middle"
+                        fontSize="9" fill={n.color} fontFamily="JetBrains Mono, monospace" fontWeight="600">
+                        {n.label.length>11?n.label.slice(0,11)+'…':n.label}
+                      </text>
+                      <text x={cx} y={cy+10} textAnchor="middle" fontSize="7" fill="#274063" fontFamily="JetBrains Mono, monospace">
+                        {n.type}
+                      </text>
+                      {isHot && (
+                        <text x={cx} y={cy+42} textAnchor="middle" fontSize="8" fill={n.color} fontFamily="JetBrains Mono, monospace">
+                          {provenanceEdges.filter(e=>e.from===n.id||e.to===n.id).length} edges
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+            {/* Legend */}
+            <div style={{ display:'flex', gap:16, marginTop:14, flexWrap:'wrap' }}>
+              {[['@','entity','#a6fcff'],['#','claim','#7fe0ff'],['!','event','#f4d676'],['>','relation','#9b6cff'],['~','state','#7efdb9'],['^','evidence','#d391ff'],['%','source','#66b8ff']].map(([tag,kind,color])=>(
+                <div key={tag} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:color, boxShadow:`0 0 5px ${color}` }}/>
+                  <span style={{ fontSize:10, color:'#8090b0' }}><span style={{ color, fontWeight:700 }}>{tag}</span> {kind}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Records ── */}
+        {tab === 'records' && (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:12 }}>
+            {memoryRecords.map(r => (
+              <div key={r.id} style={{ background:'rgba(8,19,42,0.9)', border:'1px solid rgba(47,99,255,0.12)', borderRadius:10, padding:'12px 14px',
+                borderLeft:`3px solid ${tagColors[r.tag]||'#7fe0ff'}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <span style={{ fontSize:14, color:tagColors[r.tag], fontWeight:700, filter:`drop-shadow(0 0 4px ${tagColors[r.tag]})` }}>{r.tag}</span>
+                  <span style={{ fontSize:10, color:'#4f8cfb' }}>{r.id}</span>
+                  <div style={{ flex:1 }}/>
+                  <span style={{ fontSize:10, color:'#7efdb9', fontWeight:500 }}>{(r.score*100).toFixed(0)}%</span>
+                  <span style={{ fontSize:9, color:'#274063' }}>{r.age}</span>
+                </div>
+                <div style={{ fontSize:12, color:'#bfefff', lineHeight:1.5, marginBottom:8 }}>{r.text}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ flex:1, height:3, background:'#1a2540', borderRadius:2 }}>
+                    <div style={{ height:'100%', width:`${r.score*100}%`, background:tagColors[r.tag]||'#7fe0ff', borderRadius:2, boxShadow:`0 0 5px ${tagColors[r.tag]}` }}/>
+                  </div>
+                  <span style={{ fontSize:9, color:'#274063' }}>{r.kind}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Write Queue ── */}
+        {tab === 'write queue' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {writeQueue.map((w,i) => {
+              const liveP = w.status==='writing' ? Math.min(1, w.progress+((tick*0.03)%(1-w.progress))) : w.progress;
+              return (
+                <div key={w.id} style={{ background:'rgba(8,19,42,0.9)', border:`1px solid ${w.status==='writing'?'rgba(127,224,255,0.2)':'rgba(47,99,255,0.1)'}`, borderRadius:10, padding:'14px 16px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                    <span style={{ fontSize:9, padding:'2px 7px', borderRadius:4, background:w.status==='writing'?'rgba(127,224,255,0.1)':'rgba(39,64,99,0.3)', color:w.status==='writing'?'#7fe0ff':'#274063', letterSpacing:'0.06em' }}>{w.op}</span>
+                    <span style={{ fontSize:10, color:w.status==='writing'?'#7efdb9':'#274063' }}>{w.status==='writing'?'● writing':'○ queued'}</span>
+                    <div style={{ flex:1 }}/>
+                    <span style={{ fontSize:10, color:'#4f8cfb' }}>{w.id}</span>
+                  </div>
+                  <div style={{ fontSize:12, color:'#8090b0', marginBottom:10, lineHeight:1.5 }}>{w.text}</div>
+                  <div style={{ height:5, background:'#1a2540', borderRadius:3 }}>
+                    <div style={{ height:'100%', width:`${liveP*100}%`, background:w.status==='writing'?'linear-gradient(90deg,#7fe0ff,#7efdb9)':'#274063', borderRadius:3, transition:'width 0.6s ease', boxShadow:w.status==='writing'?'0 0 8px #7fe0ff80':'none' }}/>
+                  </div>
+                  {w.status==='writing' && <div style={{ fontSize:10, color:'#7fe0ff', marginTop:4, textAlign:'right' }}>{(liveP*100).toFixed(0)}%</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Stats ── */}
+        {tab === 'stats' && (
+          <div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:12, marginBottom:24 }}>
+              {[
+                {label:'Memory records stored',value:'1,412,048',color:'#7fe0ff'},
+                {label:'Indexed today',value:'2,847',color:'#7efdb9'},
+                {label:'Pending write queue',value:'5',color:'#f4d676'},
+                {label:'Graph edges',value:'841,203',color:'#9b6cff'},
+                {label:'Avg retrieval latency',value:'38 ms',color:'#7efdb9'},
+                {label:'Last compaction',value:'03:00 UTC',color:'#66b8ff'},
+                {label:'Vector drift',value:'0.8%',color:'#7efdb9'},
+                {label:'Contradiction flags',value:'3 active',color:'#f4d676'},
+              ].map(s=>(
+                <div key={s.label} style={{ background:'rgba(8,19,42,0.9)', border:'1px solid rgba(47,99,255,0.12)', borderRadius:10, padding:'14px 16px' }}>
+                  <div style={{ fontSize:10, color:'#4f6888', marginBottom:6, lineHeight:1.4 }}>{s.label}</div>
+                  <div style={{ fontSize:22, color:s.color, fontWeight:600, filter:`drop-shadow(0 0 6px ${s.color})` }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize:10, color:'#274063', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:12 }}>Retrieval mode breakdown</div>
+            <div style={{ background:'rgba(8,19,42,0.9)', border:'1px solid rgba(47,99,255,0.12)', borderRadius:10, padding:'16px' }}>
+              {[
+                {mode:'vector',pct:0.68,color:'#9b6cff',ops:'1.1k ops/s'},
+                {mode:'graph',pct:0.21,color:'#7fe0ff',ops:'320 ops/s'},
+                {mode:'lexical',pct:0.08,color:'#f4d676',ops:'130 ops/s'},
+                {mode:'mix',pct:0.03,color:'#7efdb9',ops:'48 ops/s'},
+              ].map(r=>(
+                <div key={r.mode} style={{ marginBottom:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:4 }}>
+                    <span style={{ color:r.color, fontWeight:500 }}>{r.mode}</span>
+                    <span style={{ color:'#5a7a9a' }}>{r.ops} · {(r.pct*100).toFixed(0)}%</span>
+                  </div>
+                  <div style={{ height:6, background:'#1a2540', borderRadius:3 }}>
+                    <div style={{ height:'100%', width:`${r.pct*100}%`, background:r.color, borderRadius:3, boxShadow:`0 0 6px ${r.color}80` }}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────
+function App() {
+  const { TweaksPanel, useTweaks } = window;
+
+  const TWEAK_DEFAULS = /*EDITMODE-BEGIN*/{
+    "accentColor": "#7fe0ff",
+    "terminalHeight": 200,
+    "explorerWidth": 240,
+    "agentWidth": 300,
+    "showMetrics": true
+  } /*EDITMODE-END*/;
+
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULS);
+
+  // Panel state
+  const [explorerOpen, setExplorerOpen] = useState(true);
+  const [terminalOpen, setTerminalOpen] = useState(true);
+  const [agentOpen, setAgentOpen] = useState(true);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [ingestOpen, setIngestOpen] = useState(false);
+  const [benchmarkOpen, setBenchmarkOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState('explorer');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Explorer sub-tab: 'project' | 'system'
+  const [explorerTab, setExplorerTab] = useState('project');
+  const [sysFolders, setSysFolders] = useState(new Set(['home']));
+
+  // File tabs
+  const [openTabs, setOpenTabs] = useState(['cli', 'dashboard', 'readme']);
+  const [activeTab, setActiveTab] = useState('cli');
+  const [activeFile, setActiveFile] = useState('cli');
+
+  // File explorer
+  const [openFolders, setOpenFolders] = useState(new Set(['seam_runtime', 'branding']));
+
+  // Terminal
+  const [termLines, setTermLines] = useState(initialTermLines);
+  const [termInput, setTermInput] = useState('');
+  const [termMenuOpen, setTermMenuOpen] = useState(false);
+  const termEnd = useRef(null);
+  const termInputRef = useRef(null);
+
+  // Agent
+  const [agentMessages, setAgentMessages] = useState(initialAgentMessages);
+  const [agentInput, setAgentInput] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(MODEL_OPTIONS[0]);
+  const agentEnd = useRef(null);
+
+  useEffect(() => {
+    if (termEnd.current) termEnd.current.parentElement.scrollTop = termEnd.current.parentElement.scrollHeight;
+  }, [termLines]);
+  useEffect(() => {
+    if (agentEnd.current) agentEnd.current.parentElement.scrollTop = agentEnd.current.parentElement.scrollHeight;
+  }, [agentMessages]);
+
+  const openFile = useCallback((id) => {
+    setActiveFile(id);
+    setOpenTabs((prev) => prev.includes(id) ? prev : [...prev, id]);
+    setActiveTab(id);
+  }, []);
+
+  const closeTab = useCallback((id, e) => {
+    e.stopPropagation();
+    setOpenTabs((prev) => {
+      const next = prev.filter((t) => t !== id);
+      if (activeTab === id && next.length > 0) setActiveTab(next[next.length - 1]);
+      return next;
+    });
+  }, [activeTab]);
+
+  const toggleFolder = useCallback((id) => {
+    setOpenFolders((prev) => {const n = new Set(prev);n.has(id) ? n.delete(id) : n.add(id);return n;});
+  }, []);
+  const toggleSysFolder = useCallback((id) => {
+    setSysFolders((prev) => {const n = new Set(prev);n.has(id) ? n.delete(id) : n.add(id);return n;});
+  }, []);
+
+  const navItems = [
+  { id: 'explorer', icon: icons.explorer,  label: 'Editor' },
+  { id: 'ingest',   icon: icons.ingest,    label: 'Ingest' },
+  { id: 'memory',   icon: icons.memory,    label: 'Memory' },
+  { id: 'agent',    icon: icons.agent,     label: 'Agent' },
+  { id: 'benchmark',icon: icons.benchmark, label: 'Benchmarks' }];
+
+
+  // ── Terminal submit with /, ! and ? prefixes ───────────────────────────
+  const handleTermSubmit = (e) => {
+    e.preventDefault();
+    const raw = termInput.trim();
+    if (!raw) return;
+    const id = termLines.length;
+    const addLines = (...ls) => setTermLines((prev) => [...prev, ...ls.map((l, i) => ({ id: prev.length + i, ...l }))]);
+
+    if (raw === '/') {
+      setTermMenuOpen(true);
+      setTermInput('');
+      return;
+    }
+    if (raw.startsWith('/')) {
+      const cmd = raw.slice(1).trim();
+      addLines(
+        { kind: 'prompt', text: raw },
+        { kind: 'info', text: `[menu] executing: seam ${cmd}` },
+        { kind: 'ok', text: `[ok] seam ${cmd} — done` }
+      );
+    } else if (raw.startsWith('!')) {
+      const bash = raw.slice(1).trim();
+      addLines(
+        { kind: 'prompt', text: raw },
+        { kind: 'plain', text: `$ ${bash}` },
+        { kind: 'ok', text: `[bash] executed: ${bash}` }
+      );
+    } else if (raw === '?') {
+      addLines(
+        { kind: 'prompt', text: raw },
+        { kind: 'info', text: '  /         — open SEAM command menu' },
+        { kind: 'info', text: '  /ingest   — ingest a file into MIRL' },
+        { kind: 'info', text: '  /retrieve — retrieve context from store' },
+        { kind: 'info', text: '  /search   — search memory records' },
+        { kind: 'info', text: '  /doctor   — run health check' },
+        { kind: 'info', text: '  !<cmd>    — run a raw bash command' },
+        { kind: 'info', text: '  ?         — show this help' }
+      );
+    } else {
+      addLines(
+        { kind: 'prompt', text: raw },
+        { kind: 'info', text: `[seam] ${raw}...` }
+      );
+    }
+    setTermInput('');
+  };
+
+  const termMenuCommands = [
+  { cmd: '/ingest', desc: 'Ingest a file into MIRL memory' },
+  { cmd: '/retrieve', desc: 'Retrieve context from the store' },
+  { cmd: '/search', desc: 'Search memory records' },
+  { cmd: '/doctor', desc: 'Run health check' },
+  { cmd: '/index', desc: 'Rebuild vector index' },
+  { cmd: '/dashboard', desc: 'Open Textual dashboard' },
+  { cmd: '/serve', desc: 'Start REST API server' },
+  { cmd: '/benchmark', desc: 'Run benchmark suite' }];
+
+
+  // ── Agent submit ──────────────────────────────────────────────────────
+  const handleAgentSubmit = async (e) => {
+    e.preventDefault();
+    if (!agentInput.trim() || agentLoading) return;
+    const userMsg = { id: agentMessages.length, role: 'user', text: agentInput };
+    setAgentMessages((prev) => [...prev, userMsg]);
+    setAgentInput('');
+    setAgentLoading(true);
+    try {
+      const systemPrompt = `You are the SEAM Agent — an AI assistant embedded in the SEAM dashboard. SEAM is a local memory persistence runtime for AI agents using SQLite, vector search, graph traversal, and temporal signals. Be concise, technical, and helpful. Format responses with bullet points when listing things. Current model: ${selectedModel.label} (${selectedModel.provider}).`;
+      const resp = await window.claude.complete({
+        messages: [{ role: 'user', content: systemPrompt + '\n\nUser: ' + agentInput }]
+      });
+      setAgentMessages((prev) => [...prev, { id: prev.length, role: 'assistant', text: resp }]);
+    } catch {
+      setAgentMessages((prev) => [...prev, { id: prev.length, role: 'assistant', text: '[error] Could not reach agent. Check your connection.' }]);
+    }
+    setAgentLoading(false);
+  };
+
+  const currentContent = editorContent[activeTab] || editorContent.cli;
+
+  const handleNavClick = (id) => {
+    if (id === 'agent') { setAgentOpen(v => !v); setActiveNav('agent'); return; }
+    if (id === 'memory') { setOpenTabs(prev => prev.includes('__memory') ? prev : [...prev, '__memory']); setActiveTab('__memory'); setActiveFile('__memory'); setMemoryOpen(false); setIngestOpen(false); setExplorerOpen(false); setBenchmarkOpen(false); setActiveNav('memory'); return; }
+    if (id === 'ingest') { setIngestOpen(v => !v); setMemoryOpen(false); setExplorerOpen(false); setBenchmarkOpen(false); setActiveNav('ingest'); return; }
+    if (id === 'explorer') { setExplorerOpen(v => !v); setMemoryOpen(false); setIngestOpen(false); setBenchmarkOpen(false); setActiveNav('explorer'); return; }
+    if (id === 'benchmark') { setOpenTabs(prev => prev.includes('__benchmarks') ? prev : [...prev, '__benchmarks']); setActiveTab('__benchmarks'); setActiveFile('__benchmarks'); setBenchmarkOpen(false); setMemoryOpen(false); setIngestOpen(false); setExplorerOpen(false); setActiveNav('benchmark'); return; }
+    if (id === activeNav && explorerOpen) {setExplorerOpen(false);} else
+    {setActiveNav(id);setExplorerOpen(true);}
+  };
+
+  const explorerWidth  = explorerOpen  ? tweaks.explorerWidth : 0;
+  const memoryWidth    = memoryOpen    ? tweaks.explorerWidth : 0;
+  const ingestWidth    = ingestOpen    ? tweaks.explorerWidth : 0;
+  const benchmarkWidth = benchmarkOpen ? tweaks.explorerWidth : 0;
+  const agentWidth     = agentOpen     ? tweaks.agentWidth    : 0;
+  const termHeight     = terminalOpen  ? tweaks.terminalHeight : 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-deep)', position: 'relative' }}>
+
+      {/* ── Title bar ─────────────────────────────────────────────────── */}
+      <div style={{
+        height: 44, background: '#020915',
+        borderBottom: '1px solid rgba(47,99,255,0.2)',
+        display: 'flex', alignItems: 'center',
+        padding: '0 14px', gap: 0, flexShrink: 0,
+        userSelect: 'none'
+      }}>
+        {/* Logo + identity block */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 20 }}>
+          <SeamMark size={22} />
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+            <span style={{ color: '#a6fcff', fontSize: 13, letterSpacing: '0.14em', fontWeight: 600, textTransform: 'uppercase', fontFamily: "Permanent Marker" }}>SEAM</span>
+            <span style={{ color: '#274063', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase' }}>v0.1.0 · MIRL Runtime</span>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 22, background: 'rgba(47,99,255,0.2)', marginRight: 16 }} />
+
+        {/* Live status pills */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {[
+          { dot: '#7efdb9', label: 'SQLite', sub: '2.2 GB' },
+          { dot: '#7efdb9', label: 'Vector index', sub: '99.2%' },
+          { dot: '#7efdb9', label: 'MIRL', sub: 'connected' },
+          { dot: '#f4d676', label: 'REST API', sub: ':8765' }].
+          map((p) =>
+          <div key={p.label} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '2px 8px', borderRadius: 4,
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(47,99,255,0.12)',
+            fontSize: 10, color: '#8090b0'
+          }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: p.dot, boxShadow: `0 0 5px ${p.dot}`, flexShrink: 0 }} />
+              <span style={{ color: '#7090a0' }}>{p.label}</span>
+              <span style={{ color: p.dot, fontWeight: 500 }}>{p.sub}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }} />
+        {/* macOS dots */}
+        <div style={{ display: 'flex', gap: 6, justifyContent: "flex-start" }}>
+          {['#ff6b6b', '#f4d676', '#7efdb9'].map((c, i) =>
+          <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: c, opacity: 0.7 }} />
+          )}
+        </div>
+      </div>
+
+      {/* ── Body ──────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+
+        {/* Settings overlay */}
+        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} onOpenFile={(tabId) => { openFile(tabId); setSettingsOpen(false); }} />}
+
+        {/* ── Activity bar ───────────────────────────────────────────── */}
+        <div style={{
+          width: 48, background: '#020913', flexShrink: 0,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          borderRight: '1px solid rgba(47,99,255,0.15)', paddingTop: 6
+        }}>
+          {navItems.map((item) =>
+          <button key={item.id} title={item.label} onClick={() => handleNavClick(item.id)}
+          style={{
+            width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: activeNav === item.id && explorerOpen ? 'var(--cyan)' : 'var(--muted)',
+            borderLeft: activeNav === item.id && explorerOpen ? '2px solid var(--cyan)' : '2px solid transparent',
+            transition: 'color 0.15s, border-color 0.15s', margin: '2px 0', borderRadius: 0
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--ice)'}
+          onMouseLeave={(e) => e.currentTarget.style.color = activeNav === item.id && explorerOpen ? 'var(--cyan)' : 'var(--muted)'}>
+            {item.icon}</button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button title="Settings" onClick={() => setSettingsOpen(true)}
+          style={{
+            width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: settingsOpen ? 'var(--cyan)' : 'var(--muted)', marginBottom: 6,
+            borderLeft: settingsOpen ? '2px solid var(--cyan)' : '2px solid transparent'
+          }}>
+            {icons.settings}</button>
+        </div>
+
+        {/* ── Explorer panel ─────────────────────────────────────────── */}
+        <div style={{
+          width: explorerWidth, flexShrink: 0, overflow: 'hidden',
+          transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)',
+          background: '#030d20', borderRight: explorerOpen ? '1px solid rgba(47,99,255,0.15)' : 'none',
+          display: 'flex', flexDirection: 'column'
+        }}>
+          {explorerOpen &&
+          <>
+              {/* Header */}
+              <div style={{
+              padding: '7px 12px 0', fontSize: 10, textTransform: 'uppercase',
+              letterSpacing: '0.12em', color: '#4f8cfb',
+              borderBottom: '1px solid rgba(47,99,255,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+                <span>Explorer</span>
+                <span style={{ color: '#274063', cursor: 'pointer', fontSize: 14 }} onClick={() => setExplorerOpen(false)}>×</span>
+              </div>
+              {/* Sub-tabs: Project / System */}
+              <div style={{ display: 'flex', borderBottom: '1px solid rgba(47,99,255,0.1)', flexShrink: 0 }}>
+                {['project', 'system'].map((t) =>
+              <div key={t} onClick={() => setExplorerTab(t)} style={{
+                flex: 1, textAlign: 'center', padding: '5px 0', fontSize: 10,
+                textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer',
+                color: explorerTab === t ? '#7fe0ff' : '#274063',
+                borderBottom: explorerTab === t ? '2px solid #7fe0ff' : '2px solid transparent'
+              }}>{t}</div>
+              )}
+              </div>
+
+              {tweaks.showMetrics && explorerTab === 'project' && <MetricsPanel />}
+
+              <div style={{ overflowY: 'auto', flex: 1, paddingTop: 4 }}>
+                {explorerTab === 'project' ?
+              <>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#274063', padding: '4px 12px' }}>Seam /</div>
+                    {fileTree.map((node) =>
+                <FileNode key={node.id} node={node} depth={0}
+                openFile={openFile} activeFile={activeFile}
+                openFolders={openFolders} toggleFolder={toggleFolder} />
+                )}
+                  </> :
+
+              <>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#274063', padding: '4px 12px 6px' }}>File System</div>
+                    {systemPaths.map((node) =>
+                <FsNode key={node.id} node={node} depth={0} openFolders={sysFolders} toggleFolder={toggleSysFolder} />
+                )}
+                  </>
+              }
+              </div>
+            </>
+          }
+        </div>
+
+        {/* ── Memory panel ───────────────────────────────────────────── */}
+        <MemoryPanel width={memoryWidth} />
+
+        {/* ── Ingest panel ───────────────────────────────────────────── */}
+        <IngestPanel width={ingestWidth} onOpenSettings={(section) => { setSettingsOpen(true); }} />
+
+        {/* ── Benchmark panel ────────────────────────────────────────── */}
+        <BenchmarkPanel width={benchmarkWidth} />
+
+        {/* ── Main content area ──────────────────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+          {/* Tab bar */}
+          <div style={{
+            height: 36, background: '#020913',
+            borderBottom: '1px solid rgba(47,99,255,0.15)',
+            display: 'flex', alignItems: 'stretch', overflowX: 'auto', flexShrink: 0
+          }}>
+            {openTabs.map((tabId) => {
+              const isSpecial = tabId === '__benchmarks' || tabId === '__memory';
+              const content = editorContent[tabId];
+              const isActive = tabId === activeTab;
+              const extColors = { py: '#9b6cff', svg: '#7fe0ff', html: '#f4d676', md: '#7efdb9', txt: '#bfefff' };
+              const ext = content?.name?.split('.').pop();
+              const specialMeta = {
+                '__benchmarks': { name: 'Benchmarks', dot: '#f4d676' },
+                '__memory':     { name: 'Memory',     dot: '#9b6cff' },
+              };
+              const tabName = isSpecial ? specialMeta[tabId].name : content?.name;
+              const tabDot  = isSpecial ? specialMeta[tabId].dot  : (extColors[ext] || '#5a7a9a');
+              return (
+                <div key={tabId} onClick={() => {setActiveTab(tabId);setActiveFile(tabId);}} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px',
+                  background: isActive ? 'var(--bg-panel)' : 'transparent',
+                  borderBottom: isActive ? '2px solid var(--cyan)' : '2px solid transparent',
+                  borderRight: '1px solid rgba(47,99,255,0.1)',
+                  cursor: 'pointer', minWidth: 0, flexShrink: 0,
+                  color: isActive ? '#a6fcff' : '#4f6888', fontSize: 12, userSelect: 'none'
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: tabDot, flexShrink: 0 }} />
+                  <span>{tabName}</span>
+                  <span onClick={(e) => closeTab(tabId, e)} style={{ marginLeft: 4, color: '#274063', fontSize: 14, lineHeight: 1 }}>×</span>
+                </div>);
+
+            })}
+          </div>
+
+          {/* Editor + Terminal */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Code editor — or special full-pane views */}
+            <div style={{ flex: 1, overflow: 'auto', padding: activeTab === '__benchmarks' || activeTab === '__memory' ? '0' : '16px 0' }}>
+              {activeTab === '__benchmarks' ? <BenchmarkFullView /> :
+               activeTab === '__memory'     ? <MemoryFullView />     :
+              <div style={{ display: 'flex' }}>
+                <div style={{ width: 48, flexShrink: 0, textAlign: 'right', paddingRight: 12, color: '#1a2540', fontSize: 12, lineHeight: '19.2px', userSelect: 'none' }}>
+                  {(currentContent.lines || []).map((l) =>
+                  <div key={l.n} style={{ height: l.t === 'blank' ? 8 : 19.2 }}>{l.t !== 'blank' ? l.n : ''}</div>
+                  )}
+                </div>
+                <div style={{ flex: 1, paddingRight: 24, fontSize: 13, lineHeight: '19.2px' }}>
+                  {(currentContent.lines || []).map((l) =>
+                  <div key={l.n} style={{ height: l.t === 'blank' ? 8 : 19.2 }}><CodeLine line={l} /></div>
+                  )}
+                </div>
+              </div>
+              }
+            </div>
+
+            {/* Terminal */}
+            <div style={{
+              height: termHeight, overflow: 'hidden',
+              transition: 'height 0.22s cubic-bezier(0.4,0,0.2,1)',
+              borderTop: terminalOpen ? '1px solid rgba(47,99,255,0.2)' : 'none',
+              background: '#020b1e', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'relative'
+            }}>
+              {terminalOpen &&
+              <>
+                  <div style={{ height: 30, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, borderBottom: '1px solid rgba(47,99,255,0.1)', background: '#020913', flexShrink: 0 }}>
+                    <span style={{ color: '#4f8cfb', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Terminal</span>
+                    <span style={{ color: '#7efdb9', fontSize: 10 }}>seam</span>
+                    <div style={{ flex: 1 }} />
+                    <span style={{ color: '#274063', fontSize: 10 }}>type <span style={{ color: '#7fe0ff' }}>/</span> for menu · <span style={{ color: '#f4d676' }}>!</span> for bash · <span style={{ color: '#9b6cff' }}>?</span> for help</span>
+                    <button onClick={() => setTerminalOpen(false)} style={{ background: 'none', border: 'none', color: '#274063', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+                  </div>
+
+                  {/* Command menu */}
+                  {termMenuOpen &&
+                <div style={{
+                  position: 'absolute', bottom: 44, left: 12, zIndex: 50,
+                  background: '#030d20', border: '1px solid rgba(79,140,251,0.25)',
+                  borderRadius: 8, padding: '6px 0', minWidth: 280,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                }}>
+                      <div style={{ padding: '4px 12px 6px', fontSize: 10, color: '#4f8cfb', textTransform: 'uppercase', letterSpacing: '0.1em', borderBottom: '1px solid rgba(47,99,255,0.1)' }}>
+                        SEAM Commands
+                      </div>
+                      {termMenuCommands.map((c) =>
+                  <div key={c.cmd} onClick={() => {setTermInput(c.cmd + ' ');setTermMenuOpen(false);termInputRef.current?.focus();}}
+                  style={{ display: 'flex', gap: 10, padding: '5px 12px', cursor: 'pointer', fontSize: 12 }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79,140,251,0.08)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                    
+                          <span style={{ color: '#7fe0ff', width: 90, flexShrink: 0 }}>{c.cmd}</span>
+                          <span style={{ color: '#5a7a9a' }}>{c.desc}</span>
+                        </div>
+                  )}
+                      <div style={{ padding: '4px 12px 0', borderTop: '1px solid rgba(47,99,255,0.1)', marginTop: 4 }}>
+                        <span style={{ fontSize: 10, color: '#274063' }}>press Esc to close</span>
+                      </div>
+                    </div>
+                }
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '10px 16px', fontSize: 12 }}>
+                    {termLines.map((l) => <TermLine key={l.id} line={l} />)}
+                    <div ref={termEnd} />
+                  </div>
+                  <form onSubmit={handleTermSubmit} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderTop: '1px solid rgba(47,99,255,0.1)', flexShrink: 0 }}>
+                    <span style={{ color: '#4f8cfb', fontSize: 12 }}>❯</span>
+                    <input
+                    ref={termInputRef}
+                    value={termInput}
+                    onChange={(e) => {setTermInput(e.target.value);if (e.target.value === '/') setTermMenuOpen(true);else setTermMenuOpen(false);}}
+                    onKeyDown={(e) => {if (e.key === 'Escape') setTermMenuOpen(false);}}
+                    placeholder="seam ...  ( / menu  · ! bash  · ? help )"
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#a6fcff', fontSize: 12, fontFamily: 'var(--font)', caretColor: '#7efdb9' }} />
+                  
+                  </form>
+                </>
+              }
+            </div>
+          </div>
+        </div>
+
+        {/* ── Agent chat panel ──────────────────────────────────────── */}
+        <div style={{
+          width: agentWidth, flexShrink: 0, overflow: 'hidden',
+          transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)',
+          borderLeft: agentOpen ? '1px solid rgba(47,99,255,0.15)' : 'none',
+          background: '#030d20', display: 'flex', flexDirection: 'column'
+        }}>
+          {agentOpen &&
+          <>
+              {/* Agent header with model switcher */}
+              <div style={{ height: 36, display: 'flex', alignItems: 'center', padding: '0 10px', gap: 6, borderBottom: '1px solid rgba(47,99,255,0.12)', background: '#020913', flexShrink: 0, position: 'relative' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7efdb9', boxShadow: '0 0 6px #7efdb9', flexShrink: 0 }} />
+                <span style={{ color: '#7fe0ff', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em' }}>SEAM Agent</span>
+                <div style={{ flex: 1 }} />
+                {/* Model picker button */}
+                <button onClick={() => setModelMenuOpen((v) => !v)} style={{
+                display: 'flex', alignItems: 'center', gap: 4, padding: '2px 7px',
+                background: 'rgba(79,140,251,0.08)', border: `1px solid ${selectedModel.color}40`,
+                borderRadius: 4, cursor: 'pointer', fontSize: 10, fontFamily: 'var(--font)',
+                color: selectedModel.color
+              }}>
+                  <span>{selectedModel.label}</span>
+                  <span style={{ opacity: 0.5, fontSize: 8 }}>▾</span>
+                </button>
+                <button onClick={() => setAgentOpen(false)} style={{ background: 'none', border: 'none', color: '#274063', cursor: 'pointer', fontSize: 16, lineHeight: 1, marginLeft: 2 }}>×</button>
+
+                {/* Model dropdown */}
+                {modelMenuOpen &&
+              <div style={{
+                position: 'absolute', top: 38, right: 30, zIndex: 60,
+                background: '#030d20', border: '1px solid rgba(79,140,251,0.25)',
+                borderRadius: 8, padding: '6px 0', minWidth: 220,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+              }}>
+                    {['Anthropic', 'OpenAI', 'Google', 'Ollama'].map((provider) => {
+                  const group = MODEL_OPTIONS.filter((m) => m.provider === provider);
+                  return (
+                    <div key={provider}>
+                          <div style={{ padding: '4px 12px', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#274063' }}>{provider}</div>
+                          {group.map((m) =>
+                      <div key={m.id} onClick={() => {setSelectedModel(m);setModelMenuOpen(false);}}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px', cursor: 'pointer', fontSize: 12, background: selectedModel.id === m.id ? 'rgba(79,140,251,0.1)' : 'transparent' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79,140,251,0.07)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = selectedModel.id === m.id ? 'rgba(79,140,251,0.1)' : 'transparent'}>
+                        
+                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: m.color, flexShrink: 0 }} />
+                              <span style={{ color: selectedModel.id === m.id ? '#a6fcff' : '#8090b0' }}>{m.label}</span>
+                            </div>
+                      )}
+                        </div>);
+
+                })}
+                  </div>
+              }
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 8px' }}>
+                {agentMessages.map((m) => <AgentMsg key={m.id} msg={m} />)}
+                {agentLoading &&
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4f8cfb', fontSize: 12 }}>
+                    <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>●</span>
+                    <span style={{ color: selectedModel.color, fontSize: 11 }}>{selectedModel.label} thinking...</span>
+                  </div>
+              }
+                <div ref={agentEnd} />
+              </div>
+
+              <form onSubmit={handleAgentSubmit} style={{ padding: '10px', borderTop: '1px solid rgba(47,99,255,0.12)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', background: 'rgba(8,19,42,0.9)', border: '1px solid rgba(79,140,251,0.25)', borderRadius: 8, padding: '8px 10px' }}>
+                  <textarea
+                  value={agentInput}
+                  onChange={(e) => setAgentInput(e.target.value)}
+                  onKeyDown={(e) => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault();handleAgentSubmit(e);}}}
+                  placeholder="Ask SEAM agent..."
+                  rows={2}
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#a6fcff', fontSize: 12, fontFamily: 'var(--font)', resize: 'none', lineHeight: 1.5, caretColor: '#7efdb9' }} />
+                
+                  <button type="submit" disabled={agentLoading || !agentInput.trim()} style={{
+                  background: agentInput.trim() ? 'rgba(79,140,251,0.2)' : 'transparent',
+                  border: '1px solid rgba(79,140,251,0.3)', borderRadius: 6, padding: '5px 10px',
+                  color: agentInput.trim() ? '#7fe0ff' : '#274063',
+                  cursor: agentInput.trim() ? 'pointer' : 'default', fontSize: 12, fontFamily: 'var(--font)', transition: 'all 0.15s'
+                }}>↑</button>
+                </div>
+              </form>
+            </>
+          }
+        </div>
+      </div>
+
+      {/* ── Bottom toolbar ────────────────────────────────────────────── */}
+      <div style={{ height: 30, background: '#020913', borderTop: '1px solid rgba(47,99,255,0.15)', display: 'flex', alignItems: 'center', padding: '0 8px', gap: 2, flexShrink: 0 }}>
+        {[
+        { label: 'Terminal', active: terminalOpen, toggle: () => setTerminalOpen((v) => !v), color: '#7fe0ff', activeColor: 'rgba(127,224,255,0.08)', activeBorder: 'rgba(127,224,255,0.25)',
+          icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polyline points="4,6 10,12 4,18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><line x1="12" y1="18" x2="20" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg> },
+        { label: 'Agent', active: agentOpen, toggle: () => setAgentOpen((v) => !v), color: '#9b6cff', activeColor: 'rgba(155,108,255,0.08)', activeBorder: 'rgba(155,108,255,0.3)',
+          icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg> },
+        { label: 'Explorer', active: explorerOpen, toggle: () => setExplorerOpen((v) => !v), color: '#4f8cfb', activeColor: 'rgba(79,140,251,0.08)', activeBorder: 'rgba(79,140,251,0.25)',
+          icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.7" /><rect x="13" y="3" width="8" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.7" /><rect x="13" y="11" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.7" /></svg> }].
+        map((btn) =>
+        <button key={btn.label} onClick={btn.toggle} title={`Toggle ${btn.label}`} style={{
+          display: 'flex', alignItems: 'center', gap: 5, padding: '0 10px', height: 22,
+          background: btn.active ? btn.activeColor : 'transparent',
+          border: '1px solid ' + (btn.active ? btn.activeBorder : 'rgba(47,99,255,0.15)'),
+          borderRadius: 4, cursor: 'pointer',
+          color: btn.active ? btn.color : '#4f6888',
+          fontSize: 11, fontFamily: 'var(--font)', transition: 'all 0.15s'
+        }}>{btn.icon}{btn.label}</button>
+        )}
+        <div style={{ flex: 1 }} />
+        <StatusBar />
+      </div>
+
+      {/* Tweaks panel */}
+      <TweaksPanel>
+        <window.TweakSection title="Layout">
+          <window.TweakToggle label="Show metrics in explorer" tweakKey="showMetrics" />
+          <window.TweakSlider label="Explorer width" tweakKey="explorerWidth" min={160} max={360} step={10} />
+          <window.TweakSlider label="Agent panel width" tweakKey="agentWidth" min={220} max={480} step={10} />
+          <window.TweakSlider label="Terminal height" tweakKey="terminalHeight" min={120} max={400} step={10} />
+        </window.TweakSection>
+        <window.TweakSection title="Accent">
+          <window.TweakColor label="Accent color" tweakKey="accentColor" />
+        </window.TweakSection>
+      </TweaksPanel>
+
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1a2540; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #274063; }
+        button:focus { outline: none; }
+        textarea::placeholder, input::placeholder { color: #274063; }
+      `}</style>
+    </div>);
+
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

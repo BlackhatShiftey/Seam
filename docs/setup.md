@@ -71,7 +71,7 @@ git rev-parse HEAD
 git rev-parse origin/main
 ./.venv/bin/python -m tools.history.verify_integrity
 ./.venv/bin/python -m tools.history.verify_routing
-./.venv/bin/python -m tools.history.write_snapshot --agent codex --entries 136,135,134 --token-budget 1800
+./.venv/bin/python -m tools.history.write_snapshot --agent codex --entries 137,136,135 --token-budget 1800
 ./.venv/bin/python -m tools.history.verify_continuity
 ./.venv/bin/python -m tools.history.build_context_pack --latest 5 --token-budget 1800
 ```
