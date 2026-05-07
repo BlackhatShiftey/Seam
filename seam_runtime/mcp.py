@@ -25,7 +25,7 @@ TOOL_DESCRIPTIONS = {
     "seam_surface_show": "Show one stored SEAM-HS/1 surface library entry by `hs:<id>` ref (mirrors `seam surface show`).",
     "seam_surface_query": "Query embedded MIRL or SEAM-RC/1 directly inside a registered HS/1 surface by `hs:<id>` (mirrors `seam surface query`).",
     "seam_surface_decode": "Decode the embedded payload of a registered HS/1 surface by `hs:<id>` and return its metadata + truncated text view.",
-    "seam_benchmark_latest": "Return the most recent persisted benchmark run summaries (mirrors `seam benchmark history`).",
+    "seam_benchmark_latest": "Return the most recent persisted benchmark run summaries for agent triage.",
 }
 
 
@@ -38,7 +38,7 @@ TOOL_METADATA = {
         "input_schema": {
             "query": {"type": "string", "required": True, "description": "Search text."},
             "scope": {"type": "string", "required": False, "description": "Optional scope filter (e.g. 'thread', 'project')."},
-            "budget": {"type": "integer", "required": False, "default": 5, "description": "Max number of compact index hits."},
+            "budget": {"type": "integer", "required": False, "default": 5, "minimum": 1, "maximum": 200, "description": "Max number of compact index hits."},
         },
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     },
@@ -75,8 +75,8 @@ TOOL_METADATA = {
         "input_schema": {
             "query": {"type": "string", "required": True, "description": "Question or topic to retrieve context for."},
             "scope": {"type": "string", "required": False},
-            "budget": {"type": "integer", "required": False, "default": 5, "description": "Max search candidates considered."},
-            "pack_budget": {"type": "integer", "required": False, "default": 512, "description": "Token budget for the prompt-ready pack."},
+            "budget": {"type": "integer", "required": False, "default": 5, "minimum": 1, "maximum": 200, "description": "Max search candidates considered."},
+            "pack_budget": {"type": "integer", "required": False, "default": 512, "minimum": 1, "maximum": 65536, "description": "Token budget for the prompt-ready pack."},
             "lens": {"type": "string", "required": False, "default": "rag", "description": "Pack lens label."},
             "mode": {"type": "string", "required": False, "default": "context", "description": "Pack mode: 'context' (default), 'narrative', or 'exact'."},
         },
@@ -129,6 +129,8 @@ TOOL_METADATA = {
 
 
 _HS_REF_PATTERN = re.compile(r"^hs:[0-9a-f]+$")
+_PACK_MODES = {"context", "exact", "narrative"}
+_TEXT_PAYLOAD_FORMATS = {"MIRL", "SEAM-RC/1"}
 
 
 def run_stdio_bridge(runtime: SeamRuntime, input_stream: TextIO | None = None, output_stream: TextIO | None = None) -> None:
@@ -152,19 +154,15 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
     if not isinstance(arguments, dict):
         raise ValueError("arguments must be an object")
     if name == "seam_memory_search":
-        query = str(arguments.get("query") or "")
-        budget = int(arguments.get("budget") or 5)
+        query = _required_text(arguments.get("query"), field="query", tool=name)
+        budget = _bounded_int(arguments.get("budget"), default=5, low=1, high=200)
         scope = arguments.get("scope")
         return {"type": "result", "tool": name, "result": runtime.memory_search(query, scope=str(scope) if scope else None, budget=budget)}
     if name == "seam_memory_get":
-        ids = arguments.get("ids") or arguments.get("record_ids") or []
-        if isinstance(ids, str):
-            record_ids = [part.strip() for part in ids.split(",") if part.strip()]
-        else:
-            record_ids = [str(item) for item in ids]
+        record_ids = _coerced_record_ids(arguments.get("ids") or arguments.get("record_ids"))
         return {"type": "result", "tool": name, "result": runtime.memory_get(record_ids, include_timeline=bool(arguments.get("timeline")))}
     if name == "seam_ingest":
-        text = str(arguments.get("text") or "")
+        text = _required_text(arguments.get("text"), field="text", tool=name)
         source_ref = str(arguments.get("source_ref") or "agent://input")
         return {"type": "result", "tool": name, "result": runtime.ingest_text(text, source_ref=source_ref, persist=True).to_dict()}
     if name == "seam_stats":
@@ -174,14 +172,12 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
         rows = runtime.store.list_document_status(limit=limit)
         return {"type": "result", "tool": name, "result": _paginated(rows, key="documents", limit=limit)}
     if name == "seam_context":
-        query = str(arguments.get("query") or "")
-        if not query.strip():
-            raise ValueError("query is required for seam_context; pass {arguments:{query:'...'}}")
+        query = _required_text(arguments.get("query"), field="query", tool=name)
         scope_arg = arguments.get("scope")
-        budget = int(arguments.get("budget") or 5)
-        pack_budget = int(arguments.get("pack_budget") or 512)
+        budget = _bounded_int(arguments.get("budget"), default=5, low=1, high=200)
+        pack_budget = _bounded_int(arguments.get("pack_budget"), default=512, low=1, high=65536)
         lens = str(arguments.get("lens") or "rag")
-        mode = str(arguments.get("mode") or "context")
+        mode = _validated_pack_mode(arguments.get("mode"))
         search_result = runtime.search_ir(
             query=query,
             scope=str(scope_arg) if isinstance(scope_arg, str) and scope_arg else None,
@@ -214,9 +210,7 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
         return {"type": "result", "tool": name, "result": row}
     if name == "seam_surface_query":
         surface_ref = _validated_hs_ref(arguments.get("surface_ref") or arguments.get("ref"))
-        query = str(arguments.get("query") or "")
-        if not query.strip():
-            raise ValueError("query is required for seam_surface_query")
+        query = _required_text(arguments.get("query"), field="query", tool=name)
         limit = _bounded_int(arguments.get("limit"), default=5, low=1, high=50)
         artifact_path = _resolve_registered_surface_path(runtime, surface_ref)
         result = query_surface(artifact_path, query=query, limit=limit)
@@ -227,7 +221,7 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
         artifact_path = _resolve_registered_surface_path(runtime, surface_ref)
         payload = decode_surface(artifact_path)
         result = payload.to_dict(include_payload=False)
-        if truncate_text > 0 and payload.payload_format in {"MIRL", "SEAM-RC/1", "SEAM-RC\1"}:
+        if truncate_text > 0 and payload.payload_format in _TEXT_PAYLOAD_FORMATS:
             text = payload.text
             result["payload_text"] = text[:truncate_text]
             result["payload_text_truncated"] = len(text) > truncate_text
@@ -254,6 +248,32 @@ def _bounded_int(value: object, *, default: int, low: int, high: int) -> int:
     return max(low, min(coerced, high))
 
 
+def _required_text(value: object, *, field: str, tool: str) -> str:
+    text = str(value or "")
+    if not text.strip():
+        raise ValueError(f"{field} is required for {tool}")
+    return text if field == "text" else text.strip()
+
+
+def _coerced_record_ids(value: object) -> list[str]:
+    if isinstance(value, str):
+        record_ids = [part.strip() for part in value.split(",") if part.strip()]
+    elif isinstance(value, list):
+        record_ids = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        record_ids = []
+    if not record_ids:
+        raise ValueError("ids are required for seam_memory_get")
+    return record_ids
+
+
+def _validated_pack_mode(value: object) -> str:
+    mode = str(value or "context").strip()
+    if mode not in _PACK_MODES:
+        raise ValueError(f"mode must be one of {sorted(_PACK_MODES)}")
+    return mode
+
+
 def _paginated(rows: list[dict[str, object]], *, key: str, limit: int) -> dict[str, object]:
     return {
         key: rows,
@@ -270,7 +290,7 @@ def _validated_hs_ref(value: object) -> str:
     if not _HS_REF_PATTERN.match(ref):
         raise ValueError(
             f"Invalid surface_ref {ref!r}; canonical form is 'hs:<hex>'. "
-            "MCP tools only accept canonical ids — file paths are rejected. Use seam_surface_list to discover registered surfaces."
+            "MCP tools only accept canonical ids; file paths are rejected. Use seam_surface_list to discover registered surfaces."
         )
     return ref
 

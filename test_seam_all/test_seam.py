@@ -239,6 +239,13 @@ claim c1:
         full = dispatch_tool(runtime, {"tool": "seam_memory_get", "arguments": {"ids": [record_id], "timeline": True}})
         self.assertTrue(full["result"]["records"])
 
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_ingest", "arguments": {"text": "   "}})
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_memory_search", "arguments": {"query": " "}})
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_memory_get", "arguments": {"ids": []}})
+
     def test_mcp_bridge_exposes_stats_documents_context_and_doctor_tools(self) -> None:
         runtime = SeamRuntime(self.db_path)
         dispatch_tool(
@@ -282,6 +289,10 @@ claim c1:
 
         with self.assertRaises(ValueError):
             dispatch_tool(runtime, {"tool": "seam_context", "arguments": {"query": ""}})
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_context", "arguments": {"query": "doctor", "mode": "loose"}})
+        with self.assertRaises(ValueError):
+            dispatch_tool(runtime, {"tool": "seam_context", "arguments": {"query": "doctor", "pack_budget": "big"}})
 
     def test_mcp_bridge_surface_list_show_and_benchmark_latest_handle_empty_state(self) -> None:
         runtime = SeamRuntime(self.db_path)

@@ -15,6 +15,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - HS/1 surface library adapters landed on `main`: stored surface metadata, stable `hs:<hash>` IDs, list/show/repair, redundant file-backed copies, and direct query/verify/decode/context/import by stored ID
 - benchmark diff tooling, pass/fail gate tooling, publish-only holdout fixture routing, and tracked CI coverage
 - optional FastAPI/Uvicorn REST API surface for local compile, search, context, stats, health, persist, and lossless-compression workflows
+- agent-safe MCP stdio bridge with compact memory search/get, ingest, stats, document status, context packing, doctor, stored HS/1 surface operations, and benchmark run summaries
 - PgVector support running locally via Docker Compose on port 55432; installer coverage across Windows/Linux paths
 - Competitive RAG/install polish in progress on `codex/competitive-rag-install-polish`: one-line private install docs, product-first README, document status tracking, progressive memory search/get, `retrieve --mode vector|graph|hybrid|mix`, stdio agent bridge, and vector stale-index reporting
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
@@ -23,7 +24,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#137`. Snapshot JSON files are local derived artifacts, so a fresh Linux clone should regenerate the resume snapshot with the command in `docs/setup.md` before running continuity verification.
+- Latest continuity handoff is `HISTORY#140`. Snapshot JSON files are local derived artifacts, so a fresh Linux clone should regenerate the resume snapshot with the command in `docs/setup.md` before running continuity verification.
 - A fresh Linux clone should run the repo-local setup in `docs/setup.md`, then verify `python -m tools.history.verify_integrity`, `python -m tools.history.verify_routing`, and `python -m tools.history.verify_continuity` before starting new work.
 - Next work should continue from the functional visual-memory loop, Agent Compiler roadmap, IDE-like web dashboard, and first-class agent CLI direction, not from the already-merged HS/1 adapter/repair/benchmark branches.
 
@@ -38,6 +39,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, and env-configurable rate limiting
 - RAG efficiency surface: `seam ingest <path> --persist`, `seam memory search`, `seam memory get`, `seam retrieve --mode mix`, document status rows, vector source-hash cache/stale checks, and `seam mcp serve` stdio bridge
+- MCP agent bridge: `seam mcp serve` exposes 12 bounded, documented stdio tools for memory retrieval, controlled ingest, context, install diagnostics, stored HS/1 surfaces, and benchmark summaries; canonical `hs:<hex>` surface refs are required for surface tools
 - Interactive CLI shell: `seam shell` and `seam chat` provide the first REPL-style memory interface, with slash commands and prompt-ready context output
 - Holographic Surface surface commands: `seam surface compile|encode|decode|verify|query|search|context|import`; `bw1`, `rgb`/`rgb24`, explicit `rgba32`, and explicit `rgba64`; `surface` benchmark exactness gate, stored lookup gate, stored query gate, repair gate, and repair-query gate
 - Holographic Surface library commands: `seam surface store|list|show|repair`, plus `compile --store` and `encode --store` for SQLite metadata registration, redundant file-backed copies, and repair of missing/corrupt stored copies without committing generated user artifacts
