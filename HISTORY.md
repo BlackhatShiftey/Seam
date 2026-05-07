@@ -2823,3 +2823,23 @@ Next MCP tools to consider:
 - seam_retrieve with explicit mode={vector,graph,hybrid,mix}: full retrieval surface beyond the basic memory_search wrapper.
 - Eventually validate that TOOL_DESCRIPTIONS keys == TOOL_METADATA keys at module import.
 ---END-ENTRY-#139---
+
+---BEGIN-ENTRY-#140---
+id: 140
+date: 2026-05-07T09:29:44Z
+agent: codex
+status: done
+topics: mcp, multi-agent, command, doctor, verify, history, snapshot, protocol, status
+commits: a39245f,663d671
+refs: seam_runtime/mcp.py,seam_runtime/doctor.py,seam_runtime/cli.py,test_seam_all/test_seam.py,PROJECT_STATUS.md,docs/setup.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 139
+tokens: 222
+---
+Merged Claude's separate worktree MCP expansion into main, then tightened the bridge before pushing it as the shared repo state. The MCP stdio bridge now exposes the 12 agent-safe tools from HISTORY#139 while adding stricter dispatcher validation: blank memory searches and blank ingest writes are rejected, empty memory_get calls are rejected, search/context budgets are bounded through the shared integer helper, pack modes are validated, canonical hs:<hex> refs remain required for surface tools, and surface decode only returns text for real MIRL or SEAM-RC/1 payload formats.
+
+Updated PROJECT_STATUS.md and docs/setup.md so a fresh Linux clone resumes from this MCP handoff instead of the older dashboard-only handoff. Snapshot JSON remains local derived state, so setup now tells the next clone to regenerate entries 140,139,138 before continuity verification.
+
+Verification: python -m py_compile seam_runtime\mcp.py seam_runtime\doctor.py seam_runtime\cli.py test_seam_all\test_seam.py; python -m pytest test_seam_all\test_seam.py -q -k "mcp or doctor"; python -m pytest test_seam_all\test_seam.py tools\history\test_history_tools.py -q (170 passed); git diff --check; changed-file secret/session scan returned no candidate matches.
+
+Next: push main and confirm GitHub Actions after history/index/snapshot verification succeeds.
+---END-ENTRY-#140---
