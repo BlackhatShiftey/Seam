@@ -56,6 +56,11 @@ and `HISTORY_INDEX.md`.
   Cursor, OpenCode, and future MCP clients: use `seam mcp stdio` or `seam-mcp`
   for JSON-RPC MCP discovery/calls. `seam mcp serve` remains only as the legacy
   JSON-lines bridge for older local wrappers.
+- Agent clients that need the real pgvector adapter should launch MCP with
+  `--ensure-pgvector`. That path starts the repo Docker Compose `pgvector`
+  service, waits for container `seam-pgvector`, sets `SEAM_PGVECTOR_DSN` only
+  in the MCP server process, and reads credentials only from ignored local env
+  files such as `SEAM_LOCAL_ENV` or `~/OneDrive/Documents/SEAM/local/.env`.
 - Lossless claims require exact reconstruction and integrity checks.
 - SEAM compression must produce directly readable AI-native machine language as the primary artifact; opaque byte compression is only an optional reconstruction/integrity backing layer.
 - A compressed SEAM artifact is not complete unless SEAM can answer detail questions from the compressed language without restoring the original source.

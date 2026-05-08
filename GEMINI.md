@@ -9,7 +9,11 @@ Historical continuity: `HISTORY_INDEX.md` and surgical reads from `HISTORY.md`.
 
 This repo provides a project-local MCP config at `.gemini/settings.json`.
 Gemini should discover the `seam` MCP server automatically when started from
-the repo root.
+the repo root. The configured server runs
+`python -m seam_runtime.mcp_protocol --ensure-pgvector`, which starts the
+repo Docker Compose pgvector service before serving MCP. Pgvector credentials
+must stay in the ignored local env file selected by `SEAM_LOCAL_ENV` or in
+`~/OneDrive/Documents/SEAM/local/.env`; do not copy secrets into this guide.
 
 Use SEAM MCP tools when a request depends on repo memory, durable history,
 roadmap state, prior decisions, stored documents, HS/1 surfaces, or benchmark

@@ -3041,3 +3041,27 @@ Verification: `python -m pytest test_seam_all/test_seam.py -q -k "mcp"` returned
 
 Next: start Gemini from the repo root and run `/mcp` or ask it to use SEAM context; Gemini should expose the tools under its MCP naming convention. For future agent clients, point them at `seam-mcp` or `python -m seam_runtime.mcp_protocol` over stdio rather than the legacy JSON-lines bridge.
 ---END-ENTRY-#148---
+
+---BEGIN-ENTRY-#149---
+id: 149
+date: 2026-05-08T13:45:50Z
+agent: codex
+status: done
+topics: mcp, multi-agent, pgvector, docker, command, verify, history, snapshot
+commits: none
+refs: seam_runtime/pgvector_bootstrap.py,seam_runtime/mcp_protocol.py,.gemini/settings.json,GEMINI.md,README.md,docs/RAG_ARCHITECTURE.md,docs/howto/README.md,docs/setup.md,PROJECT_STATUS.md,REPO_LEDGER.md,docker-compose.yaml,.env.example,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 148
+tokens: 430
+---
+Gemini MCP wiring now auto-starts pgvector before serving SEAM tools.
+
+Previous state: #148 added a standard MCP JSON-RPC server and project-local Gemini config, but Gemini started `python -m seam_runtime.mcp_protocol` without pgvector bootstrap. Agents could discover SEAM tools, but pgvector depended on the operator separately starting Docker Compose and setting `SEAM_PGVECTOR_DSN`.
+
+New state: `seam_runtime/pgvector_bootstrap.py` adds a dependency-free pgvector bootstrap used by the MCP server. `python -m seam_runtime.mcp_protocol --ensure-pgvector` resolves the private env file from `SEAM_LOCAL_ENV`, `~/OneDrive/Documents/SEAM/local/.env`, or ignored repo `.env`; starts Docker Desktop when possible on Windows; runs `docker compose --env-file <private-env> up -d pgvector`; waits for container `seam-pgvector` to become healthy; creates the `vector` extension if needed; sets `SEAM_PGVECTOR_DSN` only in the MCP process; and writes startup logs to stderr so MCP stdout stays pure JSON-RPC. Gemini's `.gemini/settings.json` now uses that auto-start path with a 120-second startup timeout. The compose and env-example defaults now use port 55432 to match the repo ledger and current operator baseline.
+
+Changed files: seam_runtime/pgvector_bootstrap.py, seam_runtime/mcp_protocol.py, .gemini/settings.json, GEMINI.md, README.md, docs/RAG_ARCHITECTURE.md, docs/howto/README.md, docs/setup.md, PROJECT_STATUS.md, REPO_LEDGER.md, docker-compose.yaml, .env.example, test_seam_all/test_seam.py, HISTORY.md, HISTORY_INDEX.md, .seam/snapshots.
+
+Verification: `docker version` succeeded and `docker ps --filter name=seam-pgvector` showed the local container healthy on port 55432. `python -m pytest test_seam_all/test_seam.py -q -k "mcp or pgvector_bootstrap"` returned 11/11 PASS. Raw MCP smoke through `python -m seam_runtime.mcp_protocol --ensure-pgvector --pgvector-timeout 60` returned valid initialize and tool-call JSON-RPC; `seam_doctor` reported pgvector configured and reachable. `gemini mcp list` returned `seam: python -m seam_runtime.mcp_protocol --ensure-pgvector --pgvector-timeout 120 (stdio) - Connected`. `python -m py_compile seam_runtime/pgvector_bootstrap.py seam_runtime/mcp_protocol.py seam_runtime/cli.py seam.py`, `git diff --check`, and `python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q` all passed; the full suite was 176/176 PASS. Candidate secret/session scan found no real credentials or session links; matches were only the `POSTGRES_PASSWORD` variable name in code and `refs` in ledger prose.
+
+Next: when Gemini is started from the repo root, `/mcp` should show SEAM connected and Docker-backed pgvector ready. If pgvector auth fails after changing a local env password, recreate the local Docker volume so the running Postgres credentials match the private env file.
+---END-ENTRY-#149---

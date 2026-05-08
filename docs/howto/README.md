@@ -168,22 +168,24 @@ Success checklist:
 Windows PowerShell:
 
 ```powershell
-seam mcp serve
+seam mcp stdio
 ```
 
 Linux / WSL2:
 
 ```bash
-seam mcp serve
+seam mcp stdio
 ```
 
-The bridge speaks JSON lines on stdio. Wrappers can call `seam_memory_search`,
-`seam_memory_get`, `seam_ingest`, surface tools, and benchmark summaries without
-embedding the Python runtime.
+The bridge speaks standard MCP JSON-RPC on stdio. Wrappers can call
+`seam_memory_search`, `seam_memory_get`, `seam_ingest`, surface tools, and
+benchmark summaries without embedding the Python runtime. Use
+`seam-mcp --ensure-pgvector` when the agent should auto-start Docker Compose
+pgvector before MCP discovery.
 
 Success checklist:
 
-- the process stays open, reading stdin and emitting JSON responses
+- the process stays open, reading stdin and emitting MCP JSON-RPC responses
 - `seam doctor` reports the runtime as healthy in another terminal
 
 ## 7) Run Guarded Real-Adapter Validation (Postgres + PgVector)
@@ -203,7 +205,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_real_adapters_guarded.ps1
 Linux / WSL2 has no equivalent guarded runner yet; use the manual flow:
 
 ```bash
-docker compose --env-file "$HOME/.config/seam/.env" up -d seam-pgvector
+docker compose --env-file "$HOME/.config/seam/.env" up -d pgvector
 seam doctor
 docker compose --env-file "$HOME/.config/seam/.env" down
 ```

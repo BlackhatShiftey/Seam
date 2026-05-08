@@ -2,11 +2,11 @@
   "mcpServers": {
     "seam": {
       "command": "python",
-      "args": ["-m", "seam_runtime.mcp_protocol"],
+      "args": ["-m", "seam_runtime.mcp_protocol", "--ensure-pgvector", "--pgvector-timeout", "120"],
       "cwd": ".",
-      "timeout": 30000,
+      "timeout": 120000,
       "trust": false,
-      "description": "SEAM local memory runtime MCP server"
+      "description": "SEAM local memory runtime MCP server with pgvector auto-start"
     }
   }
 }

@@ -87,6 +87,14 @@ and `tools/call` to the existing SEAM runtime dispatcher. The older
 `seam mcp serve` JSON-lines bridge is retained for legacy local wrappers, but
 new agent integrations should use `seam mcp stdio`.
 
+For agents that should use the real pgvector adapter, start the MCP server with
+`--ensure-pgvector`. That flag reads the private env file from `SEAM_LOCAL_ENV`,
+`~/OneDrive/Documents/SEAM/local/.env`, or a local ignored `.env`, starts the
+repo Docker Compose `pgvector` service, waits for the `seam-pgvector` container
+to become healthy, creates the `vector` extension if needed, sets
+`SEAM_PGVECTOR_DSN` only in the server process, and then begins MCP JSON-RPC
+serving. Startup logs go to stderr so stdout remains valid MCP messages.
+
 Gemini project-local config:
 
 ```json
@@ -94,11 +102,11 @@ Gemini project-local config:
   "mcpServers": {
     "seam": {
       "command": "python",
-      "args": ["-m", "seam_runtime.mcp_protocol"],
+      "args": ["-m", "seam_runtime.mcp_protocol", "--ensure-pgvector", "--pgvector-timeout", "120"],
       "cwd": ".",
-      "timeout": 30000,
+      "timeout": 120000,
       "trust": false,
-      "description": "SEAM local memory runtime MCP server"
+      "description": "SEAM local memory runtime MCP server with pgvector auto-start"
     }
   }
 }

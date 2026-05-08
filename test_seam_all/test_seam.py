@@ -644,6 +644,54 @@ claim c1:
         self.assertEqual(unknown_tool["code"], -32602)
         self.assertIn("Unknown SEAM MCP tool", unknown_tool["message"])
 
+    def test_pgvector_bootstrap_uses_private_env_and_compose_service(self) -> None:
+        import subprocess
+
+        from seam_runtime.pgvector_bootstrap import ensure_pgvector
+
+        env_path = TEST_ARTIFACT_DIR / f"pgvector_{uuid4().hex}.env"
+        env_path.write_text(
+            "\n".join(
+                [
+                    "POSTGRES_DB=seam",
+                    "POSTGRES_USER=seam",
+                    "POSTGRES_PASSWORD=<local-password>",
+                    "SEAM_PGVECTOR_PORT=55432",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        calls: list[list[str]] = []
+
+        def fake_run(command, **kwargs):
+            calls.append(list(command))
+            if list(command[:3]) == ["docker", "inspect", "-f"]:
+                return subprocess.CompletedProcess(command, 0, stdout="healthy\n", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        tracked_env = ("SEAM_PGVECTOR_DSN", "POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "SEAM_PGVECTOR_PORT")
+        old_env = {key: os.environ.get(key) for key in tracked_env}
+        for key in tracked_env:
+            os.environ.pop(key, None)
+        try:
+            with patch("seam_runtime.pgvector_bootstrap.subprocess.run", side_effect=fake_run):
+                dsn = ensure_pgvector(Path.cwd(), env_path=str(env_path), stderr=StringIO())
+        finally:
+            for key, value in old_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+            env_path.unlink(missing_ok=True)
+
+        self.assertIn("port='55432'", dsn)
+        self.assertIn("dbname='seam'", dsn)
+        compose_calls = [call for call in calls if call[:2] == ["docker", "compose"]]
+        self.assertTrue(compose_calls)
+        self.assertIn("--env-file", compose_calls[0])
+        self.assertEqual(compose_calls[0][-2:], ["-d", "pgvector"])
+        self.assertTrue(any(call[:3] == ["docker", "exec", "seam-pgvector"] and "psql" in call for call in calls))
+
     def test_symbol_promotion_and_pack_compaction(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl(

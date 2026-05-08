@@ -8,6 +8,7 @@ from typing import TextIO
 
 from .installer import default_runtime_db_path
 from .mcp import TOOL_METADATA, dispatch_tool
+from .pgvector_bootstrap import PgVectorBootstrapError, ensure_pgvector
 from .runtime import SeamRuntime
 
 
@@ -202,7 +203,17 @@ def _write_jsonrpc(output_stream: TextIO, payload: dict[str, object]) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run the SEAM MCP stdio server")
     parser.add_argument("--db", default=default_runtime_db_path(), help="SQLite database path")
+    parser.add_argument("--ensure-pgvector", action="store_true", help="Start and verify the repo pgvector Docker service before serving MCP")
+    parser.add_argument("--pgvector-env", help="Private env file for Docker Compose and SEAM_PGVECTOR_DSN")
+    parser.add_argument("--pgvector-timeout", type=int, default=90, help="Seconds to wait for Docker/pgvector readiness")
     args = parser.parse_args(argv)
+    if args.ensure_pgvector:
+        repo_root = Path.cwd()
+        try:
+            ensure_pgvector(repo_root, env_path=args.pgvector_env, timeout_seconds=args.pgvector_timeout)
+        except PgVectorBootstrapError as exc:
+            print(f"[seam-mcp] pgvector startup failed: {exc}", file=sys.stderr, flush=True)
+            raise SystemExit(1) from exc
     run_mcp_server(SeamRuntime(Path(args.db)))
 
 

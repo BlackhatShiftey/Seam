@@ -58,7 +58,7 @@ state, metrics, panels, and chart surfaces without restarting.
 - Persistent local memory: SQLite is the canonical source of truth.
 - Efficient RAG: `vector`, `graph`, `hybrid`, and `mix` retrieval modes.
 - Progressive disclosure: `seam memory search` gives compact IDs first; `seam memory get <ids>` fetches full records only when needed.
-- Agent bridge: `seam mcp stdio` / `seam-mcp` exposes a standard MCP server for Gemini, Claude, Cursor, and other agents. `seam mcp serve` remains available for legacy JSON-lines wrappers.
+- Agent bridge: `seam mcp stdio` / `seam-mcp` exposes a standard MCP server for Gemini, Claude, Cursor, and other agents. Gemini's project config starts it with `--ensure-pgvector` so Docker Compose pgvector is ready before MCP tool discovery. `seam mcp serve` remains available for legacy JSON-lines wrappers.
 - Provenance: records keep refs, evidence, trace edges, and source document status.
 - Benchmark discipline: benchmark bundles are hash-verified, diffed, gated, and separated from holdout publication runs.
 - Operator surface: CLI, Textual dashboard, REST API, and installer shims all use the same runtime.
@@ -81,6 +81,7 @@ seam index
 seam reindex
 seam dashboard
 seam mcp stdio
+seam-mcp --ensure-pgvector
 seam mcp serve
 seam serve --host 127.0.0.1 --port 8765
 seam benchmark run all --persist
