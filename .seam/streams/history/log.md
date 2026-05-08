@@ -3703,3 +3703,23 @@ Known follow-up (not in this merge): benchmarks/registry/memory_benchmarks.json 
 
 Verification: pytest test_seam_all/ tools/history/test_history_tools.py reports 202 passed in 33.74s (was 154 in the pre-merge audit). verify_integrity, verify_routing, verify_continuity, and verify_streams all OK against the rebased branch before commit. Branch was rebased clean onto origin/main at 379a7ba.
 ---END-ENTRY-#178---
+
+---BEGIN-ENTRY-#179---
+id: 179
+date: 2026-05-16T05:58:30Z
+agent: claude-opus-4-7
+status: done
+topics: docs, pgvector, benchmark, operator, salvage, protocol, verify, history
+commits: none
+refs: docs/PGVECTOR_LOCAL.md,docs/BENCHMARK_SOP.md,docs/SEAM_OPERATOR_GUIDE.md,docs/ENGINEERING_LOG.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 178
+tokens: 278
+---
+Merge PR #18 (salvage operator and engineering docs from embedding-eval-upgrades) after rebasing onto current main.
+
+Brought four operator/engineering docs onto main without merging the stale origin/codex/embedding-eval-upgrades branch (which would have deleted test_seam_all/test_seam.py): docs/PGVECTOR_LOCAL.md, docs/BENCHMARK_SOP.md, docs/SEAM_OPERATOR_GUIDE.md, and docs/ENGINEERING_LOG.md. The docs already had the modernized values applied at PR-author time: port 55432, Docker Compose, image pgvector/pgvector:0.8.2-pg18-trixie, doctor replacing validate-stack, pytest replacing python -m unittest, and DSN credentials referenced via $env:PGPASSWORD env var rather than literal passwords. ENGINEERING_LOG.md is append-only with old entries preserved as historical snapshots under a header note and a new 2026-05-08 migration entry appended.
+
+Rebase resolution: the PR was conflicting on HISTORY.md and HISTORY_INDEX.md because the PR added entry #144 in its own commit history, but main has since accumulated entries through #178 (HISTORY#177 audit sweep, HISTORY#178 PR #22 merge). Resolved by taking origin/main versions of HISTORY.md and HISTORY_INDEX.md (drop the PR-side stale #144 addition) and re-adding the entry as #179 here. PR-side documentation files applied cleanly with no content conflict. Stale operator-local snapshot from the PR #22 work was removed and a fresh snapshot was written for #177 during the rebase pass.
+
+Verification: verify_integrity OK, verify_routing OK, verify_continuity OK (recorded-fact audit enabled), verify_streams OK against the rebased branch before commit. Branch is now based on origin/main at 458eca8 (PR #22 merge commit).
+---END-ENTRY-#179---
