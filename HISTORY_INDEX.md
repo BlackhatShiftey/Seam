@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 156
-total_tokens: ~23248
-latest_id: 156
+total_entries: 157
+total_tokens: ~23472
+latest_id: 157
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,15 +11,16 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
-| 156 | 2026-05-08 | done | 59a944f10bf467f6 | verify,history,snapshot,status,+ | 155 |
-| 155 | 2026-05-08 | done | f136dbff88ae5270 | roadmap,status,history,snapshot,+ | 151 |
-| 154 | 2026-05-08 | done | 3246a284b32ac002 | compile,search,roadmap,status,+ | 046 |
-| 153 | 2026-05-08 | done | 33360327fad6ae2b | benchmark,diff,verify,roadmap,+ | 037 |
-| 152 | 2026-05-08 | done | 9835e5cce63652cf | benchmark,holdout,roadmap,status,+ | 036 |
-| 151 | 2026-05-08 | done | 63e01907b14d5db2 | audit,status,verify,history | 150 |
-| 150 | 2026-05-08 | done | 634ca340b58cf331 | protocol,audit,history,snapshot,+ | 149 |
-| 149 | 2026-05-08 | done | 498e3e01a485e806 | mcp,multi-agent,pgvector,docker,+ | 148 |
-| 148 | 2026-05-08 | done | e5a8151141121f5d | mcp,multi-agent,command,protocol,+ | 147 |
+| 157 | 2026-05-09 | done | bf522acb936c676d | dashboard,roadmap,status,verify | 156 |
+| 156 | 2026-05-08 | done | 82ae97ad747806a5 | verify,history,snapshot,status,+ | 155 |
+| 155 | 2026-05-08 | done | 612bc44405d9e1c7 | roadmap,status,history,snapshot,+ | 151 |
+| 154 | 2026-05-08 | done | 3b19b2ce18063d01 | compile,search,roadmap,status,+ | 046 |
+| 153 | 2026-05-08 | done | 4028ec25f596c67e | benchmark,diff,verify,roadmap,+ | 037 |
+| 152 | 2026-05-08 | done | 5593402024b3d291 | benchmark,holdout,roadmap,status,+ | 036 |
+| 151 | 2026-05-08 | done | d1f310876de7f1b3 | audit,status,verify,history | 150 |
+| 150 | 2026-05-08 | done | 5581fce5eb074155 | protocol,audit,history,snapshot,+ | 149 |
+| 149 | 2026-05-08 | done | 698c6bdeeb7961a9 | mcp,multi-agent,pgvector,docker,+ | 148 |
+| 148 | 2026-05-08 | done | d5f6eeecd26dafb3 | mcp,multi-agent,command,protocol,+ | 147 |
 | 147 | 2026-05-08 | done | 915d0c76f5f85883 | docs,readme,command,benchmark,+ | 146 |
 | 146 | 2026-05-08 | done | e9ff4d4a2c85601a | docs,history,snapshot,verify,+ | 145 |
 | 145 | 2026-05-08 | done | e437bcdb07185db2 | benchmark,surface,compress,mirl,+ | 144 |
@@ -182,7 +183,7 @@ compact: true
 - command: count=55 latest=#149, #148, #147, #146, #145
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
-- dashboard: count=53 latest=#146, #137, #121, #120, #119
+- dashboard: count=54 latest=#157, #146, #137, #121, #120
 - diff: count=4 latest=#153, #093, #092, #037
 - docker: count=3 latest=#149, #085, #084
 - docs: count=3 latest=#147, #146, #099
@@ -212,24 +213,24 @@ compact: true
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
 - retrieval: count=11 latest=#099, #047, #038, #023, #017
-- roadmap: count=36 latest=#155, #154, #153, #152, #144
+- roadmap: count=37 latest=#157, #155, #154, #153, #152
 - roundtrip: count=2 latest=#007, #006
 - sbert: count=3 latest=#023, #022, #011
 - search: count=12 latest=#154, #088, #077, #047, #046
 - security: count=1 latest=#100
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=103 latest=#156, #155, #150, #149, #148
-- status: count=53 latest=#156, #155, #154, #153, #152
+- status: count=54 latest=#157, #156, #155, #154, #153
 - surface: count=1 latest=#145
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=18 latest=#099, #066, #044, #038, #034
-- verify: count=98 latest=#156, #155, #153, #151, #150
+- verify: count=99 latest=#157, #156, #155, #153, #151
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 136
+- done: 137
 - planned: 20

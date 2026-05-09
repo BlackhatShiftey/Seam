@@ -3195,3 +3195,32 @@ Verification: `python -m tools.history.verify_integrity`, `python -m tools.histo
 
 Updated PROJECT_STATUS.md so future agents see HISTORY#156 as the latest continuity handoff. No experimental/webui implementation was performed.
 ---END-ENTRY-#156---
+
+---BEGIN-ENTRY-#157---
+id: 157
+date: 2026-05-09T03:30:07Z
+agent: moonshotai-kimi-k2.6
+status: done
+topics: dashboard, roadmap, status, verify
+commits: 21d1687
+refs: ROADMAP.md#A-Web,experimental/webui/README.md,seam_runtime/server.py
+supersedes: 156
+tokens: 224
+---
+Convert experimental/webui from CDN/Babel prototype into local Vite+React+TS app wired to SEAM REST API.
+
+Changes:
+- Replaced single-file HTML prototype with local build (Vite, React, TypeScript)
+- Preserved IDE-like visual language: dark theme, JetBrains Mono, activity bar, status bar, scanlines overlay
+- Added typed apiClient covering GET /health, GET /stats, POST /compile, GET /search, POST /context, POST /persist, POST /lossless-compress
+- Implemented Status pane with live /health polling and /stats with clear unauthorized state
+- Implemented Compile pane sending text to /compile and rendering returned records
+- Implemented Search pane sending query to /search and rendering candidates with scores
+- Implemented Context pane sending query to /context and rendering candidates + pack JSON
+- Implemented Settings pane with API base URL and bearer token stored only in localStorage
+- Added vitest smoke test for apiClient exports (7 tests passing)
+- Archived original prototype under experimental/webui/prototype-backup/
+- Verified npm run build succeeds; production dist output clean
+- Verified Python REST API tests pass (2 passed)
+- Verified history integrity, routing, and continuity all OK
+---END-ENTRY-#157---
