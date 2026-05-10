@@ -1,9 +1,8 @@
-"""SEAM skill canonical representation.
+"""SEAM skill canonical representation and adaptive Skill Factory primitives.
 
-This package defines the SkillIR — the structured canonical representation a
-skill source spec compiles into. Renderers in tools/skills/targets/ consume
-SkillIR instances to produce target-specific instruction artifacts (Claude
-SKILL.md, Cursor .mdc, etc.).
+This package defines SkillIR plus the higher-level Skill Factory records used
+to identify agents, capture recurring issues, propose skills, and improve
+agent adapters over time.
 """
 
 from __future__ import annotations
@@ -20,6 +19,17 @@ from .skill_ir import (
     canonical_bytes,
     sha256_of_bytes,
 )
+from .factory import (
+    AgentIdentity,
+    SkillFactoryError,
+    SkillObservation,
+    SkillProposal,
+    FACTORY_SCHEMA_VERSION,
+    FACTORY_VERSION,
+    factory_record_bytes,
+    identify_agent,
+    propose_skill_from_observation,
+)
 
 __all__ = [
     "SkillIR",
@@ -32,4 +42,13 @@ __all__ = [
     "SKILL_IR_VERSION",
     "canonical_bytes",
     "sha256_of_bytes",
+    "AgentIdentity",
+    "SkillFactoryError",
+    "SkillObservation",
+    "SkillProposal",
+    "FACTORY_SCHEMA_VERSION",
+    "FACTORY_VERSION",
+    "factory_record_bytes",
+    "identify_agent",
+    "propose_skill_from_observation",
 ]
