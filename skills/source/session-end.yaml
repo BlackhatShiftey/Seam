@@ -1,0 +1,33 @@
+schema_version: "1.0"
+name: session-end
+title: SEAM Session Closeout
+short_description: Finish SEAM sessions with verified continuity
+description: Close out repo-changing SEAM sessions by recording what changed, verifying continuity, and leaving a truthful resume point.
+purpose: |
+  Finish a SEAM repo-changing session without stale status, broken history continuity, missing snapshots, unverified routing, or unreported failures.
+safety_rules:
+  - Do not silently rewrite installed skills.
+  - Do not weaken canonical SEAM verification or continuity rules.
+  - Report skipped or failed verification honestly.
+  - Keep generated artifacts separate from installed artifacts until promotion.
+workflow:
+  - number: 1
+    title: Inspect changed files
+    body: Run status and diff checks before writing history or docs.
+  - number: 2
+    title: Run verification
+    body: Run the smallest adequate tests, then broader gates when risk warrants it.
+  - number: 3
+    title: Record continuity
+    body: Append history through the repo tools, rebuild derived indexes, and write a snapshot when required.
+  - number: 4
+    title: Report final state
+    body: Report changed files, verification results, branch state, and the next concrete step.
+output_format: |
+  Closeout Summary: <short name>
+  Changed:
+  - <file>: <what changed>
+  Verification:
+  - PASS/FAIL/SKIPPED: <command>
+  Next:
+  - <next step>
