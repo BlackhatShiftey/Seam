@@ -3224,3 +3224,44 @@ Changes:
 - Verified Python REST API tests pass (2 passed)
 - Verified history integrity, routing, and continuity all OK
 ---END-ENTRY-#157---
+
+---BEGIN-ENTRY-#158---
+id: 158
+date: 2026-05-10T05:29:06Z
+agent: claude
+status: done
+topics: roadmap, plan, protocol
+commits: 475d2aa
+refs: docs/roadmap/SKILLS_COMPILER_PLAN.md,docs/roadmap/SKILLS_COMPILER_BRIEF.md,docs/roadmap/AGENT_COMPILER.md
+supersedes: 157
+tokens: 215
+---
+Skills Compiler Phase 0 — decisions doc landed.
+
+Previous state: SKILLS_COMPILER_BRIEF.md existed (entry #157 era) but no
+phase ledger or recorded decisions. The brief required four blocking
+decisions before Phase 1 could open: canonical source classification,
+output locations, provenance v1 scope, and Track placement.
+
+New state: docs/roadmap/SKILLS_COMPILER_PLAN.md records all four decisions
+with the recommended defaults from the brief, classifies all 9 existing
+.opencode/skills/* files as compile targets (not canonical source), and
+opens the per-phase ledger. The plan defers 8 of 9 source spec lifts to
+post-Phase 6; only session-end is in scope for Phases 1-7.
+
+Changed files:
+- docs/roadmap/SKILLS_COMPILER_PLAN.md (added)
+
+Why: unblocks Phase 1 (SkillIR + skills/source/session-end.yaml) by
+fixing the source/target classification and output paths. Avoids the
+prior failure mode where a generated plan claimed completion without
+producing the artifact.
+
+Verification:
+- File present at docs/roadmap/SKILLS_COMPILER_PLAN.md
+- Commit 475d2aa created on branch claude/seam-trust-security-manual-8mhEL
+- No code changes; no tests required for docs-only phase
+
+Unresolved next step: open Phase 1 (seam_runtime/skills/skill_ir.py +
+skills/source/session-end.yaml + tests in test_seam_all/).
+---END-ENTRY-#158---
