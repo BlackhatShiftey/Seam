@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import unittest
 
+try:
+    import yaml  # type: ignore  # noqa: F401
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 from seam_runtime.skills import (
     SkillIR,
     SkillObservation,
@@ -79,6 +85,7 @@ class TestSkillRendering(unittest.TestCase):
             self.assertIn("source_spec_sha256", out)
             self.assertIn("Do not silently rewrite", out)
 
+    @unittest.skipUnless(HAS_YAML, "PyYAML not installed")
     def test_compile_all_targets_paths(self):
         compiled = compile_skill_for_targets("skills/source/session-end.yaml", ["all"])
         self.assertEqual({item.target for item in compiled}, set(SUPPORTED_TARGETS))
