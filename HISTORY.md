@@ -3317,3 +3317,61 @@ Unresolved next step: open Phase 2 — Claude renderer at
 tools/skills/targets/claude.py producing skills/generated/claude/session-end/SKILL.md
 with embedded provenance header.
 ---END-ENTRY-#159---
+
+---BEGIN-ENTRY-#160---
+id: 160
+date: 2026-05-10T05:39:05Z
+agent: claude
+status: done
+topics: compile, protocol, plan
+commits: 5128348b8a455b88135ee2fb2d9f5bb7b4d58dca
+refs: tools/skills/targets/claude.py,tools/skills/model_profiles/claude.yaml,skills/generated/claude/session-end/SKILL.md,test_seam_all/test_skills_render_claude.py
+supersedes: 159
+tokens: 341
+---
+Skills Compiler Phase 2 — Claude renderer + first generated artifact landed.
+
+Previous state: Phase 1 (entry #159) gave the compiler a typed SkillIR
+and one canonical source spec but no renderer; nothing produced a target
+artifact.
+
+New state: tools/skills/ holds the operator-side compiler tooling.
+source_loader.py and profile_loader.py wrap PyYAML so the runtime
+package stays YAML-free. targets/claude.py renders SkillIR + claude
+profile + provenance dict to a Claude/OpenCode SKILL.md string with
+deterministic hand-formatted YAML frontmatter, sorted provenance block,
+and profile-driven section titles. The first real generated artifact is
+committed at skills/generated/claude/session-end/SKILL.md (8744 bytes).
+Provenance v1 fields: compiler_version, schema_version,
+source_spec_sha256, model_profile_sha256, target, skill. Runtime-varying
+fields (generated_at, git_sha) deferred to Phase 3 CLI per
+SKILLS_COMPILER_PLAN.md Decision 3.
+
+Changed files:
+- tools/skills/__init__.py (added)
+- tools/skills/source_loader.py (added)
+- tools/skills/profile_loader.py (added)
+- tools/skills/targets/__init__.py (added)
+- tools/skills/targets/claude.py (added; ~250 lines)
+- tools/skills/model_profiles/claude.yaml (added)
+- skills/generated/claude/session-end/SKILL.md (added; first artifact)
+- test_seam_all/test_skills_render_claude.py (added; 8 tests)
+
+Why: proves the SkillIR -> target renderer pipeline end-to-end on real
+content, gives reviewers a committed sample to diff against, and
+unblocks Phase 3 (CLI wiring around the same render() call).
+
+Verification:
+- python3 -m unittest test_seam_all.test_skills_render_claude: 8 passed
+- python3 -m unittest test_seam_all.test_skill_ir test_seam_all.test_seam
+  test_seam_all.test_skills_render_claude: 173 passed, 32 skipped
+- Sample artifact byte-matches a fresh re-render under
+  TestSessionEndArtifactParity (test_committed_sample_matches_renderer_output)
+- Frontmatter is valid YAML; provenance keys are sorted; sections
+  appear in declared order.
+
+Unresolved next step: open Phase 3 — wire 'seam skills compile' CLI in
+seam.py / seam_runtime.cli to drive the same render() path with
+runtime-varying provenance (generated_at, git_sha) added at compile
+time. Then push branch and open PR for review of Phases 0-2.
+---END-ENTRY-#160---

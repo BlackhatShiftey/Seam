@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 159
-total_tokens: ~24000
-latest_id: 159
+total_entries: 160
+total_tokens: ~24341
+latest_id: 160
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 160 | 2026-05-10 | done | 0c9415ec405c4cf6 | compile,protocol,plan | 159 |
 | 159 | 2026-05-10 | done | 37694d268f06f084 | compile,plan,protocol | 158 |
 | 158 | 2026-05-10 | done | 908fa0daa783577c | roadmap,plan,protocol | 157 |
 | 157 | 2026-05-09 | done | 32f10caedb00c0e4 | dashboard,roadmap,status,verify | 156 |
@@ -183,7 +184,7 @@ compact: true
 - classification: count=2 latest=#087, #086
 - codec: count=13 latest=#132, #131, #130, #129, #128
 - command: count=55 latest=#149, #148, #147, #146, #145
-- compile: count=14 latest=#159, #154, #047, #046, #043
+- compile: count=15 latest=#160, #159, #154, #047, #046
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - dashboard: count=54 latest=#157, #146, #137, #121, #120
 - diff: count=4 latest=#153, #093, #092, #037
@@ -209,8 +210,8 @@ compact: true
 - naming: count=4 latest=#033, #024, #009, #002
 - persist: count=18 latest=#047, #044, #042, #036, #032
 - pgvector: count=18 latest=#149, #121, #119, #084, #083
-- plan: count=5 latest=#159, #158, #027, #017, #003
-- protocol: count=30 latest=#159, #158, #155, #150, #148
+- plan: count=6 latest=#160, #159, #158, #027, #017
+- protocol: count=31 latest=#160, #159, #158, #155, #150
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
@@ -234,5 +235,5 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 139
+- done: 140
 - planned: 20
