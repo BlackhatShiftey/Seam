@@ -1,0 +1,12 @@
+profile_version: "1.0"
+target: cursor
+format: mdc_rules
+verbosity: low
+prefers_short_scoped_rules: true
+ide_aware: true
+supports_file_globs: true
+globs:
+  - "**/*"
+always_apply: false
+generated_path_template: "skills/generated/cursor/{skill}/{skill}.mdc"
+installed_path_template: ""
