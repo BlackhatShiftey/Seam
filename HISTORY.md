@@ -3265,3 +3265,55 @@ Verification:
 Unresolved next step: open Phase 1 (seam_runtime/skills/skill_ir.py +
 skills/source/session-end.yaml + tests in test_seam_all/).
 ---END-ENTRY-#158---
+
+---BEGIN-ENTRY-#159---
+id: 159
+date: 2026-05-10T05:34:29Z
+agent: claude
+status: done
+topics: compile, plan, protocol
+commits: f150c1b82dcd90b94f4898436ed3f07e14f592a8
+refs: seam_runtime/skills/skill_ir.py,skills/source/session-end.yaml,test_seam_all/test_skill_ir.py,docs/roadmap/SKILLS_COMPILER_PLAN.md
+supersedes: 158
+tokens: 313
+---
+Skills Compiler Phase 1 — SkillIR + first canonical source spec landed.
+
+Previous state: Phase 0 plan was recorded in entry #158 but no code
+existed. The compiler had no internal data model and no source format.
+
+New state: seam_runtime/skills/ package exists with SkillIR, ModelTarget,
+Triggers, NamedRule, StartupCheck, WorkflowStep dataclasses (frozen).
+SCHEMA_VERSION='1.0', SKILL_IR_VERSION='0.1.0'. SkillIR.from_dict
+validates required fields, schema version, and per-section types with
+explicit SkillIRError messages. SkillIR.to_dict round-trips losslessly.
+canonical_bytes/sha256_of_bytes provide deterministic provenance hashing
+without external dependencies.
+
+skills/source/session-end.yaml is the first canonical source spec,
+lifted from the existing .opencode/skills/seam-session-closeout/SKILL.md
+intent. The canonical name session-end is intentionally distinct from
+the OpenCode-installed name seam-session-closeout per Phase 0 Decision 1
+(existing files are compile targets, not source).
+
+Changed files:
+- seam_runtime/skills/__init__.py (added)
+- seam_runtime/skills/skill_ir.py (added; ~270 lines, no third-party deps)
+- skills/source/session-end.yaml (added; 7-step workflow lifted faithfully)
+- test_seam_all/test_skill_ir.py (added; 15 tests)
+
+Why: unblocks Phase 2 (first renderer) by giving the compiler a stable
+input shape and a real source spec to render. The IR must be stable and
+deterministic before any target renderer can produce byte-stable output.
+
+Verification:
+- python3 -m unittest test_seam_all.test_skill_ir -v: 15 passed, 0 failed
+- python3 -m unittest test_seam_all.test_seam: 150 passed, 32 skipped
+  (skipped due to optional deps: textual, sentence-transformers, etc.)
+- session-end.yaml round-trips cleanly through PyYAML safe_load -> SkillIR.from_dict
+- canonical_bytes is deterministic across two from_dict invocations of the same input
+
+Unresolved next step: open Phase 2 — Claude renderer at
+tools/skills/targets/claude.py producing skills/generated/claude/session-end/SKILL.md
+with embedded provenance header.
+---END-ENTRY-#159---
