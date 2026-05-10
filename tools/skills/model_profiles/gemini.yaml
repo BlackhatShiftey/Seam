@@ -1,0 +1,8 @@
+profile_version: "1.0"
+target: gemini
+format: guide_fragment
+verbosity: medium
+prefers_concise_sections: true
+supports_tool_use: true
+generated_path_template: "skills/generated/gemini/{skill}/{skill}.md"
+installed_path_template: "GEMINI.generated.{skill}.md"
