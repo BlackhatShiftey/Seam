@@ -1,0 +1,240 @@
+schema_version: "1.0"
+name: session-end
+title: SEAM Session Closeout
+short_description: Finish SEAM sessions with verified history and snapshot continuity
+description: >-
+  Close out repo-changing SEAM sessions by inspecting changed files, appending
+  HISTORY.md, rebuilding HISTORY_INDEX.md, writing a snapshot, running
+  continuity/integrity/routing verification, and reporting the exact final
+  state. Use after implementation, documentation, roadmap, ledger, protocol,
+  skill, or generated-adapter work changes repo state.
+
+purpose: |
+  Finish a SEAM repo-changing session without leaving stale status, broken
+  history continuity, missing snapshots, unverified routing, or unreported
+  failures.
+
+  This skill is the closeout partner for the orientation, design, planning,
+  and execution skills. It does not design or implement the feature. It
+  records what changed, verifies the temporal chain, and leaves the next
+  agent with a truthful resume point.
+
+model_target:
+  description: |
+    Use any capable implementation or maintenance model. The skill is
+    deliberately mechanical: precise repo bookkeeping, verification, and
+    risk reporting. Reasoning models with low temperature and explicit
+    thinking enabled produce the most reliable closeouts.
+  preferences:
+    - "temperature: low"
+    - "thinking: enabled"
+    - "purpose: exact repo bookkeeping, verification, and risk reporting"
+
+triggers:
+  use_when:
+    - code changes
+    - tests or fixtures
+    - docs, roadmap, ledger, or status updates
+    - protocol, routing, classification, snapshot, or history-tool changes
+    - local agent skills or generated adapter changes
+    - branch merge or sync work
+  do_not_use_when:
+    - read-only questions, unless the user asks for a repo-health or continuity audit
+
+non_negotiable_rules:
+  - title: HISTORY_INDEX.md is derived state
+    body: |
+      HISTORY_INDEX.md must never be appended, patched, or hand-edited. The
+      only valid sequence after a material change is:
+
+          python -m tools.history.new_entry ...
+          python -m tools.history.rebuild_index
+          python -m tools.history.write_snapshot --agent <agent> \
+              --entries <new-entry-id>,<relevant-prior-ids> \
+              --token-budget 1200
+          python -m tools.history.verify_integrity
+          python -m tools.history.verify_continuity
+
+      If the user asks to "append the index", interpret that as "append
+      history and rebuild the derived index." Do not manually edit
+      HISTORY_INDEX.md.
+
+startup_check:
+  inspect_commands:
+    - git status --short --branch
+    - git log --oneline -5
+  required_reads:
+    - AGENTS.md
+    - PROJECT_STATUS.md
+    - REPO_LEDGER.md
+    - HISTORY_INDEX.md
+    - docs/CODE_LAYOUT.md
+    - docs/DATA_ROUTING.md
+  bounded_reads:
+    - python -m tools.history.build_context_pack --topics <topic> --latest 3 --token-budget 1200
+    - python -m tools.history.build_context_pack --route <route> --token-budget 1200
+  notes: |
+    Never bulk-read all of HISTORY.md. Read orientation files only when the
+    session involves history, routing, ledgers, auditability, snapshots, or
+    multi-agent continuity.
+
+safety_rules:
+  - Do not revert, delete, reset, or overwrite unrelated work.
+  - Treat a dirty worktree as shared multi-agent state until proven otherwise.
+  - Record skipped tests as skipped, failed commands as failed, assumptions as assumptions.
+  - Do not put secrets, API keys, session URLs, private links, local agent transcript links, or credential-bearing DSNs into HISTORY.md, snapshots, docs, commit messages, or the final answer.
+  - If a secret or private session URL is found in candidate files, stop and ask for rotation/history handling instead of copying it into another artifact.
+  - Keep generated operator/user artifacts out of git unless the user explicitly promotes them as repo-owned fixtures or docs assets.
+
+workflow:
+  - number: 1
+    title: Classify the change
+    body: |
+      Identify what changed and which stable files need updates:
+
+      - HISTORY.md: required for every material change.
+      - HISTORY_INDEX.md: always rebuild with `python -m tools.history.rebuild_index`
+        after appending history; never edit by hand.
+      - .seam/snapshots/: always write one snapshot after the history entry.
+      - PROJECT_STATUS.md: update when current operating state or active focus changed.
+      - REPO_LEDGER.md: update when stable policy, architecture, routing, runtime
+        safety, or cross-agent protocol changed.
+      - tools/history/routing_manifest.json and docs/ledgers/: update only when
+        classification or routing facts changed.
+
+      Use only valid history topics from AGENTS.md.
+
+  - number: 2
+    title: Inspect candidate files
+    body: |
+      Review the changed file list before writing history:
+
+          git status --short
+          git diff --name-only
+          git diff --cached --name-only
+
+      For untracked files, inspect only files relevant to this session. Do
+      not stage or describe unrelated files as your work.
+
+  - number: 3
+    title: Run the right verification
+    body: |
+      Choose the smallest adequate test first, then broader gates when risk
+      warrants it. Common gates:
+
+          python -m pytest test_seam_all/test_seam.py -q
+          python -m tools.history.verify_integrity
+          python -m tools.history.verify_continuity
+
+      Add this when routes, classifications, route ledgers, or route-aware
+      context behavior changed:
+
+          python -m tools.history.verify_routing
+
+      Add `git diff --check` before final reporting when files changed.
+
+  - number: 4
+    title: Scan for secrets and session links
+    body: |
+      Before appending history or staging, scan candidate changed files for
+      secret-shaped strings and private session links. Keep the scan
+      targeted to candidate files, not generated or cache-heavy
+      directories.
+
+      If anything credential-like is found, redact or remove it locally and
+      rerun the scan. If it was already committed, stop and ask for
+      history-rewrite and credential-rotation handling.
+
+  - number: 5
+    title: Append HISTORY.md
+    body: |
+      Use the history tool, not manual editing:
+
+          python -m tools.history.new_entry \
+              --agent <agent> --status done \
+              --topics <comma-topics> \
+              --commits <commit-or-none> \
+              --refs <comma-refs> \
+              --supersedes <latest-related-id> \
+              --body "<body>"
+
+      The body must state: previous state, new state, changed files, why
+      the change was made, verification run and results, failures or
+      skipped verification, and unresolved next step if any. Use
+      `supersedes` for follow-up work tied to the latest relevant entry.
+      Do not edit old entries.
+
+  - number: 6
+    title: Rebuild, snapshot, verify
+    body: |
+      After the new entry is appended, immediately rebuild the derived
+      index:
+
+          python -m tools.history.rebuild_index
+          python -m tools.history.write_snapshot --agent <agent> \
+              --entries <new-entry-id>,<relevant-prior-ids> \
+              --token-budget 1200
+          python -m tools.history.verify_integrity
+          python -m tools.history.verify_continuity
+
+      If routing changed:
+
+          python -m tools.history.verify_routing
+
+  - number: 7
+    title: Final state read
+    body: |
+      Finish with:
+
+          git status --short --branch
+          git diff --stat
+
+      If the user asked to push, commit, publish, save to GitHub, or make
+      the tree clean, hand off to the publisher skill after closeout.
+      Otherwise, report the exact local state and leave unrequested git
+      actions alone.
+
+      Do not decide commit scope casually. The publisher must include
+      relevant source, docs, tests, protocol, and skill files plus
+      HISTORY.md and rebuilt HISTORY_INDEX.md, while excluding secrets,
+      local env files, caches, generated artifacts, local DBs, ignored
+      snapshot JSON, and unrelated work.
+
+output_format: |
+  Closeout Summary: <short name>
+
+  Changed:
+  - <file>: <what changed>
+
+  History:
+  - HISTORY.md: entry #<id>, topics <topics>
+  - HISTORY_INDEX.md: rebuilt
+  - HISTORY_INDEX.md update method: rebuild_index only; no manual edits
+  - Snapshot: <path>
+
+  Verification:
+  - PASS/FAIL/SKIPPED: <command>
+
+  Final State:
+  - Branch: <branch and upstream state>
+  - Worktree: <clean / dirty, with remaining untracked or modified files>
+  - Push: <pushed / not requested / blocked>
+  - Commit handoff: <not requested | publisher needed>
+
+  Next:
+  - <one concrete next step, or "none">
+
+validation_prompts:
+  - A code slice changed seam_runtime/cli.py and tests passed. Close out the session.
+  - A routing-manifest change added a new route ledger. What extra verification is required?
+  - The worktree has unrelated untracked files before closeout. What do you do?
+
+failure_conditions:
+  - edits old HISTORY.md entries
+  - skips HISTORY_INDEX.md rebuild after appending history
+  - hand-edits or appends HISTORY_INDEX.md
+  - forgets to write a snapshot
+  - claims verification passed without command evidence
+  - reads all of HISTORY.md
+  - stages or reverts unrelated work
+  - copies secrets or private session links into repo artifacts
