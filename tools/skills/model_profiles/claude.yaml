@@ -1,0 +1,32 @@
+profile_version: "1.0"
+target: claude
+format: skill_md
+verbosity: high
+prefers_numbered_protocols: true
+needs_strong_stop_rules: true
+supports_tool_use: true
+supports_repo_local_rules: false
+
+# Naming and placement
+installed_name_template: "seam-{skill}"
+generated_path_template: "skills/generated/claude/{skill}/SKILL.md"
+installed_path_template: ".opencode/skills/{installed_name}/SKILL.md"
+
+# Section headings (deterministic; do not localize)
+section_titles:
+  purpose: "Purpose"
+  model_target: "Model Target"
+  triggers: "When To Use"
+  startup_check: "Startup Check"
+  safety_rules: "Safety Rules"
+  workflow: "Workflow"
+  output_format: "Output Format"
+  validation_prompts: "Validation Prompts"
+  failure_conditions_lead: "The skill fails if it:"
+
+# Triggers section phrasing
+triggers_use_intro: "Use this skill when:"
+triggers_avoid_intro: "Do not use this skill for:"
+
+# Model target preferences rendering
+preferences_intro: "Recommended runtime preferences:"
