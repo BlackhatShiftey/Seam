@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 162
-total_tokens: ~24763
-latest_id: 162
+total_entries: 163
+total_tokens: ~24880
+latest_id: 163
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,11 +11,12 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
-| 162 | 2026-05-10 | done | 565a03ae938c15d3 | dashboard,verify,history,status | 161 |
-| 161 | 2026-05-09 | done | 750a2c4b93397fa9 | dashboard,verify,history,status | 160 |
-| 160 | 2026-05-09 | done | 034f2f3f5cf60f03 | dashboard,verify,history,status | 159 |
-| 159 | 2026-05-09 | done | 3b6a7f68ce18f07c | dashboard,verify,history,status | 158 |
-| 158 | 2026-05-09 | done | 99b6a799a40d31b2 | dashboard,verify,protocol,ledger,+ | 157 |
+| 163 | 2026-05-10 | done | a80699bb08be1032 | dashboard,verify,history,status | 162 |
+| 162 | 2026-05-10 | done | 73fed9781c136a3d | dashboard,verify,history,status | 161 |
+| 161 | 2026-05-09 | done | b6232e54452003fc | dashboard,verify,history,status | 160 |
+| 160 | 2026-05-09 | done | 63407682a372fc1c | dashboard,verify,history,status | 159 |
+| 159 | 2026-05-09 | done | 425f0c08b001e3f6 | dashboard,verify,history,status | 158 |
+| 158 | 2026-05-09 | done | 730566dbd4b6cf11 | dashboard,verify,protocol,ledger,+ | 157 |
 | 157 | 2026-05-09 | done | bf522acb936c676d | dashboard,roadmap,status,verify | 156 |
 | 156 | 2026-05-08 | done | 82ae97ad747806a5 | verify,history,snapshot,status,+ | 155 |
 | 155 | 2026-05-08 | done | 612bc44405d9e1c7 | roadmap,status,history,snapshot,+ | 151 |
@@ -188,7 +189,7 @@ compact: true
 - command: count=55 latest=#149, #148, #147, #146, #145
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
-- dashboard: count=59 latest=#162, #161, #160, #159, #158
+- dashboard: count=60 latest=#163, #162, #161, #160, #159
 - diff: count=4 latest=#153, #093, #092, #037
 - docker: count=3 latest=#149, #085, #084
 - docs: count=3 latest=#147, #146, #099
@@ -198,7 +199,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
 - handoff: count=4 latest=#136, #135, #075, #025
-- history: count=115 latest=#162, #161, #160, #159, #158
+- history: count=116 latest=#163, #162, #161, #160, #159
 - holdout: count=4 latest=#152, #093, #092, #036
 - installer: count=9 latest=#100, #099, #063, #035, #021
 - integrity: count=5 latest=#133, #103, #102, #101, #048
@@ -225,17 +226,17 @@ compact: true
 - security: count=1 latest=#100
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=103 latest=#156, #155, #150, #149, #148
-- status: count=59 latest=#162, #161, #160, #159, #158
+- status: count=60 latest=#163, #162, #161, #160, #159
 - surface: count=1 latest=#145
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=18 latest=#099, #066, #044, #038, #034
-- verify: count=104 latest=#162, #161, #160, #159, #158
+- verify: count=105 latest=#163, #162, #161, #160, #159
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 142
+- done: 143
 - planned: 20

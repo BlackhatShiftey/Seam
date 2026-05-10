@@ -3323,3 +3323,17 @@ tokens: 163
 ---
 Prepared the restored WebUI and command-palette work for GitHub publish/merge on branch codex/webui-restore-command-palette. Scope includes the restored original browser dashboard shell, command palette overlay/wiring, REST API CORS support for localhost WebUI, WebUI API client hardening, tests, restoration notes, and continuity/status updates through HISTORY#161. Excluded generated Playwright test-results artifacts from staging. Validation before publish: git fetch origin --prune, origin/main...HEAD count 0 0 before branch creation, git diff --check passed, python -m tools.history.verify_integrity passed, python -m tools.history.verify_routing passed, python -m tools.history.verify_continuity passed, npm run build passed, npm test passed with 11 tests, python -m py_compile seam_runtime/server.py passed, and python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q passed with 177 passed. Next step is explicit staging, secret scan, commit, push, PR/merge to main, fetch, and confirm local main aligns with origin/main.
 ---END-ENTRY-#162---
+
+---BEGIN-ENTRY-#163---
+id: 163
+date: 2026-05-10T08:17:07Z
+agent: codex
+status: done
+topics: dashboard, verify, history, status
+commits: none
+refs: HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 162
+tokens: 117
+---
+Post-merge continuity repair after PR #20 landed. The WebUI restore branch merged to main at ce2a4b69061c76022c4a04a77af5f4d6e50fcd02 and local main matched origin/main with ahead/behind 0 0, but the immediate post-merge continuity check failed because HISTORY_INDEX.md hashes for entries 158-162 no longer matched computed HISTORY.md entry hashes, and the latest snapshot referenced the pre-merge hashes for entries 161-162. This entry records the repair step: rebuild derived history index, write a fresh snapshot, rerun verify_integrity, verify_routing, and verify_continuity, then push the bookkeeping repair so origin/main is clean and internally consistent after the merge.
+---END-ENTRY-#163---
