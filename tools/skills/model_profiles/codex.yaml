@@ -1,0 +1,9 @@
+profile_version: "1.0"
+target: codex
+format: repo_agent_instructions
+verbosity: medium
+prefers_exact_commands: true
+emphasize_patch_discipline: true
+emphasize_tests: true
+generated_path_template: "skills/generated/codex/{skill}/{skill}.md"
+installed_path_template: "AGENTS.generated.{skill}.md"
