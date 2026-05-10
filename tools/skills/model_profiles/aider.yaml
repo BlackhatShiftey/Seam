@@ -1,0 +1,8 @@
+profile_version: "1.0"
+target: aider
+format: repo_editing_guidance
+verbosity: low
+prefers_minimal_diffs: true
+emphasize_tests: true
+generated_path_template: "skills/generated/aider/{skill}/{skill}.md"
+installed_path_template: "AIDER.generated.{skill}.md"
