@@ -1,0 +1,32 @@
+name: External memory benchmarks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  registry-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install SEAM runtime
+        run: python -m pip install -e .
+      - name: Validate external memory benchmark registry
+        run: python tools/run_external_memory_benchmarks.py --plan --scope required --format pretty --output external-memory-benchmark-plan.json
+      - name: Run configured external memory benchmarks
+        run: python tools/run_external_memory_benchmarks.py --scope required --format pretty --output external-memory-benchmark-report.json
+      - name: Upload external memory benchmark plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-memory-benchmark-plan
+          path: external-memory-benchmark-plan.json
+      - name: Upload external memory benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-memory-benchmark-report
+          path: external-memory-benchmark-report.json
