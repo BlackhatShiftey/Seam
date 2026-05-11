@@ -1,0 +1,59 @@
+{
+  "version": "SEAM-MEMORY-BENCHMARK-REGISTRY/1",
+  "required_benchmark_ids": [
+    "locomo",
+    "convomem",
+    "membench",
+    "longmemeval",
+    "beam",
+    "perltqa",
+    "evermembench",
+    "memora",
+    "mem2actbench"
+  ],
+  "optional_benchmark_ids": [
+    "memgallery",
+    "es_memeval",
+    "memgui_bench",
+    "locomo_plus",
+    "memground",
+    "engramabench",
+    "dmr",
+    "amb"
+  ],
+  "required_comparator_ids": [
+    "mem0",
+    "zep_graphiti",
+    "letta_memgpt",
+    "mempalace",
+    "hindsight",
+    "memmachine"
+  ],
+  "benchmarks": [
+    {"id": "locomo", "name": "LoCoMo", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_LOCOMO_COMMAND"},
+    {"id": "convomem", "name": "ConvoMem", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_CONVOMEM_COMMAND"},
+    {"id": "membench", "name": "MemBench", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_MEMBENCH_COMMAND"},
+    {"id": "longmemeval", "name": "LongMemEval", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_LONGMEMEVAL_COMMAND"},
+    {"id": "beam", "name": "BEAM / Beyond a Million Tokens", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_BEAM_COMMAND"},
+    {"id": "perltqa", "name": "PerLTQA", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_PERLTQA_COMMAND"},
+    {"id": "evermembench", "name": "EverMemBench", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_EVERMEMBENCH_COMMAND"},
+    {"id": "memora", "name": "Memora", "priority": "P1", "required": true, "command_env": "SEAM_BENCH_MEMORA_COMMAND"},
+    {"id": "mem2actbench", "name": "Mem2ActBench", "priority": "P2", "required": true, "command_env": "SEAM_BENCH_MEM2ACTBENCH_COMMAND"},
+    {"id": "memgallery", "name": "Mem-Gallery", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_MEMGALLERY_COMMAND"},
+    {"id": "es_memeval", "name": "ES-MemEval", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_ES_MEMEVAL_COMMAND"},
+    {"id": "memgui_bench", "name": "MemGUI-Bench", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_MEMGUI_BENCH_COMMAND"},
+    {"id": "locomo_plus", "name": "LoCoMo-Plus", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_LOCOMO_PLUS_COMMAND"},
+    {"id": "memground", "name": "MemGround", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_MEMGROUND_COMMAND"},
+    {"id": "engramabench", "name": "EngramaBench", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_ENGRAMABENCH_COMMAND"},
+    {"id": "dmr", "name": "DMR / Deep Memory Retrieval", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_DMR_COMMAND"},
+    {"id": "amb", "name": "AMB / Agent Memory Benchmark", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_AMB_COMMAND"}
+  ],
+  "comparators": [
+    {"id": "mem0", "name": "Mem0", "required": true},
+    {"id": "zep_graphiti", "name": "Zep / Graphiti", "required": true},
+    {"id": "letta_memgpt", "name": "Letta / MemGPT", "required": true},
+    {"id": "mempalace", "name": "MemPalace", "required": true},
+    {"id": "hindsight", "name": "Hindsight", "required": true},
+    {"id": "memmachine", "name": "MemMachine", "required": true}
+  ]
+}
