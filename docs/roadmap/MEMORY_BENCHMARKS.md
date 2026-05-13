@@ -1,45 +1,47 @@
-# External Memory Benchmark Roadmap
+# SEAM External Memory Benchmark Roadmap
 
-**Status:** Active roadmap track.
+**Status:** Active roadmap track. Phase 1 landed via PR #22.
+**Track:** I — External Memory Benchmarks (Comparator Gate).
+**Operator goal:** A new user can `pip install seam`, run one command, and get a comparable LoCoMo score against named systems in under 60 seconds on a clean machine.
 
-This track makes external memory benchmarks a release gate for SEAM memory claims. The registry lives at `benchmarks/registry/memory_benchmarks.json`. The runner lives at `seam_runtime/external_memory_benchmarks.py`. The operator entrypoint is `tools/run_external_memory_benchmarks.py`.
+## Why this matters
+
+SEAM makes claims about long-term memory, retrieval quality, and context efficiency. Those claims are only credible if SEAM is measured on the same external benchmarks the rest of the agent-memory field uses, and against the same comparator systems readers will compare it to.
+
+This track makes external memory benchmarks a release gate for SEAM memory claims, and makes "install SEAM and run a benchmark" a first-class onboarding path — not a research project the operator has to assemble.
 
 ## Required benchmarks
 
-Required benchmarks are LoCoMo, ConvoMem, MemBench, LongMemEval, BEAM / Beyond a Million Tokens, PerLTQA, EverMemBench, Memora, and Mem2ActBench. These are release-blocking for broad long-term memory claims. Until a benchmark has a configured runner command, CI reports it as `NOT_CONFIGURED` / `ACTION_REQUIRED` rather than silently ignoring it.
+The following benchmarks are release-blocking for broad long-term-memory claims. Each one ships with a configured runner command or CI reports it as `NOT_CONFIGURED` / `ACTION_REQUIRED` — never silently ignored.
+
+- LoCoMo
+- ConvoMem
+- MemBench
+- LongMemEval
+- BEAM (Beyond a Million Tokens)
+- PerLTQA
+- EverMemBench
+- Memora
+- Mem2ActBench
 
 ## Required comparators
 
-Required comparator systems are Mem0, Zep / Graphiti, Letta / MemGPT, MemPalace, Hindsight, and MemMachine. Comparator coverage is tracked in the registry so reporting cannot reduce the competitive field to whichever systems are easiest to beat.
+Comparator systems are tracked in the registry so reporting cannot reduce the competitive field to whichever systems are easiest to beat. Required comparators:
+
+- Mem0
+- Zep / Graphiti
+- Letta / MemGPT
+- MemPalace
+- Hindsight
+- MemMachine
 
 ## Optional expansion benchmarks
 
-Optional P3 coverage includes Mem-Gallery, ES-MemEval, MemGUI-Bench, LoCoMo-Plus, MemGround, EngramaBench, DMR, and AMB. Promote any optional benchmark to required when SEAM makes a matching public claim, such as multimodal memory, GUI-agent memory, graph-memory superiority, or production scorecard performance.
-
-## Prompt serialization and token budget optimization
-
-SEAM should evaluate TOON-style token-oriented serialization as a derived prompt transport format for structured JSON-like payloads. Canonical storage remains MIRL, JSON, and SQLite. Derived prompt payloads may use compact JSON, TOON, SEAM-RC/1, SEAM-LX/1, markdown tables, or another measured codec when that codec is reversible and cheaper under the active tokenizer.
-
-Initial targets are PACK payloads, retrieval result lists, benchmark case matrices, benchmark reports, memory search index outputs, citation/evidence tables, tool result arrays, and comparator scorecards.
-
-Gate:
-
-- codec roundtrip exactness is 100% when the payload requires lossless transport
-- canonical JSON/MIRL hashes remain unchanged
-- TOON or any alternate codec must beat compact JSON on measured token count before auto-selection
-- signed, tamper-evident, or canonical benchmark bundles keep byte-stable canonical JSON unless a formally specified canonical TOON profile is added and tested
-
-Proposed commands:
-
-```bash
-seam codec benchmark payload.json
-seam codec encode payload.json --format toon
-seam codec encode payload.json --format auto
-```
+P3 coverage: Mem-Gallery, ES-MemEval, MemGUI-Bench, LoCoMo-Plus, MemGround, EngramaBench, DMR, AMB. Promote any optional benchmark to required when SEAM makes a matching public claim (multimodal memory, GUI-agent memory, graph-memory superiority, production scorecard performance).
 
 ## Runner contract
 
-Each external benchmark declares a `command_env`. For example, `locomo` uses `SEAM_BENCH_LOCOMO_COMMAND`. The command must run the benchmark adapter and return exit code `0` on pass. The runner captures command metadata, status, return code, and stdout/stderr tails into a JSON report.
+Each registered benchmark declares a `command_env`. For example, `locomo` uses `SEAM_BENCH_LOCOMO_COMMAND`. The command must run the benchmark adapter and return exit code `0` on pass. The runner captures command metadata, status, return code, and stdout/stderr tails into a JSON report. Strict mode (set via `--strict`) escalates `NOT_CONFIGURED` and `FAIL` cases to an overall `FAIL` per `policy.strict_mode_failure_statuses` in the registry.
 
 ```bash
 python tools/run_external_memory_benchmarks.py --plan --scope required
@@ -47,10 +49,61 @@ python tools/run_external_memory_benchmarks.py --scope required --output externa
 python tools/run_external_memory_benchmarks.py --scope required --strict --output external-memory-benchmark-report.json
 ```
 
+The `seam bench external` CLI alias lands in Phase 2.
+
+## 60-second install-and-run gate
+
+This is what makes the track plug-and-play. A new user must be able to do all of the following on a clean Linux/WSL machine in under one minute, end to end, with no editing of files:
+
+1. Install SEAM (private repo install, then later `pip install seam`).
+2. Run one command to pull a default benchmark adapter (LoCoMo) and a default fixture.
+3. Get a JSON report with score, comparator deltas, and an integrity hash.
+
+Proposed UX:
+
+```bash
+pip install seam[bench]
+seam bench external --quickstart locomo
+```
+
+`--quickstart` is allowed to bundle a small public-fixture subset and a default adapter so first-run does not require the user to source datasets, configure env vars, or wire adapters. Full corpora and comparators remain opt-in.
+
+The 60-second gate is measured on the SEAM CI runner with a cold cache. Any change that pushes first-run past 90 seconds is a release blocker for this track.
+
+## Registry
+
+Canonical registry: `benchmarks/registry/memory_benchmarks.json`. The registry is the source of truth for benchmark names, scopes (`required`, `optional`), comparator coverage, command env vars, and dataset sourcing notes.
+
+The registry must validate (schema check + comparator coverage check) before any release that makes a memory claim.
+
 ## Gate
 
-A release candidate can only make broad external memory claims when the registry validates, every required benchmark has a configured runner, every configured required benchmark exits successfully, comparator results are present or explicitly marked unavailable with rationale, and the normal SEAM glassbox gate still passes with `seam benchmark gate`.
+A release candidate can only make broad external memory claims when:
+
+- The registry validates.
+- Every required benchmark has a configured runner.
+- Every configured required benchmark exits successfully under `--strict`.
+- Comparator results are present, or explicitly marked unavailable with a recorded rationale.
+- The normal SEAM glassbox gate still passes with `seam benchmark gate`.
+
+## Relationship to existing tracks
+
+- Track C (Benchmark Hardening, on main) covers SEAM's *internal* `surface_exact_rate` gate and holdout discipline. Track I sits on top of Track C and adds *external* comparator credibility.
+- Track J (Prompt Codec) defines the derived prompt transport formats (TOON, SEAM-RC/1, SEAM-LX/1, markdown tables) that this track's Phase 6 benchmark layer compares under the active tokenizer.
+- Track K (Trust, Security, Auditability) supplies the integrity primitives — Benchmark Integrity Levels (BIL-0 through BIL-6) are defined there; this track consumes them by sealing external benchmark bundles at the highest available level.
+- Track L (Agent / Skills Compiler) is independent. Skill-quality benchmarks live there.
 
 ## Implementation phases
 
-Phase 1 adds the registry, validation logic, runner plan, command execution harness, tests, and CI artifact upload. Phase 2 adds adapters under `benchmarks/external/` for each required benchmark. Phase 3 adds comparator runners. Phase 4 promotes `--strict` into release CI once required adapters and runner commands are available. Phase 5 adds a prompt codec benchmark layer that compares compact JSON, TOON, SEAM-RC/1, SEAM-LX/1, and markdown-table encodings under the active tokenizer and auto-selects only reversible, lower-token formats.
+| Phase | Title | Status |
+|-------|-------|--------|
+| 1 | Registry + validation + runner plan + command harness + tests + CI artifact upload | Landed (PR #22) |
+| 2 | `seam bench external` CLI alias + `--quickstart` LoCoMo path | Planned |
+| 3 | Adapters under `benchmarks/external/<benchmark>/` for each required benchmark | Planned (one PR per adapter) |
+| 4 | Comparator runners under `benchmarks/external/comparators/` | Planned (one PR per comparator family) |
+| 5 | Promote `--strict` into release CI once required adapters are stable | Gated promotion |
+| 6 | Prompt codec benchmark layer (see `PROMPT_CODEC.md`) compared under the active tokenizer | After codec spec lands |
+
+## Definition of done
+
+Track I is complete when a clean machine can install SEAM, run a default external memory benchmark in under 60 seconds, produce a comparable LoCoMo score against at least three named comparators, and seal the resulting bundle at the highest BIL level Track K currently supports.
