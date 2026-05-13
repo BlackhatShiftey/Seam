@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-09
+Last updated: 2026-05-13
 
 ## Current State
 
@@ -20,13 +20,15 @@ SEAM is operating as a local machine-first memory runtime with:
 - Competitive RAG/install polish in progress on `codex/competitive-rag-install-polish`: one-line private install docs, product-first README, document status tracking, progressive memory search/get, `retrieve --mode vector|graph|hybrid|mix`, stdio agent bridge, and vector stale-index reporting
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
 - IDE-like browser dashboard under `experimental/webui/` currently launches the preserved original prototype from `prototype-backup/` at the Vite root so the IDE shell, graphs, settings, terminal, and chat remain visible while the REST-wired TypeScript panes are reworked.
+- Adaptive SEAM Skill Factory foundation is merged on `main` through PR #21; current tracked code includes Skill Factory primitives and roadmap docs under `seam_runtime/skills/` and `docs/roadmap/SKILL_FACTORY.md`.
 
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#163`. Snapshot JSON files are local derived artifacts, so a fresh Linux clone should regenerate the resume snapshot with the command in `docs/setup.md` before running continuity verification.
+- Latest continuity handoff is `HISTORY#164`. Snapshot JSON files are local derived artifacts, so a fresh Linux clone should regenerate the resume snapshot with the command in `docs/setup.md` before running continuity verification.
 - A fresh Linux clone should run the repo-local setup in `docs/setup.md`, then verify `python -m tools.history.verify_integrity`, `python -m tools.history.verify_routing`, and `python -m tools.history.verify_continuity` before starting new work.
-- Next work should continue from the IDE-like web dashboard / REST API GUI, Agent Compiler roadmap, and first-class agent CLI direction, not from the already-merged HS/1 adapter/repair/benchmark branches.
+- Current GitHub PR sorting as of 2026-05-13: PR #22 is open and mergeable for external memory benchmark registry work but is behind `main`; PR #23 is draft and mergeable for roadmap concept harvest plus continuity repair; PR #19 is draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata; PR #18 is open and conflicting for operator/engineering doc salvage. Merged PR branches such as #20 and #21 should not be treated as active work just because their remote branch refs still exist.
+- Next work should continue from the IDE-like web dashboard / REST API GUI, Agent Compiler/Skill Factory roadmap, first-class agent CLI direction, and reviewed PR #22/#23 follow-up. Do not resume from already-merged HS/1 adapter/repair/benchmark branches or stale squash-merged PR refs.
 
 ## What Is Stable
 

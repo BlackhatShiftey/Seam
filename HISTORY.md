@@ -3337,3 +3337,17 @@ tokens: 117
 ---
 Post-merge continuity repair after PR #20 landed. The WebUI restore branch merged to main at ce2a4b69061c76022c4a04a77af5f4d6e50fcd02 and local main matched origin/main with ahead/behind 0 0, but the immediate post-merge continuity check failed because HISTORY_INDEX.md hashes for entries 158-162 no longer matched computed HISTORY.md entry hashes, and the latest snapshot referenced the pre-merge hashes for entries 161-162. This entry records the repair step: rebuild derived history index, write a fresh snapshot, rerun verify_integrity, verify_routing, and verify_continuity, then push the bookkeeping repair so origin/main is clean and internally consistent after the merge.
 ---END-ENTRY-#163---
+
+---BEGIN-ENTRY-#164---
+id: 164
+date: 2026-05-13T02:55:16Z
+agent: codex-gpt-5
+status: done
+topics: status, history, snapshot, verify, audit, roadmap
+commits: none
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 163
+tokens: 171
+---
+Repo readiness audit after branch and PR review. Local main is clean against origin/main after fetch/prune, with zero ahead/behind divergence. GitHub PR sorting: #22 is open and mergeable for external memory benchmark registry work but is behind main; #23 is draft and mergeable for roadmap concept harvest plus continuity repair; #19 is draft/conflicting and should be used only for partial extraction because its commit metadata includes private session-link material; #18 is open/conflicting for doc salvage. Local remote refs still include several squash-merged or stale branches, so future agents should use GitHub PR state plus file scope rather than git containment alone. Repaired current status by updating PROJECT_STATUS.md with this sorting, then rebuilt derived HISTORY_INDEX.md through this tool. Next verification is write a fresh snapshot for #164 and rerun integrity, routing, and continuity.
+---END-ENTRY-#164---
