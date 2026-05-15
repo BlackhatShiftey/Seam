@@ -133,6 +133,17 @@ presentation polish:
 
 ### A0: Migrate Dashboard to Textual — Live Panels, In-Place Input, Scrollable Boxes
 
+<!-- seam:item
+id: roadmap:track:A0
+status: done
+status-since: 2026-04-21
+status-by: history:063
+supersedes: none
+topics: dashboard, tui, textual
+priority: 3
+phase: 1
+-->
+
 **What:** Replace the current Rich-based re-render loop with a proper interactive TUI using **Textual**. The dashboard becomes a persistent session: input is handled at the bottom of the screen in-place, panels update reactively without flashing or reprinting, and every data panel is independently scrollable within its bordered box. A `seam-dash` CLI entrypoint launches it directly.
 
 **Why first:** Every other Track A item (animations, graphs, chat tab, presentation mode) is easier and cleaner to build on a proper TUI framework than on top of a re-render loop. This is the foundation.
@@ -165,6 +176,17 @@ presentation polish:
 History pointer: see `HISTORY#047` (interactive TUI baseline) and `HISTORY#024` (dashboard review stabilization).
 
 ### A-Web: IDE-Like Browser Dashboard / REST API GUI
+
+<!-- seam:item
+id: roadmap:track:A-Web
+status: in-progress
+status-since: 2026-05-10
+status-by: history:163
+supersedes: none
+topics: dashboard, webui, command
+priority: 0
+phase: 1
+-->
 
 **What:** Make the browser dashboard feel like an IDE/operator workspace, using
 the prototype in `experimental/webui/` as the visual target. The shell should
@@ -204,6 +226,17 @@ without breaking `seam dashboard`.
 
 ### A-CLI: First-Class Agent CLI
 
+<!-- seam:item
+id: roadmap:track:A-CLI
+status: in-progress
+status-since: 2026-05-07
+status-by: history:137
+supersedes: none
+topics: command, chat, dashboard
+priority: 0
+phase: 1
+-->
+
 **What:** Turn `seam` into a CLI product in the same family as Gemini CLI,
 Claude Code, and Codex CLI: an interactive shell that can remember, retrieve,
 reason over local SEAM memory, call SEAM tools, and eventually route model
@@ -233,6 +266,17 @@ path `seam shell --once ...` must remain testable in CI.
 
 ### A1: NL→MIRL Compilation Animation
 
+<!-- seam:item
+id: roadmap:track:A1
+status: done
+status-since: 2026-04-25
+status-by: history:068
+supersedes: none
+topics: dashboard, animation, mirl
+priority: 3
+phase: 1
+-->
+
 **What:** When a user runs `compile <text>` in the dashboard, show a live animation of the compilation process — text being parsed, records appearing one by one with their type labels (ENT, CLM, REL, ACT, OBJ) before the final summary.
 
 **How:**
@@ -253,6 +297,17 @@ path `seam shell --once ...` must remain testable in CI.
 
 ### A2: Benchmark Progress Bar & Live Metrics
 
+<!-- seam:item
+id: roadmap:track:A2
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: benchmark, dashboard, animation
+priority: 1
+phase: 1
+-->
+
 **What:** During `seam benchmark run all`, show a live progress bar with per-family status, current scores, and elapsed time — not just a final JSON dump.
 
 **How:**
@@ -270,6 +325,17 @@ path `seam shell --once ...` must remain testable in CI.
 ---
 
 ### A3: Benchmark History Graphs (ASCII sparklines)
+
+<!-- seam:item
+id: roadmap:track:A3
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: benchmark, dashboard, graph
+priority: 1
+phase: 1
+-->
 
 **What:** In the Benchmark tab, show a sparkline graph of recall@k and token savings across the last N stored runs, so you can see whether the system is improving or regressing over time.
 
@@ -290,6 +356,17 @@ path `seam shell --once ...` must remain testable in CI.
 ---
 
 ### A4: Vector Space Visualization
+
+<!-- seam:item
+id: roadmap:track:A4
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: vector, dashboard, graph
+priority: 1
+phase: 1
+-->
 
 **What:** A new `vectors` command in the dashboard (or a standalone `seam vectors` CLI command) that projects stored embeddings to 2D using UMAP or t-SNE and renders a scatter plot colored by record kind.
 
@@ -312,6 +389,17 @@ path `seam shell --once ...` must remain testable in CI.
 ---
 
 ### A5: Chat Tab with Claude Model
+
+<!-- seam:item
+id: roadmap:track:A5
+status: done
+status-since: 2026-04-25
+status-by: history:074
+supersedes: none
+topics: dashboard, chat, command
+priority: 3
+phase: 1
+-->
 
 **What:** Add a `Chat` tab to the dashboard. The user types a message; SEAM retrieves relevant context from the DB; the context + message is sent to Claude API; the response appears in the result panel. The model can also invoke SEAM operations as tool calls.
 
@@ -339,6 +427,17 @@ path `seam shell --once ...` must remain testable in CI.
 
 ### A6: Dashboard as a Benchmarking Presentation Tool
 
+<!-- seam:item
+id: roadmap:track:A6
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: dashboard, benchmark, animation
+priority: 1
+phase: 1
+-->
+
 **What:** A `--present` mode for the dashboard that locks into full-screen benchmark display — large metrics, color-coded pass/fail cells, animated score bars — suitable for showing SEAM benchmark results in a demo or presentation context.
 
 **How:**
@@ -359,6 +458,17 @@ path `seam shell --once ...` must remain testable in CI.
 History pointer: see `HISTORY#002`, `HISTORY#024`, `HISTORY#033`.
 
 ### B1: Command Naming Audit
+
+<!-- seam:item
+id: roadmap:track:B1
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: naming, alias, command
+priority: 1
+phase: 1
+-->
 
 **Current problems:**
 - `compile-nl` / `compile-dsl` — "compile" is developer-speak for a memory tool
@@ -400,6 +510,17 @@ All commands should feel like natural operations on a memory system:
 
 ### B2: Argument Consistency Pass
 
+<!-- seam:item
+id: roadmap:track:B2
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: naming, alias, command
+priority: 1
+phase: 1
+-->
+
 **Current problems:**
 - `--vector-backend` / `--semantic-backend` are the same flag with two names
 - `--vector-path` / `--chroma-path` — leaks Chroma implementation detail
@@ -415,6 +536,17 @@ All commands should feel like natural operations on a memory system:
 ---
 
 ### B3: README Consolidation
+
+<!-- seam:item
+id: roadmap:track:B3
+status: done
+status-since: 2026-05-08
+status-by: history:147
+supersedes: none
+topics: readme, docs, command
+priority: 3
+phase: 1
+-->
 
 **Current state:** There are multiple README files (`installers/README.md`, `benchmarks/README.md`, `experimental/retrieval_orchestrator/README.md`) with overlapping and sometimes stale content.
 
@@ -432,6 +564,17 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 
 ### C1: Holdout Suites
 
+<!-- seam:item
+id: roadmap:track:C1
+status: done
+status-since: 2026-04-27
+status-by: history:152
+supersedes: none
+topics: benchmark, holdout, fixture
+priority: 3
+phase: 1
+-->
+
 **What:** Cases that were never used during development and are only run at publish time. Results from holdout suites are the only ones that count as external claims.
 
 **Status:** Implemented 2026-04-27. See `HISTORY#092`.
@@ -446,6 +589,17 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 
 ### C2: Benchmark Diff Tooling
 
+<!-- seam:item
+id: roadmap:track:C2
+status: done
+status-since: 2026-04-27
+status-by: history:153
+supersedes: none
+topics: benchmark, diff, verify
+priority: 3
+phase: 1
+-->
+
 **What:** `seam benchmark diff <run-a.json> <run-b.json>` — shows a structured delta between two runs: which cases improved, which regressed, by how much.
 
 **Status:** Implemented 2026-04-27. See `HISTORY#092`.
@@ -459,6 +613,17 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 ---
 
 ### C3: Gold Standard Benchmarks
+
+<!-- seam:item
+id: roadmap:track:C3
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: benchmark, gold-standard, retrieval
+priority: 1
+phase: 1
+-->
 
 **What:** Run SEAM's retrieval engine against publicly known benchmarks to get externally comparable numbers.
 
@@ -480,6 +645,17 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 
 ### C4: Adversarial Testing
 
+<!-- seam:item
+id: roadmap:track:C4
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: benchmark, fixture, verify
+priority: 1
+phase: 1
+-->
+
 **What:** Deliberately try to break SEAM — malformed MIRL, adversarial queries, very long documents, Unicode edge cases, concurrent writes, empty databases.
 
 **SOP:**
@@ -491,6 +667,17 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 ---
 
 ### C5: Cross-Machine Reproducibility
+
+<!-- seam:item
+id: roadmap:track:C5
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: benchmark, verify, windows, linux
+priority: 1
+phase: 1
+-->
 
 **What:** The same benchmark run on Windows and Linux should produce identical scores.
 
@@ -505,6 +692,17 @@ History pointer: see `HISTORY#008`, `HISTORY#011`, and planned benchmark hardeni
 History pointer: see `HISTORY#041`-`HISTORY#043`.
 
 ### D1: SEAM as Claude Tool Set
+
+<!-- seam:item
+id: roadmap:track:D1
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: mcp, chat, multi-agent
+priority: 1
+phase: 1
+-->
 
 **What:** Define SEAM operations as Claude tool_use functions so a Claude agent can use SEAM's memory as a live knowledge base during a conversation.
 
@@ -525,6 +723,17 @@ History pointer: see `HISTORY#041`-`HISTORY#043`.
 
 ### D2: Auto-Compression Pipeline
 
+<!-- seam:item
+id: roadmap:track:D2
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: compress, persist, compile
+priority: 1
+phase: 1
+-->
+
 **What:** A background process (or CLI command) that watches a directory, compresses new files with SEAM-LX/1, and persists the MIRL to the database automatically.
 
 **SOP:**
@@ -537,6 +746,17 @@ History pointer: see `HISTORY#041`-`HISTORY#043`.
 ---
 
 ### D3: Batch Compile
+
+<!-- seam:item
+id: roadmap:track:D3
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: compile, persist, command
+priority: 1
+phase: 1
+-->
 
 **What:** `seam batch-compile <glob>` — compile and persist multiple files at once with a progress bar and summary report.
 
@@ -554,6 +774,17 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 ### E1: PgVector as Configurable Default
 
+<!-- seam:item
+id: roadmap:track:E1
+status: in-progress
+status-since: 2026-04-30
+status-by: history:121
+supersedes: none
+topics: pgvector, vector, docker
+priority: 0
+phase: 1
+-->
+
 **What:** When `SEAM_PGVECTOR_DSN` is set, PgVector is already used automatically. The next step is making it the explicit recommended backend for deployments with >10k records, and adding a migration path from SQLite vector index to PgVector.
 
 **SOP:**
@@ -566,6 +797,17 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 ### E2: Multi-Tenant Namespacing
 
+<!-- seam:item
+id: roadmap:track:E2
+status: planned
+status-since: 2026-04-18
+status-by: none
+supersedes: none
+topics: persist, vector
+priority: 1
+phase: 1
+-->
+
 **What:** SEAM already has namespaces (`ns`) and scopes (`scope`) on records. The next step is enforcing tenant isolation at the API level — a `tenant_id` that gates all queries.
 
 **SOP:**
@@ -577,6 +819,17 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 ---
 
 ### E3: REST API Surface
+
+<!-- seam:item
+id: roadmap:track:E3
+status: done
+status-since: 2026-04-27
+status-by: history:154
+supersedes: none
+topics: command, persist, retrieval
+priority: 3
+phase: 1
+-->
 
 **What:** Expose SEAM operations as a lightweight HTTP API so external systems can compile, search, and retrieve without running a full Python process.
 
@@ -595,6 +848,17 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 ### F1: Operator Setup Guide with Exact Commands
 
+<!-- seam:item
+id: roadmap:track:F1
+status: done
+status-since: 2026-04-28
+status-by: history:099
+supersedes: none
+topics: readme, docs, installer
+priority: 3
+phase: 1
+-->
+
 **What:** Publish a single setup guide with exact copy/paste commands for Windows, Linux, and WSL2, including optional extras and verification commands.
 
 **SOP:**
@@ -610,6 +874,17 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 ---
 
 ### F2: Documented Error Catalog and Fix Procedures
+
+<!-- seam:item
+id: roadmap:track:F2
+status: done
+status-since: 2026-04-28
+status-by: history:099
+supersedes: none
+topics: docs, readme, doctor
+priority: 3
+phase: 1
+-->
 
 **What:** Create a troubleshooting catalog that maps common operator errors to exact recovery steps.
 
@@ -631,6 +906,17 @@ History pointer: see `HISTORY#012`, `HISTORY#019`, and planned scale tracks `HIS
 
 ### F3: How-To Runbooks for Daily Operations
 
+<!-- seam:item
+id: roadmap:track:F3
+status: done
+status-since: 2026-05-08
+status-by: history:147
+supersedes: none
+topics: docs, readme, command
+priority: 3
+phase: 1
+-->
+
 **What:** Add task-oriented runbooks for common operator workflows so users can execute standard flows without source code spelunking.
 
 **SOP:**
@@ -651,6 +937,17 @@ History pointer: see `HISTORY#112` and `HISTORY#113` for the first HS/1
 surface flow.
 
 ### G1: Document-to-Machine-Language Compiler
+
+<!-- seam:item
+id: roadmap:track:G1
+status: done
+status-since: 2026-05-08
+status-by: history:145
+supersedes: none
+topics: compile, mirl, surface
+priority: 3
+phase: 1
+-->
 
 **What:** Convert documents into directly readable MIRL or `SEAM-RC/1` records
 that preserve facts, quote spans, headings, table cells, references, and source
@@ -681,6 +978,17 @@ without opening the original document.
 
 ### G2: Stored Surface Library
 
+<!-- seam:item
+id: roadmap:track:G2
+status: done
+status-since: 2026-05-06
+status-by: history:117
+supersedes: none
+topics: surface, ledger, persist
+priority: 3
+phase: 1
+-->
+
 **What:** Add a managed library for `.seam.png` surfaces. The PNG stores the
 payload bytes; SQLite stores only metadata, hashes, status, and lookup fields.
 
@@ -690,6 +998,17 @@ payload bytes; SQLite stores only metadata, hashes, status, and lookup fields.
 context, imported, and audited by hash.
 
 ### G3: Direct Image-Surface Query
+
+<!-- seam:item
+id: roadmap:track:G3
+status: done
+status-since: 2026-05-06
+status-by: history:117
+supersedes: none
+topics: surface, retrieval, command
+priority: 3
+phase: 1
+-->
 
 **What:** Make the stored image artifact itself a readable memory source.
 Queries decode PNG pixels into MIRL/RC bytes in memory, verify hashes, then run
@@ -702,6 +1021,17 @@ document-structure records that RC/1 exposes to the query path.
 without OCR, source-document restoration, or prior SQLite import.
 
 ### G4: Surface Store Benchmarks
+
+<!-- seam:item
+id: roadmap:track:G4
+status: done
+status-since: 2026-05-06
+status-by: history:117
+supersedes: none
+topics: surface, benchmark, fixture
+priority: 3
+phase: 1
+-->
 
 **What:** Add benchmark cases for the full functional loop:
 document -> machine language -> surface -> stored surface -> direct answer.

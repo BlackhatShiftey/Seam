@@ -2,18 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 174
+total_events: 205
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
-## Hot Zone (latest 174 events, oldest first)
+## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-15T00:00:00Z | history:001:3a96cd95 | session-event | done | verify, retrieval, rank, vector, chroma, command | REPO_LEDGER.md#milestone-log |
-| 2026-04-15T00:01:00Z | history:002:7d5da2d2 | session-event | done | retrieval, naming, alias | REPO_LEDGER.md#milestone-log |
-| 2026-04-15T00:02:00Z | history:003:24a47cff | session-event | done | compile, search, dashboard, command, plan | REPO_LEDGER.md#milestone-log |
-| 2026-04-15T00:03:00Z | history:004:7e181417 | session-event | done | persist, retrieval, lexical | REPO_LEDGER.md#milestone-log |
-| 2026-04-15T00:04:00Z | history:005:4604dbe9 | session-event | done | retrieval, rank, dashboard, command | REPO_LEDGER.md#milestone-log |
 | 2026-04-15T00:05:00Z | history:006:36c4cb4a | session-event | done | mirl, retrieval, compress, lx1, roundtrip, codec | REPO_LEDGER.md#milestone-log |
 | 2026-04-16T00:00:00Z | history:007:9a40910f | session-event | done | persist, verify, roundtrip, benchmark, installer, windows | REPO_LEDGER.md#milestone-log |
 | 2026-04-16T00:01:00Z | history:008:3bfa446f | session-event | done | persist, verify, benchmark, bundle, fixture, command | REPO_LEDGER.md#milestone-log |
@@ -31,6 +26,19 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-04-17T00:10:00Z | history:020:8d22eeaf | session-event | done | persist, verify, benchmark, dashboard, installer, windows | PLAN_LOG.md |
 | 2026-04-17T00:11:00Z | history:021:daf7be54 | session-event | done | persist, verify, dashboard, installer, linux, wsl2 | PLAN_LOG.md |
 | 2026-04-18T00:00:00Z | history:022:a756b492 | session-event | done | vector, sbert, pgvector, pyproject, extras | REPO_LEDGER.md#milestone-log |
+| 2026-04-18T00:00:00Z | roadmap:001:da03295c | status-change | bootstrap | benchmark, dashboard, animation | ROADMAP.md:300 |
+| 2026-04-18T00:00:00Z | roadmap:002:db44a2e3 | status-change | bootstrap | benchmark, dashboard, graph | ROADMAP.md:329 |
+| 2026-04-18T00:00:00Z | roadmap:003:e17e0340 | status-change | bootstrap | vector, dashboard, graph | ROADMAP.md:360 |
+| 2026-04-18T00:00:00Z | roadmap:004:a340e8ec | status-change | bootstrap | dashboard, benchmark, animation | ROADMAP.md:430 |
+| 2026-04-18T00:00:00Z | roadmap:005:f2de612c | status-change | bootstrap | naming, alias, command | ROADMAP.md:462 |
+| 2026-04-18T00:00:00Z | roadmap:006:bd1cbc2a | status-change | bootstrap | naming, alias, command | ROADMAP.md:513 |
+| 2026-04-18T00:00:00Z | roadmap:007:df895753 | status-change | bootstrap | benchmark, gold-standard, retrieval | ROADMAP.md:617 |
+| 2026-04-18T00:00:00Z | roadmap:008:3d9deb85 | status-change | bootstrap | benchmark, fixture, verify | ROADMAP.md:648 |
+| 2026-04-18T00:00:00Z | roadmap:009:3f1bb87b | status-change | bootstrap | benchmark, verify, windows, linux | ROADMAP.md:671 |
+| 2026-04-18T00:00:00Z | roadmap:010:8507c42e | status-change | bootstrap | mcp, chat, multi-agent | ROADMAP.md:696 |
+| 2026-04-18T00:00:00Z | roadmap:011:c578e834 | status-change | bootstrap | compress, persist, compile | ROADMAP.md:726 |
+| 2026-04-18T00:00:00Z | roadmap:012:26b0a14a | status-change | bootstrap | compile, persist, command | ROADMAP.md:750 |
+| 2026-04-18T00:00:00Z | roadmap:013:78d96960 | status-change | bootstrap | persist, vector | ROADMAP.md:800 |
 | 2026-04-18T00:01:00Z | history:023:97fbda5e | session-event | done | persist, retrieval, vector, sbert, pgvector, benchmark | REPO_LEDGER.md#milestone-log |
 | 2026-04-18T00:02:00Z | history:024:c5de2360 | session-event | done | verify, benchmark, dashboard, command, naming, ledger | REPO_LEDGER.md#milestone-log |
 | 2026-04-18T00:03:00Z | history:025:03ee4d26 | session-event | done | ledger, session, handoff | PLAN_LOG.md |
@@ -69,9 +77,12 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-04-20T21:34:16Z | history:058:e2494df1 | session-event | done | dashboard, textual, command, tui, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-20T21:40:28Z | history:059:4fb5512c | session-event | done | dashboard, textual, command, tui, history, snapshot | test_seam.py |
 | 2026-04-20T21:48:15Z | history:060:4ea6cae9 | session-event | done | dashboard, textual, chat, command, tui, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
+| 2026-04-21T00:00:00Z | roadmap:014:25894f3e | status-change | bootstrap | dashboard, tui, textual | ROADMAP.md:136 |
 | 2026-04-21T02:21:26Z | history:061:c61b823c | session-event | done | dashboard, textual, tui, history, snapshot | seam_runtime/dashboard.py,seam_runtime/ui/animations.py,seam_runtime/ui/bars.... |
 | 2026-04-21T19:36:27Z | history:062:609e5f92 | session-event | done | dashboard, textual, windows, history, snapshot | launch_dashboard.bat,seam_runtime/installer.py,installers/install_seam.py,pyp... |
 | 2026-04-21T19:49:14Z | history:063:00bb98b6 | session-event | done | installer, dashboard, textual, windows, history, snapshot | seam_runtime/installer.py,installers/install_seam.py,scripts/bootstrap_seam.p... |
+| 2026-04-25T00:00:00Z | roadmap:015:1892d7b4 | status-change | bootstrap | dashboard, animation, mirl | ROADMAP.md:269 |
+| 2026-04-25T00:00:00Z | roadmap:016:9e787be8 | status-change | bootstrap | dashboard, chat, command | ROADMAP.md:393 |
 | 2026-04-25T04:22:49Z | history:064:3c8f79c9 | session-event | done | protocol, multi-agent, mcp, history | seam_runtime/config.toml |
 | 2026-04-25T06:13:35Z | history:065:1917870c | session-event | done | dashboard, windows, command, readme, history, snapshot | README.md,installers/README.md,scripts/windows/launch_dashboard.bat |
 | 2026-04-25T06:55:46Z | history:066:c8d28059 | session-event | done | pgvector, vector, verify, windows, command, history, snap... | docker-compose.yaml,.env,seam_runtime/vector_adapters.py,seam.py |
@@ -99,10 +110,15 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-04-26T23:19:09Z | history:088:298a382c | session-event | done | mirl, compress, lx1, codec, search, verify, history, snap... | seam_runtime/lossless.py,seam_runtime/cli.py,seam.py,test_seam.py,docs/MIRL_V... |
 | 2026-04-26T23:25:45Z | history:089:575647b9 | session-event | done | benchmark, mirl, compress, verify, history, snapshot | seam_runtime/benchmarks.py,test_seam.py,docs/MIRL_V1.md,docs/ledgers/runtime/... |
 | 2026-04-26T23:29:00Z | history:090:b354c9c9 | session-event | done | benchmark, mirl, compress, verify, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/lossless.py,test_seam.py,docs/MIRL_V1... |
+| 2026-04-27T00:00:00Z | roadmap:017:5b100b91 | status-change | bootstrap | benchmark, holdout, fixture | ROADMAP.md:567 |
+| 2026-04-27T00:00:00Z | roadmap:018:385e7503 | status-change | bootstrap | benchmark, diff, verify | ROADMAP.md:592 |
+| 2026-04-27T00:00:00Z | roadmap:019:710643de | status-change | bootstrap | command, persist, retrieval | ROADMAP.md:823 |
 | 2026-04-27T04:14:02Z | history:091:003eb8d5 | session-event | done | dashboard, tui, command, compress, windows, verify, histo... | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md |
 | 2026-04-27T06:01:51Z | history:092:33be794f | session-event | done | benchmark, diff, holdout, fixture, verify, roadmap, readm... | seam_runtime/benchmarks.py,seam_runtime/cli.py,seam_runtime/runtime.py,seam.p... |
 | 2026-04-27T06:03:41Z | history:093:30b7b2a1 | session-event | done | benchmark, diff, holdout, verify, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/cli.py,test_seam.py,HISTORY.md,HISTOR... |
 | 2026-04-27T09:26:17Z | history:094:0f4cfea4 | session-event | done | command, verify, readme, roadmap, status, history, snapsh... | seam_runtime/server.py,seam_runtime/cli.py,seam_runtime/storage.py,test_seam.... |
+| 2026-04-28T00:00:00Z | roadmap:020:c39bb7a4 | status-change | bootstrap | readme, docs, installer | ROADMAP.md:851 |
+| 2026-04-28T00:00:00Z | roadmap:021:4f0bf69d | status-change | bootstrap | docs, readme, doctor | ROADMAP.md:878 |
 | 2026-04-28T08:16:31Z | history:095:0c54f0e9 | session-event | done | benchmark, verify, command, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/runtime.py,seam_runtime/cli.py,seam.p... |
 | 2026-04-28T09:07:41Z | history:096:efb0e297 | session-event | done | benchmark, verify, command, history, snapshot | .github/workflows/ci.yml,HISTORY.md,HISTORY_INDEX.md |
 | 2026-04-28T09:28:36Z | history:097:0ed9bdd4 | session-event | done | dashboard, tui, command, verify, status, history, snapshot | seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_I... |
@@ -117,6 +133,7 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-04-29T23:38:09Z | history:106:2890c852 | session-event | done | dashboard, tui, textual, verify, status, history, snapshot | seam_runtime/dashboard.py,seam_runtime/storage.py,seam_runtime/lossless.py,te... |
 | 2026-04-29T23:44:01Z | history:107:5c4f3f1f | session-event | done | dashboard, tui, verify, status, history, snapshot | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,PROJECT_STATUS.md,seam_runtime/da... |
 | 2026-04-29T23:46:56Z | history:108:a4b035eb | session-event | done | dashboard, tui, textual, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snap... |
+| 2026-04-30T00:00:00Z | roadmap:022:2ecd9cdd | status-change | bootstrap | pgvector, vector, docker | ROADMAP.md:777 |
 | 2026-04-30T06:10:55Z | history:109:136d7f19 | session-event | done | dashboard, tui, verify, status, history, snapshot | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/da... |
 | 2026-04-30T09:03:51Z | history:110:d332652b | session-event | done | compress, mirl, codec, benchmark, command, roadmap, ledge... | seam_runtime/holographic.py,seam_runtime/cli.py,seam_runtime/benchmarks.py,se... |
 | 2026-04-30T09:06:05Z | history:111:dd8d9f04 | session-event | done | command, compress, verify, history, snapshot | seam_runtime/cli.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
@@ -134,6 +151,9 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-02T14:26:46Z | history:123:e4b57958 | session-event | done | verify, windows, history, snapshot | .gitignore,docs/CODE_LAYOUT.md,test_seam_all/test_seam.py,HISTORY.md,HISTORY_... |
 | 2026-05-04T07:47:17Z | history:124:8261bcfb | session-event | done | verify, history, snapshot, ledger, protocol, audit | .gitignore,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,REPO_LEDGER.md,ROADM... |
 | 2026-05-04T07:53:59Z | history:125:66123911 | session-event | done | verify, history, snapshot, windows, audit | .github/workflows/ci.yml,docs/CODE_LAYOUT.md,docs/setup.md,HISTORY.md,HISTORY... |
+| 2026-05-06T00:00:00Z | roadmap:023:ec0e5485 | status-change | bootstrap | surface, ledger, persist | ROADMAP.md:981 |
+| 2026-05-06T00:00:00Z | roadmap:024:ee845f06 | status-change | bootstrap | surface, retrieval, command | ROADMAP.md:1002 |
+| 2026-05-06T00:00:00Z | roadmap:025:dcb018b9 | status-change | bootstrap | surface, benchmark, fixture | ROADMAP.md:1025 |
 | 2026-05-06T06:40:36Z | history:126:cf26f837 | session-event | done | compress, mirl, codec, command, verify, history, snapshot... | seam_runtime/holographic.py,seam_runtime/storage.py,seam_runtime/cli.py,test_... |
 | 2026-05-06T08:00:47Z | history:127:80771ff8 | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | .gitignore,seam_runtime/holographic.py,seam_runtime/surface_adapters.py,seam_... |
 | 2026-05-06T09:47:15Z | history:128:9eef8813 | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
@@ -142,6 +162,7 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-06T11:38:49Z | history:131:1a1a4a67 | session-event | done | benchmark, codec, compress, mirl, verify, history, snapsh... | seam_runtime/benchmarks.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFAC... |
 | 2026-05-06T11:51:48Z | history:132:3cf46987 | session-event | done | benchmark, codec, compress, mirl, verify, history, snapsh... | seam_runtime/benchmarks.py,test_seam_all/test_seam.py,docs/HOLOGRAPHIC_SURFAC... |
 | 2026-05-06T11:52:04Z | history:133:12b0bcd4 | session-event | done | history, integrity, verify, snapshot, benchmark | HISTORY.md,HISTORY_INDEX.md |
+| 2026-05-07T00:00:00Z | roadmap:026:a58216ef | status-change | bootstrap | command, chat, dashboard | ROADMAP.md:229 |
 | 2026-05-07T03:06:28Z | history:134:1c04cffa | session-event | done | history, roadmap, verify, snapshot, protocol | docs/roadmap/AGENT_COMPILER.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-05-07T05:08:26Z | history:135:05371c73 | session-event | done | status, roadmap, linux, history, snapshot, verify, protoc... | PROJECT_STATUS.md,ROADMAP.md,docs/setup.md,README.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-05-07T05:09:41Z | history:136:76b5adf0 | session-event | done | status, roadmap, linux, history, snapshot, verify, protoc... | PROJECT_STATUS.md,docs/setup.md,HISTORY.md,HISTORY_INDEX.md |
@@ -149,6 +170,9 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-07T06:42:19Z | history:138:4f65f17e | session-event | done | mcp, multi-agent, command, doctor, verify, history, snaps... | seam_runtime/mcp.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,.s... |
 | 2026-05-07T07:05:57Z | history:139:93d5d202 | session-event | done | mcp, multi-agent, command, doctor, verify, history, snaps... | seam_runtime/mcp.py,seam_runtime/doctor.py,seam_runtime/cli.py,test_seam_all/... |
 | 2026-05-07T09:29:44Z | history:140:7f73ff10 | session-event | done | mcp, multi-agent, command, doctor, verify, history, snaps... | seam_runtime/mcp.py,seam_runtime/doctor.py,seam_runtime/cli.py,test_seam_all/... |
+| 2026-05-08T00:00:00Z | roadmap:027:af98c76e | status-change | bootstrap | readme, docs, command | ROADMAP.md:540 |
+| 2026-05-08T00:00:00Z | roadmap:028:5b1621af | status-change | bootstrap | docs, readme, command | ROADMAP.md:909 |
+| 2026-05-08T00:00:00Z | roadmap:029:07066fbd | status-change | bootstrap | compile, mirl, surface | ROADMAP.md:941 |
 | 2026-05-08T09:50:28Z | history:144:d5565a39 | session-event | done | status, roadmap, ledger, benchmark, compress, verify, his... | PROJECT_STATUS.md,README.md,ROADMAP.md,docs/setup.md,docs/ledgers/runtime/com... |
 | 2026-05-08T10:11:20Z | history:141:22531976 | session-event | done | protocol, multi-agent, history, snapshot, verify | .opencode/skills/seam-session-closeout/SKILL.md,HISTORY.md,HISTORY_INDEX.md,.... |
 | 2026-05-08T10:20:42Z | history:142:beb06018 | session-event | done | protocol, multi-agent, history, snapshot, verify, audit | .opencode/skills/seam-repo-navigator/SKILL.md,.opencode/skills/seam-implement... |
@@ -170,16 +194,25 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-09T04:17:11Z | history:159:3b6a7f68 | session-event | done | dashboard, verify, history, status | experimental/webui/src/App.tsx,experimental/webui/vite.config.ts,experimental... |
 | 2026-05-09T04:26:07Z | history:160:034f2f3f | session-event | done | dashboard, verify, history, status | experimental/webui/prototype-backup/seam-dashboard-prototype.html,experimenta... |
 | 2026-05-09T17:27:20Z | history:161:750a2c4b | session-event | done | dashboard, verify, history, status | experimental/webui/prototype-backup/seam-dashboard-prototype.html,experimenta... |
+| 2026-05-10T00:00:00Z | roadmap:030:60c0ebc6 | status-change | bootstrap | dashboard, webui, command | ROADMAP.md:180 |
 | 2026-05-10T08:12:49Z | history:162:565a03ae | session-event | done | dashboard, verify, history, status | experimental/webui/prototype-backup/seam-dashboard-prototype.html,experimenta... |
 | 2026-05-10T08:17:07Z | history:163:a80699bb | session-event | done | dashboard, verify, history, status | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md |
 | 2026-05-13T02:55:16Z | history:164:b3d6e2ef | session-event | done | status, history, snapshot, verify, audit, roadmap | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
-| 2026-05-15T00:00:00Z | roadmap:001:14713117 | status-change | bootstrap | protocol, history, plan, roadmap | ROADMAP.md:727 |
-| 2026-05-15T00:00:00Z | roadmap:002:8a52b276 | status-change | bootstrap | protocol, history, plan | ROADMAP.md:760 |
-| 2026-05-15T00:00:00Z | roadmap:003:7ef40fa5 | status-change | bootstrap | protocol, retrieval, search | ROADMAP.md:787 |
-| 2026-05-15T00:00:00Z | roadmap:004:19f8e9c6 | status-change | bootstrap | protocol, retrieval, search, vector | ROADMAP.md:811 |
+| 2026-05-15T00:00:00Z | roadmap:031:6ee9e633 | status-change | bootstrap | protocol, history, plan, roadmap | ROADMAP.md:1057 |
+| 2026-05-15T00:00:00Z | roadmap:032:52d64c20 | status-change | bootstrap | protocol, history, plan | ROADMAP.md:1090 |
+| 2026-05-15T00:00:00Z | roadmap:033:75515545 | status-change | bootstrap | protocol, retrieval, search | ROADMAP.md:1117 |
+| 2026-05-15T00:00:00Z | roadmap:034:e9d932ec | status-change | bootstrap | protocol, retrieval, search, vector | ROADMAP.md:1141 |
 | 2026-05-15T06:50:47Z | history:165:89ff7e18 | session-event | done | roadmap, plan, protocol, history, status, audit, classifi... | docs/roadmap/CONTEXT_STREAMS.md,ROADMAP.md,PROJECT_STATUS.md,HISTORY.md,HISTO... |
 | 2026-05-15T16:36:43Z | history:166:f324a81c | session-event | done | protocol, history, audit, classification, plan, snapshot,... | HISTORY.md,docs/roadmap/CONTEXT_STREAMS.md,ROADMAP.md,docs/howto/README.md,HI... |
 | 2026-05-15T16:43:00Z | history:167:757a0270 | session-event | done | protocol, history, audit, classification, plan, verify, s... | .claude/settings.json,tools/claude/preflight_protocol.sh,tools/claude/session... |
 | 2026-05-15T16:45:45Z | history:168:5df27e35 | session-event | done | protocol, history, audit, classification, plan, verify, s... | tools/claude/preflight_protocol.sh,tools/claude/session_start_brief.sh,REPO_L... |
 | 2026-05-15T19:13:24Z | history:169:a06543fe | session-event | done | protocol, history, audit, classification, plan, verify, s... | tools/git-hooks/pre-commit,tools/git-hooks/install.sh,seam_runtime/doctor.py,... |
 | 2026-05-15T19:59:46Z | history:170:941f2b6d | session-event | done | protocol, history, plan, verify, status, ledger, roadmap,... | tools/streams/__init__.py,tools/streams/streams_lib.py,tools/streams/history_... |
+| 2026-05-15T21:15:18Z | history:171:65ae1a6a | session-event | done | protocol, history, plan, verify, status, ledger, roadmap,... | ROADMAP.md,tools/streams/build_context_pack.py,tools/streams/bloat_report.py,... |
+
+
+## Archive Pointers
+
+| chunk | utc_range | event_count | streams | top_topics |
+|---|---|---|---|---|
+| 0001-0005.cross.md | 2026-04-15T00:00:00Z..2026-04-15T00:04:00Z | 5 | (multi) | (multi) |
