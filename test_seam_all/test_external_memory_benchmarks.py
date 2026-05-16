@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import os
+import shlex
+import sys
 
 from seam_runtime.external_memory_benchmarks import benchmark_plan, load_memory_benchmark_registry, run_external_memory_benchmarks
 
@@ -30,7 +31,15 @@ def test_external_memory_plan_marks_missing_required_commands() -> None:
 
 
 def test_external_memory_runner_can_execute_configured_single_benchmark(monkeypatch) -> None:
-    monkeypatch.setenv("SEAM_BENCH_LOCOMO_COMMAND", "python -c import sys; sys.exit(0)")
+    command = f'{shlex.quote(sys.executable)} -c "import sys; sys.exit(0)"'
+    monkeypatch.setenv("SEAM_BENCH_LOCOMO_COMMAND", command)
     report = run_external_memory_benchmarks(scope="locomo", strict=True)
     assert report["status"] == "PASS"
     assert report["cases"][0]["status"] == "PASS"
+
+
+def test_external_memory_runner_strict_mode_fails_on_unconfigured_required(monkeypatch) -> None:
+    monkeypatch.delenv("SEAM_BENCH_LOCOMO_COMMAND", raising=False)
+    report = run_external_memory_benchmarks(scope="locomo", strict=True)
+    assert report["status"] == "FAIL"
+    assert report["cases"][0]["status"] == "NOT_CONFIGURED"

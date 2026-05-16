@@ -3677,3 +3677,29 @@ Installer work appended before this uncommitted entry landed: added dual-mode Li
 
 Verification: pre-change reads completed for PROJECT_STATUS.md, REPO_LEDGER.md, HISTORY_INDEX.md, docs/CODE_LAYOUT.md and the last six HISTORY entries via tail. After audit fixes, .venv/bin/python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py reported 189 passed in 33.75s, and .venv/bin/python -m pytest tools/streams/test_streams.py reported 12 passed in 0.22s. Installer verification before this entry: python3 -m py_compile seam_runtime/installer.py installers/install_seam.py passed; .venv/bin/python -m pytest test_seam_all/test_seam.py::InstallerLinuxTests -q passed with 14 tests; python3 installers/install_seam.py --help showed --dev; pre-created lib64 venv smoke in /tmp succeeded; .venv/bin/python -m pytest test_seam_all/test_seam.py tools/history/test_history_tools.py -q passed with 192 tests. verify_integrity OK, verify_routing OK, verify_continuity OK with the recorded-fact audit enabled (no --no-recorded-fact-audit needed), verify_streams OK. Smoke test: tools.streams.build_context_pack --stream history --latest 1 --format json now emits valid JSON, confirming the legacy delegation fix.
 ---END-ENTRY-#177---
+
+---BEGIN-ENTRY-#178---
+id: 178
+date: 2026-05-16T05:46:29Z
+agent: claude-opus-4-7
+status: done
+topics: benchmark, roadmap, registry, memory, protocol, verify, history
+commits: none
+refs: benchmarks/registry/memory_benchmarks.json,seam_runtime/external_memory_benchmarks.py,test_seam_all/test_external_memory_benchmarks.py,test_seam_all/test_seam.py,tools/run_external_memory_benchmarks.py,docs/roadmap/MEMORY_BENCHMARKS.md,.github/workflows/external-memory-benchmarks.yml,.github/workflows/ci.yml,HISTORY.md,HISTORY_INDEX.md
+supersedes: 177
+tokens: 404
+---
+Merge PR #22 (external memory benchmark roadmap + registry) with two bug fixes applied before merge.
+
+Bug 1 fixed: test_external_memory_runner_can_execute_configured_single_benchmark used SEAM_BENCH_LOCOMO_COMMAND="python -c import sys; sys.exit(0)" which shlex.split parses as ["python","-c","import","sys;","sys.exit(0)"], so subprocess invokes python with code "import" alone, which is a SyntaxError. The test was not caught by CI because ci.yml only runs test_seam_all/test_seam.py, not the new test_external_memory_benchmarks.py file. Fixed by switching the env var to f"{shlex.quote(sys.executable)} -c \"import sys; sys.exit(0)\"" so the code is preserved as one argv element. Updated ci.yml to run all of test_seam_all/ so future new test files get exercised.
+
+Bug 2 fixed: run_external_memory_benchmarks computed failing = [case for case in cases if case["status"] in registry.get("policy", {}).get("strict_mode_failure_statuses", [])], but the shipped registry JSON had no policy key. Strict mode therefore could never escalate any case to FAIL. Added policy.strict_mode_failure_statuses = ["NOT_CONFIGURED","FAIL"] to memory_benchmarks.json so strict mode now fails on missing or failed required runners. Added a new test test_external_memory_runner_strict_mode_fails_on_unconfigured_required to lock the behavior in.
+
+Bug 3 fixed (surfaced by widened CI): two installer tests from HISTORY#177 (test_dev_virtualenv_precreates_lib64_for_posix_filesystems and test_dev_install_installs_python_deps_and_ignores_existing_webui) asserted POSIX path layout (.venv/bin/python) but the InstallerLinuxTests class ran unconditionally on Windows CI where the actual code returns .venv/Scripts/python.exe. The widened CI from bug 1's fix exposed both as failures on the Windows runner. Added @unittest.skipUnless(os.name == "posix", ...) decorators so they skip on Windows; existing Windows-targeted tests in the same class (test_write_shims_returns_three_paths_windows_layout) are unaffected. Main CI run 25954164261 was failing on this regression before the fix; PR #22 now also unblocks main.
+
+PR scope unchanged otherwise: required benchmarks (LoCoMo, ConvoMem, MemBench, LongMemEval, BEAM, PerLTQA, EverMemBench, Memora, Mem2ActBench), required comparators (Mem0, Zep/Graphiti, Letta/MemGPT, MemPalace, Hindsight, MemMachine), the runner contract with command_env -> subprocess invocation, the plan/run JSON reports, the operator CLI entrypoint at tools/run_external_memory_benchmarks.py, and the dedicated GitHub Actions workflow that uploads plan and report artifacts.
+
+Known follow-up (not in this merge): benchmarks/registry/memory_benchmarks.json sits outside the seam_runtime package, so a wheel install would not ship it; the current CI and developer install both use editable install (pip install -e .) where the file resolves correctly, so the bug is latent rather than breaking. Move into seam_runtime/data/ with package-data inclusion is queued for the next PR that touches this surface.
+
+Verification: pytest test_seam_all/ tools/history/test_history_tools.py reports 202 passed in 33.74s (was 154 in the pre-merge audit). verify_integrity, verify_routing, verify_continuity, and verify_streams all OK against the rebased branch before commit. Branch was rebased clean onto origin/main at 379a7ba.
+---END-ENTRY-#178---

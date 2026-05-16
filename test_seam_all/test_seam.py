@@ -2953,6 +2953,7 @@ class InstallerLinuxTests(unittest.TestCase):
                 for arg in call:
                     self.assertFalse(arg.endswith("[dash]"), f"Unexpected [dash] arg in {call}")
 
+    @unittest.skipUnless(os.name == "posix", "POSIX-only venv layout and lib64 fallback")
     def test_dev_virtualenv_precreates_lib64_for_posix_filesystems(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2976,6 +2977,7 @@ class InstallerLinuxTests(unittest.TestCase):
             self.assertTrue((root / ".venv" / "lib64").is_dir())
             self.assertEqual(calls[0], ["/usr/bin/python3", "-m", "venv", str(root / ".venv")])
 
+    @unittest.skipUnless(os.name == "posix", "POSIX-only venv layout")
     def test_dev_install_installs_python_deps_and_ignores_existing_webui(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -55,5 +55,8 @@
     {"id": "mempalace", "name": "MemPalace", "required": true},
     {"id": "hindsight", "name": "Hindsight", "required": true},
     {"id": "memmachine", "name": "MemMachine", "required": true}
-  ]
+  ],
+  "policy": {
+    "strict_mode_failure_statuses": ["NOT_CONFIGURED", "FAIL"]
+  }
 }
