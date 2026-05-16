@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import traceback
 from pathlib import Path
 from typing import TextIO
 
@@ -83,6 +84,7 @@ def _handle_jsonrpc_message(runtime: SeamRuntime, message: object) -> dict[str, 
     except JsonRpcError as exc:
         return _error_response(request_id, exc.code, exc.message, exc.data)
     except Exception as exc:  # pragma: no cover - defensive protocol boundary
+        traceback.print_exc(file=sys.stderr)
         return _error_response(request_id, JSONRPC_INTERNAL_ERROR, "Internal error", str(exc))
 
 
@@ -126,6 +128,7 @@ def _call_tool(runtime: SeamRuntime, name: str, arguments: dict[str, object]) ->
     try:
         response = dispatch_tool(runtime, {"tool": name, "arguments": arguments})
     except Exception as exc:
+        traceback.print_exc(file=sys.stderr)
         return {
             "content": [{"type": "text", "text": str(exc)}],
             "isError": True,

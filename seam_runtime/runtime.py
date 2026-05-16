@@ -86,8 +86,16 @@ class SeamRuntime:
         if not report.valid:
             raise ValueError(json.dumps(report.to_dict(), indent=2))
         normalized = self.normalize_ir(ir_batch)
+        touched_ids = [record.id for record in normalized.records]
+        previous = self.store.load_ir(ids=touched_ids) if touched_ids else IRBatch([])
         persist_report = self.store.persist_ir(normalized)
-        self.vector_adapter.index_records(normalized.records)
+        try:
+            self.vector_adapter.index_records(normalized.records)
+        except Exception as exc:
+            self.store.delete_ir(touched_ids, include_vectors=False)
+            if previous.records:
+                self.store.persist_ir(previous)
+            raise RuntimeError("Vector indexing failed; rolled back SQLite record write") from exc
         return persist_report
 
     def search_ir(self, query: str, lens: str = "general", scope: str | None = None, budget: int = 5) -> SearchResult:
@@ -105,7 +113,19 @@ class SeamRuntime:
         batch = self.store.load_ir(ids=record_ids)
         payload = full_memory_records(batch.records)
         if include_timeline:
-            payload["context"] = neighbor_timeline(self.store.load_ir(), record_ids)
+            needed_ids = set(record_ids)
+            for record in batch.records:
+                needed_ids.update(record.prov)
+                needed_ids.update(record.evidence)
+                for key in ("src", "dst", "target", "raw_id", "subject"):
+                    value = record.attrs.get(key)
+                    if isinstance(value, str):
+                        needed_ids.add(value)
+                obj = record.attrs.get("object")
+                if isinstance(obj, str):
+                    needed_ids.add(obj)
+            timeline_batch = self.store.load_ir(ids=list(needed_ids))
+            payload["context"] = neighbor_timeline(timeline_batch, record_ids)
         return payload
 
     def pack_ir(self, record_ids: list[str] | None = None, lens: str = "general", budget: int = 512, profile: str = "default", mode: str = "context") -> Pack:

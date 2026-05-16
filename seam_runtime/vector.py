@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import hashlib
+import heapq
 from contextlib import closing
 from typing import Iterable
 
@@ -74,15 +75,29 @@ class SQLiteVectorIndex:
 
     def search(self, query: str, limit: int = 10) -> dict[str, float]:
         self.ensure_schema()
+        if limit <= 0:
+            return {}
         query_vector = self.model.embed(query)
-        scores: dict[str, float] = {}
+        top: list[tuple[float, str]] = []
         with closing(self._connect()) as connection:
-            rows = connection.execute("select record_id, vector_json from vector_index where model_name = ?", (self.model.name,)).fetchall()
-        for row in rows:
-            score = cosine(query_vector, json.loads(row["vector_json"]))
-            if score > 0:
-                scores[row["record_id"]] = score
-        ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:limit]
+            rows = connection.execute(
+                """
+                select record_id, vector_json
+                from vector_index
+                where model_name = ? and dimension = ?
+                """,
+                (self.model.name, len(query_vector)),
+            )
+            for row in rows:
+                score = cosine(query_vector, json.loads(row["vector_json"]))
+                if score <= 0:
+                    continue
+                item = (score, row["record_id"])
+                if len(top) < limit:
+                    heapq.heappush(top, item)
+                elif item > top[0]:
+                    heapq.heapreplace(top, item)
+        ordered = sorted(((record_id, score) for score, record_id in top), key=lambda item: item[1], reverse=True)
         return dict(ordered)
 
     def stale_records(self, records: Iterable[MIRLRecord]) -> list[dict[str, object]]:

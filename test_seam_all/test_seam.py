@@ -15,6 +15,8 @@ from experimental.retrieval_orchestrator.adapters import SQLiteIRAdapter
 from experimental.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime import benchmarks as benchmark_module
+from seam_runtime.mirl import IRBatch, MIRLRecord, RecordKind, Status
+from seam_runtime.reconcile import reconcile_ir
 from seam_runtime import installer as installer_module
 from seam_runtime.cli import run_cli
 from seam_runtime.dashboard import DEFAULT_CHAT_MODELS, SeamChatClient, TextualDashboardApp, run_dashboard
@@ -47,6 +49,7 @@ from seam_runtime.holographic import (
 from seam_runtime.models import (
     HashEmbeddingModel,
     OpenAICompatibleEmbeddingModel,
+    SentenceTransformerModel,
     cosine,
     default_embedding_model,
 )
@@ -130,6 +133,61 @@ claim c1:
         self.assertIn("prov:compile:1", node_ids)
         self.assertIn("span:1", node_ids)
 
+    def test_trace_loads_only_reachable_records(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl(
+            "We want a universal AI memory language for databases, RAG pipelines, and context windows. "
+            "It should translate back into natural language without losing meaning."
+        )
+        runtime.persist_ir(batch)
+        with patch.object(runtime.store, "load_ir", side_effect=AssertionError("trace must not load the full DB")):
+            trace = runtime.trace("clm:5")
+        node_ids = {node.id for node in trace.nodes}
+        self.assertIn("prov:compile:1", node_ids)
+        self.assertIn("span:1", node_ids)
+
+    def test_runtime_persist_rolls_back_record_write_when_vector_indexing_fails(self) -> None:
+        class FailingVectorAdapter:
+            name = "failing-vector"
+
+            def index_records(self, records):
+                raise RuntimeError("vector backend unavailable")
+
+            def search(self, query: str, limit: int = 10) -> dict[str, float]:
+                return {}
+
+        runtime = SeamRuntime(self.db_path, vector_adapter=FailingVectorAdapter())
+        batch = runtime.compile_nl("SEAM should not commit canonical records when required indexing fails.")
+        record_ids = [record.id for record in batch.records]
+        with self.assertRaisesRegex(RuntimeError, "Vector indexing failed"):
+            runtime.persist_ir(batch)
+        self.assertEqual(runtime.store.load_ir(ids=record_ids).records, [])
+
+    def test_runtime_persist_rollback_preserves_existing_records_and_vectors(self) -> None:
+        class FailingVectorAdapter:
+            name = "failing-vector"
+
+            def index_records(self, records):
+                raise RuntimeError("vector backend unavailable")
+
+            def search(self, query: str, limit: int = 10) -> dict[str, float]:
+                return {}
+
+        runtime = SeamRuntime(self.db_path)
+        original = runtime.compile_nl("SEAM keeps indexed records consistent when overwrites fail.")
+        runtime.persist_ir(original)
+        original_by_id = {record.id: record.to_dict() for record in original.records}
+        self.assertGreater(runtime.store.get_stats()["vector_entries"], 0)
+
+        replacement = runtime.compile_nl("Different content should not replace records if indexing fails.")
+        runtime.vector_adapter = FailingVectorAdapter()
+        with self.assertRaisesRegex(RuntimeError, "Vector indexing failed"):
+            runtime.persist_ir(replacement)
+
+        restored = runtime.store.load_ir(ids=[record.id for record in original.records])
+        self.assertEqual({record.id: record.to_dict() for record in restored.records}, original_by_id)
+        self.assertGreater(runtime.store.get_stats()["vector_entries"], 0)
+
     @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
     def test_rest_api_compile_search_context_stats_and_auth(self) -> None:
         from seam_runtime.server import create_app
@@ -200,6 +258,94 @@ claim c1:
         headers = {"Authorization": "Bearer another-test-token"}
         limited = client.get("/stats", headers=headers)
         self.assertEqual(limited.status_code, 401)
+
+    def test_rate_limiter_purges_inactive_keys_after_window(self) -> None:
+        from seam_runtime.server import RateLimiter
+
+        limiter = RateLimiter(limit_per_minute=1)
+        with patch("seam_runtime.server.time.monotonic", return_value=0.0):
+            self.assertTrue(limiter.check("client-a"))
+        with patch("seam_runtime.server.time.monotonic", return_value=61.0):
+            self.assertTrue(limiter.check("client-b"))
+        self.assertNotIn("client-a", limiter.hits)
+
+    @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
+    def test_rest_api_rejects_oversized_post_body_before_handler(self) -> None:
+        from seam_runtime.server import create_app
+
+        runtime = SeamRuntime(self.db_path)
+        with patch.dict(
+            os.environ,
+            {"SEAM_API_TOKEN": "test-token", "SEAM_API_MAX_BODY_BYTES": "16"},
+            clear=False,
+        ):
+            client = TestClient(create_app(runtime))
+        response = client.post(
+            "/compile",
+            content=b'{"text":"this body is too large"}',
+            headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        )
+        self.assertEqual(response.status_code, 413)
+
+    def test_remote_token_server_requires_explicit_insecure_override(self) -> None:
+        from seam_runtime.server import run_server
+
+        class FakeUvicorn:
+            def run(self, *args, **kwargs):
+                return None
+
+        with patch.dict(os.environ, {"SEAM_API_TOKEN": "test-token"}, clear=False):
+            with patch("seam_runtime.server._require_fastapi", return_value=None):
+                with patch("seam_runtime.server._require_uvicorn", return_value=FakeUvicorn()):
+                    with self.assertRaisesRegex(RuntimeError, "Refusing to bind authenticated API"):
+                        run_server(host="0.0.0.0", db=self.db_path)
+
+    def test_rate_limited_server_rejects_multiple_workers_without_shared_limiter(self) -> None:
+        from seam_runtime.server import run_server
+
+        class FakeUvicorn:
+            def run(self, *args, **kwargs):
+                return None
+
+        with patch.dict(os.environ, {"SEAM_API_RATE_LIMIT_PER_MINUTE": "1"}, clear=False):
+            with patch("seam_runtime.server._require_fastapi", return_value=None):
+                with patch("seam_runtime.server._require_uvicorn", return_value=FakeUvicorn()):
+                    with self.assertRaisesRegex(RuntimeError, "process-local"):
+                        run_server(host="127.0.0.1", db=self.db_path, workers=2)
+
+    def test_sqlite_vector_search_streams_rows_without_fetchall(self) -> None:
+        from seam_runtime.vector import SQLiteVectorIndex
+
+        class StaticModel:
+            name = "test-model"
+            dimension = 2
+
+            def embed(self, text: str) -> list[float]:
+                return [1.0, 0.0]
+
+        class StreamingRows:
+            def __iter__(self):
+                return iter(
+                    [
+                        {"record_id": "rec:1", "vector_json": "[1.0, 0.0]"},
+                        {"record_id": "rec:2", "vector_json": "[0.0, 1.0]"},
+                    ]
+                )
+
+            def fetchall(self):
+                raise AssertionError("search must stream vector rows")
+
+        class FakeConnection:
+            def execute(self, query, params=()):
+                return StreamingRows()
+
+            def close(self):
+                return None
+
+        index = SQLiteVectorIndex(str(self.db_path), StaticModel())
+        with patch.object(index, "ensure_schema", return_value=None):
+            with patch.object(index, "_connect", return_value=FakeConnection()):
+                self.assertEqual(index.search("query", limit=1), {"rec:1": 1.0})
 
     def test_vector_index_reindex_and_search(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -804,6 +950,117 @@ claim c1:
         self.assertEqual(model.timeout_s, 12.5)
         self.assertEqual(model.dimensions, 256)
 
+    def test_sentence_transformer_lock_prevents_double_load_h7(self) -> None:
+        import threading
+        import sys
+        from unittest.mock import MagicMock
+
+        fake_dims = 128
+        # Build a mock SentenceTransformer that records how many times it was called
+        fake_st_class = MagicMock()
+        fake_st_instance = MagicMock()
+        fake_st_instance.encode.return_value.tolist.return_value = [0.0] * (fake_dims - 1) + [1.0]
+        type(fake_st_instance).get_sentence_embedding_dimension = MagicMock(return_value=fake_dims)
+        fake_st_class.return_value = fake_st_instance
+
+        real_st = sys.modules.get("sentence_transformers")
+        sys.modules["sentence_transformers"] = MagicMock()
+        sys.modules["sentence_transformers"].SentenceTransformer = fake_st_class
+        try:
+            st_model = SentenceTransformerModel(model_name="test-model")
+            results: list[list[float]] = []
+            errors: list[Exception] = []
+            ready = threading.Barrier(4, timeout=5)
+
+            def worker() -> None:
+                try:
+                    ready.wait()
+                    results.append(st_model.embed("hello"))
+                except Exception as exc:
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=worker) for _ in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            self.assertEqual(len(errors), 0, f"unexpected errors: {errors}")
+            self.assertEqual(len(results), 4, "all 4 threads should return vectors")
+            # SentenceTransformer(...) must be called exactly once
+            self.assertEqual(fake_st_class.call_count, 1,
+                             f"SentenceTransformer called {fake_st_class.call_count} times, expected 1")
+            # All results are the same normalized vector
+            for vec in results:
+                self.assertEqual(len(vec), fake_dims)
+        finally:
+            del sys.modules["sentence_transformers"]
+            if real_st is not None:
+                sys.modules["sentence_transformers"] = real_st
+
+    def test_openai_embedding_retries_transient_errors_h8(self) -> None:
+        import urllib.error
+        from unittest.mock import MagicMock, patch
+
+        model = OpenAICompatibleEmbeddingModel(
+            model="test-model",
+            api_key_env="SEAM_TEST_KEY_H8",
+            base_url="https://test.example/v1/embeddings",
+            dimensions=128,
+        )
+        response_payload = {"data": [{"embedding": [0.0] * 127 + [1.0]}]}
+
+        def _build_success_response() -> MagicMock:
+            resp = MagicMock()
+            resp.read.return_value = json.dumps(response_payload).encode("utf-8")
+            resp.__enter__.return_value = resp
+            resp.__exit__.return_value = False
+            return resp
+
+        with patch.dict("os.environ", {"SEAM_TEST_KEY_H8": "fake-key"}):
+            # --- succeeds on third attempt after two URLErrors ---
+            with patch("urllib.request.urlopen") as mock_urlopen:
+                mock_urlopen.side_effect = [
+                    urllib.error.URLError("transient timeout"),
+                    urllib.error.URLError("connection reset"),
+                    _build_success_response(),
+                ]
+                result = model.embed("retry test")
+                self.assertEqual(len(result), 128)
+                self.assertEqual(mock_urlopen.call_count, 3,
+                                 f"expected 3 attempts (2 failures + 1 success), got {mock_urlopen.call_count}")
+
+            # --- does NOT retry on HTTP 400 client error ---
+            with patch("urllib.request.urlopen") as mock_urlopen:
+                mock_urlopen.side_effect = urllib.error.HTTPError(
+                    "https://test.example", 400, "Bad Request", {}, None,
+                )
+                with self.assertRaises(urllib.error.HTTPError):
+                    model.embed("bad request")
+                self.assertEqual(mock_urlopen.call_count, 1,
+                                 "HTTP 400 should not be retried")
+
+            # --- DOES retry HTTP 429 and 5xx ---
+            for status in (429, 502, 503):
+                with self.subTest(status=status):
+                    with patch("urllib.request.urlopen") as mock_urlopen:
+                        mock_urlopen.side_effect = [
+                            urllib.error.HTTPError("https://test.example", status, "Server Error", {}, None),
+                            _build_success_response(),
+                        ]
+                        result = model.embed("retryable http")
+                        self.assertEqual(len(result), 128)
+                        self.assertEqual(mock_urlopen.call_count, 2,
+                                         f"HTTP {status} should be retried once then succeed")
+
+            # --- exhausts all retries ---
+            with patch("urllib.request.urlopen") as mock_urlopen:
+                mock_urlopen.side_effect = urllib.error.URLError("persistent failure")
+                with self.assertRaises(urllib.error.URLError):
+                    model.embed("always fails")
+                self.assertEqual(mock_urlopen.call_count, 3,
+                                 "should exhaust all 3 attempts then raise")
+
     def test_retrieval_benchmark_uses_gold_fixtures(self) -> None:
         runtime = SeamRuntime(self.db_path)
         benchmark = runtime.run_retrieval_benchmark()
@@ -822,6 +1079,70 @@ claim c1:
         self.assertEqual(exact_score["reversibility"], 1.0)
         self.assertGreaterEqual(context_score["traceability"], 0.66)
         self.assertGreater(context_score["overall"], 0.0)
+
+    def test_reconcile_supersedes_when_winner_newer(self) -> None:
+        newer = MIRLRecord(
+            id="clm:a", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:01Z", conf=0.5,
+            attrs={"subject": "X", "predicate": "color", "object": "red"},
+        )
+        older = MIRLRecord(
+            id="clm:b", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:00Z", conf=0.9,
+            attrs={"subject": "X", "predicate": "color", "object": "blue"},
+        )
+        report = reconcile_ir(IRBatch(records=[newer, older]))
+        self.assertEqual(len(report.actions), 1)
+        self.assertEqual(report.actions[0]["type"], "supersedes")
+        self.assertEqual(report.actions[0]["winner"], "clm:a")
+        self.assertEqual(report.actions[0]["loser"], "clm:b")
+
+    def test_reconcile_contradicts_when_same_timestamp_different_objects(self) -> None:
+        claim_a = MIRLRecord(
+            id="clm:c", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:00Z", conf=0.9,
+            attrs={"subject": "X", "predicate": "color", "object": "red"},
+        )
+        claim_b = MIRLRecord(
+            id="clm:d", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:00Z", conf=0.5,
+            attrs={"subject": "X", "predicate": "color", "object": "blue"},
+        )
+        report = reconcile_ir(IRBatch(records=[claim_a, claim_b]))
+        self.assertEqual(len(report.actions), 1)
+        self.assertEqual(report.actions[0]["type"], "contradicts")
+        self.assertEqual(report.actions[0]["winner"], "clm:c")
+        self.assertEqual(report.actions[0]["loser"], "clm:d")
+
+    def test_reconcile_contradicts_same_timestamp_equal_confidence(self) -> None:
+        claim_a = MIRLRecord(
+            id="clm:e", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:00Z", conf=0.8,
+            attrs={"subject": "X", "predicate": "color", "object": "red"},
+        )
+        claim_b = MIRLRecord(
+            id="clm:f", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:00Z", conf=0.8,
+            attrs={"subject": "X", "predicate": "color", "object": "blue"},
+        )
+        report = reconcile_ir(IRBatch(records=[claim_a, claim_b]))
+        self.assertEqual(len(report.actions), 1)
+        self.assertEqual(report.actions[0]["type"], "contradicts")
+
+    def test_reconcile_duplicates_when_same_object(self) -> None:
+        claim_a = MIRLRecord(
+            id="clm:g", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:01Z", conf=0.9,
+            attrs={"subject": "X", "predicate": "color", "object": "red"},
+        )
+        claim_b = MIRLRecord(
+            id="clm:h", kind=RecordKind.CLM,
+            updated_at="2025-06-01T00:00:00Z", conf=0.5,
+            attrs={"subject": "X", "predicate": "color", "object": "red"},
+        )
+        report = reconcile_ir(IRBatch(records=[claim_a, claim_b]))
+        self.assertEqual(len(report.actions), 1)
+        self.assertEqual(report.actions[0]["type"], "duplicates")
 
     def test_retrieval_orchestrator_builds_mixed_plan(self) -> None:
         runtime = SeamRuntime(self.db_path)

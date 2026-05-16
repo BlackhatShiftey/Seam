@@ -163,6 +163,9 @@ and `HISTORY_INDEX.md`.
 - Rate limiting is configured by `SEAM_API_RATE_LIMIT_PER_MINUTE` or `SEAM_API_RATE_LIMIT`; `0` or unset disables the limiter.
 - Local browser dashboard origins `http://127.0.0.1:5173` and `http://localhost:5173` are allowed by default through CORS so the Vite WebUI can call the API during development. Override with `SEAM_API_CORS_ORIGINS` as a comma-separated list, or set it to `0`, `false`, `off`, or `none` to disable CORS.
 - API handlers must use existing `SeamRuntime` behavior and public report `to_dict()` methods rather than inventing parallel response fields.
+- POST/PUT/PATCH bodies are bounded by `SEAM_API_MAX_BODY_BYTES` (default `5000000`; `0` disables). Oversized requests return HTTP 413 before endpoint handlers run.
+- Authenticated REST servers refuse non-loopback binds such as `0.0.0.0` unless the operator intentionally sets `SEAM_API_ALLOW_INSECURE_REMOTE=1` or places the API behind a TLS terminator. Bearer-token deployments should prefer loopback plus TLS reverse proxy for remote access.
+- The built-in rate limiter is process-local. If `SEAM_API_RATE_LIMIT_PER_MINUTE` is enabled, `seam serve --workers` greater than 1 is refused unless `SEAM_API_ALLOW_PROCESS_LOCAL_RATE_LIMIT=1` is set after an external shared limiter is in front. `SEAM_API_RATE_LIMIT_MAX_KEYS` bounds tracked client keys.
 
 ## Benchmark Publication Policy
 

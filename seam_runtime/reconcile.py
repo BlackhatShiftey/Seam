@@ -26,17 +26,14 @@ def reconcile_ir(batch: IRBatch) -> ReconcileReport:
             added_records.append(MIRLRecord(id=f"rel:dup:{subject}:{predicate}", kind=RecordKind.REL, ns=group[0].ns, scope=group[0].scope, status=Status.INFERRED, conf=0.8, attrs={"src": ids[0], "predicate": "duplicates", "dst": ids[-1]}))
             continue
 
-        ordered = sorted(group, key=lambda item: (item.updated_at, item.conf), reverse=True)
+        ordered = sorted(group, key=lambda item: (item.updated_at, item.conf, item.id), reverse=True)
         winner = ordered[0]
         for loser in ordered[1:]:
             # supersedes: winner is strictly newer than loser.
-            # contradicts: same timestamp but loser had higher confidence in its
-            # object — newer-but-less-confident timestamp wins the sort, but the
-            # claims are simultaneous, so flag the conflict rather than implying
-            # a sequence.
+            # contradicts: same timestamp — the claims are simultaneous and
+            # disagree about the object, so flag the conflict rather than
+            # implying a temporal sequence.
             if winner.updated_at > loser.updated_at:
-                relation = "supersedes"
-            elif winner.conf >= loser.conf:
                 relation = "supersedes"
             else:
                 relation = "contradicts"

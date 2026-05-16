@@ -361,15 +361,21 @@ class SQLiteStore:
             )
 
     def _persist_edges(self, connection: sqlite3.Connection, record: MIRLRecord) -> None:
+        # Remove existing edges for this record so that re-persists with
+        # changed edge sets do not leave stale edges behind (H2 integrity fix).
+        connection.execute("delete from ir_edges where src_id = ?", (record.id,))
         attrs = record.attrs
         edges: list[tuple[str, str, str]] = []
         if record.kind == RecordKind.REL:
-            edges.append((str(attrs.get("src")), str(attrs.get("predicate")), str(attrs.get("dst"))))
+            src = attrs.get("src")
+            dst = attrs.get("dst")
+            if src is not None and dst is not None:
+                edges.append((str(src), str(attrs.get("predicate")), str(dst)))
         elif record.kind == RecordKind.CLM:
-            subject = str(attrs.get("subject"))
+            subject = attrs.get("subject")
             obj = attrs.get("object")
-            if isinstance(obj, str) and ":" in obj:
-                edges.append((subject, str(attrs.get("predicate")), obj))
+            if subject is not None and isinstance(obj, str) and ":" in obj:
+                edges.append((str(subject), str(attrs.get("predicate")), obj))
         for prov in record.prov:
             edges.append((record.id, "prov", prov))
         for evidence in record.evidence:
@@ -393,6 +399,23 @@ class SQLiteStore:
             rows = connection.execute(query, params).fetchall()
         return IRBatch([MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows])
 
+    def delete_ir(self, ids: list[str], include_vectors: bool = True) -> None:
+        if not ids:
+            return
+        placeholders = ",".join("?" for _ in ids)
+        with closing(self._connect()) as connection:
+            connection.execute(f"delete from raw_docs where id in ({placeholders})", ids)
+            connection.execute(f"delete from raw_spans where id in ({placeholders})", ids)
+            connection.execute(f"delete from symbol_table where id in ({placeholders})", ids)
+            connection.execute(f"delete from pack_store where id in ({placeholders})", ids)
+            connection.execute(f"delete from prov_log where id in ({placeholders})", ids)
+            connection.execute(f"delete from ir_edges where src_id in ({placeholders}) or dst_id in ({placeholders})", ids + ids)
+            connection.execute(f"delete from projection_index where record_id in ({placeholders})", ids)
+            if include_vectors:
+                connection.execute(f"delete from vector_index where record_id in ({placeholders})", ids)
+            connection.execute(f"delete from ir_records where id in ({placeholders})", ids)
+            connection.commit()
+
     def read_pack(self, pack_id: str) -> Pack:
         batch = self.load_ir(ids=[pack_id])
         if not batch.records:
@@ -403,30 +426,35 @@ class SQLiteStore:
         return Pack.from_record(record)
 
     def trace(self, root_id: str) -> TraceGraph:
-        batch = self.load_ir()
-        records = batch.by_id()
-        if root_id not in records:
-            raise KeyError(root_id)
-        seen = {root_id}
-        queue = [root_id]
-        edges: list[dict[str, str]] = []
-        while queue:
-            current = queue.pop(0)
-            record = records[current]
-            refs = list(record.prov) + list(record.evidence)
-            for key in ("src", "dst", "target", "raw_id", "subject"):
-                value = record.attrs.get(key)
-                if isinstance(value, str) and value in records:
-                    refs.append(value)
-            obj = record.attrs.get("object")
-            if isinstance(obj, str) and obj in records:
-                refs.append(obj)
-            for dst in refs:
-                edges.append({"src": current, "type": "trace", "dst": dst})
-                if dst in records and dst not in seen:
-                    seen.add(dst)
-                    queue.append(dst)
-        return TraceGraph(root_id=root_id, nodes=[records[node_id] for node_id in seen], edges=edges)
+        with closing(self._connect()) as connection:
+            root = _load_record_by_id(connection, root_id)
+            if root is None:
+                raise KeyError(root_id)
+            records = {root_id: root}
+            seen = {root_id}
+            order = [root_id]
+            queue = [root_id]
+            edges: list[dict[str, str]] = []
+            while queue:
+                current = queue.pop(0)
+                record = records[current]
+                refs = _trace_refs(record)
+                edge_rows = connection.execute(
+                    "select dst_id from ir_edges where src_id = ? order by id",
+                    (current,),
+                ).fetchall()
+                refs.extend(row["dst_id"] for row in edge_rows)
+                for dst in dict.fromkeys(refs):
+                    target = _load_record_by_id(connection, dst)
+                    if target is None and dst not in record.prov and dst not in record.evidence:
+                        continue
+                    edges.append({"src": current, "type": "trace", "dst": dst})
+                    if target is not None and dst not in seen:
+                        records[dst] = target
+                        seen.add(dst)
+                        order.append(dst)
+                        queue.append(dst)
+        return TraceGraph(root_id=root_id, nodes=[records[node_id] for node_id in order], edges=edges)
 
     def write_machine_artifact(
         self,
@@ -774,6 +802,25 @@ def _document_status_row(row: sqlite3.Row) -> dict[str, object]:
     }
 
 
+def _load_record_by_id(connection: sqlite3.Connection, record_id: str) -> MIRLRecord | None:
+    row = connection.execute("select payload_json from ir_records where id = ?", (record_id,)).fetchone()
+    if row is None:
+        return None
+    return MIRLRecord.from_dict(json.loads(row["payload_json"]))
+
+
+def _trace_refs(record: MIRLRecord) -> list[str]:
+    refs = list(record.prov) + list(record.evidence)
+    for key in ("src", "dst", "target", "raw_id", "subject"):
+        value = record.attrs.get(key)
+        if isinstance(value, str):
+            refs.append(value)
+    obj = record.attrs.get("object")
+    if isinstance(obj, str):
+        refs.append(obj)
+    return refs
+
+
 def _surface_artifact_row(row: sqlite3.Row) -> dict[str, object]:
     return {
         "surface_id": row["surface_id"],
@@ -804,4 +851,3 @@ def _file_sha256(path: str) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-

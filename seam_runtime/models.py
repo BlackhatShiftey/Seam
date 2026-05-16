@@ -4,8 +4,11 @@ import hashlib
 import json
 import math
 import os
+import threading
+import time
+import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 
@@ -48,13 +51,18 @@ class SentenceTransformerModel:
     name: str = ""
     dimension: int = 384
     _model: Any = None
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not self.name:
             self.name = f"st:{self.model_name}"
 
     def _load(self):
-        if self._model is None:
+        if self._model is not None:
+            return self._model
+        with self._lock:
+            if self._model is not None:
+                return self._model
             try:
                 from sentence_transformers import SentenceTransformer
             except ImportError as exc:
@@ -100,8 +108,28 @@ class OpenAICompatibleEmbeddingModel:
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        max_retries = 3
+        base_delay = 1.0
+        last_exc: BaseException | None = None
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as exc:
+                last_exc = exc
+                if exc.code not in (429, 500, 502, 503, 504) or attempt == max_retries - 1:
+                    raise
+            except urllib.error.URLError as exc:
+                last_exc = exc
+                if attempt == max_retries - 1:
+                    raise
+            if attempt < max_retries - 1:
+                time.sleep(base_delay * (2 ** attempt))
+        else:
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("Embedding request failed after retries")
         vector = [float(value) for value in payload["data"][0]["embedding"]]
         if len(vector) != self.dimension:
             raise RuntimeError(

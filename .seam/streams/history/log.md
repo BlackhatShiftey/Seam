@@ -3747,3 +3747,59 @@ PR-side HISTORY.md/HISTORY_INDEX.md changes from the original PR (entry #164) we
 
 Verification: verify_integrity OK, verify_routing OK, verify_continuity OK with the recorded-fact audit (skip flag only for the snapshot-precedence interim state during multi-PR rebase work; gate passes once the merge commit lands on main), verify_streams OK. Branch is based on origin/main at b059cdb (PR #18 merge commit).
 ---END-ENTRY-#180---
+
+---BEGIN-ENTRY-#181---
+id: 181
+date: 2026-05-16T06:16:00Z
+agent: codex-gpt-5
+status: done
+topics: persist, retrieval, search, vector, security, verify, history, status, ledger
+commits: none
+refs: seam_runtime/storage.py,seam_runtime/vector.py,seam_runtime/server.py,seam_runtime/runtime.py,test_seam_all/test_seam.py,PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 180
+tokens: 447
+---
+Runtime/API scale hardening for the operator-reported C1-C6 observations.
+
+Confirmed and fixed C1: SQLiteStore.trace no longer calls load_ir() for the full database. It now loads the root record by id, walks only reachable references through record provenance/evidence/attrs plus indexed ir_edges, and returns a stable ordered TraceGraph for the reachable subgraph.
+
+Confirmed and partially fixed C2 for the SQLite fallback vector index: SQLiteVectorIndex.search no longer fetches all vector rows into Python memory. It streams rows from SQLite, filters by model and dimension, keeps only a bounded heap of top-k cosine scores, and returns the requested limit. This makes the fallback memory-bounded; true large-scale ANN search remains the PgVector adapter path.
+
+Confirmed and fixed C3/C4/C5 for the REST server safety envelope. RateLimiter now purges inactive keys and bounds tracked keys through SEAM_API_RATE_LIMIT_MAX_KEYS. If SEAM_API_RATE_LIMIT_PER_MINUTE is enabled, run_server refuses workers > 1 unless SEAM_API_ALLOW_PROCESS_LOCAL_RATE_LIMIT=1 is set because the built-in limiter is process-local. A BodySizeLimitMiddleware enforces SEAM_API_MAX_BODY_BYTES on POST/PUT/PATCH requests (default 5000000, 0 disables) and returns 413 for oversized bodies before endpoint handlers run. Authenticated non-loopback binds such as 0.0.0.0 are refused unless SEAM_API_ALLOW_INSECURE_REMOTE=1 is set intentionally or the operator uses loopback plus a TLS reverse proxy.
+
+Confirmed and fixed C6 behavior: SeamRuntime.persist_ir now snapshots any pre-existing touched records, writes the normalized batch, and if vector_adapter.index_records fails it deletes the touched writes, restores previous records, and raises RuntimeError("Vector indexing failed; rolled back SQLite record write") instead of reporting a successful persist with missing derived index entries.
+
+Added regression coverage in test_seam_all/test_seam.py for bounded trace traversal without load_ir(), vector-index rollback on indexing failure, rollback preservation of existing records and vector entries on failed overwrites, rate-limiter stale-key cleanup, request body 413 rejection, authenticated remote bind refusal, multi-worker rate-limit refusal, and streaming SQLite vector search without fetchall(). PROJECT_STATUS.md and REPO_LEDGER.md now record the new stable REST API safety behavior.
+
+Verification: the focused red/green slice `.venv/bin/python -m pytest test_seam_all/test_seam.py -k "trace_loads_only_reachable_records or persist_rolls_back_record_write or rate_limiter_purges or oversized_post_body or remote_token_server or rate_limited_server or sqlite_vector_search_streams"` first failed with the selected regression tests failing on the pre-fix code, then passed after the changes. The overwrite rollback edge case `.venv/bin/python -m pytest test_seam_all/test_seam.py -k "persist_rolls_back_record_write or rollback_preserves_existing_records_and_vectors"` failed before the rollback-vector preservation adjustment and passed after it. Full runtime regression verification `.venv/bin/python -m pytest test_seam_all/test_seam.py` passed with 162 passed in 34.76s.
+---END-ENTRY-#181---
+
+---BEGIN-ENTRY-#182---
+id: 182
+date: 2026-05-16T06:38:45Z
+agent: claude-opus-4-7
+status: done
+topics: harden, models, mcp, reconcile, memory, storage, vector, atomicity, retry, locking, tests, audit
+commits: none
+refs: seam_runtime/models.py,seam_runtime/mcp.py,seam_runtime/mcp_protocol.py,seam_runtime/reconcile.py,seam_runtime/runtime.py,seam_runtime/storage.py,seam_runtime/vector.py,seam_runtime/server.py,test_seam_all/test_seam.py
+supersedes: 181
+tokens: 409
+---
+H-track hardening sweep across 9 parallel audit agents.
+
+H7/H8 (models.py): Added threading.Lock with double-checked locking to SentenceTransformerModel._load() to prevent double-load race under concurrent embed() calls. Added retry/backoff loop (3 attempts, exponential 1s/2s) to OpenAICompatibleEmbeddingModel.embed() for transient URLError and HTTP 429/500/502/503/504. Tests: test_sentence_transformer_lock_prevents_double_load_h7 (4-thread barrier, asserts exactly 1 SentenceTransformer constructor call) and test_openai_embedding_retries_transient_errors_h8 (4 sub-scenarios: URLError recovery, HTTP 400 no-retry, 429/502/503 retry, exhausted retries propagate).
+
+H4 (mcp.py, mcp_protocol.py): Added traceback.print_exc(file=sys.stderr) at three catch-all boundaries (run_stdio_bridge, _handle_jsonrpc_message, _call_tool). Agent-facing errors continue to return only str(exc) with no traceback disclosure. Operator diagnostics now visible on stderr.
+
+H6 (reconcile.py): Fixed non-deterministic tie-breaking. Sort key expanded from (updated_at, conf) to (updated_at, conf, id) for deterministic ordering. Removed dead elif winner.conf >= loser.conf branch — simultaneous claims (same timestamp) with different objects are now correctly classified as contradicts rather than false supersedes. Added 4 reconcile tests covering supersedes, contradicts (different confidence same timestamp), contradicts (equal confidence), and duplicates.
+
+H10 (runtime.py): memory_get(include_timeline=True) replaced unbounded self.store.load_ir() with bounded two-hop neighbor lookup collecting IDs from prov, evidence, and attr references, then calling load_ir(ids=list(needed_ids)). Eliminates full-DB-load DoS vector.
+
+H2 (storage.py): _persist_edges now DELETEs existing edges before INSERT to prevent stale edges on record re-persist. Added None guards for src/dst/subject attrs. delete_ir now cleans projection_index (was orphaned). trace() refactored from full-DB load_ir() to iterative _load_record_by_id() walking ir_edges.
+
+H1/H3/H5: Audited and confirmed false-positives — edge cases already handled, experimental imports safe at module level, variable names semantically correct.
+
+Audit findings (read-only, not fixed): H11 coverage gaps (retrieval.py, agent_memory.py, surface_adapters.py, evals.py, reconcile.py now partially covered). H12/H13 CI gaps (no Linux runner, no lint/type/coverage tooling). H14/H15/H16 history/streams atomicity (no fsync/rename, no flock, no streaming parse). H17 experimental dead-code (hybrid_orchestrator dead, webui dead).
+
+Verification: 6 parallel test agents audited all 225 tests across the full suite — 0 failures. Domain splits: models/vector (23 passed), mcp/protocol (10 passed), runtime/memory/storage (23 passed), reconcile/pack (10 passed), history/streams (50 passed), remaining suite (109 passed).
+---END-ENTRY-#182---

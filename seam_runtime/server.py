@@ -32,6 +32,7 @@ def _require_uvicorn() -> Any:
 @dataclass
 class RateLimiter:
     limit_per_minute: int = 0
+    max_keys: int = 10000
     hits: dict[str, list[float]] = field(default_factory=dict)
 
     def check(self, key: str) -> bool:
@@ -39,6 +40,10 @@ class RateLimiter:
             return True
         now = time.monotonic()
         window_start = now - 60.0
+        self._purge(window_start)
+        if key not in self.hits and len(self.hits) >= self.max_keys:
+            oldest_key = min(self.hits, key=lambda item: self.hits[item][-1] if self.hits[item] else 0.0)
+            self.hits.pop(oldest_key, None)
         recent = [stamp for stamp in self.hits.get(key, []) if stamp >= window_start]
         if len(recent) >= self.limit_per_minute:
             self.hits[key] = recent
@@ -47,6 +52,11 @@ class RateLimiter:
         self.hits[key] = recent
         return True
 
+    def _purge(self, window_start: float) -> None:
+        stale = [key for key, stamps in self.hits.items() if not any(stamp >= window_start for stamp in stamps)]
+        for key in stale:
+            self.hits.pop(key, None)
+
 
 def _rate_limit_from_env() -> int:
     raw = os.environ.get("SEAM_API_RATE_LIMIT_PER_MINUTE") or os.environ.get("SEAM_API_RATE_LIMIT") or "0"
@@ -54,6 +64,22 @@ def _rate_limit_from_env() -> int:
         return max(0, int(raw))
     except ValueError:
         return 0
+
+
+def _rate_limit_max_keys_from_env() -> int:
+    raw = os.environ.get("SEAM_API_RATE_LIMIT_MAX_KEYS") or "10000"
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 10000
+
+
+def _max_body_bytes_from_env() -> int:
+    raw = os.environ.get("SEAM_API_MAX_BODY_BYTES") or "5000000"
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 5000000
 
 
 def _cors_origins_from_env() -> list[str]:
@@ -72,6 +98,55 @@ def _client_key(request: Any, authorization: str | None = None) -> str:
     return getattr(client, "host", "local") or "local"
 
 
+class _RequestBodyTooLarge(Exception):
+    pass
+
+
+class BodySizeLimitMiddleware:
+    def __init__(self, app: Any, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if self.max_body_bytes <= 0 or scope.get("type") != "http" or scope.get("method") not in {"POST", "PUT", "PATCH"}:
+            await self.app(scope, receive, send)
+            return
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        content_length = headers.get(b"content-length")
+        if content_length is not None:
+            try:
+                if int(content_length.decode("ascii")) > self.max_body_bytes:
+                    await _send_body_too_large(scope, send, self.max_body_bytes)
+                    return
+            except ValueError:
+                pass
+        received = 0
+
+        async def limited_receive() -> dict[str, Any]:
+            nonlocal received
+            message = await receive()
+            if message.get("type") == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_body_bytes:
+                    raise _RequestBodyTooLarge
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except _RequestBodyTooLarge:
+            await _send_body_too_large(scope, send, self.max_body_bytes)
+
+
+async def _send_body_too_large(scope: dict[str, Any], send: Any, max_body_bytes: int) -> None:
+    from starlette.responses import JSONResponse
+
+    async def empty_receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    response = JSONResponse({"detail": f"Request body exceeds {max_body_bytes} bytes"}, status_code=413)
+    await response(scope, empty_receive, send)
+
+
 def create_app(runtime: SeamRuntime | None = None) -> Any:
     Depends, FastAPI, Header, HTTPException, Request = _require_fastapi()
     # Required: `from __future__ import annotations` defers annotation evaluation,
@@ -80,10 +155,11 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
     # the class is the same across create_app() calls.
     globals()["Request"] = Request
     runtime = runtime or SeamRuntime(default_runtime_db_path())
-    limiter = RateLimiter(_rate_limit_from_env())
+    limiter = RateLimiter(_rate_limit_from_env(), max_keys=_rate_limit_max_keys_from_env())
     token = os.environ.get("SEAM_API_TOKEN")
 
     app = FastAPI(title="SEAM Runtime API", version="0.1")
+    app.add_middleware(BodySizeLimitMiddleware, max_body_bytes=_max_body_bytes_from_env())
     cors_origins = _cors_origins_from_env()
     if cors_origins:
         from fastapi.middleware.cors import CORSMiddleware
@@ -207,6 +283,7 @@ def run_server(
 ) -> None:
     _require_fastapi()
     uvicorn = _require_uvicorn()
+    _validate_server_safety(host=host, workers=workers)
     os.environ["SEAM_SERVER_DB"] = str(db or default_runtime_db_path())
     uvicorn.run(
         "seam_runtime.server:create_app_from_env",
@@ -216,6 +293,28 @@ def run_server(
         workers=workers,
         factory=True,
     )
+
+
+def _validate_server_safety(host: str, workers: int) -> None:
+    if _rate_limit_from_env() > 0 and workers > 1 and not _env_truthy("SEAM_API_ALLOW_PROCESS_LOCAL_RATE_LIMIT"):
+        raise RuntimeError(
+            "SEAM API rate limiting is process-local; use one worker or set "
+            "SEAM_API_ALLOW_PROCESS_LOCAL_RATE_LIMIT=1 after placing a shared limiter in front."
+        )
+    if os.environ.get("SEAM_API_TOKEN") and _is_remote_bind(host) and not _env_truthy("SEAM_API_ALLOW_INSECURE_REMOTE"):
+        raise RuntimeError(
+            "Refusing to bind authenticated API to a non-loopback host without TLS. "
+            "Use a TLS reverse proxy, bind to 127.0.0.1, or set SEAM_API_ALLOW_INSECURE_REMOTE=1 intentionally."
+        )
+
+
+def _is_remote_bind(host: str) -> bool:
+    normalized = host.strip().lower().strip("[]")
+    return normalized not in {"127.0.0.1", "::1", "localhost"}
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def create_app_from_env() -> Any:

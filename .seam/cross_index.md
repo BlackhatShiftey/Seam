@@ -2,18 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 211
+total_events: 216
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-17T00:02:00Z | history:012:42f88b38 | session-event | done | compile, persist, verify, search, vector, pgvector | REPO_LEDGER.md#milestone-log |
-| 2026-04-17T00:03:00Z | history:013:31d18f0e | session-event | done | vector, pgvector, doctor | REPO_LEDGER.md#milestone-log |
-| 2026-04-17T00:04:00Z | history:014:64235421 | session-event | done | persist, vector, pgvector, installer, linux, doctor | REPO_LEDGER.md#milestone-log |
-| 2026-04-17T00:05:00Z | history:015:56a3f517 | session-event | done | persist, vector, pgvector, bundle, dashboard, installer | REPO_LEDGER.md#milestone-log |
-| 2026-04-17T00:06:00Z | history:016:9e7ef826 | session-event | done | compile, mirl, persist, verify, search, vector | PLAN_LOG.md |
 | 2026-04-17T00:07:00Z | history:017:f6989d91 | session-event | done | persist, retrieval, rank, vector, chroma, plan | PLAN_LOG.md |
 | 2026-04-17T00:08:00Z | history:018:e570611b | session-event | done | verify, search, compress, lx1, codec, command | PLAN_LOG.md |
 | 2026-04-17T00:09:00Z | history:019:655d3a5a | session-event | done | vector, pgvector, doctor, status, session | PLAN_LOG.md |
@@ -209,10 +204,15 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-16T00:22:59Z | history:175:a27d3a0a | session-event | done | verify, history, audit, protocol, status | PROJECT_STATUS.md,tools/history/test_count_audit.py,tools/history/test_histor... |
 | 2026-05-16T00:29:22Z | history:176:96af49b3 | session-event | done | protocol, history, plan, verify, status, ledger, roadmap,... | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md |
 | 2026-05-16T04:58:56Z | history:177:65153fde | session-event | done | audit, security, verify, history, protocol, status, class... | docker-compose.yaml,.github/workflows/ci.yml,.gitignore,.rgignore,pyproject.t... |
+| 2026-05-16T05:46:29Z | history:178:5d5cbd56 | session-event | done | benchmark, roadmap, registry, memory, protocol, verify, h... | benchmarks/registry/memory_benchmarks.json,seam_runtime/external_memory_bench... |
+| 2026-05-16T05:58:30Z | history:179:e7611cad | session-event | done | docs, pgvector, benchmark, operator, salvage, protocol, v... | docs/PGVECTOR_LOCAL.md,docs/BENCHMARK_SOP.md,docs/SEAM_OPERATOR_GUIDE.md,docs... |
+| 2026-05-16T06:01:05Z | history:180:2fe45947 | session-event | done | roadmap, plan, protocol, history, concepts | ROADMAP.md,docs/roadmap/MEMORY_BENCHMARKS.md,docs/roadmap/PROMPT_CODEC.md,doc... |
+| 2026-05-16T06:16:00Z | history:181:3081e253 | session-event | done | persist, retrieval, search, vector, security, verify, his... | seam_runtime/storage.py,seam_runtime/vector.py,seam_runtime/server.py,seam_ru... |
+| 2026-05-16T06:38:45Z | history:182:8affbd0f | session-event | done | harden, models, mcp, reconcile, memory, storage, vector, ... | seam_runtime/models.py,seam_runtime/mcp.py,seam_runtime/mcp_protocol.py,seam_... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0011.cross.md | 2026-04-15T00:00:00Z..2026-04-17T00:01:00Z | 11 | (multi) | (multi) |
+| 0001-0016.cross.md | 2026-04-15T00:00:00Z..2026-04-17T00:06:00Z | 16 | (multi) | (multi) |
