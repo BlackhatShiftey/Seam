@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 179
-total_tokens: ~35315
-latest_id: 179
+total_entries: 180
+total_tokens: ~35734
+latest_id: 180
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 180 | 2026-05-16 | done | 2fe459472bec912b | roadmap,plan,protocol,history,+ | 179 |
 | 179 | 2026-05-16 | done | e7611cad3f20cafd | docs,pgvector,benchmark,operator,+ | 178 |
 | 178 | 2026-05-16 | done | 5d5cbd562db9ae66 | benchmark,roadmap,registry,memory,+ | 177 |
 | 177 | 2026-05-16 | done | 65153fde2e73fafe | audit,security,verify,history,+ | 176 |
@@ -205,6 +206,7 @@ compact: true
 - command: count=55 latest=#149, #148, #147, #146, #145
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
+- concepts: count=1 latest=#180
 - dashboard: count=60 latest=#163, #162, #161, #160, #159
 - diff: count=4 latest=#153, #093, #092, #037
 - docker: count=3 latest=#149, #085, #084
@@ -215,7 +217,7 @@ compact: true
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
 - handoff: count=5 latest=#176, #136, #135, #075, #025
-- history: count=132 latest=#179, #178, #177, #176, #175
+- history: count=133 latest=#180, #179, #178, #177, #176
 - holdout: count=4 latest=#152, #093, #092, #036
 - installer: count=12 latest=#177, #173, #169, #100, #099
 - integrity: count=5 latest=#133, #103, #102, #101, #048
@@ -231,14 +233,14 @@ compact: true
 - operator: count=1 latest=#179
 - persist: count=18 latest=#047, #044, #042, #036, #032
 - pgvector: count=19 latest=#179, #149, #121, #119, #084
-- plan: count=11 latest=#176, #171, #170, #169, #168
-- protocol: count=43 latest=#179, #178, #177, #176, #175
+- plan: count=12 latest=#180, #176, #171, #170, #169
+- protocol: count=44 latest=#180, #179, #178, #177, #176
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
 - registry: count=1 latest=#178
 - retrieval: count=11 latest=#099, #047, #038, #023, #017
-- roadmap: count=43 latest=#178, #176, #171, #170, #165
+- roadmap: count=44 latest=#180, #178, #176, #171, #170
 - roundtrip: count=2 latest=#007, #006
 - salvage: count=1 latest=#179
 - sbert: count=3 latest=#023, #022, #011
@@ -258,5 +260,5 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 159
+- done: 160
 - planned: 20

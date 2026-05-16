@@ -1160,6 +1160,66 @@ to a pip-installable `seam_protocol/` package for templating into other repos.
 **Gate:** Re-ingestion of unchanged content is a no-op (hash skip). Library
 namespaces (`ns=library.*`) stay separate from canonical `local.default`.
 Template scaffolds cleanly into a fresh repo with `seam-protocol init`.
+## Track L — Agent / Skills Compiler
+
+**Status:** Planned major workstream. Foundation specs already on `main`.
+**Canonical specs:** `docs/roadmap/AGENT_COMPILER.md`, `docs/roadmap/SKILL_FACTORY.md`.
+**Execution plan:** `docs/roadmap/SKILLS_COMPILER.md`.
+
+Compile structured SEAM skill specs into target-specific agent instruction artifacts (Claude, Cursor, Codex, Gemini, Aider, generic). Audit installed copies for drift. Eventually wrap each artifact as a SEAM-HS/1 holographic surface with embedded provenance. The adaptive identification / observation / proposal / promotion loop sits on top of the compiler and is specified in `SKILL_FACTORY.md`.
+
+Phase work (see `SKILLS_COMPILER.md`):
+
+1. SkillIR + first canonical source spec (`session-end`)
+2. First renderer (Claude profile) + provenance header
+3. `seam skills compile` CLI
+4. Second renderer (Cursor profile)
+5. `seam skills audit` (read-only)
+6. `seam skills apply` (gated)
+7. HS/1 attestation wrap + `seam skills verify`
+8+. H4 optimizer, H3 benchmark suite, Track K integration (deferred)
+
+---
+
+## Track I — External Memory Benchmarks (Comparator Gate)
+
+**Status:** Planned major workstream. Concept-only on main; implementation lives on `bench/add-memory-benchmark-registry`.
+**Canonical spec:** `docs/roadmap/MEMORY_BENCHMARKS.md`.
+
+Make external memory benchmarks (LoCoMo, ConvoMem, MemBench, LongMemEval, BEAM, PerLTQA, EverMemBench, Memora, Mem2ActBench) a release gate for SEAM memory claims, with required comparator coverage (Mem0, Zep/Graphiti, Letta/MemGPT, MemPalace, Hindsight, MemMachine).
+
+**60-second install-and-run gate:** a new user can `pip install seam[bench]` and `seam bench external --quickstart locomo` on a clean Linux/WSL machine and get a JSON report with score, comparator deltas, and an integrity hash, end to end, in under 60 seconds.
+
+Phase work:
+
+1. Registry + validation + runner plan + command harness + tests + CI artifact upload
+2. `seam bench external` CLI alias + `--quickstart` LoCoMo path
+3. Adapters under `benchmarks/external/<benchmark>/`
+4. Comparator runners
+5. Promote `--strict` into release CI
+6. Prompt codec benchmark layer (see Track J)
+
+---
+
+## Track J — Prompt Codec Optimization
+
+**Status:** Planned roadmap track.
+**Canonical spec:** `docs/roadmap/PROMPT_CODEC.md`.
+
+Evaluate TOON, compact JSON, SEAM-RC/1, SEAM-LX/1, and markdown-table encodings as *derived* prompt transports. Canonical storage (MIRL, JSON, SQLite) does not change. Codec selection is restricted to prompt-bound payloads (PACK, retrieval results, benchmark case matrices, comparator scorecards, etc.). Auto-selection only promotes a codec that beats compact JSON on measured token count under the active tokenizer and round-trips losslessly.
+
+---
+
+## Track K — Trust, Security, Lineage, and Auditability
+
+**Status:** Planned major workstream.
+**Canonical spec:** `docs/roadmap/TRUST_SECURITY_AUDITABILITY.md`.
+
+Trust evidence on demand from the runtime, CLI, contracts, audit ledger, validation reports, provenance, and benchmark bundles. The dashboard becomes the visualization layer for that evidence, not the source of it.
+
+Items: threat model (K0), capability and permission model (K1), tamper-evident audit ledger (K2), secrets scanning and redaction (K3), optional encrypted SQLite store (K4), versioned contracts (K5), unified `seam trust report` (K6), operation validation reports (K7), OpenLineage export (K8), OpenTelemetry correlation (K9), supply-chain proof / SBOM / release attestation (K10), security test suite (K11), incident response and vulnerability disclosure (K12), verified benchmark bundles with **Benchmark Integrity Levels BIL-0 through BIL-6** (K13).
+
+Track I (external memory benchmarks) and Track L (Skills Compiler) consume Track K primitives in their later phases.
 
 ---
 
@@ -1197,6 +1257,12 @@ Next - dashboard and agent ergonomics
 - D1: SEAM as Claude/Gemini/Codex tool set
 - A5: Chat tab in dashboard
 
+Next plug-and-play target - external memory benchmark credibility
+- I1: External memory benchmark registry + runner (landed via PR #22)
+- I2: `seam bench external --quickstart locomo` — 60-second install-and-run gate
+- I3: First three required adapters (LoCoMo, ConvoMem, MemBench)
+- I4: First three required comparators (Mem0, Zep/Graphiti, Letta/MemGPT)
+
 Later - benchmark credibility, scale, and adaptive context loop
 - H2: Improvement streams (deferred ~4 weeks of H1 operational data; see CONTEXT_STREAMS.md §12)
 - H3: Retrieval integration with stream filters (after H1 substrate stable)
@@ -1209,6 +1275,11 @@ Later - benchmark credibility, scale, and adaptive context loop
 - A4: Vector visualization
 - E1: PgVector migration helper
 - E2: Multi-tenant namespacing
+
+Major workstreams scheduled after the plug-and-play target lands
+- Track H: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
+- Track J: Prompt codec optimization (TOON / SEAM-RC / SEAM-LX evaluation)
+- Track K: Trust, security, lineage, auditability (capabilities, audit ledger, BIL benchmark bundles)
 ```
 
 Snapshot archival policy: do not delete or compress `.seam/snapshots/` ad hoc.

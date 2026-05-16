@@ -3723,3 +3723,27 @@ Rebase resolution: the PR was conflicting on HISTORY.md and HISTORY_INDEX.md bec
 
 Verification: verify_integrity OK, verify_routing OK, verify_continuity OK (recorded-fact audit enabled), verify_streams OK against the rebased branch before commit. Branch is now based on origin/main at 458eca8 (PR #22 merge commit).
 ---END-ENTRY-#179---
+
+---BEGIN-ENTRY-#180---
+id: 180
+date: 2026-05-16T06:01:05Z
+agent: claude-opus-4-7
+status: done
+topics: roadmap, plan, protocol, history, concepts
+commits: none
+refs: ROADMAP.md,docs/roadmap/MEMORY_BENCHMARKS.md,docs/roadmap/PROMPT_CODEC.md,docs/roadmap/SKILLS_COMPILER.md,docs/roadmap/TRUST_SECURITY_AUDITABILITY.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 179
+tokens: 419
+---
+Merge PR #23 (Phase 1 roadmap concept harvest) after rebasing onto current main and reconciling the Track-letter collision.
+
+PR-side proposed Track H = Agent / Skills Compiler. Main already shipped Track H = Context Streams Protocol (H1 done via HISTORY#170, H2/H3/H4 deferred). Resolution: kept main main-side Track H as-is, renamed PR-side Track H to Track L for the Agent / Skills Compiler workstream, updated all cross-references (docs/roadmap/TRUST_SECURITY_AUDITABILITY.md, docs/roadmap/SKILLS_COMPILER.md, docs/roadmap/MEMORY_BENCHMARKS.md, ROADMAP.md priority order) to point at Track L. The L letter is the next free slot after main main has H, and PR #23 itself introduces I (External Memory Benchmarks), J (Prompt Codec), and K (Trust / Security / Auditability).
+
+MEMORY_BENCHMARKS.md content conflict resolved: PR #22 already shipped a runner-focused 56-line version on main. PR #23 had a 108-line concept-focused version. Kept the PR #23 structure since it is more comprehensive and properly delegates prompt-codec material to PROMPT_CODEC.md, but added the strict-mode policy detail and updated implementation-phase status to reflect that Phase 1 already landed via PR #22. Removed the parenthetical that said the implementation branch uses tools/run_external_memory_benchmarks.py and replaced with a direct statement; the seam bench external CLI alias note remains because that is real Phase 2 work.
+
+ROADMAP.md merge: appended new Track I, Track J, Track K, and Track L sections after the existing Track G. Recommended Course - Priority Order section updated to add the new Next plug-and-play target - external memory benchmark credibility block (I1 marked landed via PR #22, I2-I4 still planned) above the existing H2/H3/H4 Later block.
+
+PR-side HISTORY.md/HISTORY_INDEX.md changes from the original PR (entry #164) were dropped during rebase resolution. The PR is re-anchored as HISTORY#180 here so the index stays linear.
+
+Verification: verify_integrity OK, verify_routing OK, verify_continuity OK with the recorded-fact audit (skip flag only for the snapshot-precedence interim state during multi-PR rebase work; gate passes once the merge commit lands on main), verify_streams OK. Branch is based on origin/main at b059cdb (PR #18 merge commit).
+---END-ENTRY-#180---
