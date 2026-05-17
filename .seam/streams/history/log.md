@@ -3857,3 +3857,23 @@ Pre-existing from PR #22 (already merged): benchmarks/registry/memory_benchmarks
 
 Verification: pytest test_seam_all/test_external_memory_benchmarks.py = 12 passed. pytest test_seam_all = 188 passed. seam bench external --plan --format json produces SEAM-EXTERNAL-MEMORY-BENCHMARK-PLAN/1 identical to standalone tool. seam bench external --strict exits 1 with no env vars. SEAM_BENCH_LOCOMO_COMMAND stub run reports PASS. seam doctor = PASS. verify_integrity, verify_routing, verify_continuity all OK. No secret-shaped strings in changed files.
 ---END-ENTRY-#185---
+
+---BEGIN-ENTRY-#186---
+id: 186
+date: 2026-05-17T21:25:43Z
+agent: claude-opus-4-7
+status: done
+topics: docs, handoff, protocol
+commits: TBD
+refs: docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md,docs/SOP_EXTERNAL_BENCH_LLM_JUDGE.md,docs/SOP_EXTERNAL_BENCH_MEM0_COMPARATOR.md,docs/SOP_EXTERNAL_BENCH_ZEP_COMPARATOR.md
+supersedes: 185
+tokens: 180
+---
+Landed SOP 1-4 handoff documents on main: SEAM LoCoMo adapter, LLM-judge scoring, Mem0 comparator, Zep/Graphiti comparator. Docs-only change; no runtime or test code touched. SOP 0's contract (registry, runner, CLI, module surface) is unchanged and remains the integration point all four SOPs import from.
+
+Origin: cherry-picked the four markdown files from origin/claude/document-branch-ideas-qe15Z (PR #24). PR #24 carried additional continuity bookkeeping (HISTORY/HISTORY_INDEX/PROJECT_STATUS/ROADMAP edits) that has been superseded by HISTORY#185 from PR #25 (SOP 0). The four roadmap docs PR #24 added (MEMORY_BENCHMARKS, PROMPT_CODEC, SKILLS_COMPILER, TRUST_SECURITY_AUDITABILITY) were already landed on main via earlier PRs and were skipped. Only the four new SOP markdown files were carried over here, sidestepping the conflict surface.
+
+Effect: DeepSeek handoff for Track I SOPs 1-4 is now self-contained on main. Next step is SOP 1 (SEAM LoCoMo adapter) as a focused PR. The 3-PR plan with the operator is: SOP 1 alone, SOP 2 alone, SOPs 3+4 bundled.
+
+Verification: no runtime files changed, so no pytest run is load-bearing for this entry. Will run verify_integrity, verify_routing, verify_continuity, verify_streams before commit; secret-grep across the four new files returns clean.
+---END-ENTRY-#186---

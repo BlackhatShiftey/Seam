@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 185
-total_tokens: ~37263
-latest_id: 185
+total_entries: 186
+total_tokens: ~37443
+latest_id: 186
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 186 | 2026-05-17 | done | 6dac80c872609921 | docs,handoff,protocol | 185 |
 | 185 | 2026-05-17 | done | ed014b41907810de | benchmark,command,protocol,verify | 178 |
 | 184 | 2026-05-17 | done | b8f6f1ed6ccd2c31 | audit,verify,history,status | 183 |
 | 183 | 2026-05-16 | done | 93cfaec87e03e205 | mcp,pack,verify,history,+ | 182 |
@@ -216,13 +217,13 @@ compact: true
 - dashboard: count=60 latest=#163, #162, #161, #160, #159
 - diff: count=4 latest=#153, #093, #092, #037
 - docker: count=3 latest=#149, #085, #084
-- docs: count=5 latest=#179, #177, #147, #146, #099
+- docs: count=6 latest=#186, #179, #177, #147, #146
 - doctor: count=8 latest=#170, #169, #140, #139, #138
 - extras: count=1 latest=#022
 - fixture: count=4 latest=#145, #092, #039, #008
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
-- handoff: count=5 latest=#176, #136, #135, #075, #025
+- handoff: count=6 latest=#186, #176, #136, #135, #075
 - harden: count=1 latest=#182
 - history: count=136 latest=#184, #183, #181, #180, #179
 - holdout: count=4 latest=#152, #093, #092, #036
@@ -244,7 +245,7 @@ compact: true
 - persist: count=19 latest=#181, #047, #044, #042, #036
 - pgvector: count=19 latest=#179, #149, #121, #119, #084
 - plan: count=12 latest=#180, #176, #171, #170, #169
-- protocol: count=45 latest=#185, #180, #179, #178, #177
+- protocol: count=46 latest=#186, #185, #180, #179, #178
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
@@ -274,5 +275,5 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 165
+- done: 166
 - planned: 20
