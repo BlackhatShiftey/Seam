@@ -3825,3 +3825,17 @@ Added regression coverage in test_seam_all/test_seam.py: test_mcp_bridge_imports
 
 Verification: the new focused pytest slice `.venv/bin/python -m pytest test_seam_all/test_seam.py -k "context_pack_refs_match_budgeted_entries or mcp_bridge_imports_without_experimental_retrieval"` failed with 2 failures before the fixes and passed after them. Full suite `.venv/bin/python -m pytest test_seam_all tools/history/test_history_tools.py tools/streams/test_streams.py` passed with no failures in 43.07s.
 ---END-ENTRY-#183---
+
+---BEGIN-ENTRY-#184---
+id: 184
+date: 2026-05-17T17:36:37Z
+agent: codex-gpt-5
+status: done
+topics: audit, verify, history, status
+commits: 8bee677
+refs: HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/cross_index.md
+supersedes: 183
+tokens: 120
+---
+Repository audit and closeout for committed and uncommitted state. Fetched origin and found origin/claude/document-branch-ideas-qe15Z, but left non-main branches untouched. Initial state: main at b4a62f4 was one commit ahead of origin/main with an unstaged HISTORY#183 patch. Verification before committing: candidate-file secret and private-session-link scan found no matches; git diff --check passed; verify_integrity, verify_routing, verify_continuity, and verify_streams returned OK; .venv/bin/python -m pytest test_seam_all tools/history/test_history_tools.py tools/streams/test_streams.py passed 230 tests in 44.94s. Committed the HISTORY#183 patch as 8bee677 and pushed main; final status before this entry was clean, ahead/behind 0/0, with only one attached worktree at /media/terrabyte/T7/Proprietary/Projects-All/Seam.
+---END-ENTRY-#184---

@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 217
+total_events: 218
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-17T00:08:00Z | history:018:e570611b | session-event | done | verify, search, compress, lx1, codec, command | PLAN_LOG.md |
 | 2026-04-17T00:09:00Z | history:019:655d3a5a | session-event | done | vector, pgvector, doctor, status, session | PLAN_LOG.md |
 | 2026-04-17T00:10:00Z | history:020:8d22eeaf | session-event | done | persist, verify, benchmark, dashboard, installer, windows | PLAN_LOG.md |
 | 2026-04-17T00:11:00Z | history:021:daf7be54 | session-event | done | persist, verify, dashboard, installer, linux, wsl2 | PLAN_LOG.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-16T06:16:00Z | history:181:3081e253 | session-event | done | persist, retrieval, search, vector, security, verify, his... | seam_runtime/storage.py,seam_runtime/vector.py,seam_runtime/server.py,seam_ru... |
 | 2026-05-16T06:38:45Z | history:182:8affbd0f | session-event | done | harden, models, mcp, reconcile, memory, storage, vector, ... | seam_runtime/models.py,seam_runtime/mcp.py,seam_runtime/mcp_protocol.py,seam_... |
 | 2026-05-16T07:31:59Z | history:183:93cfaec8 | session-event | done | mcp, pack, verify, history, audit | seam_runtime/mcp.py,seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.m... |
+| 2026-05-17T17:36:37Z | history:184:b8f6f1ed | session-event | done | audit, verify, history, status | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/cross_index.md |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0017.cross.md | 2026-04-15T00:00:00Z..2026-04-17T00:07:00Z | 17 | (multi) | (multi) |
+| 0001-0018.cross.md | 2026-04-15T00:00:00Z..2026-04-17T00:08:00Z | 18 | (multi) | (multi) |
