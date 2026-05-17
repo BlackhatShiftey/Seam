@@ -1,0 +1,192 @@
+[
+  {
+    "sample_id": "conv-1",
+    "conversation": {
+      "speaker_a": "Alice",
+      "speaker_b": "Bob",
+      "sessions": [
+        {
+          "date_time": "2023-04-12 09:14",
+          "dia_id": 1,
+          "dialogs": [
+            {"speaker": "Alice", "text": "Hey Bob, I've been thinking -- we should take a trip somewhere this summer."},
+            {"speaker": "Bob", "text": "That sounds great! Where were you thinking?"},
+            {"speaker": "Alice", "text": "I've always wanted to visit Japan. The cherry blossoms might be over by then, but the summer festivals look amazing."},
+            {"speaker": "Bob", "text": "Japan would be incredible. I've been reading about the food scene in Osaka."},
+            {"speaker": "Alice", "text": "And Kyoto has all those beautiful temples. We could do a few days in each city."}
+          ]
+        },
+        {
+          "date_time": "2023-04-15 20:30",
+          "dia_id": 2,
+          "dialogs": [
+            {"speaker": "Bob", "text": "I looked up flights. If we go in June, we can get decent prices on Japan Airlines."},
+            {"speaker": "Alice", "text": "When in June? I'd need to give work at least three weeks' notice."},
+            {"speaker": "Bob", "text": "How about departing June 15th? That gives us almost two full weeks."},
+            {"speaker": "Alice", "text": "June 15th works for me. Let's start roughing out an itinerary."},
+            {"speaker": "Bob", "text": "Great. I'll start a shared map with pins for everything we want to see."},
+            {"speaker": "Alice", "text": "Perfect. Let's aim for four days in Tokyo, three in Kyoto, and two in Osaka."}
+          ]
+        },
+        {
+          "date_time": "2023-04-22 18:45",
+          "dia_id": 3,
+          "dialogs": [
+            {"speaker": "Alice", "text": "I booked the flights! Japan Airlines, departing June 15th, returning June 28th."},
+            {"speaker": "Bob", "text": "Amazing! I found a great ryokan in Kyoto we should book before it fills up."},
+            {"speaker": "Alice", "text": "A ryokan? That's a traditional inn, right? I've heard they have hot springs."},
+            {"speaker": "Bob", "text": "Exactly. The one I found is near Kiyomizu-dera temple and includes breakfast."},
+            {"speaker": "Alice", "text": "Book it! I can't wait for this trip."}
+          ]
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "Where are Alice and Bob planning to travel?",
+        "answer": "Japan",
+        "category": 1,
+        "evidence": ["D1:1"]
+      },
+      {
+        "question": "When do Alice and Bob plan to depart?",
+        "answer": "June 15th",
+        "category": 1,
+        "evidence": ["D2:4"]
+      },
+      {
+        "question": "Which city did Alice want to visit for the temples?",
+        "answer": "Kyoto",
+        "category": 2,
+        "evidence": ["D1:5"]
+      },
+      {
+        "question": "What airline did they book tickets on?",
+        "answer": "Japan Airlines",
+        "category": 1,
+        "evidence": ["D2:1", "D3:1"]
+      }
+    ]
+  },
+  {
+    "sample_id": "conv-2",
+    "conversation": {
+      "speaker_a": "Alice",
+      "speaker_b": "Bob",
+      "sessions": [
+        {
+          "date_time": "2023-05-02 12:30",
+          "dia_id": 1,
+          "dialogs": [
+            {"speaker": "Bob", "text": "Have you started that book I lent you yet?"},
+            {"speaker": "Alice", "text": "The Starlight Paradox? Yes, I'm about sixty pages in and hooked."},
+            {"speaker": "Bob", "text": "Right? Mira Chen is such an underrated sci-fi author."},
+            {"speaker": "Alice", "text": "The way she describes the deep-space observatory feels so lived-in. You can tell she did her research."},
+            {"speaker": "Bob", "text": "Wait until you hit chapter twelve. It completely recontextualizes everything from the first act."}
+          ]
+        },
+        {
+          "date_time": "2023-05-05 19:15",
+          "dia_id": 2,
+          "dialogs": [
+            {"speaker": "Alice", "text": "Okay, I finished chapter twelve. You were NOT kidding about that twist."},
+            {"speaker": "Bob", "text": "The stars being dormant alien ships was such a wild reveal. I didn't see it coming at all."},
+            {"speaker": "Alice", "text": "And the way the protagonist realizes her own research was being suppressed? Chilling."},
+            {"speaker": "Bob", "text": "Exactly. It's a metaphor for how institutions bury inconvenient truths."}
+          ]
+        },
+        {
+          "date_time": "2023-05-09 21:00",
+          "dia_id": 3,
+          "dialogs": [
+            {"speaker": "Alice", "text": "I finished The Starlight Paradox last night. The ending was bittersweet."},
+            {"speaker": "Bob", "text": "I know! When she makes contact but can't tell anyone? That's going to stay with me."},
+            {"speaker": "Alice", "text": "Do you know if Mira Chen has a sequel planned?"},
+            {"speaker": "Bob", "text": "She does! The second book, Eclipse Vector, came out last fall."},
+            {"speaker": "Alice", "text": "I'm ordering it tonight. We should do a buddy read when it arrives."}
+          ]
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "What is the title of the book they are discussing?",
+        "answer": "The Starlight Paradox",
+        "category": 1,
+        "evidence": ["D1:2"]
+      },
+      {
+        "question": "Who wrote The Starlight Paradox?",
+        "answer": "Mira Chen",
+        "category": 1,
+        "evidence": ["D1:3"]
+      },
+      {
+        "question": "What was the major plot twist Bob mentioned from chapter twelve?",
+        "answer": "The stars were actually dormant alien ships",
+        "category": 2,
+        "evidence": ["D2:2"]
+      }
+    ]
+  },
+  {
+    "sample_id": "conv-3",
+    "conversation": {
+      "speaker_a": "Alice",
+      "speaker_b": "Bob",
+      "sessions": [
+        {
+          "date_time": "2023-05-14 10:00",
+          "dia_id": 1,
+          "dialogs": [
+            {"speaker": "Alice", "text": "I went by the community center today. They approved our garden plot request."},
+            {"speaker": "Bob", "text": "That's great news! Did Ms. Rodriguez say how much space we get?"},
+            {"speaker": "Alice", "text": "She gave us plot seven -- it's about ten by fifteen feet, with good morning sun."},
+            {"speaker": "Bob", "text": "Ten by fifteen is a solid start. We can fit quite a bit in that footprint."}
+          ]
+        },
+        {
+          "date_time": "2023-05-16 16:20",
+          "dia_id": 2,
+          "dialogs": [
+            {"speaker": "Bob", "text": "I drafted a planting layout. I'm thinking tomatoes along the back, carrots in the middle, basil up front."},
+            {"speaker": "Alice", "text": "Tomatoes and basil together is smart -- they're good companion plants."},
+            {"speaker": "Bob", "text": "Exactly. The basil helps repel tomato hornworms. We should also add marigolds around the border."},
+            {"speaker": "Alice", "text": "Great idea. Can we squeeze in a cucumber trellis on the north side?"},
+            {"speaker": "Bob", "text": "Easily. I'll revise the layout tonight and pick up seeds this weekend."}
+          ]
+        },
+        {
+          "date_time": "2023-05-20 08:45",
+          "dia_id": 3,
+          "dialogs": [
+            {"speaker": "Alice", "text": "Planting day! I brought the seedlings, the trowels, and a watering can."},
+            {"speaker": "Bob", "text": "Perfect. I have the compost and the stakes for the tomatoes."},
+            {"speaker": "Alice", "text": "Let's start with the tomatoes since they need the deepest holes."},
+            {"speaker": "Bob", "text": "Good plan. I'll dig while you sort the seedlings by height."}
+          ]
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "Who approved the community garden space?",
+        "answer": "Ms. Rodriguez, the community center manager",
+        "category": 1,
+        "evidence": ["D1:2"]
+      },
+      {
+        "question": "Which vegetables did Alice and Bob decide to plant?",
+        "answer": "tomatoes, carrots, and basil",
+        "category": 2,
+        "evidence": ["D2:1"]
+      },
+      {
+        "question": "What did Bob bring on planting day?",
+        "answer": "compost and stakes for the tomatoes",
+        "category": 1,
+        "evidence": ["D3:2"]
+      }
+    ]
+  }
+]
