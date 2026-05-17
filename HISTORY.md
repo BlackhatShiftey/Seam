@@ -3877,3 +3877,21 @@ Effect: DeepSeek handoff for Track I SOPs 1-4 is now self-contained on main. Nex
 
 Verification: no runtime files changed, so no pytest run is load-bearing for this entry. Will run verify_integrity, verify_routing, verify_continuity, verify_streams before commit; secret-grep across the four new files returns clean.
 ---END-ENTRY-#186---
+
+---BEGIN-ENTRY-#187---
+id: 187
+date: 2026-05-17
+agent: deepseek
+status: done
+topics: benchmark, fixture, retrieval, protocol
+commits: 7d45156
+refs: benchmarks/external/common/types.py,benchmarks/external/common/scoring.py,benchmarks/external/common/dataset.py,benchmarks/external/common/runner.py,benchmarks/external/locomo/run.py,benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/fixtures/quickstart.json,test_seam_all/test_locomo_dataset.py,test_seam_all/test_locomo_scoring.py,test_seam_all/test_locomo_seam_adapter.py,test_seam_all/test_locomo_runner_cli.py,seam_runtime/cli.py,benchmarks/external/README.md,docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md
+supersedes: 186
+tokens: 280
+---
+Implemented SOP 1: SEAM LoCoMo adapter (Track I Phase 3). Ships the shared adapter scaffold under benchmarks/external/common/ (types, scoring, dataset, runner), the LoCoMo adapter with per-scope SQLite isolation under benchmarks/external/locomo/adapters/seam.py (retrieval-only, no LLM calls), a 10-case synthetic quickstart fixture, and the CLI entrypoint at benchmarks/external/locomo/run.py. Replaced the --quickstart reserved stub in seam_runtime/cli.py with real dispatch to the LoCoMo runner. String-match scoring only: exact_match, token_f1, context_recall.
+
+Quickstart completes in ~5s on local machine (under the 60s gate). Integrity hash is stable across two runs on the same fixture (latency fields excluded from hash). seam bench external --plan still works (SOP 0 contract intact).
+
+Verification: pytest test_seam_all/test_locomo_scoring.py = 11 passed. test_locomo_dataset.py = 4 passed. test_locomo_seam_adapter.py = 4 passed. test_locomo_runner_cli.py = 6 passed (includes hash stability). SOP 0 tests = 12 passed. Full suite = 213 passed in 81s. seam bench external --quickstart locomo exits 0 and produces SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1. seam doctor = PASS. verify_integrity, verify_routing, verify_continuity all OK. No network access during quickstart. No writes outside test_seam/locomo/. Adapter under 115 lines. Scoring has zero third-party imports.
+---END-ENTRY-#187---
