@@ -3839,3 +3839,21 @@ tokens: 120
 ---
 Repository audit and closeout for committed and uncommitted state. Fetched origin and found origin/claude/document-branch-ideas-qe15Z, but left non-main branches untouched. Initial state: main at b4a62f4 was one commit ahead of origin/main with an unstaged HISTORY#183 patch. Verification before committing: candidate-file secret and private-session-link scan found no matches; git diff --check passed; verify_integrity, verify_routing, verify_continuity, and verify_streams returned OK; .venv/bin/python -m pytest test_seam_all tools/history/test_history_tools.py tools/streams/test_streams.py passed 230 tests in 44.94s. Committed the HISTORY#183 patch as 8bee677 and pushed main; final status before this entry was clean, ahead/behind 0/0, with only one attached worktree at /media/terrabyte/T7/Proprietary/Projects-All/Seam.
 ---END-ENTRY-#184---
+
+---BEGIN-ENTRY-#185---
+id: 185
+date: 2026-05-17
+agent: deepseek
+status: done
+topics: benchmark, command, protocol, verify
+commits: 1fe91af
+refs: seam_runtime/cli.py,seam_runtime/external_memory_benchmarks.py,tools/run_external_memory_benchmarks.py,benchmarks/registry/memory_benchmarks.json,benchmarks/external/README.md,test_seam_all/test_external_memory_benchmarks.py,.github/workflows/ci.yml,PROJECT_STATUS.md,docs/SOP_EXTERNAL_BENCH_PHASE1_REGISTRY.md
+supersedes: 178
+tokens: 260
+---
+Landed SOP 0 of Track I (external memory benchmarks). Added `seam bench external` CLI subcommand with --plan, --strict, --scope, --output, --format, --timeout-seconds, and reserved --quickstart flag. The CLI subcommand mirrors the standalone tools/run_external_memory_benchmarks.py runner. --quickstart prints the SOP 1 pointer and exits 2. Created benchmarks/external/README.md (23 lines, no adapter promises). Expanded test coverage from 4 to 12 tests covering registry validation, plan scoping, runner behavior, pretty renderers, and CLI smoke. Added informational CI plan artifact step to .github/workflows/ci.yml (no --strict). Updated PROJECT_STATUS.md stable section.
+
+Pre-existing from PR #22 (already merged): benchmarks/registry/memory_benchmarks.json with policy.strict_mode_failure_statuses, seam_runtime/external_memory_benchmarks.py with REGISTRY_PATH resolving from package directory, and tools/run_external_memory_benchmarks.py standalone CLI. No adapter implementations yet; SOP 1 (SEAM LoCoMo adapter) is next.
+
+Verification: pytest test_seam_all/test_external_memory_benchmarks.py = 12 passed. pytest test_seam_all = 188 passed. seam bench external --plan --format json produces SEAM-EXTERNAL-MEMORY-BENCHMARK-PLAN/1 identical to standalone tool. seam bench external --strict exits 1 with no env vars. SEAM_BENCH_LOCOMO_COMMAND stub run reports PASS. seam doctor = PASS. verify_integrity, verify_routing, verify_continuity all OK. No secret-shaped strings in changed files.
+---END-ENTRY-#185---

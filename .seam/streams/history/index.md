@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 184
-total_tokens: ~37003
-latest_id: 184
+total_entries: 185
+total_tokens: ~37263
+latest_id: 185
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 185 | 2026-05-17 | done | ed014b41907810de | benchmark,command,protocol,verify | 178 |
 | 184 | 2026-05-17 | done | b8f6f1ed6ccd2c31 | audit,verify,history,status | 183 |
 | 183 | 2026-05-16 | done | 93cfaec87e03e205 | mcp,pack,verify,history,+ | 182 |
 | 182 | 2026-05-16 | done | 8affbd0fb0aee56d | harden,models,mcp,reconcile,+ | 181 |
@@ -202,13 +203,13 @@ compact: true
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
 - audit: count=30 latest=#184, #183, #182, #177, #176
-- benchmark: count=45 latest=#179, #178, #171, #153, #152
+- benchmark: count=46 latest=#185, #179, #178, #171, #153
 - bundle: count=2 latest=#015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
 - classification: count=11 latest=#177, #176, #171, #170, #169
 - codec: count=13 latest=#132, #131, #130, #129, #128
-- command: count=55 latest=#149, #148, #147, #146, #145
+- command: count=56 latest=#185, #149, #148, #147, #146
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
@@ -243,7 +244,7 @@ compact: true
 - persist: count=19 latest=#181, #047, #044, #042, #036
 - pgvector: count=19 latest=#179, #149, #121, #119, #084
 - plan: count=12 latest=#180, #176, #171, #170, #169
-- protocol: count=44 latest=#180, #179, #178, #177, #176
+- protocol: count=45 latest=#185, #180, #179, #178, #177
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
@@ -266,12 +267,12 @@ compact: true
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=20 latest=#182, #181, #099, #066, #044
-- verify: count=123 latest=#184, #183, #181, #179, #178
+- verify: count=124 latest=#185, #184, #183, #181, #179
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 164
+- done: 165
 - planned: 20
