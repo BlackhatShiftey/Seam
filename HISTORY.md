@@ -3351,3 +3351,17 @@ tokens: 323
 ---
 Repo bookkeeping and concept-harvest pass: phase 1 of branch reconciliation. Separated concepts (roadmap-only) from real work (code to be reconciled in later phases). Concepts harvested and added to root roadmap as new tracks H/I/J/K with pointer docs under docs/roadmap/. Track H (Agent/Skills Compiler) gets a phased execution plan reconciled against existing AGENT_COMPILER.md and SKILL_FACTORY.md; implementation code on claude/seam-trust-security-manual-8mhEL remains unmerged and is deferred to a follow-up PR. Track I (External Memory Benchmarks) defines a 60-second install-and-run gate (pip install seam[bench]; seam bench external --quickstart locomo) so a new user can produce a comparable LoCoMo score on a clean Linux/WSL machine in under a minute. Track J (Prompt Codec) records TOON/SEAM-RC/SEAM-LX evaluation scope, restricted to derived prompt transports — canonical MIRL/JSON/SQLite storage is unaffected. Track K (Trust, Security, Lineage, Auditability) records F0-F13 items including Benchmark Integrity Levels BIL-0 through BIL-6, renumbered to Track K because Track F is already used on main for Docs/Setup/Error Playbooks. Branch reconciliation status: bench/add-memory-benchmark-registry queued for phase-2 PR (concept now landed); docs/salvage-embedding-eval-guides queued for phase-3 doc extraction (no branch history merge); claude/seam-trust-security-manual-8mhEL queued for phase-4 partial extraction of compiler code only. Pre-work, verify_integrity failed on HISTORY_INDEX.md hash drift across entries 143-162 with no snapshot for latest entry; rebuild_index regenerated the index and integrity check now passes. Verification before commit: python -m tools.history.verify_integrity passes, python -m tools.history.verify_routing reports Routing OK. Snapshot for this entry will be written by the closeout step after this entry lands. Next step is commit, push, open draft PR for phase 1.
 ---END-ENTRY-#164---
+
+---BEGIN-ENTRY-#165---
+id: 165
+date: 2026-05-17T01:02:59Z
+agent: claude
+status: done
+topics: benchmark, plan, protocol, handoff, roadmap
+commits: none
+refs: docs/SOP_EXTERNAL_BENCH_PHASE1_REGISTRY.md,docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md,docs/SOP_EXTERNAL_BENCH_LLM_JUDGE.md,docs/SOP_EXTERNAL_BENCH_MEM0_COMPARATOR.md,docs/SOP_EXTERNAL_BENCH_ZEP_COMPARATOR.md
+supersedes: 164
+tokens: 1
+---
+-
+---END-ENTRY-#165---

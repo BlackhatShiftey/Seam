@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-09
+Last updated: 2026-05-17
 
 ## Current State
 
@@ -64,6 +64,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Turn the SEAM CLI into a first-class agent CLI like Gemini/Claude/Codex CLI: keep `seam shell` as the entrypoint, then add model routing, tool execution, repo/context awareness, command history, and guardrails on top of SEAM memory.
 - Continue feature delivery without reintroducing duplicated continuity text
 - Run real-adapter validation through guarded scripts to enforce resource ceilings and automatic service cleanup
+- Track I (external memory benchmarks) handoff series is fully specified across five SOPs in `docs/SOP_EXTERNAL_BENCH_*.md` (Phase 1+2 registry/runner/CLI, SEAM LoCoMo adapter, LLM-judge scoring, Mem0 comparator, Zep comparator). Each SOP has a DeepSeek implementation checklist and a reviewer verification checklist; pick them up sequentially. See `HISTORY#165`.
 - Legacy roadmap entries `HISTORY#028`-`HISTORY#047` remain append-only planning cards. `HISTORY#036` (holdout suites), `HISTORY#037` (benchmark diff tooling), and `HISTORY#046` (REST API surface) are implemented and superseded by `HISTORY#152`, `HISTORY#153`, and `HISTORY#154`; use `ROADMAP.md` Recommended Course for current priority.
 
 ## Operational Baseline

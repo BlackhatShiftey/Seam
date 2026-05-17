@@ -3,7 +3,7 @@
 Handoff target: DeepSeek (or any contributor)
 Track: I — External Memory Benchmarks
 Canonical spec: `docs/roadmap/MEMORY_BENCHMARKS.md`
-Prereq PR: Phase 1+2 registry/runner + `seam bench external` CLI (delivered separately).
+Sequence: **SOP 1 of 5.** Prereq: SOP 0 (`SOP_EXTERNAL_BENCH_PHASE1_REGISTRY.md`). Follow-ups: SOP 2 (LLM-judge), SOP 3 (Mem0 comparator), SOP 4 (Zep comparator).
 
 This SOP defines exactly what to build for the first real external memory benchmark adapter: SEAM running LoCoMo with string-match scoring (EM + F1) and a 60-second quickstart path.
 
@@ -296,17 +296,86 @@ Update `seam_runtime/cli.py` so `seam bench external --quickstart locomo` resolv
 - runs `--quickstart` via subprocess, asserts exit 0, asserts JSON output validates, asserts `integrity_hash` is present and stable across two runs on the same fixture
 - asserts the run completes in under 60 seconds on the CI runner
 
-## 11. Acceptance criteria
+## 11. DeepSeek implementation checklist
 
-- `seam bench external --quickstart locomo` exits 0 on a clean machine in under 60s
-- Output JSON validates against the `SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1` shape
-- All four test files pass
-- `python -m tools.history.verify_continuity` passes after the HISTORY entry is appended
-- No new heavy dependency (LoCoMo dataset loader uses only stdlib)
-- No network calls in the quickstart path
-- No write outside `test_seam/` and the per-run output path
+Work through these in order. Tick each box in the PR description as you complete it.
 
-## 12. Pitfalls and notes
+- [ ] SOP 0 (Phase 1+2 registry/runner) is merged on `main`; pulled latest
+- [ ] Created `benchmarks/external/common/{__init__,types,dataset,scoring,runner}.py`
+- [ ] `types.py` exports the four dataclasses/protocol in section 4 verbatim
+- [ ] `dataset.py` loads `fixtures/quickstart.json` and parses real LoCoMo JSON shape per section 5
+- [ ] `scoring.py` implements `_normalize`, `exact_match`, `token_f1`, `context_recall` per section 7
+- [ ] `runner.py` exposes `run_benchmark(*, adapter, cases, progress=None) -> RunReport`
+- [ ] Created `benchmarks/external/locomo/{__init__,run}.py` and `adapters/{__init__,base,seam}.py`
+- [ ] `adapters/base.py` re-exports `MemorySystemAdapter` from `common.types`
+- [ ] `adapters/seam.py` implements the contract in section 6, under 250 lines
+- [ ] Per-scope SQLite isolation: each case opens/drops its own DB under `test_seam/locomo/<scope_id>.db`
+- [ ] No LLM calls; `generated_answer` stays `None`
+- [ ] Created quickstart fixture at `benchmarks/external/locomo/fixtures/quickstart.json` with 5-10 synthetic LoCoMo-shape cases
+- [ ] Quickstart completes in under 60 seconds on the dev machine (`time python -m benchmarks.external.locomo.run --quickstart`)
+- [ ] CLI: `python -m benchmarks.external.locomo.run --quickstart` and `--dataset <path>` and `--limit N` all work
+- [ ] Updated `seam bench external --quickstart locomo` in `seam_runtime/cli.py` to dispatch to the LoCoMo runner (replaces the SOP 0 reserved-flag stub)
+- [ ] Registered default for `SEAM_BENCH_LOCOMO_COMMAND` when unset: documented in `benchmarks/external/locomo/__init__.py` and `benchmarks/external/README.md`
+- [ ] Result JSON validates against `SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1` shape per section 8
+- [ ] `integrity_hash` is stable across two runs on the same fixture
+- [ ] Wrote all four test files in section 10; all pass
+- [ ] Full test suite still passes (`pytest test_seam_all -x`)
+- [ ] Updated `PROJECT_STATUS.md`: bullet under "What Is Stable" mentioning `seam bench external --quickstart locomo`
+- [ ] Appended HISTORY entry per template in section 13
+- [ ] `python -m tools.history.verify_continuity` passes
+- [ ] `python -m tools.history.verify_integrity` passes
+- [ ] Pushed branch and opened **draft** PR titled `Phase 3: SEAM LoCoMo adapter (string-match scoring)`
+
+## 12. Reviewer verification checklist
+
+- [ ] `time seam bench external --quickstart locomo` exits 0 in under 60 seconds on a clean Linux/WSL machine
+- [ ] Output JSON has `version: SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1`, `benchmark: locomo`, `adapter: seam`, non-empty `cases`, populated `scores.context_recall_mean`, and a `integrity_hash` field
+- [ ] Two consecutive `--quickstart` runs produce identical `integrity_hash`
+- [ ] `seam bench external --quickstart locomo --output /tmp/run.json` writes a JSON file with the same shape
+- [ ] `python -m benchmarks.external.locomo.run --dataset <path> --limit 3` works against any real LoCoMo JSON sample (reviewer supplies one if available; skip otherwise with a note)
+- [ ] `pytest test_seam_all/test_locomo_dataset.py test_seam_all/test_locomo_scoring.py test_seam_all/test_locomo_seam_adapter.py test_seam_all/test_locomo_runner_cli.py -v` passes
+- [ ] `pytest test_seam_all -x` passes (full suite)
+- [ ] No network call observed during `--quickstart` (run with `strace -f -e trace=connect` or equivalent and confirm only loopback)
+- [ ] No writes outside `test_seam/`, the per-run output path, and stdout: `find . -newer <pre-run-timestamp> -type f -not -path './test_seam/*' -not -path './.git/*'` should be empty
+- [ ] `python -m tools.history.verify_continuity` passes
+- [ ] `seam doctor` still returns PASS
+- [ ] Adapter file `benchmarks/external/locomo/adapters/seam.py` is under 250 lines
+- [ ] Scoring file `benchmarks/external/common/scoring.py` has zero third-party imports
+- [ ] `grep -RE "(sk-[A-Za-z0-9]{20,}|anthropic|openai|claude\.ai/(chat|share))" benchmarks/external/` returns nothing (no LLM client, no API key leak)
+- [ ] Quickstart fixture is synthetic, not derived from the real LoCoMo dataset (verify by reading 2-3 cases — text should be clearly invented)
+- [ ] PR description ticks every box in section 11
+
+## 13. Acceptance commands (single block — copy and run)
+
+```bash
+pip install -e .
+
+# Quickstart timing
+time seam bench external --quickstart locomo --output /tmp/locomo_quickstart.json
+jq '.version, .benchmark, .adapter, .scores, .integrity_hash' /tmp/locomo_quickstart.json
+
+# Stable integrity hash
+seam bench external --quickstart locomo --output /tmp/run_a.json
+seam bench external --quickstart locomo --output /tmp/run_b.json
+diff <(jq .integrity_hash /tmp/run_a.json) <(jq .integrity_hash /tmp/run_b.json)
+
+# Module-direct invocation
+python -m benchmarks.external.locomo.run --quickstart --output /tmp/direct.json
+
+# Tests
+pytest test_seam_all/test_locomo_dataset.py \
+       test_seam_all/test_locomo_scoring.py \
+       test_seam_all/test_locomo_seam_adapter.py \
+       test_seam_all/test_locomo_runner_cli.py -v
+pytest test_seam_all -x
+
+# Continuity
+python -m tools.history.verify_continuity
+python -m tools.history.verify_integrity
+seam doctor
+```
+
+## 14. Pitfalls and notes
 
 - **Do not bundle the real LoCoMo dataset in the repo.** It is gated on HF. The quickstart fixture is synthetic LoCoMo-shaped data. Document where to download the real dataset in `benchmarks/external/README.md`.
 - **Do not call out to any LLM.** This PR is string-match only. LLM-judge is the next SOP.
@@ -314,7 +383,7 @@ Update `seam_runtime/cli.py` so `seam bench external --quickstart locomo` resolv
 - **Keep the adapter under 250 lines.** If you find yourself building a full retrieval pipeline inside the adapter, push that complexity back into `seam_runtime` instead.
 - **Tokenizer-free F1.** Use whitespace split + lowercase + punctuation strip. Do not import tiktoken or any tokenizer here. The benchmark must run with zero ML deps.
 
-## 13. HISTORY entry template
+## 15. HISTORY entry template
 
 ```yaml
 id: NNN
@@ -336,6 +405,6 @@ body: |
   on local machine. No comparator adapters yet; next: Mem0 (SOP_EXTERNAL_BENCH_MEM0_COMPARATOR.md).
 ```
 
-## 14. Estimated scope
+## 16. Estimated scope
 
 ~1200–1800 lines net. One review cycle. No dependencies added beyond what SEAM already ships.
