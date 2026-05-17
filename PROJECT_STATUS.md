@@ -41,6 +41,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
 - Dashboard snapshot/smoke-test behavior
 - Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
+- `seam bench external --plan` CLI alias and `benchmarks/registry/memory_benchmarks.json` registry
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, bounded request bodies, env-configurable process-local rate limiting, and remote authenticated bind guardrails
 - RAG efficiency surface: `seam ingest <path> --persist`, `seam memory search`, `seam memory get`, `seam retrieve --mode mix`, document status rows, vector source-hash cache/stale checks, and `seam mcp stdio` MCP server
 - MCP agent bridge: `seam mcp stdio` and `seam-mcp` expose 16 bounded, documented tools over standard MCP JSON-RPC for Gemini/Claude/Cursor-style clients; Gemini's project config starts it with `--ensure-pgvector` so Docker Compose pgvector is healthy before MCP tool discovery; `seam mcp serve` remains as the legacy JSON-lines bridge. Tools cover memory retrieval, controlled ingest, context, install diagnostics, stored HS/1 surfaces, index status, retrieval modes, and benchmark summaries; canonical `hs:<hex>` surface refs are required for surface tools.

@@ -46,6 +46,12 @@ from .holographic import (
 )
 from .lx1 import decode as lx1_decode, encode as lx1_encode, token_savings_report
 from .agent_memory import render_memory_index, render_memory_records
+from .external_memory_benchmarks import (
+    benchmark_plan,
+    render_external_memory_plan_pretty,
+    render_external_memory_report_pretty,
+    run_external_memory_benchmarks,
+)
 from .mirl import IRBatch
 from .runtime import SeamRuntime
 from .surface_adapters import SurfaceFileAdapter
@@ -384,6 +390,20 @@ def build_parser() -> argparse.ArgumentParser:
     lx1_benchmark_parser.add_argument("--scope", default="project")
     lx1_benchmark_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
+    bench_parser = subparsers.add_parser("bench", help="External memory benchmark registry and runner")
+    bench_subparsers = bench_parser.add_subparsers(dest="bench_command", required=True)
+    bench_external_parser = bench_subparsers.add_parser(
+        "external",
+        help="Run or plan external memory benchmarks (LoCoMo, MemBench, etc.)",
+    )
+    bench_external_parser.add_argument("--scope", default="required", help="required, all, or a single benchmark id")
+    bench_external_parser.add_argument("--plan", action="store_true", help="Print the configured/missing runner plan and exit 0")
+    bench_external_parser.add_argument("--strict", action="store_true", help="Fail when required runners are NOT_CONFIGURED")
+    bench_external_parser.add_argument("--output", help="Write JSON to this path")
+    bench_external_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+    bench_external_parser.add_argument("--timeout-seconds", type=int, default=3600)
+    bench_external_parser.add_argument("--quickstart", help="Reserved for SOP 1 (LoCoMo). Not yet implemented.")
+
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
 
@@ -650,6 +670,24 @@ def run_cli(argv: list[str] | None = None) -> None:
         from .server import run_server
 
         run_server(host=args.host, port=args.port, db=args.db, reload=args.reload, workers=args.workers)
+        return
+
+    if args.command == "bench" and args.bench_command == "external":
+        if args.quickstart:
+            print("--quickstart requires a benchmark adapter. See docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md (SOP 1).")
+            raise SystemExit(2)
+        if args.plan:
+            payload = benchmark_plan(scope=args.scope)
+            text = json.dumps(payload, indent=2) if args.format == "json" else render_external_memory_plan_pretty(payload)
+            exit_code = 0
+        else:
+            payload = run_external_memory_benchmarks(scope=args.scope, strict=args.strict, timeout_seconds=args.timeout_seconds)
+            text = json.dumps(payload, indent=2) if args.format == "json" else render_external_memory_report_pretty(payload)
+            exit_code = 1 if payload.get("status") == "FAIL" else 0
+        if args.output:
+            Path(args.output).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(text)
+        raise SystemExit(exit_code)
         return
 
     runtime = SeamRuntime(args.db)

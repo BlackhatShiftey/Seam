@@ -34,3 +34,12 @@ jobs:
 
       - name: Gate benchmark suite
         run: python -m seam benchmark gate benchmark_bundle.json
+
+      - name: External memory benchmark plan
+        run: python -m tools.run_external_memory_benchmarks --plan --format json --output external-memory-benchmark-plan.json
+
+      - name: Upload external memory benchmark plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-memory-benchmark-plan
+          path: external-memory-benchmark-plan.json
