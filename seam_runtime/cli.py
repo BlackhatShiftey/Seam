@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
 from importlib.util import find_spec
 from pathlib import Path
@@ -402,7 +403,7 @@ def build_parser() -> argparse.ArgumentParser:
     bench_external_parser.add_argument("--output", help="Write JSON to this path")
     bench_external_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
     bench_external_parser.add_argument("--timeout-seconds", type=int, default=3600)
-    bench_external_parser.add_argument("--quickstart", help="Reserved for SOP 1 (LoCoMo). Not yet implemented.")
+    bench_external_parser.add_argument("--quickstart", choices=["locomo"], help="Run a bundled quickstart benchmark (locomo: 60s synthetic fixture)")
 
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
@@ -674,8 +675,13 @@ def run_cli(argv: list[str] | None = None) -> None:
 
     if args.command == "bench" and args.bench_command == "external":
         if args.quickstart:
-            print("--quickstart requires a benchmark adapter. See docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md (SOP 1).")
-            raise SystemExit(2)
+            if args.quickstart == "locomo":
+                cmd = [sys.executable, "-m", "benchmarks.external.locomo.run", "--quickstart"]
+                if args.output:
+                    cmd.extend(["--output", args.output])
+                result = subprocess.run(cmd, check=False)
+                raise SystemExit(result.returncode)
+            raise SystemExit(f"Unknown quickstart target: {args.quickstart!r}")
         if args.plan:
             payload = benchmark_plan(scope=args.scope)
             text = json.dumps(payload, indent=2) if args.format == "json" else render_external_memory_plan_pretty(payload)

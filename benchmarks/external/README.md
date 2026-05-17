@@ -18,6 +18,25 @@ to set before invocation.
 The `--plan` step is always safe (no side effects) and lets you validate wiring
 before any work runs.
 
+## LoCoMo quickstart
+
+```bash
+seam bench external --quickstart locomo
+```
+
+Runs a bundled 10-case synthetic fixture against the SEAM adapter using
+string-match scoring (EM, token F1, context recall). Completes in under
+60 seconds with no network access and no dataset download required.
+
+The full LoCoMo dataset (`snap-research/locomo` on HuggingFace) can be run
+with:
+
+```bash
+seam bench external locomo --dataset /path/to/locomo.json
+```
+
 ## Where adapters go
 
-One subdirectory per benchmark. The first adapter will land in SOP 1.
+One subdirectory per benchmark. The LoCoMo adapter lives under
+`benchmarks/external/locomo/`. Future adapters follow the same pattern
+with shared infrastructure under `benchmarks/external/common/`.

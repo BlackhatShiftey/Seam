@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 186
-total_tokens: ~37443
-latest_id: 186
+total_entries: 187
+total_tokens: ~37723
+latest_id: 187
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 187 | 2026-05-17 | done | 66289df0fb65a735 | benchmark,fixture,retrieval,protocol | 186 |
 | 186 | 2026-05-17 | done | 6dac80c872609921 | docs,handoff,protocol | 185 |
 | 185 | 2026-05-17 | done | ed014b41907810de | benchmark,command,protocol,verify | 178 |
 | 184 | 2026-05-17 | done | b8f6f1ed6ccd2c31 | audit,verify,history,status | 183 |
@@ -204,7 +205,7 @@ compact: true
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
 - audit: count=30 latest=#184, #183, #182, #177, #176
-- benchmark: count=46 latest=#185, #179, #178, #171, #153
+- benchmark: count=47 latest=#187, #185, #179, #178, #171
 - bundle: count=2 latest=#015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
@@ -220,7 +221,7 @@ compact: true
 - docs: count=6 latest=#186, #179, #177, #147, #146
 - doctor: count=8 latest=#170, #169, #140, #139, #138
 - extras: count=1 latest=#022
-- fixture: count=4 latest=#145, #092, #039, #008
+- fixture: count=5 latest=#187, #145, #092, #039, #008
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
 - handoff: count=6 latest=#186, #176, #136, #135, #075
@@ -245,13 +246,13 @@ compact: true
 - persist: count=19 latest=#181, #047, #044, #042, #036
 - pgvector: count=19 latest=#179, #149, #121, #119, #084
 - plan: count=12 latest=#180, #176, #171, #170, #169
-- protocol: count=46 latest=#186, #185, #180, #179, #178
+- protocol: count=47 latest=#187, #186, #185, #180, #179
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
 - reconcile: count=1 latest=#182
 - registry: count=1 latest=#178
-- retrieval: count=12 latest=#181, #099, #047, #038, #023
+- retrieval: count=13 latest=#187, #181, #099, #047, #038
 - retry: count=1 latest=#182
 - roadmap: count=44 latest=#180, #178, #176, #171, #170
 - roundtrip: count=2 latest=#007, #006
@@ -275,5 +276,5 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 166
+- done: 167
 - planned: 20
