@@ -3803,3 +3803,25 @@ Audit findings (read-only, not fixed): H11 coverage gaps (retrieval.py, agent_me
 
 Verification: 6 parallel test agents audited all 225 tests across the full suite — 0 failures. Domain splits: models/vector (23 passed), mcp/protocol (10 passed), runtime/memory/storage (23 passed), reconcile/pack (10 passed), history/streams (50 passed), remaining suite (109 passed).
 ---END-ENTRY-#182---
+
+---BEGIN-ENTRY-#183---
+id: 183
+date: 2026-05-16T07:31:59Z
+agent: codex-gpt-5
+status: done
+topics: mcp, pack, verify, history, audit
+commits: none
+refs: seam_runtime/mcp.py,seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 182
+tokens: 293
+---
+Follow-up verification and fixes after checking the combined C/H hardening commit.
+
+Fresh verification showed the worktree was clean and HEAD was one commit ahead of origin/main, but two delegated false-positive claims did not hold under direct tests. H3 was still real: seam_runtime.mcp imported experimental.retrieval_orchestrator at module import time, so a broken experimental retrieval module prevented the MCP bridge from loading even for unrelated tools. H5 was also still real: context-mode pack_records truncated payload entries by budget but kept refs for every input record, so refs did not describe the actual context payload.
+
+Fixes: seam_runtime.mcp now imports RetrievalOrchestrator lazily inside the seam_retrieve branch only, so the bridge can import and serve unrelated tools if experimental retrieval is unavailable. seam_runtime.pack now builds context refs from the included budgeted entries, keeps exact and narrative refs as the full input set, clamps context entry slicing at zero for non-positive budgets, and centralizes deterministic pack id generation in _pack_id.
+
+Added regression coverage in test_seam_all/test_seam.py: test_mcp_bridge_imports_without_experimental_retrieval simulates experimental import failure in a clean subprocess and requires seam_runtime.mcp import to succeed; test_context_pack_refs_match_budgeted_entries verifies context pack refs and payload refs match the budgeted entry ids.
+
+Verification: the new focused pytest slice `.venv/bin/python -m pytest test_seam_all/test_seam.py -k "context_pack_refs_match_budgeted_entries or mcp_bridge_imports_without_experimental_retrieval"` failed with 2 failures before the fixes and passed after them. Full suite `.venv/bin/python -m pytest test_seam_all tools/history/test_history_tools.py tools/streams/test_streams.py` passed with no failures in 43.07s.
+---END-ENTRY-#183---

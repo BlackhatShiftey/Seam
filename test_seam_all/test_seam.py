@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import asyncio
 import unittest
@@ -106,6 +108,21 @@ class SeamTests(unittest.TestCase):
         pack = pack_ir(batch, lens="design", mode="exact")
         unpacked = unpack_exact_pack(pack)
         self.assertEqual(batch.to_json(), unpacked.to_json())
+
+    def test_context_pack_refs_match_budgeted_entries(self) -> None:
+        records = [
+            MIRLRecord(
+                id=f"clm:{index}",
+                kind=RecordKind.CLM,
+                attrs={"subject": f"subject:{index}", "predicate": "needs", "object": "memory"},
+            )
+            for index in range(3)
+        ]
+        pack = pack_ir(IRBatch(records), budget=1)
+        entry_ids = [entry["id"] for entry in pack.payload["entries"]]
+        self.assertEqual(entry_ids, ["clm:0"])
+        self.assertEqual(pack.refs, entry_ids)
+        self.assertEqual(pack.payload["refs"], entry_ids)
 
     def test_verifier_rejects_missing_claim_fields(self) -> None:
         batch = compile_dsl(
@@ -413,6 +430,27 @@ claim c1:
             dispatch_tool(runtime, {"tool": "seam_memory_search", "arguments": {"query": " "}})
         with self.assertRaises(ValueError):
             dispatch_tool(runtime, {"tool": "seam_memory_get", "arguments": {"ids": []}})
+
+    def test_mcp_bridge_imports_without_experimental_retrieval(self) -> None:
+        script = r"""
+import builtins
+import sys
+
+orig = builtins.__import__
+
+def blocked(name, globals=None, locals=None, fromlist=(), level=0):
+    if name.startswith("experimental.retrieval_orchestrator") or name == "experimental":
+        raise ImportError("simulated experimental import failure")
+    return orig(name, globals, locals, fromlist, level)
+
+builtins.__import__ = blocked
+sys.modules.pop("seam_runtime.mcp", None)
+import seam_runtime.mcp
+print("ok")
+"""
+        result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "ok")
 
     def test_mcp_bridge_exposes_stats_documents_context_and_doctor_tools(self) -> None:
         runtime = SeamRuntime(self.db_path)

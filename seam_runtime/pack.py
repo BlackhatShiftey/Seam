@@ -10,24 +10,33 @@ from .symbols import build_symbol_maps
 
 def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: int = 512, mode: str = "context", profile: str = "default", namespace: str | None = None) -> Pack:
     ordered = sorted(records, key=lambda record: record.id)
-    refs = [record.id for record in ordered]
-    pack_id_seed = f"{mode}|{lens}|{budget}|{','.join(refs)}".encode("utf-8")
-    pack_id = f"pack:{mode}:{len(refs)}:{hashlib.sha256(pack_id_seed).hexdigest()[:12]}"
     expansion_to_symbol, _ = build_symbol_maps(ordered, namespace=namespace)
 
     if mode == "exact":
+        refs = [record.id for record in ordered]
+        pack_id = _pack_id(mode, lens, budget, refs)
         payload = {"records": [record.to_dict() for record in ordered]}
         body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return Pack(pack_id=pack_id, mode=mode, lens=lens, refs=refs, payload=payload, budget=budget, reversible=True, token_cost=token_count(body), profile=profile)
 
     if mode == "narrative":
+        refs = [record.id for record in ordered]
+        pack_id = _pack_id(mode, lens, budget, refs)
         summary = _narrative_summary(ordered, lens=lens)
         return Pack(pack_id=pack_id, mode=mode, lens=lens, refs=refs, payload={"summary": summary}, budget=budget, reversible=False, token_cost=token_count(summary), profile=profile)
 
     entries = [{"id": record.id, "kind": record.kind.value, "signal": _compact_signal(_signal_for_record(record), expansion_to_symbol), "prov": record.prov, "evidence": record.evidence} for record in ordered]
-    payload = {"lens": lens, "entries": entries[:budget], "refs": refs, "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
+    included_entries = entries[: max(0, int(budget))]
+    refs = [str(entry["id"]) for entry in included_entries]
+    pack_id = _pack_id("context", lens, budget, refs)
+    payload = {"lens": lens, "entries": included_entries, "refs": refs, "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
     body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return Pack(pack_id=pack_id, mode="context", lens=lens, refs=refs, payload=payload, budget=budget, reversible=False, token_cost=token_count(body), profile=profile)
+
+
+def _pack_id(mode: str, lens: str, budget: int, refs: list[str]) -> str:
+    pack_id_seed = f"{mode}|{lens}|{budget}|{','.join(refs)}".encode("utf-8")
+    return f"pack:{mode}:{len(refs)}:{hashlib.sha256(pack_id_seed).hexdigest()[:12]}"
 
 
 def unpack_exact_pack(pack: Pack) -> IRBatch:

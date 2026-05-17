@@ -10,7 +10,6 @@ from typing import TextIO
 from .doctor import build_doctor_report
 from .holographic import decode_surface, query_surface, verify_surface, context_surface
 from .runtime import SeamRuntime
-from experimental.retrieval_orchestrator import RetrievalOrchestrator
 
 
 # Backwards-compatible name->description map. The ready line still emits this
@@ -315,6 +314,8 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
             },
         }
     if name == "seam_retrieve":
+        from experimental.retrieval_orchestrator import RetrievalOrchestrator
+
         query = _required_text(arguments.get("query"), field="query", tool=name)
         scope_arg = arguments.get("scope")
         budget = _bounded_int(arguments.get("budget"), default=5, low=1, high=50)
