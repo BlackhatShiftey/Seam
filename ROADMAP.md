@@ -149,6 +149,7 @@ phase: 1
 **Why first:** Every other Track A item (animations, graphs, chat tab, presentation mode) is easier and cleaner to build on a proper TUI framework than on top of a re-render loop. This is the foundation.
 
 **How:**
+> Implementation note: superseded by Textual migration; see HISTORY#108.
 - Migrate from `Rich.Live` full-screen re-render → **Textual** widgets with reactive data bindings
 - Each panel becomes a Textual `DataTable`, `ListView`, or custom `ScrollView` widget — independently scrollable
 - Input bar at the bottom is a Textual `Input` widget; on submit it runs the existing `execute()` logic and updates only the affected panel
@@ -280,6 +281,7 @@ phase: 1
 **What:** When a user runs `compile <text>` in the dashboard, show a live animation of the compilation process — text being parsed, records appearing one by one with their type labels (ENT, CLM, REL, ACT, OBJ) before the final summary.
 
 **How:**
+> Implementation note: superseded by Textual migration; see HISTORY#108.
 - Use Rich `Live` context manager in `dashboard.py`
 - On compile, stream record creation events from `compile_nl` by yielding intermediate batches
 - Each record appears with a typewriter-style pop: `[green]ENT[/green] ent:project:seam → "SEAM"`
@@ -404,6 +406,7 @@ phase: 1
 **What:** Add a `Chat` tab to the dashboard. The user types a message; SEAM retrieves relevant context from the DB; the context + message is sent to Claude API; the response appears in the result panel. The model can also invoke SEAM operations as tool calls.
 
 **How:**
+> Implementation note: superseded by Textual migration; see HISTORY#108.
 - New tab: `runtime | benchmark | chat`
 - Chat history stored in `DashboardApp` as a deque
 - On each message: run `search_ir` + `pack_ir` to get context, send as system prompt to Claude
