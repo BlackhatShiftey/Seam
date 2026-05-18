@@ -18,6 +18,7 @@ import argparse
 import datetime as _dt
 import os
 import sys
+import threading
 
 from tools.history.history_lib import (
     HISTORY_PATH,
@@ -29,6 +30,9 @@ from tools.history.history_lib import (
     read_history_bytes,
 )
 from tools.history.rebuild_index import rebuild
+
+
+_PROCESS_LOCK = threading.Lock()
 
 
 def _acquire_history_lock():
@@ -88,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     topics = [t.strip() for t in args.topics.split(",") if t.strip()]
     tokens = estimate_tokens(body)
 
+    _PROCESS_LOCK.acquire()
     lock_fd, unlock = _acquire_history_lock()
     try:
         existing = read_history_bytes()
@@ -137,7 +142,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Appended #{new_id:03d}. HISTORY.md now has {n} entries.")
         return 0
     finally:
-        unlock()
+        try:
+            unlock()
+        finally:
+            _PROCESS_LOCK.release()
 
 
 if __name__ == "__main__":

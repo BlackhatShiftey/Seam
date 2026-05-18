@@ -4081,3 +4081,17 @@ Verification:
   python3 -m tools.streams.verify_streams → streams OK
   PYTHONPATH=. .venv/bin/pytest test_seam_all/ tools/history/ tools/streams/ -q → 341 passed
 ---END-ENTRY-#193---
+
+---BEGIN-ENTRY-#194---
+id: 194
+date: 2026-05-18T10:26:40Z
+agent: codex
+status: done
+topics: verify, history, protocol
+commits: none
+refs: tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30
+supersedes: 193
+tokens: 179
+---
+CI follow-up for PR #30 production readiness remediation. Windows CI failed in tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes with PermissionError while rebuilding HISTORY_INDEX.md. Root cause: the existing advisory file lock serialized separate processes but did not serialize same-process ThreadPoolExecutor workers on Windows, so one thread could rewrite the locked index path while another worker still held the byte-range lock. Added a process-local threading.Lock around the existing OS lock in tools/history/new_entry.py so thread-level concurrency and process-level concurrency both serialize the append/rebuild critical section.\n\nVerification after the fix: .venv/bin/python -m pytest tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes -q -> 1 passed. .venv/bin/python -m tools.history.verify_integrity -> Integrity OK. .venv/bin/python -m tools.history.verify_routing -> Routing OK. .venv/bin/python -m tools.history.verify_continuity -> Continuity OK. .venv/bin/python -m tools.streams.verify_streams -> streams OK. Full local suite had passed before this fix with 341 passed, 1 warning, 3 subtests passed; rerun full suite and GitHub CI after recording this entry.
+---END-ENTRY-#194---
