@@ -1321,7 +1321,7 @@ Later - benchmark credibility, scale, and adaptive context loop
 - E2: Multi-tenant namespacing
 
 Major workstreams scheduled after the plug-and-play target lands
-- Track H: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
+- Track L: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
 - Track J: Prompt codec optimization (TOON / SEAM-RC / SEAM-LX evaluation)
 - Track K: Trust, security, lineage, auditability (capabilities, audit ledger, BIL benchmark bundles)
 ```
