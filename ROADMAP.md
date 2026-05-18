@@ -974,6 +974,34 @@ priority: 3
 phase: 2
 -->
 
+<!-- seam:item
+id: roadmap:track:F:backlog:verify-continuity-ref-existence
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: verify, continuity, history
+priority: 3
+phase: 2
+-->
+
+**What:** Add ref-file existence validation to `verify_continuity`. The gate currently validates structural integrity (hashes, supersedes chains, snapshots) but does not check that files listed in an entry's `refs:` field exist in the git index. HISTORY#191 referenced `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md` in its `refs:` field before the file was tracked; the continuity gate did not catch the orphaned ref because it only validates hashes, chains, and snapshots — not ref-file presence.
+
+**Proposed approach (design only; not implemented):**
+1. Parse each entry's `refs:` field and classify each ref:
+   - `http://` or `https://` prefix → skip (external URL, valid outside repo).
+   - `HISTORY#NNN` pattern → validate the entry exists in HISTORY.md.
+   - Path-like ref (contains `/` or `.`) → validate the file exists in the git index via a single `git ls-files` read per run (in-memory set lookup; no per-file shell-out).
+   - Section-anchor ref (`file.md#section`) → validate the file exists; anchor validation is stretch.
+2. Scope: only validate refs in the most recent N entries (default: 10). Historical entries often reference files that were deliberately renamed or archived; scanning all 192 entries would produce noise.
+3. Output as warnings, not hard failures: `Continuity OK (2 ref-file warnings: docs/SOP_PRODUCTION_READINESS_REMEDIATION.md not in git index at entry #191)`. Operators triage warnings without the gate blocking a commit for a stale ref in an old entry.
+4. Deterministic: one `git ls-files` call per run, in-memory set membership check per ref. No per-file shell-out. Runs in milliseconds.
+
+Constraint satisfaction:
+- Deterministic and fast: single `git ls-files` read + set lookups. No shell-out per ref.
+- Distinguishes external (skip URLs) from internal (validate paths/HISTORY refs).
+- No flood of historical noise: age-gated to recent N entries only.
+
 ### F1: Operator Setup Guide with Exact Commands
 
 <!-- seam:item
