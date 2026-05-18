@@ -3895,3 +3895,21 @@ Quickstart completes in ~5s on local machine (under the 60s gate). Integrity has
 
 Verification: pytest test_seam_all/test_locomo_scoring.py = 11 passed. test_locomo_dataset.py = 4 passed. test_locomo_seam_adapter.py = 4 passed. test_locomo_runner_cli.py = 6 passed (includes hash stability). SOP 0 tests = 12 passed. Full suite = 213 passed in 81s. seam bench external --quickstart locomo exits 0 and produces SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1. seam doctor = PASS. verify_integrity, verify_routing, verify_continuity all OK. No network access during quickstart. No writes outside test_seam/locomo/. Adapter under 115 lines. Scoring has zero third-party imports.
 ---END-ENTRY-#187---
+
+---BEGIN-ENTRY-#188---
+id: 188
+date: 2026-05-17
+agent: deepseek
+status: done
+topics: benchmark, retrieval, command, protocol
+commits: 350adff
+refs: benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,benchmarks/external/common/scoring.py,benchmarks/external/locomo/run.py,seam_runtime/cli.py,pyproject.toml,test_seam_all/test_locomo_judge.py,benchmarks/external/README.md,docs/SOP_EXTERNAL_BENCH_LLM_JUDGE.md
+supersedes: 187
+tokens: 240
+---
+Implemented SOP 2: Optional LLM-as-judge scoring for external memory benchmarks. Added judge protocol (StubJudge, ClaudeJudge, OpenAIJudge) behind seam[bench-judge] optional extra. Wired --judge claude|openai|stub into the LoCoMo runner and seam bench external CLI. Default path (string-match only) unchanged; 60s quickstart gate preserved.
+
+StubJudge returns deterministic "correct" verdict for tests. ClaudeJudge and OpenAIJudge lazy-import their SDKs, respect SEAM_BENCH_JUDGE_MODEL env override, and fail with clear error messages when the package or API key is missing. Judge errors per case are recorded (not raised), so a single transient failure doesn't abort the run. Judge scores are excluded from the integrity hash.
+
+Verification: pytest test_seam_all/test_locomo_judge.py = 11 passed (stub, missing-dep, lazy-import, runner integration, error handling, CLI smoke). Full suite = 224 passed in 85s. seam bench external --quickstart locomo (no --judge) produces identical scores to SOP 1. --judge stub produces judge_score_mean=1.0. --judge claude without anthropic prints clear error and exits 1. seam doctor = PASS. No secrets, no real LLM API calls in tests. SOP 0 plan still works.
+---END-ENTRY-#188---
