@@ -1,3 +1,4 @@
+# Canonical invocation: python -m <module>
 name: CI
 
 on:
@@ -36,7 +37,7 @@ jobs:
         run: python -m seam benchmark gate benchmark_bundle.json
 
       - name: External memory benchmark plan
-        run: python -m tools.run_external_memory_benchmarks --plan --format json --output external-memory-benchmark-plan.json
+        run: python -m tools.run_external_memory_benchmarks --plan --scope all --format json --output external-memory-benchmark-plan.json
 
       - name: Upload external memory benchmark plan
         uses: actions/upload-artifact@v4

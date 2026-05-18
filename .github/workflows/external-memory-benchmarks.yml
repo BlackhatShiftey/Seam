@@ -1,3 +1,4 @@
+# Canonical invocation: python -m <module>
 name: External memory benchmarks
 
 on:
@@ -17,9 +18,9 @@ jobs:
       - name: Install SEAM runtime
         run: python -m pip install -e .
       - name: Validate external memory benchmark registry
-        run: python tools/run_external_memory_benchmarks.py --plan --scope required --format pretty --output external-memory-benchmark-plan.json
+        run: python -m tools.run_external_memory_benchmarks --plan --scope all --format pretty --output external-memory-benchmark-plan.json
       - name: Run configured external memory benchmarks
-        run: python tools/run_external_memory_benchmarks.py --scope required --format pretty --output external-memory-benchmark-report.json
+        run: python -m tools.run_external_memory_benchmarks --scope all --format pretty --output external-memory-benchmark-report.json
       - name: Upload external memory benchmark plan
         uses: actions/upload-artifact@v4
         with:
