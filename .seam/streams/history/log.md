@@ -4050,3 +4050,34 @@ Verification at closeout:
 Observation for follow-up (not fixed here):
   verify_continuity does not currently validate that files listed in an entry's `refs:` field exist in the git index. That is a true continuity check the gate is missing. File as a Track F backlog card if the operator wants it.
 ---END-ENTRY-#192---
+
+---BEGIN-ENTRY-#193---
+id: 193
+date: 2026-05-18T09:30:00Z
+agent: claude-opus-4-7
+status: done
+topics: verify, continuity, roadmap, protocol
+commits: none
+refs: ROADMAP.md,docs/SOP_PRODUCTION_READINESS_REMEDIATION.md
+supersedes: 192
+tokens: 211
+---
+Continuity-gap observation from HISTORY#192 catalogued as a Track F backlog card.
+
+Added seam:item card roadmap:track:F:backlog:verify-continuity-ref-existence (status: planned) to ROADMAP.md. The card proposes adding ref-file existence validation to verify_continuity with three constraints:
+- Deterministic and fast: single git ls-files read + in-memory set lookup, no per-file shell-out
+- Distinguishes external URLs (skip) from internal paths (validate)
+- Age-gated to recent N entries to avoid noise from deliberately stale historical refs
+Output as warnings, not hard failures.
+
+The gap was discovered when HISTORY#191 listed docs/SOP_PRODUCTION_READINESS_REMEDIATION.md in its refs: before the file was tracked. The continuity gate validated hashes, supersedes chains, and snapshots — not ref-file presence — so the orphaned ref was not caught.
+
+seam:item count: 50 (was 49).
+
+Verification:
+  python3 -m tools.history.verify_integrity → Integrity OK
+  python3 -m tools.history.verify_continuity → Continuity OK
+  python3 -m tools.history.verify_routing → Routing OK
+  python3 -m tools.streams.verify_streams → streams OK
+  PYTHONPATH=. .venv/bin/pytest test_seam_all/ tools/history/ tools/streams/ -q → 341 passed
+---END-ENTRY-#193---

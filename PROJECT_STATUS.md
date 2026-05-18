@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-18 (HISTORY#192 — verify_streams stale-cross-index detection + TDD lock-in for #191 work)
+Last updated: 2026-05-18 (HISTORY#193 — continuity-gap observation catalogued as Track F backlog card; PR prepared for operator review)
 
 ## Current State
 
@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#192` — close-out follow-up to #191: hardened `verify_streams` to detect stale `.seam/cross_index.md` (parses `total_events:` and compares against live stream count), folded in three TDD tests that lock in #191's ROADMAP marker and Track H mislabel fixes, and tracked the orphaned `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md` that #191 cited in its refs but never committed. `HISTORY#191` was the production readiness remediation pass (Phases 1-7 from `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md`) executed on branch `deepseek/production-readiness-remediation`.
+- Latest continuity handoff is `HISTORY#193` — continuity-gap observation from #192 catalogued as Track F backlog card `roadmap:track:F:backlog:verify-continuity-ref-existence` (status: planned) proposing ref-file existence validation for `verify_continuity`. PR descriptions, test counts, and track summaries prepared for operator review. Branch `deepseek/production-readiness-remediation` is 28 commits ahead of origin/main, awaiting operator PR push/merge decision. `HISTORY#192` hardened `verify_streams` with stale-cross-index detection + TDD lock-in for #191 fixes. `HISTORY#191` was the production readiness remediation pass (Phases 1-7 from `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md`).
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
