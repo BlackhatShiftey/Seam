@@ -9,7 +9,6 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
-from experimental.retrieval_orchestrator import RetrievalOrchestrator
 from .benchmarks import (
     BENCHMARK_SUITES,
     render_benchmark_diff_pretty,
@@ -1099,6 +1098,7 @@ def _handle_shell_command(
         query = argument.strip() if command == "/context" else text
         if not query:
             return "Usage: /context <query>"
+        from experimental.retrieval_orchestrator import RetrievalOrchestrator
         orchestrator = RetrievalOrchestrator(runtime)
         rag_payload = orchestrator.rag(
             query,
@@ -1565,7 +1565,8 @@ def _add_rag_sync_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--vector-collection", "--chroma-collection", dest="vector_collection", default="seam_hybrid")
 
 
-def _build_retrieval_orchestrator(runtime: SeamRuntime, args: argparse.Namespace) -> RetrievalOrchestrator:
+def _build_retrieval_orchestrator(runtime: SeamRuntime, args: argparse.Namespace):
+    from experimental.retrieval_orchestrator import RetrievalOrchestrator
     return RetrievalOrchestrator(
         runtime,
         semantic_backend=getattr(args, "vector_backend", "seam"),
