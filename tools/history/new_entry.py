@@ -16,10 +16,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import os
 import sys
+import threading
 
 from tools.history.history_lib import (
     HISTORY_PATH,
+    INDEX_PATH,
     estimate_tokens,
     format_entry,
     next_entry_id,
@@ -27,6 +30,42 @@ from tools.history.history_lib import (
     read_history_bytes,
 )
 from tools.history.rebuild_index import rebuild
+
+
+_PROCESS_LOCK = threading.Lock()
+
+
+def _acquire_history_lock():
+    """Acquire an exclusive advisory lock for HISTORY.md/HISTORY_INDEX.md updates.
+
+    Returns a (lock_fd, release_fn) pair. Callers must invoke release_fn in a
+    ``finally`` block.
+    """
+    git_dir = INDEX_PATH.parent / ".git"
+    lock_path = git_dir / "seam-history.lock" if git_dir.is_dir() else INDEX_PATH.with_name(f"{INDEX_PATH.name}.lock")
+    fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+
+        def _release():
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            finally:
+                os.close(fd)
+
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+        def _release():
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+
+    return fd, _release
 
 
 def _now_iso() -> str:
@@ -55,52 +94,60 @@ def main(argv: list[str] | None = None) -> int:
     topics = [t.strip() for t in args.topics.split(",") if t.strip()]
     tokens = estimate_tokens(body)
 
-    existing = read_history_bytes()
-    entries = parse_entries(existing) if existing else []
-    new_id = next_entry_id(entries)
+    _PROCESS_LOCK.acquire()
+    lock_fd, unlock = _acquire_history_lock()
+    try:
+        existing = read_history_bytes()
+        entries = parse_entries(existing) if existing else []
+        new_id = next_entry_id(entries)
 
-    # Normalize supersedes format: accept "042" or "#042" → store as "042"
-    supersedes = args.supersedes
-    if supersedes != "none":
-        supersedes = supersedes.lstrip("#")
+        # Normalize supersedes format: accept "042" or "#042" → store as "042"
+        supersedes = args.supersedes
+        if supersedes != "none":
+            supersedes = supersedes.lstrip("#")
+            try:
+                supersedes_id = int(supersedes)
+            except ValueError:
+                print(f"ERROR: --supersedes must be an entry id or 'none'", file=sys.stderr)
+                return 2
+            if supersedes_id not in {e.id for e in entries}:
+                print(
+                    f"ERROR: --supersedes #{supersedes_id:03d} not found in HISTORY.md "
+                    f"(highest existing id is #{max((e.id for e in entries), default=0):03d})",
+                    file=sys.stderr,
+                )
+                return 2
+
+        entry_text = format_entry(
+            id=new_id,
+            date=date,
+            agent=args.agent,
+            status=args.status,
+            topics=topics,
+            commits=args.commits,
+            refs=args.refs,
+            supersedes=supersedes,
+            tokens=tokens,
+            body=body,
+        )
+
+        # Append with a blank line separator if file is non-empty
+        with open(HISTORY_PATH, "ab") as f:
+            if existing and not existing.endswith(b"\n\n"):
+                if existing.endswith(b"\n"):
+                    f.write(b"\n")
+                else:
+                    f.write(b"\n\n")
+            f.write(entry_text.encode("utf-8"))
+
+        n = rebuild()
+        print(f"Appended #{new_id:03d}. HISTORY.md now has {n} entries.")
+        return 0
+    finally:
         try:
-            supersedes_id = int(supersedes)
-        except ValueError:
-            print(f"ERROR: --supersedes must be an entry id or 'none'", file=sys.stderr)
-            return 2
-        if supersedes_id not in {e.id for e in entries}:
-            print(
-                f"ERROR: --supersedes #{supersedes_id:03d} not found in HISTORY.md "
-                f"(highest existing id is #{max((e.id for e in entries), default=0):03d})",
-                file=sys.stderr,
-            )
-            return 2
-
-    entry_text = format_entry(
-        id=new_id,
-        date=date,
-        agent=args.agent,
-        status=args.status,
-        topics=topics,
-        commits=args.commits,
-        refs=args.refs,
-        supersedes=supersedes,
-        tokens=tokens,
-        body=body,
-    )
-
-    # Append with a blank line separator if file is non-empty
-    with open(HISTORY_PATH, "ab") as f:
-        if existing and not existing.endswith(b"\n\n"):
-            if existing.endswith(b"\n"):
-                f.write(b"\n")
-            else:
-                f.write(b"\n\n")
-        f.write(entry_text.encode("utf-8"))
-
-    n = rebuild()
-    print(f"Appended #{new_id:03d}. HISTORY.md now has {n} entries.")
-    return 0
+            unlock()
+        finally:
+            _PROCESS_LOCK.release()
 
 
 if __name__ == "__main__":

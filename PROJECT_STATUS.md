@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-17 (Track I COMPLETE — SOPs 0-4 all landed)
+Last updated: 2026-05-18 (HISTORY#193 — continuity-gap observation catalogued as Track F backlog card; PR prepared for operator review)
 
 ## Current State
 
@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#190` — audit + merge closeout for PR #29 (SOPs 3+4 Mem0+Zep comparators): committed locally as `c08b35a`, squash-merged on `main` as `dc9b09d`, feature branch deleted on origin and local tracking ref pruned, worktree clean. Track I scope (SOPs 0-4) is now fully merged on `main`. `HISTORY#189` was the SOPs 3+4 implementation; `HISTORY#188` was SOP 2 LLM-judge.
+- Latest continuity handoff is `HISTORY#195` — PR #30 production-readiness remediation Windows CI follow-up. `HISTORY#194` added same-process serialization, then #195 superseded it after the second Windows CI run proved the OS lock must also move off `HISTORY_INDEX.md` itself; `tools/history/new_entry.py` now uses `.git/seam-history.lock` in real checkouts plus the process-local mutex. PR #30 is open from `deepseek/production-readiness-remediation` to `main`; rerun CI before squash-merge. `HISTORY#193` catalogued the `verify_continuity` ref-existence backlog card; `HISTORY#192` hardened `verify_streams`; `HISTORY#191` was the production readiness remediation pass (Phases 1-7 from `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md`).
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
@@ -58,6 +58,9 @@ SEAM is operating as a local machine-first memory runtime with:
 
 ## Active Focus
 
+- Deferred: experimental/hybrid_orchestrator/ deletion awaits operator confirmation (Phase 3 audit: no external imports, legacy re-export shim, safe to delete)
+- Deferred: ~113 remaining assertTrue→specific-assertion replacements in test_seam.py (backlog card roadmap:track:F:asserttrue-scrub)
+- Deferred: 10 low-priority backlog items catalogued under Track F (Phase 7)
 - Reduce startup context overhead by relying on compact index + surgical history reads
 - Preserve near-complete temporal history without loading all history into model context
 - Keep maintenance, security, context, and runtime facts logically routed for AI search without duplicating chronology

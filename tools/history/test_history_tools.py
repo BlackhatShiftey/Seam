@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools.history import history_lib
+from tools.history import new_entry as new_entry_module
 from tools.history.history_lib import (
     compute_entry_hash,
     estimate_tokens,
@@ -61,6 +62,8 @@ class TempRepoBase(unittest.TestCase):
                 (ls, "SNAPSHOTS_DIR", self.snaps),
                 (ri, "HISTORY_PATH", self.history),
                 (ri, "INDEX_PATH", self.index),
+                (new_entry_module, "HISTORY_PATH", self.history),
+                (new_entry_module, "INDEX_PATH", self.index),
                 (vc, "HISTORY_PATH", self.history),
                 (vc, "INDEX_PATH", self.index),
                 (vc, "SNAPSHOTS_DIR", self.snaps),
@@ -182,6 +185,35 @@ class TestRebuildIndexIdempotent(TempRepoBase):
             rebuild(self.history, self.index)
         text = self.index.read_text(encoding="utf-8")
         self.assertIn("total_entries: 0", text)
+
+
+class TestNewEntryLock(TempRepoBase):
+    def test_new_entry_lock_serializes_concurrent_writes(self):
+        import concurrent.futures
+        self.write_entries([sample_entry(1)])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+
+            def write_entry(worker_id: int) -> int:
+                return new_entry_module.main([
+                    "--agent", "test",
+                    "--status", "done",
+                    "--topics", "meta",
+                    "--body", f"Concurrent entry from worker {worker_id}",
+                ])
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                futures = [pool.submit(write_entry, i) for i in range(4)]
+                results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+            self.assertTrue(all(r == 0 for r in results),
+                            f"One or more workers returned non-zero: {results}")
+
+            entries = parse_entries(self.history.read_bytes())
+            ids = [e.id for e in entries]
+            self.assertEqual(len(ids), len(set(ids)),
+                             f"Duplicate ids detected: {ids}")
+            self.assertEqual(len(ids), 5, f"Expected 5 entries (1 base + 4 concurrent), got {len(ids)}")
 
 
 class TestVerifyIntegrity(TempRepoBase):
@@ -318,6 +350,28 @@ class TestContextPack(TempRepoBase):
         pack = build_context_pack(entries, latest=3, token_budget=15)
         self.assertEqual(pack.included_ids, [3])
         self.assertEqual(pack.skipped_ids, [2, 1])
+
+    def test_invalid_utf8_survives_decode_replace(self):
+        entry = (
+            b"---BEGIN-ENTRY-#001---\n"
+            b"id: 001\n"
+            b"date: 2026-04-18T12:00:00Z\n"
+            b"agent: test\n"
+            b"status: done\n"
+            b"topics: meta\n"
+            b"commits: none\n"
+            b"refs: none\n"
+            b"supersedes: none\n"
+            b"tokens: 5\n"
+            b"hash: 0000000000000000000000000000000000000000000000000000000000000001\n"
+            b"---\n"
+            b"Body with \xff\xfe invalid bytes.\n"
+            b"---END-ENTRY-#001---\n"
+        )
+        self.history.write_bytes(entry)
+        entries = parse_entries(self.history.read_bytes())
+        pack = build_context_pack(entries, latest=1, token_budget=999)
+        self.assertIn("invalid bytes", pack.pack)
 
 
 class TestVerifyContinuity(TempRepoBase):

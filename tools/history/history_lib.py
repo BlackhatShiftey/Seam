@@ -94,7 +94,7 @@ def parse_entries(data: bytes) -> list[Entry]:
 
         h = hashlib.sha256(raw).hexdigest()
 
-        entry = _parse_entry_body(raw.decode("utf-8"), begin_id)
+        entry = _parse_entry_body(raw.decode("utf-8", errors="replace"), begin_id)
         entry.byte_start = byte_start
         entry.byte_end = byte_end
         entry.line_start = line_start

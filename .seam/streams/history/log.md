@@ -3951,3 +3951,161 @@ tokens: 130
 ---
 Audit + merge closeout for HISTORY#189 (SOPs 3+4 Mem0+Zep comparators). Reviewed adapter source (lazy imports, scope isolation, clear missing-extra errors, deterministic close()), reran the full suite (252 passed) and the four verify gates (integrity, routing, continuity, streams all OK), staged 12 files, committed locally as c08b35a, pushed feat/track-i-sop3-4-mem0-zep-comparators, opened PR #29, squash-merged as dc9b09d, deleted the feature branch on origin, pruned the local tracking ref, and confirmed worktree clean on main with origin/main fast-forwarded. Track I (SOPs 0-4) is now merged on main; PR #29 is the merged tip. No SEAM-vs-X public claims; those remain gated on Track K (BIL bundles). Next track is operator's choice per ROADMAP.md (no auto-proposal).
 ---END-ENTRY-#190---
+
+---BEGIN-ENTRY-#191---
+id: 191
+date: 2026-05-18T07:51:08Z
+agent: claude-opus-4-7
+status: done
+topics: audit, verify, protocol, roadmap, tests, ci, security, history
+commits: none
+refs: PROJECT_STATUS.md,REPO_LEDGER.md,ROADMAP.md,seam_runtime/cli.py,seam_runtime/vector_adapters.py,tools/history/new_entry.py,tools/history/build_context_pack.py,tools/history/history_lib.py,test_seam_all/conftest.py,test_seam_all/test_cli_import_isolation.py,test_seam_all/test_vector_adapter_table_name_validation.py,test_seam_all/test_evals.py,test_seam_all/test_agent_memory.py,test_seam_all/test_transpile.py,test_seam_all/test_external_memory_benchmarks.py,test_seam_all/test_seam.py,.github/workflows/ci.yml,.github/workflows/external-memory-benchmarks.yml,benchmarks/registry/memory_benchmarks.json,benchmarks/external/locomo/adapters/seam.py,pyproject.toml,docs/SOP_PRODUCTION_READINESS_REMEDIATION.md
+supersedes: 190
+tokens: 904
+---
+Production readiness remediation pass per docs/SOP_PRODUCTION_READINESS_REMEDIATION.md.
+All four verify gates green at closeout.
+
+Phase 1 — Critical correctness gaps:
+  P1.1 Commit rebuilt cross-index (hot zone through history:190). Regenerated with tools.streams.rebuild_cross_index. verify_streams OK.
+  P1.2 Add file locking to tools/history/new_entry.py. Cross-platform advisory lock (fcntl/msvcrt) on HISTORY_INDEX.md. Test: test_new_entry_lock_serializes_concurrent_writes (4-thread ThreadPoolExecutor, no duplicate ids). tools/history/test_history_tools.py all 39 tests OK.
+  P1.3 Create test_seam_all/conftest.py with three fixtures (tmp_db_path, seam_runtime, isolated_env). SeamRuntime import matched from test_seam_all/test_seam.py (from seam import SeamRuntime). 252 passed, same count as before.
+  P1.4 Standardize CI workflow invocations to python -m <module> --scope all. Both ci.yml and external-memory-benchmarks.yml now use canonical pattern. Local command verified: python -m tools.run_external_memory_benchmarks --plan --scope all.
+
+Phase 2 — Runtime + roadmap + doc quick wins:
+  P2.1 Lazy-import experimental.retrieval_orchestrator in seam_runtime/cli.py. Moved top-level import into _handle_shell_command and _build_retrieval_orchestrator. Regression test test_cli_import_isolation.py: subprocess.run python -m seam doctor OK.
+  P2.2 Re-validate table_name in PgVectorAdapter. Renamed _validate_identifier to _validate_table_name; added calls in ensure_schema, index_records, search, stale_records. Test: 4 tests in test_vector_adapter_table_name_validation.py (valid names, semicolon, spaces, mutated adapter). Full test_seam_all 253 passed.
+  P2.3 Add seam:item markers for Tracks I (done), J (planned), K (planned), L (planned) in ROADMAP.md. verify_streams OK, seam:item count 38 (was 34).
+  P2.4 Fix Track H mislabel at ROADMAP.md recommended course: "Track H: Agent / Skills Compiler" → "Track L: Agent / Skills Compiler". Track H is Context Streams Protocol.
+  P2.5 Delete 10 leftover conv-*.db files in test_seam/locomo/. Added TODO comment in benchmarks/external/locomo/adapters/seam.py (default db_path should be tmp_path). Files were untracked (test_seam/ gitignored).
+  P2.6 Delete untracked seam.db at repo root. Confirmed git log shows untracked, no pyproject.toml/script canonical reference to root seam.db.
+
+Phase 3 — Dead-code audit (deferred):
+  P3.1 experimental/hybrid_orchestrator/ audit: grep found no active code imports outside the directory. __init__.py is a legacy re-export shim from retrieval_orchestrator. Deletion NOT performed — awaiting operator confirmation per SOP §12. HISTORY references in HISTORY.md and docs mention it as stale dead code. Finding: safe to delete; operator must confirm.
+
+Phase 4 — Test coverage gaps:
+  P4.1 Dedicated tests for evals.py, agent_memory.py, transpile.py. New test files added 28 test functions; python -m pytest test_seam_all/ -q passed with 286 passed. Coverage: one test per public function plus negative-path tests.
+  P4.2 Add Linux CI job. Converted ci.yml to os matrix [windows-latest, ubuntu-latest] with fail-fast:false. Added Linux installer smoke test step gated on ubuntu-latest.
+
+Phase 5 — Test quality scrub:
+  P5.1 Strengthen 15 weak assertTrue patterns in test_seam_all/test_seam.py. Replaced any(...) with set-based assertions, assertIn, assertEqual where applicable; added diagnostic messages to complex checks. 170 passed. Filed backlog card roadmap:track:F:asserttrue-scrub (status: planned) for remaining ~113 cases.
+
+Phase 6 — Medium-priority cleanups:
+  P6.1 Replace hardcoded operator paths in REPO_LEDGER.md (C:\Users\iwana\...) with in-repo references (scripts/run_guarded.ps1, etc.). All three scripts confirmed present.
+  P6.2 Add [tool.pytest.ini_options] to pyproject.toml (testpaths, addopts, markers). 339 tests collected. Note: existing pytest.ini takes precedence; consolidation deferred.
+  P6.3 Mark unimplemented comparators (letta_memgpt, mempalace, hindsight, memmachine) with status: not_implemented in benchmarks/registry/memory_benchmarks.json. Added registry validator test asserting status field present and valid. python -m pytest test_seam_all/test_external_memory_benchmarks.py -q passed with 13 passed.
+  P6.4 Fix UnicodeDecodeError in tools/history/build_context_pack.py line 183 and tools/history/history_lib.py line 97: decode("utf-8") → decode("utf-8", errors="replace"). Added test for invalid UTF-8 byte sequence. 40 history tool tests OK.
+  P6.5 ROADMAP done-track How section refresh: added "Implementation note: superseded by Textual migration; see HISTORY#108." to Tracks A0, A1, A5 How sections. Additive one-liners only.
+  P6.6 Skipped (per SOP).
+  P6.7 Skipped (per SOP).
+
+Phase 7 — Low-priority backlog (catalogue only):
+  P7: Added 10 seam:item cards under Track F with status: planned for: SECURITY.md contact clarity, installer symlink edge case, git-hooks macOS sha256sum, scoring weights, backoff jitter, JSON comparison fragility, ps1 double-backslash, experience stream empty, superseded phase tree, test_claude_judge flaky. Total seam:item count: 49.
+
+Verification at closeout:
+  python3 -m tools.history.verify_integrity → Integrity OK
+  python3 -m tools.history.verify_continuity → Continuity OK
+  python3 -m tools.history.verify_routing → Routing OK
+  python3 -m tools.streams.verify_streams → streams OK
+  .venv/bin/python -m pytest test_seam_all/ -q → 286 passed, 3 subtests passed
+  python3 -m unittest tools.history.test_history_tools -q → 40 tests OK
+
+Items deferred awaiting operator confirmation:
+  - Phase 3: experimental/hybrid_orchestrator/ deletion (no external imports; legacy re-export shim; safe to delete per audit)
+  - Phase 5: remaining ~113 assertTrue→specific-assertion replacements (backlog card filed)
+  - Phase 7: 10 backlog items catalogued (not fixed)
+  - pytest.ini / pyproject.toml pytest config consolidation (both exist; pyproject.toml ignored while pytest.ini present)
+---END-ENTRY-#191---
+
+---BEGIN-ENTRY-#192---
+id: 192
+date: 2026-05-18T08:45:31Z
+agent: claude-opus-4-7
+status: done
+topics: verify, streams, tests, protocol, continuity, history
+commits: none
+refs: tools/streams/verify_streams.py,tools/streams/test_streams.py,docs/SOP_PRODUCTION_READINESS_REMEDIATION.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 191
+tokens: 356
+---
+Close-out follow-up to HISTORY#191. Three items folded into the substrate:
+
+(1) verify_streams hardening — added stale-detection for .seam/cross_index.md. The gate now parses `total_events:` from the file and compares against `len(collect_all_events())` from the live stream logs. On mismatch (or missing/unparseable header), emits `cross_index.md is stale: total_events=<X> but streams report <Y>; run tools.streams.rebuild_cross_index`. Closes the gap where a stale cross-index could pass verify_streams as long as the file existed.
+
+(2) TDD coverage in tools/streams/test_streams.py — three tests authored before HISTORY#191 but not folded into that closeout:
+    - test_extracts_tracks_i_j_k_l_items: asserts roadmap:track:{I,J,K,L} markers exist (P2.3 work was already on disk; this locks it in).
+    - test_agent_compiler_is_not_labeled_as_track_h: asserts the Track H mislabel cannot regress (P2.4 work was already on disk; this locks it in).
+    - test_verify_detects_stale_cross_index: red until item (1) above made it green.
+
+(3) Continuity drift fix — HISTORY#191 listed `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md` in its `refs:` field but the file was never `git add`ed. `git ls-files` returned empty; `git log --all` showed no commits. The continuity gate did not catch this because it validates structural integrity (hashes, supersedes chains, snapshots), not ref-file existence. Tracking the file now so the #191 refs are honest.
+
+Verification at closeout:
+  python3 -m tools.history.verify_integrity → Integrity OK
+  python3 -m tools.history.verify_continuity → Continuity OK
+  python3 -m tools.history.verify_routing → Routing OK
+  python3 -m tools.streams.verify_streams → streams OK
+  PYTHONPATH=. .venv/bin/pytest tools/streams/test_streams.py -q → 15 passed
+  PYTHONPATH=. .venv/bin/pytest tools/history/test_history_tools.py -q → 40 passed
+
+Observation for follow-up (not fixed here):
+  verify_continuity does not currently validate that files listed in an entry's `refs:` field exist in the git index. That is a true continuity check the gate is missing. File as a Track F backlog card if the operator wants it.
+---END-ENTRY-#192---
+
+---BEGIN-ENTRY-#193---
+id: 193
+date: 2026-05-18T09:30:00Z
+agent: claude-opus-4-7
+status: done
+topics: verify, continuity, roadmap, protocol
+commits: none
+refs: ROADMAP.md,docs/SOP_PRODUCTION_READINESS_REMEDIATION.md
+supersedes: 192
+tokens: 211
+---
+Continuity-gap observation from HISTORY#192 catalogued as a Track F backlog card.
+
+Added seam:item card roadmap:track:F:backlog:verify-continuity-ref-existence (status: planned) to ROADMAP.md. The card proposes adding ref-file existence validation to verify_continuity with three constraints:
+- Deterministic and fast: single git ls-files read + in-memory set lookup, no per-file shell-out
+- Distinguishes external URLs (skip) from internal paths (validate)
+- Age-gated to recent N entries to avoid noise from deliberately stale historical refs
+Output as warnings, not hard failures.
+
+The gap was discovered when HISTORY#191 listed docs/SOP_PRODUCTION_READINESS_REMEDIATION.md in its refs: before the file was tracked. The continuity gate validated hashes, supersedes chains, and snapshots — not ref-file presence — so the orphaned ref was not caught.
+
+seam:item count: 50 (was 49).
+
+Verification:
+  python3 -m tools.history.verify_integrity → Integrity OK
+  python3 -m tools.history.verify_continuity → Continuity OK
+  python3 -m tools.history.verify_routing → Routing OK
+  python3 -m tools.streams.verify_streams → streams OK
+  PYTHONPATH=. .venv/bin/pytest test_seam_all/ tools/history/ tools/streams/ -q → 341 passed
+---END-ENTRY-#193---
+
+---BEGIN-ENTRY-#194---
+id: 194
+date: 2026-05-18T10:26:40Z
+agent: codex
+status: done
+topics: verify, history, protocol
+commits: none
+refs: tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30
+supersedes: 193
+tokens: 179
+---
+CI follow-up for PR #30 production readiness remediation. Windows CI failed in tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes with PermissionError while rebuilding HISTORY_INDEX.md. Root cause: the existing advisory file lock serialized separate processes but did not serialize same-process ThreadPoolExecutor workers on Windows, so one thread could rewrite the locked index path while another worker still held the byte-range lock. Added a process-local threading.Lock around the existing OS lock in tools/history/new_entry.py so thread-level concurrency and process-level concurrency both serialize the append/rebuild critical section.\n\nVerification after the fix: .venv/bin/python -m pytest tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes -q -> 1 passed. .venv/bin/python -m tools.history.verify_integrity -> Integrity OK. .venv/bin/python -m tools.history.verify_routing -> Routing OK. .venv/bin/python -m tools.history.verify_continuity -> Continuity OK. .venv/bin/python -m tools.streams.verify_streams -> streams OK. Full local suite had passed before this fix with 341 passed, 1 warning, 3 subtests passed; rerun full suite and GitHub CI after recording this entry.
+---END-ENTRY-#194---
+
+---BEGIN-ENTRY-#195---
+id: 195
+date: 2026-05-18T10:33:00Z
+agent: codex
+status: done
+topics: verify, history, protocol
+commits: none
+refs: tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30
+supersedes: 194
+tokens: 162
+---
+Follow-up to HISTORY#194 after the second Windows CI run showed the root cause was narrower: the lock was held on HISTORY_INDEX.md itself, and rebuild_index opened HISTORY_INDEX.md through a separate handle for write. Windows denies that write while the byte-range lock is held. Moved the OS advisory lock to a dedicated lock path instead of the generated index file: real git checkouts use .git/seam-history.lock so no worktree lock artifact is created, while tests without .git fall back to a temporary sidecar beside the patched index path. Kept the process-local threading.Lock so same-process threads serialize before acquiring the OS lock.\n\nVerification before recording this entry: .venv/bin/python -m pytest tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes -q -> 1 passed. Previous #194 process-local-only fix was insufficient on Windows and is superseded by this sidecar-lock correction.
+---END-ENTRY-#195---

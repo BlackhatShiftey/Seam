@@ -49,12 +49,12 @@
     {"id": "amb", "name": "AMB / Agent Memory Benchmark", "priority": "P3", "required": false, "command_env": "SEAM_BENCH_AMB_COMMAND"}
   ],
   "comparators": [
-    {"id": "mem0", "name": "Mem0", "required": true},
-    {"id": "zep_graphiti", "name": "Zep / Graphiti", "required": true},
-    {"id": "letta_memgpt", "name": "Letta / MemGPT", "required": true},
-    {"id": "mempalace", "name": "MemPalace", "required": true},
-    {"id": "hindsight", "name": "Hindsight", "required": true},
-    {"id": "memmachine", "name": "MemMachine", "required": true}
+    {"id": "mem0", "name": "Mem0", "required": true, "status": "implemented"},
+    {"id": "zep_graphiti", "name": "Zep / Graphiti", "required": true, "status": "implemented"},
+    {"id": "letta_memgpt", "name": "Letta / MemGPT", "required": true, "status": "not_implemented"},
+    {"id": "mempalace", "name": "MemPalace", "required": true, "status": "not_implemented"},
+    {"id": "hindsight", "name": "Hindsight", "required": true, "status": "not_implemented"},
+    {"id": "memmachine", "name": "MemMachine", "required": true, "status": "not_implemented"}
   ],
   "policy": {
     "strict_mode_failure_statuses": ["NOT_CONFIGURED", "FAIL"]

@@ -47,7 +47,7 @@ class PgVectorAdapter:
     name: str = "pgvector"
 
     def __post_init__(self) -> None:
-        self.table_name = _validate_identifier(self.table_name)
+        _validate_table_name(self.table_name)
 
     def _connect(self):
         try:
@@ -57,6 +57,7 @@ class PgVectorAdapter:
         return psycopg.connect(self.dsn)
 
     def ensure_schema(self) -> None:
+        _validate_table_name(self.table_name)
         with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute("create extension if not exists vector")
@@ -87,6 +88,7 @@ class PgVectorAdapter:
             connection.commit()
 
     def index_records(self, records: list[MIRLRecord]) -> None:
+        _validate_table_name(self.table_name)
         self.ensure_schema()
         with self._connect() as connection:
             with connection.cursor() as cursor:
@@ -120,6 +122,7 @@ class PgVectorAdapter:
             connection.commit()
 
     def search(self, query: str, limit: int = 10) -> dict[str, float]:
+        _validate_table_name(self.table_name)
         self.ensure_schema()
         query_vector = self.model.embed(query)
         with self._connect() as connection:
@@ -138,6 +141,7 @@ class PgVectorAdapter:
         return {record_id: float(score) for record_id, score in rows if score is not None and float(score) > 0}
 
     def stale_records(self, records: list[MIRLRecord]) -> list[dict[str, object]]:
+        _validate_table_name(self.table_name)
         self.ensure_schema()
         stale: list[dict[str, object]] = []
         with self._connect() as connection:
@@ -164,10 +168,9 @@ class PgVectorAdapter:
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def _validate_identifier(name: str) -> str:
+def _validate_table_name(name: str) -> None:
     if not _IDENTIFIER_RE.fullmatch(name):
-        raise ValueError(f"Unsafe SQL identifier: {name}")
-    return name
+        raise ValueError(f"Unsafe SQL identifier: {name!r}")
 
 
 def _vector_literal(vector: list[float]) -> str:

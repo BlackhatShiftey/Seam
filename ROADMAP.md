@@ -149,6 +149,7 @@ phase: 1
 **Why first:** Every other Track A item (animations, graphs, chat tab, presentation mode) is easier and cleaner to build on a proper TUI framework than on top of a re-render loop. This is the foundation.
 
 **How:**
+> Implementation note: superseded by Textual migration; see HISTORY#108.
 - Migrate from `Rich.Live` full-screen re-render → **Textual** widgets with reactive data bindings
 - Each panel becomes a Textual `DataTable`, `ListView`, or custom `ScrollView` widget — independently scrollable
 - Input bar at the bottom is a Textual `Input` widget; on submit it runs the existing `execute()` logic and updates only the affected panel
@@ -280,6 +281,7 @@ phase: 1
 **What:** When a user runs `compile <text>` in the dashboard, show a live animation of the compilation process — text being parsed, records appearing one by one with their type labels (ENT, CLM, REL, ACT, OBJ) before the final summary.
 
 **How:**
+> Implementation note: superseded by Textual migration; see HISTORY#108.
 - Use Rich `Live` context manager in `dashboard.py`
 - On compile, stream record creation events from `compile_nl` by yielding intermediate batches
 - Each record appears with a typewriter-style pop: `[green]ENT[/green] ent:project:seam → "SEAM"`
@@ -404,6 +406,7 @@ phase: 1
 **What:** Add a `Chat` tab to the dashboard. The user types a message; SEAM retrieves relevant context from the DB; the context + message is sent to Claude API; the response appears in the result panel. The model can also invoke SEAM operations as tool calls.
 
 **How:**
+> Implementation note: superseded by Textual migration; see HISTORY#108.
 - New tab: `runtime | benchmark | chat`
 - Chat history stored in `DashboardApp` as a deque
 - On each message: run `search_ir` + `pack_ir` to get context, send as system prompt to Claude
@@ -846,6 +849,159 @@ phase: 1
 
 ## Track F — Docs, Setup Guides, and Error Playbooks
 
+<!-- seam:item
+id: roadmap:track:F:asserttrue-scrub
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: tests, quality
+priority: 3
+phase: 1
+-->
+
+**What:** Complete the remaining ~113 assertTrue→specific-assertion replacements in test_seam.py. Phase 1 addressed 15 highest-value cases; the remainder are mostly string-in-list and result-existence checks that benefit from better diagnostics.
+
+### F-backlog: Production Readiness Backlog Items
+
+<!-- seam:item
+id: roadmap:track:F:backlog:security-md
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: docs, security
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:installer-symlink
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: installer, linux
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:git-hooks-macos-sha256
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: git-hooks, macos
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:scoring-weights
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: retrieval, benchmark
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:backoff-jitter
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: models, retry
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:json-comparison-fragility
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: pack, json
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:ps1-double-backslash
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: scripts, windows
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:experience-stream-empty
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: experience, protocol
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:superseded-phase-tree
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: roadmap, docs
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:test-claude-judge-flaky
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: tests, judge
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:verify-continuity-ref-existence
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: verify, continuity, history
+priority: 3
+phase: 2
+-->
+
+**What:** Add ref-file existence validation to `verify_continuity`. The gate currently validates structural integrity (hashes, supersedes chains, snapshots) but does not check that files listed in an entry's `refs:` field exist in the git index. HISTORY#191 referenced `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md` in its `refs:` field before the file was tracked; the continuity gate did not catch the orphaned ref because it only validates hashes, chains, and snapshots — not ref-file presence.
+
+**Proposed approach (design only; not implemented):**
+1. Parse each entry's `refs:` field and classify each ref:
+   - `http://` or `https://` prefix → skip (external URL, valid outside repo).
+   - `HISTORY#NNN` pattern → validate the entry exists in HISTORY.md.
+   - Path-like ref (contains `/` or `.`) → validate the file exists in the git index via a single `git ls-files` read per run (in-memory set lookup; no per-file shell-out).
+   - Section-anchor ref (`file.md#section`) → validate the file exists; anchor validation is stretch.
+2. Scope: only validate refs in the most recent N entries (default: 10). Historical entries often reference files that were deliberately renamed or archived; scanning all 192 entries would produce noise.
+3. Output as warnings, not hard failures: `Continuity OK (2 ref-file warnings: docs/SOP_PRODUCTION_READINESS_REMEDIATION.md not in git index at entry #191)`. Operators triage warnings without the gate blocking a commit for a stale ref in an old entry.
+4. Deterministic: one `git ls-files` call per run, in-memory set membership check per ref. No per-file shell-out. Runs in milliseconds.
+
+Constraint satisfaction:
+- Deterministic and fast: single `git ls-files` read + set lookups. No shell-out per ref.
+- Distinguishes external (skip URLs) from internal (validate paths/HISTORY refs).
+- No flood of historical noise: age-gated to recent N entries only.
+
 ### F1: Operator Setup Guide with Exact Commands
 
 <!-- seam:item
@@ -1162,6 +1318,17 @@ namespaces (`ns=library.*`) stay separate from canonical `local.default`.
 Template scaffolds cleanly into a fresh repo with `seam-protocol init`.
 ## Track L — Agent / Skills Compiler
 
+<!-- seam:item
+id: roadmap:track:L
+status: planned
+status-since: 2026-05-15
+status-by: history:180
+supersedes: none
+topics: agent, compiler, skills
+priority: 2
+phase: 1
+-->
+
 **Status:** Planned major workstream. Foundation specs already on `main`.
 **Canonical specs:** `docs/roadmap/AGENT_COMPILER.md`, `docs/roadmap/SKILL_FACTORY.md`.
 **Execution plan:** `docs/roadmap/SKILLS_COMPILER.md`.
@@ -1183,6 +1350,17 @@ Phase work (see `SKILLS_COMPILER.md`):
 
 ## Track I — External Memory Benchmarks (Comparator Gate)
 
+<!-- seam:item
+id: roadmap:track:I
+status: done
+status-since: 2026-05-17
+status-by: history:189
+supersedes: none
+topics: benchmark, retrieval, comparator
+priority: 1
+phase: 1
+-->
+
 **Status:** Planned major workstream. Concept-only on main; implementation lives on `bench/add-memory-benchmark-registry`.
 **Canonical spec:** `docs/roadmap/MEMORY_BENCHMARKS.md`.
 
@@ -1203,6 +1381,17 @@ Phase work:
 
 ## Track J — Prompt Codec Optimization
 
+<!-- seam:item
+id: roadmap:track:J
+status: planned
+status-since: 2026-05-15
+status-by: history:180
+supersedes: none
+topics: codec, compress, prompt, benchmark
+priority: 2
+phase: 1
+-->
+
 **Status:** Planned roadmap track.
 **Canonical spec:** `docs/roadmap/PROMPT_CODEC.md`.
 
@@ -1211,6 +1400,17 @@ Evaluate TOON, compact JSON, SEAM-RC/1, SEAM-LX/1, and markdown-table encodings 
 ---
 
 ## Track K — Trust, Security, Lineage, and Auditability
+
+<!-- seam:item
+id: roadmap:track:K
+status: planned
+status-since: 2026-05-15
+status-by: history:180
+supersedes: none
+topics: security, audit, trust, benchmark
+priority: 2
+phase: 1
+-->
 
 **Status:** Planned major workstream.
 **Canonical spec:** `docs/roadmap/TRUST_SECURITY_AUDITABILITY.md`.
@@ -1277,7 +1477,7 @@ Later - benchmark credibility, scale, and adaptive context loop
 - E2: Multi-tenant namespacing
 
 Major workstreams scheduled after the plug-and-play target lands
-- Track H: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
+- Track L: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
 - Track J: Prompt codec optimization (TOON / SEAM-RC / SEAM-LX evaluation)
 - Track K: Trust, security, lineage, auditability (capabilities, audit ledger, BIL benchmark bundles)
 ```

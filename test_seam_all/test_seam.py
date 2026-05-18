@@ -134,7 +134,9 @@ claim c1:
         )
         report = verify_ir(batch)
         self.assertFalse(report.valid)
-        self.assertTrue(any(issue.code == "missing_claim_field" for issue in report.issues))
+        codes = {issue.code for issue in report.issues}
+        self.assertIn("missing_claim_field", codes)
+
 
     def test_runtime_persist_search_trace(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -896,7 +898,9 @@ print("ok")
         self.assertTrue(compose_calls)
         self.assertIn("--env-file", compose_calls[0])
         self.assertEqual(compose_calls[0][-2:], ["-d", "pgvector"])
-        self.assertTrue(any(call[:3] == ["docker", "exec", "seam-pgvector"] and "psql" in call for call in calls))
+        self.assertTrue(any(call[:3] == ["docker", "exec", "seam-pgvector"] and "psql" in call for call in calls),
+                        "Expected a docker exec psql call for pgvector boot check")
+
 
     def test_symbol_promotion_and_pack_compaction(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -1248,6 +1252,7 @@ claim c2:
         self.assertTrue(hits)
         self.assertEqual([hit.record.id for hit in hits], ["c1"])
         self.assertTrue(any(reason == "matched=predicate" for reason in hits[0].reasons))
+        self.assertIn("matched=predicate", hits[0].reasons)
 
     def test_cli_plan_outputs_mixed_intent(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -1405,7 +1410,8 @@ claim c2:
         self.assertTrue(result.passed)
         self.assertGreaterEqual(result.artifact.token_savings_ratio, 0.75)
         self.assertTrue(result.search_log)
-        self.assertTrue(any(attempt.status == "improved" for attempt in result.search_log))
+        search_statuses = {attempt.status for attempt in result.search_log}
+        self.assertIn("improved", search_statuses)
         self.assertTrue(result.stop_reason)
 
     def test_lossless_benchmark_logs_fluctuations_for_debugging(self) -> None:
@@ -1416,7 +1422,8 @@ claim c2:
         self.assertTrue(payload["search_log"])
         statuses = {attempt["status"] for attempt in payload["search_log"]}
         self.assertIn("improved", statuses)
-        self.assertTrue(any(status in {"flat", "regressed"} for status in statuses))
+        self.assertTrue(statuses & {"flat", "regressed"},
+                        "Expected at least one flat/regressed status")
 
     def test_lossless_benchmark_respects_requested_tokenizer(self) -> None:
         text = "SEAM preserves exact context while compressing token usage for lossless recovery.\n" * 12
@@ -1794,7 +1801,8 @@ claim c1:
             jpeg_path.write_bytes(b"\xff\xd8not-a-real-surface")
             result = verify_surface(jpeg_path)
             self.assertFalse(result.ok)
-            self.assertTrue(any("JPEG" in error for error in result.errors))
+            self.assertTrue(any("JPEG" in error for error in result.errors),
+                            "JPEG input should be rejected with a format error")
         finally:
             if jpeg_path.exists():
                 jpeg_path.unlink()
@@ -2030,6 +2038,8 @@ claim c1:
         self.assertEqual(gate["status"], "PASS")
         self.assertEqual(gate["summary"]["failed"], 0)
         self.assertTrue(all(check["status"] == "PASS" for check in gate["checks"]))
+        check_statuses = {check["status"] for check in gate["checks"]}
+        self.assertEqual(check_statuses, {"PASS"})
 
     def test_benchmark_gate_flags_threshold_failure(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -2045,7 +2055,8 @@ claim c1:
         gate = runtime.evaluate_benchmark_gate(report, policy=policy)
         self.assertEqual(gate["status"], "FAIL")
         failed = [check for check in gate["checks"] if check["status"] == "FAIL"]
-        self.assertTrue(any(check["metric"] == "worst_case_savings" for check in failed))
+        failed_metrics = {check["metric"] for check in failed}
+        self.assertIn("worst_case_savings", failed_metrics)
 
     def test_cli_benchmark_diff_json_accepts_bundle_paths(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -2173,7 +2184,8 @@ claim c1:
             verification = runtime.verify_benchmark_bundle(tampered_path)
             self.assertEqual(verification["status"], "FAIL")
             self.assertFalse(verification["bundle_hash_ok"])
-            self.assertTrue(any(not item["ok"] for item in verification["case_checks"]))
+            failed_cases = [item for item in verification["case_checks"] if not item["ok"]]
+            self.assertTrue(failed_cases, "Expected at least one failed case check")
         finally:
             for target in (bundle_path, tampered_path):
                 if target.exists():
@@ -2469,7 +2481,8 @@ claim c1:
                 self.assertEqual(os.environ.get("SEAM_CHAT_API_KEY"), "test-settings-key")
                 self.assertEqual(os.environ.get("SEAM_CHAT_BASE_URL"), "https://example.invalid/v1")
                 self.assertEqual(os.environ.get("SEAM_CHAT_MODEL"), "test-model")
-                self.assertTrue(any("Applied: SEAM_CHAT_API_KEY" in line for line in app.result_lines))
+                self.assertTrue(any("Applied: SEAM_CHAT_API_KEY" in line for line in app.result_lines),
+                                "Settings apply should log API key confirmation")
 
         try:
             asyncio.run(_check())
@@ -2525,7 +2538,8 @@ claim c1:
                 app._on_btn_apply_surface(None)
                 await pilot.pause()
                 self.assertEqual(os.environ.get("SEAM_SURFACE_MODE"), "rgba32")
-                self.assertTrue(any("Holographic Surface" in line for line in app.result_lines))
+                surface_lines = [line for line in app.result_lines if "Holographic Surface" in line]
+                self.assertTrue(surface_lines, "Expected Holographic Surface output")
 
                 app.query_one("#cfg-key-openrouter").value = "test-openrouter-key"
                 app._on_btn_use_openrouter(None)
@@ -2725,7 +2739,8 @@ claim c1:
                 overview = app.query_one("#overview-panel")
                 self.assertEqual(explorer.id, "explorer-tree")
                 self.assertIn("Total", "\n".join(overview._panel_lines))
-                self.assertTrue(any("Reload" in line for line in app.memory_lines))
+                reload_lines = [line for line in app.memory_lines if "Reload" in line]
+                self.assertTrue(reload_lines, "Expected Reload command in memory output")
 
         asyncio.run(_check())
 
@@ -2747,14 +2762,16 @@ claim c1:
                 await pilot.pause()
                 explorer = app.query_one("#explorer-tree")
                 namespace_labels = [str(child.label) for child in explorer.root.children]
-                self.assertTrue(any("local.default" in label for label in namespace_labels))
+                self.assertTrue(any("local.default" in label for label in namespace_labels),
+                                "Expected local.default namespace among labels")
                 ns_node = next(
                     child
                     for child in explorer.root.children
                     if (child.data or {}).get("ns") == "local.default"
                 )
                 scope_labels = [str(child.label) for child in ns_node.children]
-                self.assertTrue(any("thread" in label for label in scope_labels))
+                self.assertTrue(any("thread" in label for label in scope_labels),
+                                "Expected 'thread' scope among labels")
 
         asyncio.run(_check())
 
@@ -2917,7 +2934,8 @@ claim c1:
                 # Running a benchmark populates benchmark_lines and switches the tab
                 app.process_command(f"!benchmark {source_path} --min-savings 0.75")
                 await pilot.pause()
-                self.assertTrue(any("Benchmark" in line for line in app.benchmark_lines))
+                benchmark_lines = [line for line in app.benchmark_lines if "Benchmark" in line]
+                self.assertTrue(benchmark_lines, "Expected Benchmark output")
 
                 # Switching back to runtime shows overview tab
                 app.process_command("!tab runtime")

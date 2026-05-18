@@ -180,7 +180,7 @@ def build_context_pack(
             skipped.append(entry_id)
             continue
         included.append(entry_id)
-        chunks.append(entry.raw.decode("utf-8").strip())
+        chunks.append(entry.raw.decode("utf-8", errors="replace").strip())
         tokens_used += entry.tokens
 
     pack = "\n\n".join(chunks)
