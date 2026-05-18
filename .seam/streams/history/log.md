@@ -4123,3 +4123,49 @@ tokens: 143
 ---
 Track K memory-trust spine roadmap update landed after PR #30 merge. Added K14-K18 seam:item cards to ROADMAP.md for store-aware contradiction reports, provenance stress tests, diagnostic JSON evidence mode, session-root manifests/signatures, and stake-weighted memory signals. Updated docs/roadmap/TRUST_SECURITY_AUDITABILITY.md with the Memory Trust Spine Addendum. The ordering keeps contradiction detection and provenance stress testing ahead of signing and merit weighting, so SEAM does not confuse signatures or operational success with truth.\n\nReran tools.streams.roadmap_parser after the roadmap edit; it now reports 55 items/events, confirming K14-K18 are parsed into the roadmap stream. Updated PROJECT_STATUS.md to point at this handoff and to record that PR #30 squash-merged on main as decd1dd after Windows/Ubuntu CI plus registry-plan passed.
 ---END-ENTRY-#196---
+
+---BEGIN-ENTRY-#197---
+id: 197
+date: 2026-05-18T12:01:36Z
+agent: codex
+status: done
+topics: security, verify, lx1, benchmark, dashboard
+commits: none
+refs: seam_runtime/server.py,seam_runtime/lx1.py,seam_runtime/dashboard.py,seam_runtime/benchmarks.py,test_seam_all/test_seam.py,test_seam_all/test_cli_import_isolation.py
+supersedes: 196
+tokens: 419
+---
+Verified the deep-audit report against current main and fixed the confirmed runtime issues without touching experimental/webui wiring. Confirmed current baseline is main at origin/main with only untracked .vscode; the reported modified-roadmap state was stale. C2 was valid: RateLimiter.check mutated shared hit state without serialization. Added a process-local lock and a concurrent same-key regression. C6 was valid: LX1 decode accepted unknown status codes as ASSERTED. LX1 now raises ValueError for unknown status metadata with a regression test. M6 was valid for the dashboard import boundary: seam_runtime.dashboard imported experimental.retrieval_orchestrator at module import time. Moved that to a lazy dashboard-orchestrator builder and added import-isolation coverage. H3 was valid for benchmark temp DB cleanup: long_context and agent_tasks families leaked /tmp/seam-bench-*.db files. Added cleanup around per-case temp runtimes and a regression that checks both families leave no temp DB, WAL, or SHM files.\n\nClaims checked and not reproduced as critical data loss: forced mid-batch SQLiteStore.persist_ir failure and forced delete_ir failure both rolled back cleanly under Python sqlite transaction behavior; bw1 HS/1 payloads round-tripped exactly for payload sizes 1..79; tools/history/new_entry.py already uses a sidecar OS lock plus process lock from HISTORY#195, and the reported lock-order issue did not reproduce as a deadlock path in the current implementation. C3 remains a true scalability limitation in SQLiteVectorIndex.search because it scans all matching vectors in Python; C4 remains a local CLI/dashboard trust-boundary design issue rather than a newly fixed remote path traversal vulnerability.\n\nVerification before recording: PYTHONPATH=. .venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q -> 345 passed, 1 warning, 3 subtests passed in 89.52s. .venv/bin/python -m py_compile seam_runtime/server.py seam_runtime/lx1.py seam_runtime/dashboard.py seam_runtime/benchmarks.py -> OK. git diff --check -> OK. .venv/bin/python -m tools.history.verify_integrity -> Integrity OK. .venv/bin/python -m tools.history.verify_routing -> Routing OK. .venv/bin/python -m tools.history.verify_continuity -> Continuity OK. .venv/bin/python -m tools.streams.verify_streams -> streams OK. Benchmark smoke: .venv/bin/python -m seam benchmark run long_context --format json -> PASS, bundle_hash d195537532cb5951a410020a0978ed4e3526a956a0ff85bb163ce822e13fe6cf; .venv/bin/python -m seam bench external --quickstart locomo --adapter seam --judge stub -> 10 cases, judge_score_mean 1.0, integrity_hash b9890a3041719b1e7685cb01bbe5edd9e62596c09e0c6c9c2988e4b3ba65f2f1.
+---END-ENTRY-#197---
+
+---BEGIN-ENTRY-#198---
+id: 198
+date: 2026-05-18T15:31:05Z
+agent: codex
+status: done
+topics: audit, verify, benchmark, docs, history, status
+commits: none
+refs: seam_runtime/storage.py,seam_runtime/mirl.py,tools/history/write_snapshot.py,tools/history/test_history_tools.py,test_seam_all/test_seam.py,docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md,PROJECT_STATUS.md
+supersedes: 197
+tokens: 279
+---
+Deep-audit follow-up after HISTORY#197. Continued without additional agent delegation per operator instruction. Added bounded SQLiteStore.load_ir pagination with limit/offset validation and stable id ordering; added tests for first page, later page, empty page, and negative limit rejection. Added MIRL parser line-context errors so malformed MIRL text raises a bounded ValueError naming the failing line instead of a raw split/json exception. Added explicit snapshot pack metadata: selected_entries continues to list requested entries, while new pack_entry_ids and skipped_entry_ids state which selected entries were included in or skipped from the embedded pack because of token budget. Added docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md as the next-cycle deep-audit remediation blueprint and corrected its benchmark/write_snapshot command examples against the actual CLI. Updated PROJECT_STATUS.md to point at this handoff.\n\nVerification before recording: PYTHONPATH=. .venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q -> 348 passed, 1 warning, 3 subtests passed in 90.92s. Focused tests for pagination, MIRL parse context, snapshot skipped-entry metadata, snapshot roundtrip, trace, and rollback paths passed. .venv/bin/python -m py_compile seam_runtime/storage.py seam_runtime/mirl.py tools/history/write_snapshot.py test_seam_all/test_seam.py tools/history/test_history_tools.py -> OK. git diff --check -> OK. Candidate diff and SOP secret/session scan returned no findings. Benchmark smoke: .venv/bin/python -m seam benchmark run long_context --format json -> PASS, bundle_hash 812ae009b5c11ad7884169bc285c4b8604fa5b32b0d9c12aee0ab334de65f608; .venv/bin/python -m seam bench external --quickstart locomo --adapter seam --judge stub -> 10 cases, judge_score_mean 1.0, integrity_hash b9890a3041719b1e7685cb01bbe5edd9e62596c09e0c6c9c2988e4b3ba65f2f1. No WebUI wiring was performed.
+---END-ENTRY-#198---
+
+---BEGIN-ENTRY-#199---
+id: 199
+date: 2026-05-18
+agent: deepseek
+status: done
+topics: vector, persist, verify, audit
+commits: none
+refs: seam_runtime/vector.py,tests/audit/__init__.py,tests/audit/test_vector_pragmas.py
+supersedes: 198
+tokens: 160
+---
+Item P1-12: Added SQLite pragmas to SQLiteVectorIndex._connect() in vector.py, aligning it with the storage.py _connect() hardening from HISTORY#177. Changes: sqlite3.connect timeout raised to 5.0s, journal_mode=WAL set for on-disk databases (skipped for :memory:), busy_timeout=5000, foreign_keys=ON, and synchronous=NORMAL. The synchronous=NORMAL pragma is an addition beyond storage.py's current set.
+
+New test file tests/audit/test_vector_pragmas.py (1 test) verifies all four pragma values on a real on-disk tmp_path database after ensure_schema(). New tests/audit/__init__.py package marker.
+
+Verification: focused test python3 -m pytest tests/audit/test_vector_pragmas.py = 1 passed. Full suite = 349 passed, 1 warning, 3 subtests passed in 89.81s. py_compile OK. No regressions.
+---END-ENTRY-#199---

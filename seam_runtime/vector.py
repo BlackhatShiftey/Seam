@@ -20,8 +20,13 @@ class SQLiteVectorIndex:
         self.model = model
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
+        connection = sqlite3.connect(self.path, timeout=5.0)
         connection.row_factory = sqlite3.Row
+        if self.path != ":memory:":
+            connection.execute("pragma journal_mode=WAL")
+        connection.execute("pragma busy_timeout=5000")
+        connection.execute("pragma foreign_keys=ON")
+        connection.execute("pragma synchronous=NORMAL")
         return connection
 
     def ensure_schema(self) -> None:

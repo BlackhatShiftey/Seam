@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-18 (HISTORY#193 — continuity-gap observation catalogued as Track F backlog card; PR prepared for operator review)
+Last updated: 2026-05-18 (HISTORY#199 — vector.py SQLite pragma alignment)
 
 ## Current State
 
@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#196` — Track K memory-trust spine roadmap update. PR #30 production-readiness remediation was squash-merged on `main` as `decd1dd` after Windows/Ubuntu CI and registry-plan passed; the branch was deleted on origin. `HISTORY#196` added planned K14-K18 roadmap cards for store-aware contradiction reports, provenance stress tests, diagnostic JSON evidence mode, session-root manifests/signatures, and stake-weighted memory signals, with the detailed design mirrored in `docs/roadmap/TRUST_SECURITY_AUDITABILITY.md`. `HISTORY#195` was the Windows-safe sidecar-lock fix for `tools/history/new_entry.py`.
+- Latest continuity handoff is `HISTORY#199` — vector.py SQLite pragma alignment (P1-12). `HISTORY#198` was the prior deep-audit follow-up pass with bounded `SQLiteStore.load_ir()` pagination, MIRL parse errors with line context, explicit snapshot `pack_entry_ids` and `skipped_entry_ids`, and `docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md` for the next remediation cycle.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.

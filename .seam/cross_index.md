@@ -2,16 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 251
+total_events: 254
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-18T00:17:00Z | history:039:5f9c7681 | session-event | planned | mirl, benchmark, fixture, roadmap, status | PLAN_LOG.md |
-| 2026-04-18T00:18:00Z | history:040:9e870fe4 | session-event | planned | verify, benchmark, roadmap, status | PLAN_LOG.md |
-| 2026-04-18T00:19:00Z | history:041:d7cfa8db | session-event | planned | compile, search, compress, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:20:00Z | history:042:dc8878e5 | session-event | planned | compile, persist, compress, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:21:00Z | history:043:2c4029af | session-event | planned | compile, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:22:00Z | history:044:1dfd1f24 | session-event | planned | persist, vector, pgvector, roadmap, status | PLAN_LOG.md |
@@ -186,6 +183,7 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-17T17:36:37Z | history:184:b8f6f1ed | session-event | done | audit, verify, history, status | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/cross_index.md |
 | 2026-05-17T21:25:43Z | history:186:6dac80c8 | session-event | done | docs, handoff, protocol | docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md,docs/SOP_EXTERNAL_BENCH_LLM_JU... |
 | 2026-05-18 | history:190:8ecacfad | session-event | done | handoff, protocol, command | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md |
+| 2026-05-18 | history:199:6838df98 | session-event | done | vector, persist, verify, audit | seam_runtime/vector.py,tests/audit/__init__.py,tests/audit/test_vector_pragma... |
 | 2026-05-18T00:00:00Z | roadmap:039:8c84adf1 | status-change | bootstrap | tests, quality | ROADMAP.md:852 |
 | 2026-05-18T00:00:00Z | roadmap:040:3b5ee9a1 | status-change | bootstrap | docs, security | ROADMAP.md:867 |
 | 2026-05-18T00:00:00Z | roadmap:041:5fcc3d8d | status-change | bootstrap | installer, linux | ROADMAP.md:878 |
@@ -209,10 +207,12 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-18T10:26:40Z | history:194:33aefde3 | session-event | done | verify, history, protocol | tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30 |
 | 2026-05-18T10:33:00Z | history:195:bbc6e6d3 | session-event | done | verify, history, protocol | tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30 |
 | 2026-05-18T10:43:26Z | history:196:34581023 | session-event | done | roadmap, history, verify | ROADMAP.md,docs/roadmap/TRUST_SECURITY_AUDITABILITY.md,.seam/streams/roadmap/... |
+| 2026-05-18T12:01:36Z | history:197:aadd22bd | session-event | done | security, verify, lx1, benchmark, dashboard | seam_runtime/server.py,seam_runtime/lx1.py,seam_runtime/dashboard.py,seam_run... |
+| 2026-05-18T15:31:05Z | history:198:25e22fed | session-event | done | audit, verify, benchmark, docs, history, status | seam_runtime/storage.py,seam_runtime/mirl.py,tools/history/write_snapshot.py,... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0051.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:16:00Z | 51 | (multi) | (multi) |
+| 0001-0054.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:19:00Z | 54 | (multi) | (multi) |
