@@ -846,6 +846,19 @@ phase: 1
 
 ## Track F — Docs, Setup Guides, and Error Playbooks
 
+<!-- seam:item
+id: roadmap:track:F:asserttrue-scrub
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: tests, quality
+priority: 3
+phase: 1
+-->
+
+**What:** Complete the remaining ~113 assertTrue→specific-assertion replacements in test_seam.py. Phase 1 addressed 15 highest-value cases; the remainder are mostly string-in-list and result-existence checks that benefit from better diagnostics.
+
 ### F1: Operator Setup Guide with Exact Commands
 
 <!-- seam:item
