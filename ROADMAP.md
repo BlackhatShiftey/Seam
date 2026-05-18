@@ -1162,6 +1162,17 @@ namespaces (`ns=library.*`) stay separate from canonical `local.default`.
 Template scaffolds cleanly into a fresh repo with `seam-protocol init`.
 ## Track L — Agent / Skills Compiler
 
+<!-- seam:item
+id: roadmap:track:L
+status: planned
+status-since: 2026-05-15
+status-by: history:180
+supersedes: none
+topics: agent, compiler, skills
+priority: 2
+phase: 1
+-->
+
 **Status:** Planned major workstream. Foundation specs already on `main`.
 **Canonical specs:** `docs/roadmap/AGENT_COMPILER.md`, `docs/roadmap/SKILL_FACTORY.md`.
 **Execution plan:** `docs/roadmap/SKILLS_COMPILER.md`.
@@ -1183,6 +1194,17 @@ Phase work (see `SKILLS_COMPILER.md`):
 
 ## Track I — External Memory Benchmarks (Comparator Gate)
 
+<!-- seam:item
+id: roadmap:track:I
+status: done
+status-since: 2026-05-17
+status-by: history:189
+supersedes: none
+topics: benchmark, retrieval, comparator
+priority: 1
+phase: 1
+-->
+
 **Status:** Planned major workstream. Concept-only on main; implementation lives on `bench/add-memory-benchmark-registry`.
 **Canonical spec:** `docs/roadmap/MEMORY_BENCHMARKS.md`.
 
@@ -1203,6 +1225,17 @@ Phase work:
 
 ## Track J — Prompt Codec Optimization
 
+<!-- seam:item
+id: roadmap:track:J
+status: planned
+status-since: 2026-05-15
+status-by: history:180
+supersedes: none
+topics: codec, compress, prompt, benchmark
+priority: 2
+phase: 1
+-->
+
 **Status:** Planned roadmap track.
 **Canonical spec:** `docs/roadmap/PROMPT_CODEC.md`.
 
@@ -1211,6 +1244,17 @@ Evaluate TOON, compact JSON, SEAM-RC/1, SEAM-LX/1, and markdown-table encodings 
 ---
 
 ## Track K — Trust, Security, Lineage, and Auditability
+
+<!-- seam:item
+id: roadmap:track:K
+status: planned
+status-since: 2026-05-15
+status-by: history:180
+supersedes: none
+topics: security, audit, trust, benchmark
+priority: 2
+phase: 1
+-->
 
 **Status:** Planned major workstream.
 **Canonical spec:** `docs/roadmap/TRUST_SECURITY_AUDITABILITY.md`.
