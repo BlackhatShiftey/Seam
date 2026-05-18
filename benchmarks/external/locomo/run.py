@@ -16,6 +16,7 @@ import json
 import sys
 
 from benchmarks.external.common.dataset import load_locomo_cases, load_quickstart_cases
+from benchmarks.external.common.judge import build_judge
 from benchmarks.external.common.runner import run_benchmark
 from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
 
@@ -51,6 +52,17 @@ def main() -> None:
         default="seam",
         help="Which adapter to use (default: seam)",
     )
+    parser.add_argument(
+        "--judge",
+        default=None,
+        choices=["none", "stub", "claude", "openai"],
+        help="LLM judge in addition to string-match scoring",
+    )
+    parser.add_argument(
+        "--judge-model",
+        default=None,
+        help="Override the default judge model id",
+    )
     args = parser.parse_args()
 
     if not args.quickstart and not args.dataset:
@@ -76,11 +88,15 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown adapter: {args.adapter}")
 
+    # Build judge
+    judge = build_judge(args.judge, model=args.judge_model)
+
     # Run benchmark
     report = run_benchmark(
         adapter=adapter,
         cases=cases,
         dataset_source=source,
+        judge=judge,
     )
 
     # Output

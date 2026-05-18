@@ -404,6 +404,8 @@ def build_parser() -> argparse.ArgumentParser:
     bench_external_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
     bench_external_parser.add_argument("--timeout-seconds", type=int, default=3600)
     bench_external_parser.add_argument("--quickstart", choices=["locomo"], help="Run a bundled quickstart benchmark (locomo: 60s synthetic fixture)")
+    bench_external_parser.add_argument("--judge", choices=["none", "stub", "claude", "openai"], default=None, help="LLM judge in addition to string-match scoring")
+    bench_external_parser.add_argument("--judge-model", default=None, help="Override the default judge model id")
 
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
@@ -679,6 +681,10 @@ def run_cli(argv: list[str] | None = None) -> None:
                 cmd = [sys.executable, "-m", "benchmarks.external.locomo.run", "--quickstart"]
                 if args.output:
                     cmd.extend(["--output", args.output])
+                if args.judge:
+                    cmd.extend(["--judge", args.judge])
+                if args.judge_model:
+                    cmd.extend(["--judge-model", args.judge_model])
                 result = subprocess.run(cmd, check=False)
                 raise SystemExit(result.returncode)
             raise SystemExit(f"Unknown quickstart target: {args.quickstart!r}")

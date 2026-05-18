@@ -38,3 +38,18 @@ def context_recall(retrieved: str, gold: str) -> float:
         return 1.0
     hits = sum(1 for tok in gold_tokens if tok in retrieved_tokens)
     return hits / len(gold_tokens)
+
+
+def aggregate_judge_scores(verdicts: list) -> dict:
+    seen = [v for v in verdicts if v is not None]
+    if not seen:
+        return {"judge_score_mean": None, "judge_count": 0}
+    _score = lambda v: v.score if hasattr(v, "score") else v["score"]
+    _verdict = lambda v: v.verdict if hasattr(v, "verdict") else v["verdict"]
+    return {
+        "judge_score_mean": sum(_score(v) for v in seen) / len(seen),
+        "judge_count": len(seen),
+        "correct_count": sum(1 for v in seen if _verdict(v) == "correct"),
+        "partial_count": sum(1 for v in seen if _verdict(v) == "partial"),
+        "incorrect_count": sum(1 for v in seen if _verdict(v) == "incorrect"),
+    }

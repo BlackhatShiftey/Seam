@@ -37,6 +37,16 @@ seam bench external locomo --dataset /path/to/locomo.json
 
 ## Where adapters go
 
+## Judges
+
+- Default: string-match only (no API key or extra deps needed)
+- `--judge stub`: deterministic test judge, always returns correct
+- `--judge claude`: requires `pip install seam[bench-judge]` and `ANTHROPIC_API_KEY`
+- `--judge openai`: requires `pip install seam[bench-judge]` and `OPENAI_API_KEY`
+- Cost: one LLM call per case. Quickstart has ~10 cases.
+
+## Where adapters go
+
 One subdirectory per benchmark. The LoCoMo adapter lives under
 `benchmarks/external/locomo/`. Future adapters follow the same pattern
 with shared infrastructure under `benchmarks/external/common/`.

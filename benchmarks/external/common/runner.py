@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from benchmarks.external.common.types import AdapterAnswer, BenchmarkCase, MemorySystemAdapter
-from benchmarks.external.common.scoring import context_recall, exact_match, token_f1
+from benchmarks.external.common.scoring import aggregate_judge_scores, context_recall, exact_match, token_f1
 
 RESULT_VERSION = "SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1"
 
@@ -28,6 +28,7 @@ def run_benchmark(
     adapter: MemorySystemAdapter,
     cases: list[BenchmarkCase],
     dataset_source: str = "unknown",
+    judge: object | None = None,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict:
     """Run adapter against cases and return a RunReport dict.
@@ -56,7 +57,7 @@ def run_benchmark(
         em = exact_match(answer.retrieved_context, case.gold_answer)
         f1 = token_f1(answer.retrieved_context, case.gold_answer)
 
-        case_results.append({
+        case_entry: dict = {
             "case_id": case.case_id,
             "category": case.category,
             "scores": {
@@ -66,7 +67,26 @@ def run_benchmark(
             },
             "retrieval_latency_ms": answer.retrieval_latency_ms,
             "answer_latency_ms": answer.answer_latency_ms,
-        })
+        }
+
+        if judge is not None:
+            try:
+                verdict = judge.score(
+                    question=case.question,
+                    gold=case.gold_answer,
+                    pred=answer.generated_answer or answer.retrieved_context,
+                )
+                case_entry["judge"] = {
+                    "verdict": verdict.verdict,
+                    "score": verdict.score,
+                    "rationale": verdict.rationale,
+                    "judge_name": verdict.judge_name,
+                    "judge_model": verdict.judge_model,
+                }
+            except Exception as exc:
+                case_entry["judge"] = {"error": str(exc)}
+
+        case_results.append(case_entry)
 
         if progress:
             progress(idx + 1, total)
@@ -81,14 +101,24 @@ def run_benchmark(
     else:
         cr_mean = em_mean = f1_mean = 0.0
 
-    scores = {
+    scores: dict = {
         "context_recall_mean": cr_mean,
         "answer_em_mean": em_mean,
         "answer_f1_mean": f1_mean,
     }
 
+    judge_verdicts = []
+    for c in case_results:
+        j = c.get("judge")
+        if j and "verdict" in j:
+            judge_verdicts.append(j)
+        else:
+            judge_verdicts.append(None)
+    if any(v is not None for v in judge_verdicts):
+        scores.update(aggregate_judge_scores(judge_verdicts))
+
     stable_cases = [
-        {k: v for k, v in c.items() if k not in ("retrieval_latency_ms", "answer_latency_ms")}
+        {k: v for k, v in c.items() if k not in ("retrieval_latency_ms", "answer_latency_ms", "judge")}
         for c in case_results
     ]
     integrity = _integrity_hash(stable_cases, scores)
