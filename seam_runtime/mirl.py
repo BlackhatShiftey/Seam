@@ -111,12 +111,22 @@ class MIRLRecord:
         )
 
     @classmethod
-    def from_text_line(cls, line: str) -> "MIRLRecord":
-        kind, record_id, payload = line.split("|", 2)
-        data = json.loads(payload)
+    def from_text_line(cls, line: str, line_number: int | None = None) -> "MIRLRecord":
+        prefix = f"MIRL line {line_number}" if line_number is not None else "MIRL line"
+        try:
+            kind, record_id, payload = line.split("|", 2)
+        except ValueError as exc:
+            raise ValueError(f"{prefix}: expected KIND|id|json payload") from exc
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{prefix}: invalid JSON payload: {exc.msg}") from exc
         data["id"] = record_id
         data["kind"] = kind
-        return cls.from_dict(data)
+        try:
+            return cls.from_dict(data)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"{prefix}: invalid MIRL record {record_id!r}: {exc}") from exc
 
 
 @dataclass
@@ -138,7 +148,7 @@ class IRBatch:
     @classmethod
     def from_text(cls, text: str) -> "IRBatch":
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        return cls([MIRLRecord.from_text_line(line) for line in lines])
+        return cls([MIRLRecord.from_text_line(line, line_number=index) for index, line in enumerate(lines, start=1)])
 
     @classmethod
     def from_json(cls, payload: list[dict[str, Any]]) -> "IRBatch":

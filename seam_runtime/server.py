@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hmac
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,23 +35,25 @@ class RateLimiter:
     limit_per_minute: int = 0
     max_keys: int = 10000
     hits: dict[str, list[float]] = field(default_factory=dict)
+    _lock: Any = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def check(self, key: str) -> bool:
         if self.limit_per_minute <= 0:
             return True
-        now = time.monotonic()
-        window_start = now - 60.0
-        self._purge(window_start)
-        if key not in self.hits and len(self.hits) >= self.max_keys:
-            oldest_key = min(self.hits, key=lambda item: self.hits[item][-1] if self.hits[item] else 0.0)
-            self.hits.pop(oldest_key, None)
-        recent = [stamp for stamp in self.hits.get(key, []) if stamp >= window_start]
-        if len(recent) >= self.limit_per_minute:
+        with self._lock:
+            now = time.monotonic()
+            window_start = now - 60.0
+            self._purge(window_start)
+            if key not in self.hits and len(self.hits) >= self.max_keys:
+                oldest_key = min(self.hits, key=lambda item: self.hits[item][-1] if self.hits[item] else 0.0)
+                self.hits.pop(oldest_key, None)
+            recent = [stamp for stamp in self.hits.get(key, []) if stamp >= window_start]
+            if len(recent) >= self.limit_per_minute:
+                self.hits[key] = recent
+                return False
+            recent.append(now)
             self.hits[key] = recent
-            return False
-        recent.append(now)
-        self.hits[key] = recent
-        return True
+            return True
 
     def _purge(self, window_start: float) -> None:
         stale = [key for key, stamps in self.hits.items() if not any(stamp >= window_start for stamp in stamps)]

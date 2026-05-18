@@ -257,6 +257,22 @@ class TestSnapshots(TempRepoBase):
         self.assertIn("Body of entry 1.", payload["pack"])
         self.assertIn("Body of entry 3.", payload["pack"])
 
+    def test_snapshot_records_pack_entries_skipped_by_token_budget(self):
+        self.write_entries([sample_entry(1), sample_entry(2), sample_entry(3)])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+            snap_path = write_snapshot(
+                agent="claude-test",
+                entry_ids=[1, 2, 3],
+                token_budget=20,
+                snapshots_dir=self.snaps,
+            )
+            ok, payload, errs = load_and_verify(snap_path)
+        self.assertTrue(ok, f"Errors: {errs}")
+        self.assertEqual([item["id"] for item in payload["selected_entries"]], [1, 2, 3])
+        self.assertEqual(payload["pack_entry_ids"], [1, 2])
+        self.assertEqual(payload["skipped_entry_ids"], [3])
+
     def test_find_latest_accepts_repo_root_path(self):
         self.write_entries([sample_entry(1)])
         with self.patch_paths():

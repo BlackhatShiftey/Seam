@@ -169,7 +169,10 @@ def decode_record(line: str, default_ns: str = "local.default", default_scope: s
             elif meta.startswith("c="):
                 conf = float(meta[2:])
             elif meta.startswith("s="):
-                status = _CODE_TO_STATUS.get(meta[2:], Status.ASSERTED)
+                status_code = meta[2:]
+                if status_code not in _CODE_TO_STATUS:
+                    raise ValueError(f"unknown LX1 status code: {status_code!r}")
+                status = _CODE_TO_STATUS[status_code]
             elif meta.startswith("@"):
                 prov.append(meta[1:])
             elif meta.startswith("^"):

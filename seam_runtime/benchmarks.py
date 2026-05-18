@@ -963,65 +963,69 @@ def _run_long_context_family(
 
     cases: list[dict[str, Any]] = []
     for config in _load_json_fixture(fixture_path, _default_long_context_cases(), require_exists=require_fixture):
-        temp_runtime = runtime.__class__(Path(tempfile.gettempdir()) / f"seam-bench-long-{uuid4().hex}.db")
-        batch = compile_dsl(_build_long_context_dsl(config), scope="project")
-        temp_runtime.persist_ir(batch)
-        rag = RetrievalOrchestrator(temp_runtime).rag(
-            config["query"],
-            budget=int(config.get("budget", 5)),
-            pack_budget=int(config.get("pack_budget", 128)),
-        )
-        prompt_payload = build_context_payload(rag.to_dict(), view="prompt")
-        summary_payload = build_context_payload(rag.to_dict(), view="summary")
-        records_payload = build_context_payload(rag.to_dict(), view="records")
-        prompt_text = render_context_pretty(prompt_payload)
-        summary_text = render_context_pretty(summary_payload)
-        records_text = json.dumps(records_payload["output"], indent=2, sort_keys=True)
-        prompt_tokens, estimator = count_prompt_tokens(prompt_text, tokenizer=tokenizer)
-        records_tokens, _ = count_prompt_tokens(records_text, tokenizer=tokenizer)
-        expected_hit = any(record_id in config["expected_ids"] for record_id in rag.candidate_ids)
-        prompt_contains = all(snippet in prompt_text for snippet in config.get("required_prompt_snippets", []))
-        summary_contains = all(snippet in summary_text for snippet in config.get("required_summary_snippets", []))
-        projection_id = None
-        if persist:
-            temp_runtime.store.write_projection(
-                record_id=f"benchmark:{config['name']}",
-                projection_kind="prompt",
-                projection_text=prompt_text,
-                tokenizer=estimator,
-                metadata={"family": "long_context", "case": config["name"]},
+        temp_db = Path(tempfile.gettempdir()) / f"seam-bench-long-{uuid4().hex}.db"
+        temp_runtime = runtime.__class__(temp_db)
+        try:
+            batch = compile_dsl(_build_long_context_dsl(config), scope="project")
+            temp_runtime.persist_ir(batch)
+            rag = RetrievalOrchestrator(temp_runtime).rag(
+                config["query"],
+                budget=int(config.get("budget", 5)),
+                pack_budget=int(config.get("pack_budget", 128)),
             )
-            projection_id = temp_runtime.store.write_projection(
-                record_id=f"benchmark:{config['name']}",
-                projection_kind="records",
-                projection_text=records_text,
-                tokenizer=estimator,
-                metadata={"family": "long_context", "case": config["name"]},
-            )
-        case = {
-            "case_id": config["name"],
-            "status": "PASS" if expected_hit and prompt_contains and summary_contains else "FAIL",
-            "metrics": {
-                "expected_hit": expected_hit,
-                "prompt_contains": prompt_contains,
-                "summary_contains": summary_contains,
-                "prompt_tokens": prompt_tokens,
-                "records_tokens": records_tokens,
-                "prompt_token_savings_vs_records": round(_savings_ratio(records_tokens, prompt_tokens), 6),
-                "token_estimator": estimator,
-            },
-            "trace": {
-                "query": config["query"],
-                "candidate_ids": rag.candidate_ids,
-                "prompt": prompt_text,
-                "summary": summary_text,
-            },
-            "debug_flags": _long_context_flags(expected_hit, prompt_contains, summary_contains, prompt_tokens, records_tokens),
-            "improvement_loop": _long_context_actions(expected_hit, prompt_contains, summary_contains, prompt_tokens, records_tokens),
-        }
-        if projection_id is not None:
-            case["projection_id"] = projection_id
-        cases.append(_stamp_case_hash(case))
+            prompt_payload = build_context_payload(rag.to_dict(), view="prompt")
+            summary_payload = build_context_payload(rag.to_dict(), view="summary")
+            records_payload = build_context_payload(rag.to_dict(), view="records")
+            prompt_text = render_context_pretty(prompt_payload)
+            summary_text = render_context_pretty(summary_payload)
+            records_text = json.dumps(records_payload["output"], indent=2, sort_keys=True)
+            prompt_tokens, estimator = count_prompt_tokens(prompt_text, tokenizer=tokenizer)
+            records_tokens, _ = count_prompt_tokens(records_text, tokenizer=tokenizer)
+            expected_hit = any(record_id in config["expected_ids"] for record_id in rag.candidate_ids)
+            prompt_contains = all(snippet in prompt_text for snippet in config.get("required_prompt_snippets", []))
+            summary_contains = all(snippet in summary_text for snippet in config.get("required_summary_snippets", []))
+            projection_id = None
+            if persist:
+                temp_runtime.store.write_projection(
+                    record_id=f"benchmark:{config['name']}",
+                    projection_kind="prompt",
+                    projection_text=prompt_text,
+                    tokenizer=estimator,
+                    metadata={"family": "long_context", "case": config["name"]},
+                )
+                projection_id = temp_runtime.store.write_projection(
+                    record_id=f"benchmark:{config['name']}",
+                    projection_kind="records",
+                    projection_text=records_text,
+                    tokenizer=estimator,
+                    metadata={"family": "long_context", "case": config["name"]},
+                )
+            case = {
+                "case_id": config["name"],
+                "status": "PASS" if expected_hit and prompt_contains and summary_contains else "FAIL",
+                "metrics": {
+                    "expected_hit": expected_hit,
+                    "prompt_contains": prompt_contains,
+                    "summary_contains": summary_contains,
+                    "prompt_tokens": prompt_tokens,
+                    "records_tokens": records_tokens,
+                    "prompt_token_savings_vs_records": round(_savings_ratio(records_tokens, prompt_tokens), 6),
+                    "token_estimator": estimator,
+                },
+                "trace": {
+                    "query": config["query"],
+                    "candidate_ids": rag.candidate_ids,
+                    "prompt": prompt_text,
+                    "summary": summary_text,
+                },
+                "debug_flags": _long_context_flags(expected_hit, prompt_contains, summary_contains, prompt_tokens, records_tokens),
+                "improvement_loop": _long_context_actions(expected_hit, prompt_contains, summary_contains, prompt_tokens, records_tokens),
+            }
+            if projection_id is not None:
+                case["projection_id"] = projection_id
+            cases.append(_stamp_case_hash(case))
+        finally:
+            _cleanup_temp_db(temp_db)
 
     summary = {
         "case_count": len(cases),
@@ -1167,89 +1171,93 @@ def _run_agent_task_family(
 
     cases: list[dict[str, Any]] = []
     for config in _load_json_fixture(fixture_path, _default_agent_task_cases(), require_exists=require_fixture):
-        temp_runtime = runtime.__class__(Path(tempfile.gettempdir()) / f"seam-bench-agent-{uuid4().hex}.db")
-        batch = compile_dsl(config["dsl"], scope="project")
-        temp_runtime.persist_ir(batch)
-        rag = RetrievalOrchestrator(temp_runtime).rag(
-            config["query"],
-            budget=int(config.get("budget", 5)),
-            pack_budget=int(config.get("pack_budget", 128)),
-        )
-        prompt_payload = build_context_payload(rag.to_dict(), view="prompt")
-        evidence_payload = build_context_payload(rag.to_dict(), view="evidence")
-        summary_payload = build_context_payload(rag.to_dict(), view="summary")
-        records_payload = build_context_payload(rag.to_dict(), view="records")
-        prompt_text = render_context_pretty(prompt_payload)
-        summary_text = render_context_pretty(summary_payload)
-        records_text = render_context_pretty(records_payload)
-        evidence_rows = evidence_payload["output"]
-        payload_text = records_text if records_text != "[]" else prompt_text
-        payload_benchmark = benchmark_text_lossless(payload_text, tokenizer=tokenizer, min_token_savings=0.10)
-        prompt_tokens, estimator = count_prompt_tokens(prompt_text, tokenizer=tokenizer)
-        records_tokens, _ = count_prompt_tokens(records_text, tokenizer=tokenizer)
-        expected_hit = any(record_id in config["expected_ids"] for record_id in rag.candidate_ids)
-        prompt_contains = all(snippet in prompt_text for snippet in config.get("required_prompt_snippets", []))
-        summary_contains = all(snippet in summary_text for snippet in config.get("required_summary_snippets", []))
-        evidence_contains = any(row["record_id"] in config["expected_ids"] for row in evidence_rows)
-        records_contain = all(record_id in records_text for record_id in config["expected_ids"])
-        artifact_id = None
-        if persist:
-            artifact_id = temp_runtime.store.write_machine_artifact(
-                source_type="benchmark.agent_task",
-                source_id=config["name"],
-                artifact=payload_benchmark.artifact.to_dict(include_machine_text=True),
-                roundtrip_ok=payload_benchmark.roundtrip_match,
-                metadata={"family": "agent_tasks", "case": config["name"], "projection": "exact_payload"},
+        temp_db = Path(tempfile.gettempdir()) / f"seam-bench-agent-{uuid4().hex}.db"
+        temp_runtime = runtime.__class__(temp_db)
+        try:
+            batch = compile_dsl(config["dsl"], scope="project")
+            temp_runtime.persist_ir(batch)
+            rag = RetrievalOrchestrator(temp_runtime).rag(
+                config["query"],
+                budget=int(config.get("budget", 5)),
+                pack_budget=int(config.get("pack_budget", 128)),
             )
-        case = {
-            "case_id": config["name"],
-            "status": "PASS"
-            if expected_hit and prompt_contains and summary_contains and evidence_contains and records_contain and payload_benchmark.roundtrip_match
-            else "FAIL",
-            "metrics": {
-                "expected_hit": expected_hit,
-                "prompt_contains": prompt_contains,
-                "summary_contains": summary_contains,
-                "evidence_contains": evidence_contains,
-                "records_contain": records_contain,
-                "prompt_tokens": prompt_tokens,
-                "records_tokens": records_tokens,
-                "prompt_token_savings_vs_records": round(_savings_ratio(records_tokens, prompt_tokens), 6),
-                "exact_payload_lossless_savings": round(payload_benchmark.artifact.token_savings_ratio, 6),
-                "exact_payload_roundtrip_match": payload_benchmark.roundtrip_match,
-                "token_estimator": estimator,
-            },
-            "trace": {
-                "query": config["query"],
-                "candidate_ids": rag.candidate_ids,
-                "prompt": prompt_text,
-                "summary": summary_text,
-                "evidence": evidence_rows,
-                "exact_payload_compression": payload_benchmark.to_dict(include_machine_text=False),
-            },
-            "debug_flags": _agent_task_flags(
-                expected_hit,
-                prompt_contains,
-                summary_contains,
-                evidence_contains,
-                records_contain,
-                prompt_tokens,
-                records_tokens,
-            ),
-            "improvement_loop": _agent_task_actions(
-                expected_hit,
-                prompt_contains,
-                summary_contains,
-                evidence_contains,
-                records_contain,
-                prompt_tokens,
-                records_tokens,
-                payload_benchmark.artifact.token_savings_ratio,
-            ),
-        }
-        if artifact_id is not None:
-            case["artifact_id"] = artifact_id
-        cases.append(_stamp_case_hash(case))
+            prompt_payload = build_context_payload(rag.to_dict(), view="prompt")
+            evidence_payload = build_context_payload(rag.to_dict(), view="evidence")
+            summary_payload = build_context_payload(rag.to_dict(), view="summary")
+            records_payload = build_context_payload(rag.to_dict(), view="records")
+            prompt_text = render_context_pretty(prompt_payload)
+            summary_text = render_context_pretty(summary_payload)
+            records_text = render_context_pretty(records_payload)
+            evidence_rows = evidence_payload["output"]
+            payload_text = records_text if records_text != "[]" else prompt_text
+            payload_benchmark = benchmark_text_lossless(payload_text, tokenizer=tokenizer, min_token_savings=0.10)
+            prompt_tokens, estimator = count_prompt_tokens(prompt_text, tokenizer=tokenizer)
+            records_tokens, _ = count_prompt_tokens(records_text, tokenizer=tokenizer)
+            expected_hit = any(record_id in config["expected_ids"] for record_id in rag.candidate_ids)
+            prompt_contains = all(snippet in prompt_text for snippet in config.get("required_prompt_snippets", []))
+            summary_contains = all(snippet in summary_text for snippet in config.get("required_summary_snippets", []))
+            evidence_contains = any(row["record_id"] in config["expected_ids"] for row in evidence_rows)
+            records_contain = all(record_id in records_text for record_id in config["expected_ids"])
+            artifact_id = None
+            if persist:
+                artifact_id = temp_runtime.store.write_machine_artifact(
+                    source_type="benchmark.agent_task",
+                    source_id=config["name"],
+                    artifact=payload_benchmark.artifact.to_dict(include_machine_text=True),
+                    roundtrip_ok=payload_benchmark.roundtrip_match,
+                    metadata={"family": "agent_tasks", "case": config["name"], "projection": "exact_payload"},
+                )
+            case = {
+                "case_id": config["name"],
+                "status": "PASS"
+                if expected_hit and prompt_contains and summary_contains and evidence_contains and records_contain and payload_benchmark.roundtrip_match
+                else "FAIL",
+                "metrics": {
+                    "expected_hit": expected_hit,
+                    "prompt_contains": prompt_contains,
+                    "summary_contains": summary_contains,
+                    "evidence_contains": evidence_contains,
+                    "records_contain": records_contain,
+                    "prompt_tokens": prompt_tokens,
+                    "records_tokens": records_tokens,
+                    "prompt_token_savings_vs_records": round(_savings_ratio(records_tokens, prompt_tokens), 6),
+                    "exact_payload_lossless_savings": round(payload_benchmark.artifact.token_savings_ratio, 6),
+                    "exact_payload_roundtrip_match": payload_benchmark.roundtrip_match,
+                    "token_estimator": estimator,
+                },
+                "trace": {
+                    "query": config["query"],
+                    "candidate_ids": rag.candidate_ids,
+                    "prompt": prompt_text,
+                    "summary": summary_text,
+                    "evidence": evidence_rows,
+                    "exact_payload_compression": payload_benchmark.to_dict(include_machine_text=False),
+                },
+                "debug_flags": _agent_task_flags(
+                    expected_hit,
+                    prompt_contains,
+                    summary_contains,
+                    evidence_contains,
+                    records_contain,
+                    prompt_tokens,
+                    records_tokens,
+                ),
+                "improvement_loop": _agent_task_actions(
+                    expected_hit,
+                    prompt_contains,
+                    summary_contains,
+                    evidence_contains,
+                    records_contain,
+                    prompt_tokens,
+                    records_tokens,
+                    payload_benchmark.artifact.token_savings_ratio,
+                ),
+            }
+            if artifact_id is not None:
+                case["artifact_id"] = artifact_id
+            cases.append(_stamp_case_hash(case))
+        finally:
+            _cleanup_temp_db(temp_db)
 
     summary = {
         "case_count": len(cases),
@@ -2323,4 +2331,3 @@ def _cleanup_temp_db(base_path: Path) -> None:
                 candidate.unlink()
             except PermissionError:
                 pass
-

@@ -41,8 +41,6 @@ except ImportError as exc:  # pragma: no cover - optional dashboard path
     ScrollableContainer = None  # type: ignore[assignment]
     _TEXTUAL_IMPORT_ERROR = exc
 
-from experimental.retrieval_orchestrator import RetrievalOrchestrator
-
 from .context_views import CONTEXT_VIEWS, build_context_payload
 from .lossless import (
     LOSSLESS_CODECS,
@@ -63,6 +61,23 @@ from .installer import default_runtime_db_path
 from .ui import animations as _ui_animations
 from .ui import bars as _ui_bars
 from .ui import logo as _ui_logo
+
+
+def _build_retrieval_orchestrator(
+    runtime: SeamRuntime,
+    *,
+    vector_backend: str,
+    vector_path: str,
+    vector_collection: str,
+) -> Any:
+    from experimental.retrieval_orchestrator import RetrievalOrchestrator
+
+    return RetrievalOrchestrator(
+        runtime,
+        semantic_backend=vector_backend,
+        chroma_path=vector_path,
+        chroma_collection=vector_collection,
+    )
 
 
 DEFAULT_CHAT_MODELS = [
@@ -2241,11 +2256,11 @@ class DashboardApp:
         self.vector_path = vector_path
         self.vector_collection = vector_collection
         self.no_clear = no_clear
-        self.orchestrator = RetrievalOrchestrator(
+        self.orchestrator = _build_retrieval_orchestrator(
             runtime,
-            semantic_backend=vector_backend,
-            chroma_path=vector_path,
-            chroma_collection=vector_collection,
+            vector_backend=vector_backend,
+            vector_path=vector_path,
+            vector_collection=vector_collection,
         )
         self.events: deque[DashboardEvent] = deque(maxlen=2000)
         self.active_tab = "runtime"
@@ -2576,11 +2591,11 @@ class DashboardApp:
                 return False
 
             if args.command in {"reload", "refresh"}:
-                self.orchestrator = RetrievalOrchestrator(
+                self.orchestrator = _build_retrieval_orchestrator(
                     self.runtime,
-                    semantic_backend=self.vector_backend,
-                    chroma_path=self.vector_path,
-                    chroma_collection=self.vector_collection,
+                    vector_backend=self.vector_backend,
+                    vector_path=self.vector_path,
+                    vector_collection=self.vector_collection,
                 )
                 metrics = self._collect_metrics()
                 payload = {

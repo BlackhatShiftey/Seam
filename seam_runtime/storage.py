@@ -383,7 +383,18 @@ class SQLiteStore:
         for src_id, edge_type, dst_id in edges:
             connection.execute("insert or ignore into ir_edges (src_id, edge_type, dst_id) values (?, ?, ?)", (src_id, edge_type, dst_id))
 
-    def load_ir(self, ids: list[str] | None = None, ns: str | None = None, scope: str | None = None) -> IRBatch:
+    def load_ir(
+        self,
+        ids: list[str] | None = None,
+        ns: str | None = None,
+        scope: str | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> IRBatch:
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be non-negative")
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
         query = "select payload_json from ir_records where 1=1"
         params: list[object] = []
         if ids:
@@ -395,6 +406,12 @@ class SQLiteStore:
         if scope:
             query += " and scope = ?"
             params.append(scope)
+        if limit is not None:
+            query += " order by id limit ? offset ?"
+            params.extend([limit, offset])
+        elif offset:
+            query += " order by id limit -1 offset ?"
+            params.append(offset)
         with closing(self._connect()) as connection:
             rows = connection.execute(query, params).fetchall()
         return IRBatch([MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows])

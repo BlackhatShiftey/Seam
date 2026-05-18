@@ -66,6 +66,8 @@ def write_snapshot(
 
     selected = []
     pack_chunks = []
+    pack_entry_ids = []
+    skipped_entry_ids = []
     tokens_used = 0
     for eid in entry_ids:
         if eid not in by_id:
@@ -74,8 +76,10 @@ def write_snapshot(
         selected.append({"id": e.id, "hash": e.hash_short})
         if include_pack:
             if tokens_used + e.tokens > token_budget:
+                skipped_entry_ids.append(e.id)
                 continue
             pack_chunks.append(e.raw.decode("utf-8"))
+            pack_entry_ids.append(e.id)
             tokens_used += e.tokens
 
     now = _dt.datetime.now(_dt.timezone.utc)
@@ -89,6 +93,8 @@ def write_snapshot(
         "index_version": _index_version(),
         "latest_entry_id": max(entry_ids) if entry_ids else None,
         "selected_entries": selected,
+        "pack_entry_ids": pack_entry_ids if include_pack else [],
+        "skipped_entry_ids": skipped_entry_ids if include_pack else [],
         "pack": "\n\n".join(pack_chunks) if include_pack else "",
     }
     payload["integrity_hash"] = _compute_integrity_hash(payload)

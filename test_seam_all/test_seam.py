@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import asyncio
 import unittest
 from contextlib import redirect_stdout
@@ -165,6 +166,32 @@ claim c1:
         self.assertIn("prov:compile:1", node_ids)
         self.assertIn("span:1", node_ids)
 
+    def test_store_load_ir_supports_stable_pagination(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = IRBatch(
+            [
+                MIRLRecord(id="rec:003", kind=RecordKind.ENT, attrs={"label": "three"}),
+                MIRLRecord(id="rec:001", kind=RecordKind.ENT, attrs={"label": "one"}),
+                MIRLRecord(id="rec:002", kind=RecordKind.ENT, attrs={"label": "two"}),
+            ]
+        )
+        runtime.store.persist_ir(batch)
+
+        first_page = runtime.store.load_ir(limit=2)
+        second_page = runtime.store.load_ir(limit=2, offset=2)
+
+        self.assertEqual([record.id for record in first_page.records], ["rec:001", "rec:002"])
+        self.assertEqual([record.id for record in second_page.records], ["rec:003"])
+        self.assertEqual(runtime.store.load_ir(limit=2, offset=10).records, [])
+        with self.assertRaisesRegex(ValueError, "limit must be non-negative"):
+            runtime.store.load_ir(limit=-1)
+
+    def test_ir_batch_from_text_reports_malformed_line_number(self) -> None:
+        text = '{"not":"mirl"}\nBAD-LINE'
+
+        with self.assertRaisesRegex(ValueError, "MIRL line 1"):
+            IRBatch.from_text(text)
+
     def test_runtime_persist_rolls_back_record_write_when_vector_indexing_fails(self) -> None:
         class FailingVectorAdapter:
             name = "failing-vector"
@@ -287,6 +314,26 @@ claim c1:
         with patch("seam_runtime.server.time.monotonic", return_value=61.0):
             self.assertTrue(limiter.check("client-b"))
         self.assertNotIn("client-a", limiter.hits)
+
+    def test_rate_limiter_serializes_concurrent_checks_for_same_key(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        from seam_runtime.server import RateLimiter
+
+        class SlowGetDict(dict):
+            def get(self, key, default=None):  # type: ignore[no-untyped-def]
+                value = super().get(key, default)
+                time.sleep(0.01)
+                return value
+
+        limiter = RateLimiter(limit_per_minute=1)
+        limiter.hits = SlowGetDict({"client-a": []})
+        with patch("seam_runtime.server.time.monotonic", return_value=100.0):
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                results = list(executor.map(lambda _: limiter.check("client-a"), range(8)))
+
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(results.count(False), 7)
 
     @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
     def test_rest_api_rejects_oversized_post_body_before_handler(self) -> None:
@@ -1907,6 +1954,24 @@ claim c1:
         finally:
             if bundle_path.exists():
                 bundle_path.unlink()
+
+    def test_runtime_benchmark_temp_databases_are_cleaned_up(self) -> None:
+        temp_root = Path(tempfile.gettempdir())
+        patterns = ("seam-bench-long-*.db*", "seam-bench-agent-*.db*")
+        for pattern in patterns:
+            for path in temp_root.glob(pattern):
+                path.unlink(missing_ok=True)
+
+        runtime = SeamRuntime(self.db_path)
+        report = runtime.run_benchmark_suite(suite="long_context")
+        self.assertEqual(report["summary"]["status"], "PASS")
+        report = runtime.run_benchmark_suite(suite="agent_tasks")
+        self.assertEqual(report["summary"]["status"], "PASS")
+
+        leftovers = [path for pattern in patterns for path in temp_root.glob(pattern)]
+        for path in leftovers:
+            path.unlink(missing_ok=True)
+        self.assertEqual(leftovers, [])
 
     def test_runtime_readable_benchmark_compares_rc1_to_source(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -3758,6 +3823,12 @@ class LX1NotationTests(unittest.TestCase):
         self.assertIn("~s=o", line)
         restored = decode_record(line)
         self.assertEqual(restored.status, Status.OBSERVED)
+
+    def test_decode_rejects_unknown_status_code(self) -> None:
+        from seam_runtime.lx1 import decode_record
+
+        with self.assertRaisesRegex(ValueError, "unknown LX1 status code"):
+            decode_record("R raw:1 ~s=unknown content=hello")
 
     def test_batch_roundtrip(self) -> None:
         from seam_runtime.lx1 import decode, encode
