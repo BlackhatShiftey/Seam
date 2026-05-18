@@ -351,6 +351,28 @@ class TestContextPack(TempRepoBase):
         self.assertEqual(pack.included_ids, [3])
         self.assertEqual(pack.skipped_ids, [2, 1])
 
+    def test_invalid_utf8_survives_decode_replace(self):
+        entry = (
+            b"---BEGIN-ENTRY-#001---\n"
+            b"id: 001\n"
+            b"date: 2026-04-18T12:00:00Z\n"
+            b"agent: test\n"
+            b"status: done\n"
+            b"topics: meta\n"
+            b"commits: none\n"
+            b"refs: none\n"
+            b"supersedes: none\n"
+            b"tokens: 5\n"
+            b"hash: 0000000000000000000000000000000000000000000000000000000000000001\n"
+            b"---\n"
+            b"Body with \xff\xfe invalid bytes.\n"
+            b"---END-ENTRY-#001---\n"
+        )
+        self.history.write_bytes(entry)
+        entries = parse_entries(self.history.read_bytes())
+        pack = build_context_pack(entries, latest=1, token_budget=999)
+        self.assertIn("invalid bytes", pack.pack)
+
 
 class TestVerifyContinuity(TempRepoBase):
     def test_continuity_ok_with_latest_snapshot(self):
