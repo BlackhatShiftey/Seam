@@ -862,6 +862,118 @@ phase: 1
 
 **What:** Complete the remaining ~113 assertTrue→specific-assertion replacements in test_seam.py. Phase 1 addressed 15 highest-value cases; the remainder are mostly string-in-list and result-existence checks that benefit from better diagnostics.
 
+### F-backlog: Production Readiness Backlog Items
+
+<!-- seam:item
+id: roadmap:track:F:backlog:security-md
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: docs, security
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:installer-symlink
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: installer, linux
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:git-hooks-macos-sha256
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: git-hooks, macos
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:scoring-weights
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: retrieval, benchmark
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:backoff-jitter
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: models, retry
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:json-comparison-fragility
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: pack, json
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:ps1-double-backslash
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: scripts, windows
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:experience-stream-empty
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: experience, protocol
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:superseded-phase-tree
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: roadmap, docs
+priority: 3
+phase: 2
+-->
+
+<!-- seam:item
+id: roadmap:track:F:backlog:test-claude-judge-flaky
+status: planned
+status-since: 2026-05-18
+status-by: history:PENDING
+supersedes: none
+topics: tests, judge
+priority: 3
+phase: 2
+-->
+
 ### F1: Operator Setup Guide with Exact Commands
 
 <!-- seam:item
