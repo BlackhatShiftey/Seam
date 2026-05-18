@@ -4095,3 +4095,17 @@ tokens: 179
 ---
 CI follow-up for PR #30 production readiness remediation. Windows CI failed in tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes with PermissionError while rebuilding HISTORY_INDEX.md. Root cause: the existing advisory file lock serialized separate processes but did not serialize same-process ThreadPoolExecutor workers on Windows, so one thread could rewrite the locked index path while another worker still held the byte-range lock. Added a process-local threading.Lock around the existing OS lock in tools/history/new_entry.py so thread-level concurrency and process-level concurrency both serialize the append/rebuild critical section.\n\nVerification after the fix: .venv/bin/python -m pytest tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes -q -> 1 passed. .venv/bin/python -m tools.history.verify_integrity -> Integrity OK. .venv/bin/python -m tools.history.verify_routing -> Routing OK. .venv/bin/python -m tools.history.verify_continuity -> Continuity OK. .venv/bin/python -m tools.streams.verify_streams -> streams OK. Full local suite had passed before this fix with 341 passed, 1 warning, 3 subtests passed; rerun full suite and GitHub CI after recording this entry.
 ---END-ENTRY-#194---
+
+---BEGIN-ENTRY-#195---
+id: 195
+date: 2026-05-18T10:33:00Z
+agent: codex
+status: done
+topics: verify, history, protocol
+commits: none
+refs: tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30
+supersedes: 194
+tokens: 162
+---
+Follow-up to HISTORY#194 after the second Windows CI run showed the root cause was narrower: the lock was held on HISTORY_INDEX.md itself, and rebuild_index opened HISTORY_INDEX.md through a separate handle for write. Windows denies that write while the byte-range lock is held. Moved the OS advisory lock to a dedicated lock path instead of the generated index file: real git checkouts use .git/seam-history.lock so no worktree lock artifact is created, while tests without .git fall back to a temporary sidecar beside the patched index path. Kept the process-local threading.Lock so same-process threads serialize before acquiring the OS lock.\n\nVerification before recording this entry: .venv/bin/python -m pytest tools/history/test_history_tools.py::TestNewEntryLock::test_new_entry_lock_serializes_concurrent_writes -q -> 1 passed. Previous #194 process-local-only fix was insufficient on Windows and is superseded by this sidecar-lock correction.
+---END-ENTRY-#195---

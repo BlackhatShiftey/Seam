@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 228
+total_events: 229
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-18T00:00:00Z | roadmap:007:df895753 | status-change | bootstrap | benchmark, gold-standard, retrieval | ROADMAP.md:617 |
 | 2026-04-18T00:00:00Z | roadmap:008:3d9deb85 | status-change | bootstrap | benchmark, fixture, verify | ROADMAP.md:648 |
 | 2026-04-18T00:00:00Z | roadmap:009:3f1bb87b | status-change | bootstrap | benchmark, verify, windows, linux | ROADMAP.md:671 |
 | 2026-04-18T00:00:00Z | roadmap:010:8507c42e | status-change | bootstrap | mcp, chat, multi-agent | ROADMAP.md:696 |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-18T08:45:31Z | history:192:d3b2d91d | session-event | done | verify, streams, tests, protocol, continuity, history | tools/streams/verify_streams.py,tools/streams/test_streams.py,docs/SOP_PRODUC... |
 | 2026-05-18T09:30:00Z | history:193:9b402292 | session-event | done | verify, continuity, roadmap, protocol | ROADMAP.md,docs/SOP_PRODUCTION_READINESS_REMEDIATION.md |
 | 2026-05-18T10:26:40Z | history:194:33aefde3 | session-event | done | verify, history, protocol | tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30 |
+| 2026-05-18T10:33:00Z | history:195:bbc6e6d3 | session-event | done | verify, history, protocol | tools/history/new_entry.py,tools/history/test_history_tools.py,PR#30 |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0028.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:00:00Z | 28 | (multi) | (multi) |
+| 0001-0029.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:00:00Z | 29 | (multi) | (multi) |

@@ -36,12 +36,14 @@ _PROCESS_LOCK = threading.Lock()
 
 
 def _acquire_history_lock():
-    """Acquire an exclusive advisory lock on HISTORY_INDEX.md.
+    """Acquire an exclusive advisory lock for HISTORY.md/HISTORY_INDEX.md updates.
 
     Returns a (lock_fd, release_fn) pair. Callers must invoke release_fn in a
     ``finally`` block.
     """
-    fd = os.open(str(INDEX_PATH), os.O_RDWR | os.O_CREAT)
+    git_dir = INDEX_PATH.parent / ".git"
+    lock_path = git_dir / "seam-history.lock" if git_dir.is_dir() else INDEX_PATH.with_name(f"{INDEX_PATH.name}.lock")
+    fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
     if os.name == "nt":
         import msvcrt
         msvcrt.locking(fd, msvcrt.LK_LOCK, 1)

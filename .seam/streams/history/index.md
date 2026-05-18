@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 194
-total_tokens: ~40003
-latest_id: 194
+total_entries: 195
+total_tokens: ~40165
+latest_id: 195
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 195 | 2026-05-18 | done | bbc6e6d30fc0ca3e | verify,history,protocol | 194 |
 | 194 | 2026-05-18 | done | 33aefde3e9a9e3ca | verify,history,protocol | 193 |
 | 193 | 2026-05-18 | done | 9b402292209d9db1 | verify,continuity,roadmap,protocol | 192 |
 | 192 | 2026-05-18 | done | d3b2d91d8e200632 | verify,streams,tests,protocol,+ | 191 |
@@ -235,7 +236,7 @@ compact: true
 - graph: count=2 latest=#099, #030
 - handoff: count=7 latest=#190, #186, #176, #136, #135
 - harden: count=1 latest=#182
-- history: count=139 latest=#194, #192, #191, #184, #183
+- history: count=140 latest=#195, #194, #192, #191, #184
 - holdout: count=4 latest=#152, #093, #092, #036
 - installer: count=12 latest=#177, #173, #169, #100, #099
 - integrity: count=5 latest=#133, #103, #102, #101, #048
@@ -255,7 +256,7 @@ compact: true
 - persist: count=19 latest=#181, #047, #044, #042, #036
 - pgvector: count=19 latest=#179, #149, #121, #119, #084
 - plan: count=12 latest=#180, #176, #171, #170, #169
-- protocol: count=54 latest=#194, #193, #192, #191, #190
+- protocol: count=55 latest=#195, #194, #193, #192, #191
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
@@ -279,12 +280,12 @@ compact: true
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=20 latest=#182, #181, #099, #066, #044
-- verify: count=128 latest=#194, #193, #192, #191, #185
+- verify: count=129 latest=#195, #194, #193, #192, #191
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 174
+- done: 175
 - planned: 20
