@@ -180,6 +180,20 @@ def test_pretty_renderers_return_non_empty() -> None:
     assert "SEAM external memory benchmarks" in report_text
 
 
+def test_registry_comparators_have_status_field() -> None:
+    """Every comparator must have a status field with a valid value."""
+    registry = load_memory_benchmark_registry()
+    valid_statuses = {"implemented", "not_implemented", "deprecated"}
+    for comparator in registry["comparators"]:
+        assert "status" in comparator, (
+            f"Comparator {comparator['id']!r} missing required 'status' field"
+        )
+        assert comparator["status"] in valid_statuses, (
+            f"Comparator {comparator['id']!r} has invalid status "
+            f"{comparator['status']!r}; expected one of {valid_statuses}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # New tests — CLI smoke
 # ---------------------------------------------------------------------------
