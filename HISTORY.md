@@ -3913,3 +3913,27 @@ StubJudge returns deterministic "correct" verdict for tests. ClaudeJudge and Ope
 
 Verification: pytest test_seam_all/test_locomo_judge.py = 11 passed (stub, missing-dep, lazy-import, runner integration, error handling, CLI smoke). Full suite = 224 passed in 85s. seam bench external --quickstart locomo (no --judge) produces identical scores to SOP 1. --judge stub produces judge_score_mean=1.0. --judge claude without anthropic prints clear error and exits 1. seam doctor = PASS. No secrets, no real LLM API calls in tests. SOP 0 plan still works.
 ---END-ENTRY-#188---
+
+---BEGIN-ENTRY-#189---
+id: 189
+date: 2026-05-17
+agent: deepseek
+status: done
+topics: benchmark, retrieval, command, protocol
+commits: TBD
+refs: benchmarks/external/locomo/adapters/mem0.py,benchmarks/external/locomo/adapters/zep.py,benchmarks/external/locomo/run.py,seam_runtime/cli.py,pyproject.toml,test_seam_all/test_locomo_mem0_adapter.py,test_seam_all/test_locomo_zep_adapter.py,docs/SOP_EXTERNAL_BENCH_MEM0_COMPARATOR.md,docs/SOP_EXTERNAL_BENCH_ZEP_COMPARATOR.md
+supersedes: 188
+tokens: 260
+---
+Implemented SOPs 3+4 (bundled): Mem0 + Zep/Graphiti LoCoMo comparator adapters. Both implement the MemorySystemAdapter protocol from SOP 1, producing the same RunReport schema so SEAM, Mem0, and Zep results are directly comparable. Both are behind optional extras: seam[bench-mem0] (mem0ai>=0.1.0, chromadb>=0.4.0) and seam[bench-zep] (zep-cloud>=2.0.0).
+
+Mem0 adapter: per-scope user_id isolation via Mem0 Memory, temp Chroma store (no writes to operator home dir), lazy import of mem0 SDK, clear error messages for missing package (pip install seam[bench-mem0]) and missing OPENAI_API_KEY. close() cleans temp dir.
+
+Zep adapter: per-scope user_id + session_id isolation via Zep client, fallback import chain (zep_cloud to zep_python), clear error messages for missing SDK (pip install seam[bench-zep]) and missing ZEP_API_KEY/ZEP_API_URL. close() deletes all created users.
+
+CLI: --adapter {seam|mem0|zep} flag wired through seam bench external --quickstart locomo and the subprocess dispatch. Extending to future adapters requires only a new adapter file + one line in build_adapter() factory. SOP 0 contract (plan, registry, CLI) unchanged.
+
+Verification: pytest test_locomo_mem0_adapter.py = 14 passed, test_locomo_zep_adapter.py = 14 passed. All locomo tests = 64 passed. Full suite = 252 passed in 86s. No regressions. Missing-extra error messages clear (seam[bench-mem0] / seam[bench-zep]). Integrity hash deterministic. Module-level isolation confirmed. seam doctor = PASS. verify_integrity, verify_routing, verify_continuity all OK.
+
+Track I scope (SOPs 0-4) is complete. Mem0+Zep comparators ship behind optional extras. No SEAM-vs-X public claims pending Track K (BIL bundles). Three-way scoring (SEAM/Mem0/Zep) is now reproducible on the quickstart fixture. Next track is the operator's choice per ROADMAP.md.
+---END-ENTRY-#189---

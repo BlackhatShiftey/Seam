@@ -27,6 +27,8 @@ server = ["fastapi>=0.100", "uvicorn[standard]>=0.23", "python-multipart>=0.0.6"
 agent = []
 rerank = ["sentence-transformers>=2.0"]
 bench-judge = ["anthropic>=0.40", "openai>=1.0"]
+bench-mem0 = ["mem0ai>=0.1.0", "chromadb>=0.4.0"]
+bench-zep = ["zep-cloud>=2.0.0"]
 all-extras = ["textual>=0.50", "psycopg[binary]>=3.0", "sentence-transformers>=2.0", "fastapi>=0.100", "uvicorn[standard]>=0.23", "python-multipart>=0.0.6"]
 
 [project.scripts]
