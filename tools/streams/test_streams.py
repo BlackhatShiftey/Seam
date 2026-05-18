@@ -85,6 +85,18 @@ class RoadmapParserTests(unittest.TestCase):
         self.assertIn("roadmap:track:H3", ids)
         self.assertIn("roadmap:track:H4", ids)
 
+    def test_extracts_tracks_i_j_k_l_items(self) -> None:
+        items = parse_roadmap_markers(ROADMAP_PATH.read_text(encoding="utf-8"))
+        ids = {it.item_id for it in items}
+        self.assertIn("roadmap:track:I", ids)
+        self.assertIn("roadmap:track:J", ids)
+        self.assertIn("roadmap:track:K", ids)
+        self.assertIn("roadmap:track:L", ids)
+
+    def test_agent_compiler_is_not_labeled_as_track_h(self) -> None:
+        text = ROADMAP_PATH.read_text(encoding="utf-8")
+        self.assertNotIn("Track H: Agent / Skills Compiler", text)
+
     def test_events_have_sequential_ids_and_required_fields(self) -> None:
         items = parse_roadmap_markers(ROADMAP_PATH.read_text(encoding="utf-8"))
         events = items_to_events(items)
@@ -157,6 +169,20 @@ class VerifyStreamsTests(unittest.TestCase):
         rebuild_index("experience")
         rebuild_cross_index()
         self.assertEqual(verify_all(), [])
+
+    def test_verify_detects_stale_cross_index(self) -> None:
+        sync_history_mirror()
+        rebuild_index("history")
+        rebuild_index("roadmap")
+        rebuild_index("experience")
+        rebuild_cross_index()
+        original = CROSS_INDEX_PATH.read_text(encoding="utf-8")
+        try:
+            stale = original.replace("total_events:", "total_events: 0 # stale", 1)
+            CROSS_INDEX_PATH.write_text(stale, encoding="utf-8")
+            self.assertTrue(any("cross_index.md is stale" in err for err in verify_all()))
+        finally:
+            CROSS_INDEX_PATH.write_text(original, encoding="utf-8")
 
 
 if __name__ == "__main__":

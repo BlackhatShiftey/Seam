@@ -4016,3 +4016,37 @@ Items deferred awaiting operator confirmation:
   - Phase 7: 10 backlog items catalogued (not fixed)
   - pytest.ini / pyproject.toml pytest config consolidation (both exist; pyproject.toml ignored while pytest.ini present)
 ---END-ENTRY-#191---
+
+---BEGIN-ENTRY-#192---
+id: 192
+date: 2026-05-18T08:45:31Z
+agent: claude-opus-4-7
+status: done
+topics: verify, streams, tests, protocol, continuity, history
+commits: none
+refs: tools/streams/verify_streams.py,tools/streams/test_streams.py,docs/SOP_PRODUCTION_READINESS_REMEDIATION.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 191
+tokens: 356
+---
+Close-out follow-up to HISTORY#191. Three items folded into the substrate:
+
+(1) verify_streams hardening — added stale-detection for .seam/cross_index.md. The gate now parses `total_events:` from the file and compares against `len(collect_all_events())` from the live stream logs. On mismatch (or missing/unparseable header), emits `cross_index.md is stale: total_events=<X> but streams report <Y>; run tools.streams.rebuild_cross_index`. Closes the gap where a stale cross-index could pass verify_streams as long as the file existed.
+
+(2) TDD coverage in tools/streams/test_streams.py — three tests authored before HISTORY#191 but not folded into that closeout:
+    - test_extracts_tracks_i_j_k_l_items: asserts roadmap:track:{I,J,K,L} markers exist (P2.3 work was already on disk; this locks it in).
+    - test_agent_compiler_is_not_labeled_as_track_h: asserts the Track H mislabel cannot regress (P2.4 work was already on disk; this locks it in).
+    - test_verify_detects_stale_cross_index: red until item (1) above made it green.
+
+(3) Continuity drift fix — HISTORY#191 listed `docs/SOP_PRODUCTION_READINESS_REMEDIATION.md` in its `refs:` field but the file was never `git add`ed. `git ls-files` returned empty; `git log --all` showed no commits. The continuity gate did not catch this because it validates structural integrity (hashes, supersedes chains, snapshots), not ref-file existence. Tracking the file now so the #191 refs are honest.
+
+Verification at closeout:
+  python3 -m tools.history.verify_integrity → Integrity OK
+  python3 -m tools.history.verify_continuity → Continuity OK
+  python3 -m tools.history.verify_routing → Routing OK
+  python3 -m tools.streams.verify_streams → streams OK
+  PYTHONPATH=. .venv/bin/pytest tools/streams/test_streams.py -q → 15 passed
+  PYTHONPATH=. .venv/bin/pytest tools/history/test_history_tools.py -q → 40 passed
+
+Observation for follow-up (not fixed here):
+  verify_continuity does not currently validate that files listed in an entry's `refs:` field exist in the git index. That is a true continuity check the gate is missing. File as a Track F backlog card if the operator wants it.
+---END-ENTRY-#192---
