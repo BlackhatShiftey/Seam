@@ -2,18 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 219
+total_events: 224
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-17T00:10:00Z | history:020:8d22eeaf | session-event | done | persist, verify, benchmark, dashboard, installer, windows | PLAN_LOG.md |
-| 2026-04-17T00:11:00Z | history:021:daf7be54 | session-event | done | persist, verify, dashboard, installer, linux, wsl2 | PLAN_LOG.md |
-| 2026-04-18T00:00:00Z | history:022:a756b492 | session-event | done | vector, sbert, pgvector, pyproject, extras | REPO_LEDGER.md#milestone-log |
-| 2026-04-18T00:00:00Z | roadmap:001:da03295c | status-change | bootstrap | benchmark, dashboard, animation | ROADMAP.md:300 |
-| 2026-04-18T00:00:00Z | roadmap:002:db44a2e3 | status-change | bootstrap | benchmark, dashboard, graph | ROADMAP.md:329 |
 | 2026-04-18T00:00:00Z | roadmap:003:e17e0340 | status-change | bootstrap | vector, dashboard, graph | ROADMAP.md:360 |
 | 2026-04-18T00:00:00Z | roadmap:004:a340e8ec | status-change | bootstrap | dashboard, benchmark, animation | ROADMAP.md:430 |
 | 2026-04-18T00:00:00Z | roadmap:005:f2de612c | status-change | bootstrap | naming, alias, command | ROADMAP.md:462 |
@@ -208,11 +203,16 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-16T06:38:45Z | history:182:8affbd0f | session-event | done | harden, models, mcp, reconcile, memory, storage, vector, ... | seam_runtime/models.py,seam_runtime/mcp.py,seam_runtime/mcp_protocol.py,seam_... |
 | 2026-05-16T07:31:59Z | history:183:93cfaec8 | session-event | done | mcp, pack, verify, history, audit | seam_runtime/mcp.py,seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.m... |
 | 2026-05-17 | history:185:ed014b41 | session-event | done | benchmark, command, protocol, verify | seam_runtime/cli.py,seam_runtime/external_memory_benchmarks.py,tools/run_exte... |
+| 2026-05-17 | history:187:66289df0 | session-event | done | benchmark, fixture, retrieval, protocol | benchmarks/external/common/types.py,benchmarks/external/common/scoring.py,ben... |
+| 2026-05-17 | history:188:a4e89290 | session-event | done | benchmark, retrieval, command, protocol | benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,benc... |
+| 2026-05-17 | history:189:054cfd3f | session-event | done | benchmark, retrieval, command, protocol | benchmarks/external/locomo/adapters/mem0.py,benchmarks/external/locomo/adapte... |
 | 2026-05-17T17:36:37Z | history:184:b8f6f1ed | session-event | done | audit, verify, history, status | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/cross_index.md |
+| 2026-05-17T21:25:43Z | history:186:6dac80c8 | session-event | done | docs, handoff, protocol | docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md,docs/SOP_EXTERNAL_BENCH_LLM_JU... |
+| 2026-05-18 | history:190:8ecacfad | session-event | done | handoff, protocol, command | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0019.cross.md | 2026-04-15T00:00:00Z..2026-04-17T00:09:00Z | 19 | (multi) | (multi) |
+| 0001-0024.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:00:00Z | 24 | (multi) | (multi) |
