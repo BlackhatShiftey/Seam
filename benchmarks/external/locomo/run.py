@@ -18,7 +18,23 @@ import sys
 from benchmarks.external.common.dataset import load_locomo_cases, load_quickstart_cases
 from benchmarks.external.common.judge import build_judge
 from benchmarks.external.common.runner import run_benchmark
-from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
+
+
+def build_adapter(name: str):
+    """Lazy-import factory so SEAM-only runs don't require Mem0/Zep installed."""
+    if name == "seam":
+        from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
+
+        return SeamLocomoAdapter()
+    if name == "mem0":
+        from benchmarks.external.locomo.adapters.mem0 import Mem0LocomoAdapter
+
+        return Mem0LocomoAdapter()
+    if name == "zep":
+        from benchmarks.external.locomo.adapters.zep import ZepLocomoAdapter
+
+        return ZepLocomoAdapter()
+    raise ValueError(f"unknown adapter {name!r}")
 
 
 def main() -> None:
@@ -48,7 +64,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--adapter",
-        choices=["seam"],
+        choices=["seam", "mem0", "zep"],
         default="seam",
         help="Which adapter to use (default: seam)",
     )
@@ -83,10 +99,7 @@ def main() -> None:
         cases = cases[: args.limit]
 
     # Build adapter
-    if args.adapter == "seam":
-        adapter = SeamLocomoAdapter()
-    else:
-        raise ValueError(f"Unknown adapter: {args.adapter}")
+    adapter = build_adapter(args.adapter)
 
     # Build judge
     judge = build_judge(args.judge, model=args.judge_model)

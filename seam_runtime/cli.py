@@ -404,6 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
     bench_external_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
     bench_external_parser.add_argument("--timeout-seconds", type=int, default=3600)
     bench_external_parser.add_argument("--quickstart", choices=["locomo"], help="Run a bundled quickstart benchmark (locomo: 60s synthetic fixture)")
+    bench_external_parser.add_argument("--adapter", choices=["seam", "mem0", "zep"], default="seam", help="Memory system under test")
     bench_external_parser.add_argument("--judge", choices=["none", "stub", "claude", "openai"], default=None, help="LLM judge in addition to string-match scoring")
     bench_external_parser.add_argument("--judge-model", default=None, help="Override the default judge model id")
 
@@ -681,6 +682,8 @@ def run_cli(argv: list[str] | None = None) -> None:
                 cmd = [sys.executable, "-m", "benchmarks.external.locomo.run", "--quickstart"]
                 if args.output:
                     cmd.extend(["--output", args.output])
+                if args.adapter:
+                    cmd.extend(["--adapter", args.adapter])
                 if args.judge:
                     cmd.extend(["--judge", args.judge])
                 if args.judge_model:
