@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 224
+total_events: 225
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-18T00:00:00Z | roadmap:003:e17e0340 | status-change | bootstrap | vector, dashboard, graph | ROADMAP.md:360 |
 | 2026-04-18T00:00:00Z | roadmap:004:a340e8ec | status-change | bootstrap | dashboard, benchmark, animation | ROADMAP.md:430 |
 | 2026-04-18T00:00:00Z | roadmap:005:f2de612c | status-change | bootstrap | naming, alias, command | ROADMAP.md:462 |
 | 2026-04-18T00:00:00Z | roadmap:006:bd1cbc2a | status-change | bootstrap | naming, alias, command | ROADMAP.md:513 |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-17T17:36:37Z | history:184:b8f6f1ed | session-event | done | audit, verify, history, status | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/cross_index.md |
 | 2026-05-17T21:25:43Z | history:186:6dac80c8 | session-event | done | docs, handoff, protocol | docs/SOP_EXTERNAL_BENCH_LOCOMO_SEAM_ADAPTER.md,docs/SOP_EXTERNAL_BENCH_LLM_JU... |
 | 2026-05-18 | history:190:8ecacfad | session-event | done | handoff, protocol, command | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md |
+| 2026-05-18T07:51:08Z | history:191:4007a129 | session-event | done | audit, verify, protocol, roadmap, tests, ci, security, hi... | PROJECT_STATUS.md,REPO_LEDGER.md,ROADMAP.md,seam_runtime/cli.py,seam_runtime/... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0024.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:00:00Z | 24 | (multi) | (multi) |
+| 0001-0025.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:00:00Z | 25 | (multi) | (multi) |
