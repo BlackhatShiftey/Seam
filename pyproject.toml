@@ -47,3 +47,11 @@ include = ["experimental*", "seam_runtime*"]
 [tool.setuptools.exclude-package-data]
 # Operator-local Codex profile; never ship in the wheel.
 seam_runtime = ["config.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["test_seam_all", "tools/history"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: marks tests that take more than 5 seconds",
+    "external: tests that hit external services (pgvector, network)",
+]
