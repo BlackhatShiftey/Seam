@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 189
-total_tokens: ~38223
-latest_id: 189
+total_entries: 190
+total_tokens: ~38353
+latest_id: 190
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 190 | 2026-05-18 | done | 8ecacfad7c8834f6 | handoff,protocol,command | 189 |
 | 189 | 2026-05-17 | done | 054cfd3f6116b4fb | benchmark,retrieval,command,protocol | 188 |
 | 188 | 2026-05-17 | done | a4e8929020b446c4 | benchmark,retrieval,command,protocol | 187 |
 | 187 | 2026-05-17 | done | 66289df0fb65a735 | benchmark,fixture,retrieval,protocol | 186 |
@@ -213,7 +214,7 @@ compact: true
 - chroma: count=2 latest=#017, #001
 - classification: count=11 latest=#177, #176, #171, #170, #169
 - codec: count=13 latest=#132, #131, #130, #129, #128
-- command: count=58 latest=#189, #188, #185, #149, #148
+- command: count=59 latest=#190, #189, #188, #185, #149
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
@@ -226,7 +227,7 @@ compact: true
 - fixture: count=5 latest=#187, #145, #092, #039, #008
 - gold-standard: count=1 latest=#038
 - graph: count=2 latest=#099, #030
-- handoff: count=6 latest=#186, #176, #136, #135, #075
+- handoff: count=7 latest=#190, #186, #176, #136, #135
 - harden: count=1 latest=#182
 - history: count=136 latest=#184, #183, #181, #180, #179
 - holdout: count=4 latest=#152, #093, #092, #036
@@ -248,7 +249,7 @@ compact: true
 - persist: count=19 latest=#181, #047, #044, #042, #036
 - pgvector: count=19 latest=#179, #149, #121, #119, #084
 - plan: count=12 latest=#180, #176, #171, #170, #169
-- protocol: count=49 latest=#189, #188, #187, #186, #185
+- protocol: count=50 latest=#190, #189, #188, #187, #186
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
 - readme: count=17 latest=#147, #121, #117, #116, #100
@@ -278,5 +279,5 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 169
+- done: 170
 - planned: 20

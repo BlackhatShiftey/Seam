@@ -3937,3 +3937,17 @@ Verification: pytest test_locomo_mem0_adapter.py = 14 passed, test_locomo_zep_ad
 
 Track I scope (SOPs 0-4) is complete. Mem0+Zep comparators ship behind optional extras. No SEAM-vs-X public claims pending Track K (BIL bundles). Three-way scoring (SEAM/Mem0/Zep) is now reproducible on the quickstart fixture. Next track is the operator's choice per ROADMAP.md.
 ---END-ENTRY-#189---
+
+---BEGIN-ENTRY-#190---
+id: 190
+date: 2026-05-18
+agent: claude
+status: done
+topics: handoff, protocol, command
+commits: c08b35a,dc9b09d
+refs: HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 189
+tokens: 130
+---
+Audit + merge closeout for HISTORY#189 (SOPs 3+4 Mem0+Zep comparators). Reviewed adapter source (lazy imports, scope isolation, clear missing-extra errors, deterministic close()), reran the full suite (252 passed) and the four verify gates (integrity, routing, continuity, streams all OK), staged 12 files, committed locally as c08b35a, pushed feat/track-i-sop3-4-mem0-zep-comparators, opened PR #29, squash-merged as dc9b09d, deleted the feature branch on origin, pruned the local tracking ref, and confirmed worktree clean on main with origin/main fast-forwarded. Track I (SOPs 0-4) is now merged on main; PR #29 is the merged tip. No SEAM-vs-X public claims; those remain gated on Track K (BIL bundles). Next track is operator's choice per ROADMAP.md (no auto-proposal).
+---END-ENTRY-#190---
