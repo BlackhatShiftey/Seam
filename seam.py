@@ -29,7 +29,7 @@ from seam_runtime.holographic import (
     query_surface,
     verify_surface,
 )
-from seam_runtime.mirl import IRBatch, MIRLRecord, Pack
+from seam_runtime.mirl import IRBatch, MIRLRecord, Pack, RecordKind
 from seam_runtime.models import HashEmbeddingModel, OpenAICompatibleEmbeddingModel
 from seam_runtime.nl import compile_nl
 from seam_runtime.pack import pack_records, unpack_exact_pack
@@ -50,8 +50,8 @@ def decompile_ir(records, mode: str = "expanded") -> str:
         batch = records
     else:
         batch = IRBatch(list(records))
-    states = [record for record in batch.records if record.kind.value == "STA"]
-    claims = [record for record in batch.records if record.kind.value == "CLM"]
+    states = [record for record in batch.records if record.kind == RecordKind.STA]
+    claims = [record for record in batch.records if record.kind == RecordKind.CLM]
     if states:
         summary = "; ".join(f"{key}={value}" for key, value in states[0].attrs.get("fields", {}).items())
     elif claims:

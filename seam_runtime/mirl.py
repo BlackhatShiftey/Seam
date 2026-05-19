@@ -249,7 +249,7 @@ class Pack:
         attrs = record.attrs
         return cls(
             pack_id=record.id,
-            mode=attrs["mode"],
+            mode=attrs.get("mode", "context"),
             lens=attrs.get("lens", "general"),
             refs=list(attrs.get("refs", [])),
             payload=dict(attrs.get("payload", {})),

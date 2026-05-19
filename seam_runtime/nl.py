@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
 
@@ -24,8 +25,9 @@ def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "loca
     raw_id = "raw:1"
     span_id = "span:1"
     prov_id = "prov:compile:1"
-    user_id = "ent:user:local"
-    project_id = "ent:project:seam"
+    source_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
+    user_id = f"ent:user:{source_hash}"
+    project_id = f"ent:project:{_infer_project_name(raw_text).lower().replace(' ', '_')}_{source_hash}"
     goal = _extract_goal(raw_text)
     scope_values = _detect_scope(raw_text)
     principles = _detect_principles(raw_text)

@@ -1271,8 +1271,6 @@ function EnvHub({ onOpenFile, onClose }) {
     </button>;
 
 
-  const SectionHeader_OLD = null;
-
   const [revealed, setRevealed] = useState({});
   const [editing, setEditing] = useState({});
   const [reloadFlash, setReloadFlash] = useState(null);
@@ -1835,19 +1833,24 @@ const MODEL_OPTIONS = [
 const ingestStages = ['Select files', 'Parse & chunk', 'Compile MIRL', 'Embed vectors', 'Persist to DB'];
 
 function IngestPanel({ width, onOpenSettings }) {
-  const [files, setFiles] = useState([
-  { id: 'f1', name: 'README.md', size: '7.2 KB', status: 'done', stage: 4, records: 12 },
-  { id: 'f2', name: 'ROADMAP.md', size: '25.6 KB', status: 'running', stage: 2, records: 0 },
-  { id: 'f3', name: 'SEAM_SPEC_V0.1.md', size: '24.8 KB', status: 'queued', stage: 0, records: 0 },
-  { id: 'f4', name: 'HISTORY.md', size: '116 KB', status: 'queued', stage: 0, records: 0 }]
-  );
+  // Persisted file list — starts empty, populated by user drops/picks
+  const [files, setFiles] = usePersisted('seam-dash-ingest-files', []);
   const [dragOver, setDragOver] = useState(false);
   const [batchMode, setBatchMode] = useState('persist');
   const [autoMode, setAutoMode] = useState(false);
   const [autoLog, setAutoLog] = useState([]);
 
-  // Sync ledger — fingerprint of every file that's been ingested so we never re-ingest
-  const [syncLedger, setSyncLedger] = useState(() => new Set(['README.md|7.2 KB']));
+  // Persisted sync ledger — fingerprint of every file that's been ingested so we never re-ingest
+  // Stored as array in localStorage, converted to Set for runtime use
+  const [ledgerArr, setLedgerArr] = usePersisted('seam-dash-ingest-ledger', []);
+  const syncLedger = React.useMemo(() => new Set(ledgerArr), [ledgerArr]);
+  const setSyncLedger = (updater) => {
+    if (typeof updater === 'function') {
+      setLedgerArr((prev) => [...updater(new Set(prev))]);
+    } else {
+      setLedgerArr([...updater]);
+    }
+  };
   const [skippedCount, setSkippedCount] = useState(0);
   const fingerprint = (f) => `${f.name}|${f.size}`;
 
@@ -1952,8 +1955,9 @@ function IngestPanel({ width, onOpenSettings }) {
     return () => clearInterval(autoRef.current);
   }, [autoMode]);
 
-  const statusColor = { done: '#7efdb9', running: '#7fe0ff', queued: '#274063', error: '#ff6b6b', preview: '#d391ff' };
-  const statusLabel = { done: 'done', running: 'ingesting', queued: 'queued', error: 'error', preview: 'preview (dry-run)' };
+  // Retro cyberpunk Apple palette — amber CRT glow for done, phosphor for active
+  const statusColor = { done: '#ffb347', running: '#7fe0ff', queued: '#274063', error: '#ff6b6b', preview: '#d391ff' };
+  const statusLabel = { done: '✓ ingested', running: 'ingesting', queued: 'queued', error: 'error', preview: 'preview (dry-run)' };
 
   const addDemoFile = () => {
     const names = ['agent_memory.py', 'benchmarks.py', 'storage.py', 'mirl.py', 'cli.py', 'runtime.py'];
@@ -1999,13 +2003,19 @@ function IngestPanel({ width, onOpenSettings }) {
     setFiles((prev) => {
       const next = prev.map((f) => {
         if (f.status !== 'queued') return f;
-        if (f._file && batchMode === 'persist') {
           // Trigger real API ingest asynchronously
           ingestFileViaAPI(f).then((result) => {
             if (result && result.ok) {
               setFiles((cur) => cur.map((c) =>
                 c.id === f.id ? { ...c, status: 'done', stage: 5, records: result.records } : c
               ));
+              if (batchMode === 'persist') {
+                setSyncLedger((prev) => {
+                  const n = new Set(prev);
+                  n.add(fingerprint(f));
+                  return n;
+                });
+              }
             } else {
               setFiles((cur) => cur.map((c) =>
                 c.id === f.id ? { ...c, status: 'error', stage: 0, records: 0 } : c
@@ -2013,8 +2023,6 @@ function IngestPanel({ width, onOpenSettings }) {
             }
           });
           return { ...f, status: 'running', stage: 1, mode: batchMode };
-        }
-        return { ...f, status: 'running', stage: 1, mode: batchMode };
       });
       return next;
     });
@@ -2240,8 +2248,8 @@ function IngestPanel({ width, onOpenSettings }) {
         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor[f.status], flexShrink: 0, boxShadow: f.status === 'running' ? `0 0 5px ${statusColor[f.status]}` : 'none' }} />
-              <span style={{ fontSize: 11, color: f.status === 'done' ? '#bfefff' : f.status === 'running' ? '#7fe0ff' : '#5a7a9a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor[f.status], flexShrink: 0, boxShadow: f.status === 'running' ? `0 0 5px ${statusColor[f.status]}` : f.status === 'done' ? '0 0 4px #ffb347' : 'none' }} />
+              <span style={{ fontSize: 11, color: f.status === 'done' ? '#ffb347' : f.status === 'running' ? '#7fe0ff' : '#5a7a9a', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: f.status === 'done' ? 0.7 : 1, fontStyle: f.status === 'done' ? 'italic' : 'normal' }}>{f.name}</span>
               <span style={{ fontSize: 9, color: '#274063', flexShrink: 0 }}>{f.size}</span>
               <button onClick={() => removeFile(f.id)} style={{ background: 'none', border: 'none', color: '#274063', cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
             </div>
@@ -2251,7 +2259,7 @@ function IngestPanel({ width, onOpenSettings }) {
               {ingestStages.map((s, i) =>
             <div key={s} title={s} style={{
               flex: 1, height: 3, borderRadius: 1,
-              background: i < f.stage ? '#7efdb9' : i === f.stage && f.status === 'running' ? '#7fe0ff' : '#1a2540',
+              background: i < f.stage ? (f.status === 'done' ? '#ffb347' : '#7efdb9') : i === f.stage && f.status === 'running' ? '#7fe0ff' : '#1a2540',
               boxShadow: i === f.stage && f.status === 'running' ? '0 0 4px #7fe0ff' : 'none',
               transition: 'background 0.3s'
             }} />
@@ -2260,7 +2268,7 @@ function IngestPanel({ width, onOpenSettings }) {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#274063' }}>
               <span style={{ color: statusColor[f.status] }}>{statusLabel[f.status]}{f.status === 'running' ? ` — ${ingestStages[f.stage]}` : ''}</span>
-              {f.records > 0 && <span style={{ color: '#7efdb9' }}>{f.records} MIRL records</span>}
+              {f.records > 0 && <span style={{ color: f.status === 'done' ? '#ffb347' : '#7efdb9' }}>{f.records} MIRL records</span>}
             </div>
           </div>
         )}
@@ -2276,14 +2284,19 @@ function IngestPanel({ width, onOpenSettings }) {
               <span>Files queued</span><span style={{ color: '#bfefff' }}>{files.length}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888', marginBottom: 3 }}>
-              <span>Completed</span><span style={{ color: '#7efdb9' }}>{done}</span>
+              <span>Completed</span><span style={{ color: '#ffb347' }}>{done}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888', marginBottom: 3 }}>
               <span>Running</span><span style={{ color: '#7fe0ff' }}>{running}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888' }}>
-              <span>MIRL records written</span><span style={{ color: '#7efdb9' }}>{totalRecords}</span>
+              <span>MIRL records written</span><span style={{ color: '#ffb347' }}>{totalRecords}</span>
             </div>
+            {skippedCount > 0 &&
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4f6888', marginTop: 3, borderTop: '1px dashed rgba(47,99,255,0.1)', paddingTop: 3 }}>
+              <span>Already ingested (skipped)</span><span style={{ color: '#f4d676' }}>{skippedCount}</span>
+            </div>
+            }
           </div>
         }
       </div>
@@ -4927,6 +4940,14 @@ function App() {
   const [sysFolders, setSysFolders] = useState(new Set(['home']));
   const [sysSearch, setSysSearch] = useState('');
 
+  // Live File Tree state
+  const [liveTree, setLiveTree] = useState(fileTree);
+  useEffect(() => {
+    window.SeamAPI.tree().then((res) => {
+      if (res && res.tree && res.tree.length > 0) setLiveTree(res.tree);
+    }).catch(() => { /* silent fallback to mock tree */ });
+  }, []);
+
   // Map system filesystem node ids → editor tab ids when they correspond to a known file,
   // otherwise create a transient buffer with a placeholder.
   const SYS_FILE_MAP = {
@@ -5858,7 +5879,7 @@ function App() {
                         </div>
                       </div>
                     </div>
-                    {fileTree.map((node) =>
+                    {liveTree.map((node) =>
                 <FileNode key={node.id} node={node} depth={0}
                 openFile={openFile} activeFile={activeFile}
                 openFolders={openFolders} toggleFolder={toggleFolder} />

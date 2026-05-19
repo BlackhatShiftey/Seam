@@ -190,9 +190,6 @@ class SQLiteStore:
                 create index if not exists idx_document_status_hash on document_status (source_hash);
                 create index if not exists idx_ir_edges_src on ir_edges (src_id);
                 create index if not exists idx_ir_edges_dst on ir_edges (dst_id);
-                delete from ir_edges where id not in (
-                    select min(id) from ir_edges group by src_id, edge_type, dst_id
-                );
                 create unique index if not exists idx_ir_edges_unique
                     on ir_edges (src_id, edge_type, dst_id);
                 create index if not exists idx_machine_artifacts_source on machine_artifacts (source_type, source_id);
@@ -779,7 +776,7 @@ class SQLiteStore:
         with closing(self._connect()) as connection:
             row = connection.execute("select report_json from benchmark_runs where run_id = ?", (run_id,)).fetchone()
         if row is None:
-            return {}
+            raise KeyError(f"Benchmark run not found: {run_id}")
         return json.loads(row["report_json"])
 
     def list_benchmark_runs(self, limit: int = 10) -> list[dict[str, object]]:

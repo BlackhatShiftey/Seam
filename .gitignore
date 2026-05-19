@@ -50,6 +50,18 @@ seam_runtime/_handoff_20260419/
 .seam/snapshots/*.json
 .seam/surfaces/
 
+# Local editor and agent config
+.vscode/
+.gemini/
+.opencode/package.json
+.opencode/package-lock.json
+
+# Generated surface artifacts
+*.seam.png
+
+# Local artifact dumps
+Webui-final-dash/
+
 # Publish-only benchmark material stays local unless intentionally released
 benchmarks/fixtures/holdout/*.json
 !benchmarks/fixtures/holdout/*.example.json

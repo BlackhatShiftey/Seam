@@ -713,7 +713,7 @@ def _resolve_token_counter(tokenizer: str) -> tuple[Callable[[str], int], str]:
     raise ValueError(f"Unsupported tokenizer: {tokenizer}")
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=8)
 def _load_tiktoken_encoding(name: str):
     try:
         import tiktoken

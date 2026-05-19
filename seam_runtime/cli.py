@@ -702,7 +702,6 @@ def run_cli(argv: list[str] | None = None) -> None:
             Path(args.output).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(text)
         raise SystemExit(exit_code)
-        return
 
     runtime = SeamRuntime(args.db)
 
@@ -1145,8 +1144,9 @@ def _resolve_benchmark_ref(runtime: SeamRuntime, value: str) -> str | dict[str, 
     path = Path(value)
     if path.exists():
         return value
-    payload = runtime.read_benchmark_run(value)
-    if not payload:
+    try:
+        payload = runtime.read_benchmark_run(value)
+    except KeyError:
         raise SystemExit(f"Benchmark bundle or persisted run not found: {value}")
     return payload
 
@@ -1154,7 +1154,7 @@ def _resolve_benchmark_ref(runtime: SeamRuntime, value: str) -> str | dict[str, 
 def _read_text_source(source: str) -> str:
     if source == "-":
         return sys.stdin.read()
-    return Path(source).read_bytes().decode("utf-8")
+    return Path(source).read_bytes().decode("utf-8", errors="replace")
 
 
 def _sha256_file(source: str) -> str | None:
@@ -1166,12 +1166,12 @@ def _sha256_file(source: str) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _resolve_surface_path(surface_ref: str, runtime: SeamRuntime | None = None) -> Path:
+def _resolve_surface_path(surface_ref: str, runtime: SeamRuntime | None = None, db_path: str | None = None) -> Path:
     path = Path(surface_ref)
     if path.exists():
         return path
     if runtime is None:
-        runtime = SeamRuntime()
+        runtime = SeamRuntime(db_path or "seam.db")
     return Path(str(runtime.store.read_surface_artifact(surface_ref)["artifact_path"]))
 
 

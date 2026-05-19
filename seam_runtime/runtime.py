@@ -97,9 +97,10 @@ class SeamRuntime:
             self.vector_adapter.index_records(normalized.records)
         except Exception as exc:
             try:
-                self.store.delete_ir(touched_ids, include_vectors=False)
+                self.store.delete_ir(touched_ids, include_vectors=True)
                 if previous.records:
                     self.store.persist_ir(previous)
+                    self.vector_adapter.index_records(previous.records)
             except Exception as rollback_exc:
                 touched_preview = ", ".join(touched_ids[:20])
                 if len(touched_ids) > 20:
@@ -120,7 +121,7 @@ class SeamRuntime:
         batch = self.store.load_ir(scope=scope)
         vector_scores = self.vector_adapter.search(query, limit=max(budget * 3, 10))
         namespace = batch.records[0].ns if batch.records else None
-        return search_batch(batch, query=query, scope=scope, limit=budget, vector_scores=vector_scores, namespace=namespace)
+        return search_batch(batch, query=query, scope=scope, limit=max(1, budget), vector_scores=vector_scores, namespace=namespace)
 
     def memory_search(self, query: str, scope: str | None = None, budget: int = 5) -> dict[str, object]:
         result = self.search_ir(query, scope=scope, budget=budget)
@@ -160,8 +161,8 @@ class SeamRuntime:
 
     def decompile_ir(self, record_ids: list[str], mode: str = "expanded") -> str:
         batch = self.store.load_ir(ids=record_ids)
-        claims = [record for record in batch.records if record.kind.value == "CLM"]
-        states = [record for record in batch.records if record.kind.value == "STA"]
+        claims = [record for record in batch.records if record.kind == RecordKind.CLM]
+        states = [record for record in batch.records if record.kind == RecordKind.STA]
         if states:
             fields = states[0].attrs.get("fields", {})
             body = "; ".join(f"{key}={value}" for key, value in fields.items())

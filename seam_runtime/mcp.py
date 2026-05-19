@@ -314,7 +314,10 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
             },
         }
     if name == "seam_retrieve":
-        from experimental.retrieval_orchestrator import RetrievalOrchestrator
+        try:
+            from experimental.retrieval_orchestrator import RetrievalOrchestrator
+        except ImportError:
+            return {"type": "error", "tool": name, "error": "Retrieval orchestrator not available (experimental module missing)"}
 
         query = _required_text(arguments.get("query"), field="query", tool=name)
         scope_arg = arguments.get("scope")

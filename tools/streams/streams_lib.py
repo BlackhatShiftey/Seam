@@ -235,29 +235,35 @@ def _acquire_stream_lock(kind: str):
     stream_dir = STREAMS_ROOT / kind
     stream_dir.mkdir(parents=True, exist_ok=True)
     lock_path = stream_dir / "log.lock"
-    fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
-    if os.name == "nt":
-        import msvcrt
-        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+    fd = -1
+    try:
+        fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
 
-        def _release():
-            try:
-                os.lseek(fd, 0, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-            finally:
-                os.close(fd)
+            def _release():
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                finally:
+                    os.close(fd)
 
-    else:
-        import fcntl
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX)
 
-        def _release():
-            try:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            finally:
-                os.close(fd)
+            def _release():
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
 
-    return fd, _release
+        return fd, _release
+    except Exception:
+        if fd >= 0:
+            os.close(fd)
+        raise
 
 
 def append_event(kind: str, header_fields: dict[str, str], body: str, *, agent: str, date: str) -> StreamEvent:
