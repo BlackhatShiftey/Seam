@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-18 (HISTORY#200 — file-locked append_event for streams)
+Last updated: 2026-05-19 (HISTORY#202 — Claude pre-commit fix to P0-6 atomicity test patch target)
 
 ## Current State
 
@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#200` — file-locked `append_event` in `tools/streams/streams_lib.py` (deep-audit item P0-5). Wraps the stream-log read-modify-write in `fcntl.flock(LOCK_EX)` on a sibling `<kind>/log.lock`, mirroring `tools/history/new_entry.py`; Windows fallback uses `msvcrt.locking`. New `tools/streams/test_streams.py::AppendEventLockTests` covers the concurrent-id race. `HISTORY#199` was vector.py SQLite pragma alignment (P1-12); `HISTORY#198` was the prior deep-audit follow-up pass (bounded `SQLiteStore.load_ir()` pagination, MIRL parse line-context errors, snapshot `pack_entry_ids`/`skipped_entry_ids`, and `docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md`).
+- Latest continuity handoff is `HISTORY#202` — Claude pre-commit fix to the P0-6 atomicity regression test in `tools/streams/test_streams.py::RebuildIndexTests`. The test was patching `tools.streams.rebuild_index.STREAMS_ROOT`, which is a no-op because `index_path()` and `read_log()` resolve `STREAMS_ROOT` via name lookup in `tools.streams.streams_lib`; the patch target was repointed to `tools.streams.streams_lib.STREAMS_ROOT` so the test actually exercises the populated-index branch under `tmp_root`. The P0-6 code change in `HISTORY#201` (atomic cross-index + per-stream index rebuild via tmp + `os.replace`) is unchanged. `HISTORY#200` was file-locked `append_event` for streams (P0-5); `HISTORY#199` was vector.py SQLite pragma alignment (P1-12); `HISTORY#198` was the prior deep-audit follow-up pass (bounded `SQLiteStore.load_ir()` pagination, MIRL parse line-context errors, snapshot `pack_entry_ids`/`skipped_entry_ids`, and `docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md`).
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.

@@ -8,6 +8,7 @@ archive chunks under .seam/cross_index_archive/.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from tools.streams.streams_lib import (
@@ -69,15 +70,20 @@ def rebuild_cross_index() -> dict[str, object]:
     cold = items[:-HOT_ZONE_MAX] if total > HOT_ZONE_MAX else []
 
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
-    for stale in ARCHIVE_DIR.glob("*.cross.md"):
-        stale.unlink()
     archive_pointers: list[str] = []
+    new_chunk_names: set[str] = set()
+    tmp_pairs: list[tuple[Path, Path]] = []  # (tmp, target)
+
+    # Phase 1 — write all new content to .tmp files first.
     if cold:
         chunk_path = ARCHIVE_DIR / f"0001-{len(cold):04d}.cross.md"
-        chunk_path.write_text(
+        new_chunk_names.add(chunk_path.name)
+        tmp_path = chunk_path.with_name(chunk_path.name + ".tmp")
+        tmp_path.write_text(
             "# Cross-Index Archive Chunk\n\n" + render_table(cold) + "\n",
             encoding="utf-8",
         )
+        tmp_pairs.append((tmp_path, chunk_path))
         archive_pointers.append(
             f"| {chunk_path.name} | {cold[0]['utc']}..{cold[-1]['utc']} | {len(cold)} | (multi) | (multi) |"
         )
@@ -107,7 +113,19 @@ def rebuild_cross_index() -> dict[str, object]:
 
     text = "\n".join(header) + body + ("\n" + "\n".join(archive_section) if archive_pointers else "") + "\n"
     CROSS_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CROSS_INDEX_PATH.write_text(text, encoding="utf-8")
+    cross_tmp = CROSS_INDEX_PATH.with_name(CROSS_INDEX_PATH.name + ".tmp")
+    cross_tmp.write_text(text, encoding="utf-8")
+    tmp_pairs.append((cross_tmp, CROSS_INDEX_PATH))
+
+    # Phase 2 — commit all .tmp files via atomic rename.
+    for tmp, target in tmp_pairs:
+        os.replace(tmp, target)
+
+    # Phase 3 — clean up stale archive chunks not in the new set.
+    for stale in ARCHIVE_DIR.glob("*.cross.md"):
+        if stale.name not in new_chunk_names:
+            stale.unlink()
+
     return {
         "total": total,
         "hot": len(hot),

@@ -2,15 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 255
+total_events: 257
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-18T00:21:00Z | history:043:2c4029af | session-event | planned | compile, roadmap, status | PLAN_LOG.md |
-| 2026-04-18T00:22:00Z | history:044:1dfd1f24 | session-event | planned | persist, vector, pgvector, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:23:00Z | history:045:8726b649 | session-event | planned | command, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:24:00Z | history:046:7c1c6caa | session-event | planned | compile, search, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:25:00Z | history:047:72b2b3a5 | session-event | planned | compile, persist, retrieval, search, benchmark, dashboard | PLAN_LOG.md |
@@ -209,10 +207,12 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-18T12:01:36Z | history:197:aadd22bd | session-event | done | security, verify, lx1, benchmark, dashboard | seam_runtime/server.py,seam_runtime/lx1.py,seam_runtime/dashboard.py,seam_run... |
 | 2026-05-18T15:31:05Z | history:198:25e22fed | session-event | done | audit, verify, benchmark, docs, history, status | seam_runtime/storage.py,seam_runtime/mirl.py,tools/history/write_snapshot.py,... |
 | 2026-05-19T00:02:24Z | history:200:f75ab478 | session-event | done | streams, security, verify, audit | tools/streams/streams_lib.py,tools/streams/test_streams.py |
+| 2026-05-19T01:03:45Z | history:201:8b9ca2e1 | session-event | done | streams, security, verify, audit | tools/streams/rebuild_cross_index.py,tools/streams/rebuild_index.py,tools/str... |
+| 2026-05-19T01:07:10Z | history:202:239b6a93 | session-event | done | streams, test, verify, audit | tools/streams/test_streams.py,PROJECT_STATUS.md |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0055.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:20:00Z | 55 | (multi) | (multi) |
+| 0001-0057.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:22:00Z | 57 | (multi) | (multi) |

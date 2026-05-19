@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 200
-total_tokens: ~41354
-latest_id: 200
+total_entries: 202
+total_tokens: ~41920
+latest_id: 202
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,8 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 202 | 2026-05-19 | done | 239b6a934fd32acd | streams,test,verify,audit | 201 |
+| 201 | 2026-05-19 | done | 8b9ca2e119b92aef | streams,security,verify,audit | 200 |
 | 200 | 2026-05-19 | done | f75ab4782a0b4169 | streams,security,verify,audit | 199 |
 | 199 | 2026-05-18 | done | 6838df98bd3bfc47 | vector,persist,verify,audit | 198 |
 | 198 | 2026-05-18 | done | 25e22fed1041c64e | audit,verify,benchmark,docs,+ | 197 |
@@ -217,7 +219,7 @@ compact: true
 - alias: count=2 latest=#033, #002
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
-- audit: count=34 latest=#200, #199, #198, #191, #184
+- audit: count=36 latest=#202, #201, #200, #199, #198
 - benchmark: count=51 latest=#198, #197, #189, #188, #187
 - bundle: count=2 latest=#015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
@@ -274,23 +276,24 @@ compact: true
 - salvage: count=1 latest=#179
 - sbert: count=3 latest=#023, #022, #011
 - search: count=13 latest=#181, #154, #088, #077, #047
-- security: count=6 latest=#200, #197, #191, #181, #177
+- security: count=7 latest=#201, #200, #197, #191, #181
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=105 latest=#166, #164, #156, #155, #150
 - status: count=77 latest=#198, #184, #181, #177, #176
 - storage: count=1 latest=#182
-- streams: count=2 latest=#200, #192
+- streams: count=4 latest=#202, #201, #200, #192
 - surface: count=1 latest=#145
+- test: count=1 latest=#202
 - tests: count=3 latest=#192, #191, #182
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=21 latest=#199, #182, #181, #099, #066
-- verify: count=134 latest=#200, #199, #198, #197, #196
+- verify: count=136 latest=#202, #201, #200, #199, #198
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 180
+- done: 182
 - planned: 20

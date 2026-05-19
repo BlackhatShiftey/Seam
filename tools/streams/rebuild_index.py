@@ -11,6 +11,7 @@ then trusts the root index.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from tools.streams.streams_lib import (
@@ -31,10 +32,12 @@ def rebuild_index(kind: str) -> dict[str, object]:
     data = read_log(kind)
     if not data:
         index_path(kind).parent.mkdir(parents=True, exist_ok=True)
-        index_path(kind).write_text(
+        tmp = index_path(kind).with_name(index_path(kind).name + ".tmp")
+        tmp.write_text(
             f"# {kind.capitalize()} Index\n\ntotal_events: 0\nlatest_id: 0\nsource: streams/{kind}/log.md\nschema: seam-stream-index/v1\n",
             encoding="utf-8",
         )
+        os.replace(tmp, index_path(kind))
         return {"kind": kind, "events": 0}
     events = parse_events(data, kind)
     lines: list[str] = [
@@ -59,7 +62,9 @@ def rebuild_index(kind: str) -> dict[str, object]:
             f"{evt.hash_short} | {evt.fields.get('supersedes','')} | {topics_disp} |"
         )
     index_path(kind).parent.mkdir(parents=True, exist_ok=True)
-    index_path(kind).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    tmp = index_path(kind).with_name(index_path(kind).name + ".tmp")
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    os.replace(tmp, index_path(kind))
     return {"kind": kind, "events": len(events)}
 
 

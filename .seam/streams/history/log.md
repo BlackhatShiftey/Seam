@@ -4187,3 +4187,39 @@ New test class AppendEventLockTests in tools/streams/test_streams.py extends the
 
 Verification: focused python -m pytest tools/streams/test_streams.py -q -k concurrent_append = 1 passed. Full suite python -m pytest test_seam_all/ tools/history/ tools/streams/ tests/ -q = 350 passed, 1 warning, 3 subtests passed. verify_integrity OK, verify_routing OK, verify_continuity OK, verify_streams OK. py_compile + compileall OK.
 ---END-ENTRY-#200---
+
+---BEGIN-ENTRY-#201---
+id: 201
+date: 2026-05-19T01:03:45Z
+agent: deepseek
+status: done
+topics: streams, security, verify, audit
+commits: none
+refs: tools/streams/rebuild_cross_index.py,tools/streams/rebuild_index.py,tools/streams/test_streams.py
+supersedes: 200
+tokens: 317
+---
+Item P0-6: Atomic cross-index and per-stream index rebuild. Replaced the delete-then-write pattern in tools/streams/rebuild_cross_index.py with a three-phase commit: phase 1 writes new archive chunk(s) and the cross-index to <name>.tmp siblings; phase 2 commits each tmp via os.replace(tmp, target); phase 3 deletes only stale *.cross.md chunks not in the new chunk-name set. Mid-write failure now leaves old chunks and the cross-index intact instead of leaving the archive partially cleared. Applied the same tmp + os.replace pattern to both write_text calls in tools/streams/rebuild_index.py (empty-index path and populated-index path); history stream is unaffected because that path still delegates to sync_history_mirror().
+
+Added two regression tests in tools/streams/test_streams.py. CrossIndexTests::test_rebuild_cross_index_atomic_on_write_failure patches collect_all_events to return 250 events (triggers cold archive chunk write), pre-creates a stale archive chunk, patches Path.write_text to raise OSError, and asserts the stale chunk still exists and CROSS_INDEX_PATH is unchanged. RebuildIndexTests::test_rebuild_index_atomic_on_write_failure builds an isolated tmp STREAMS_ROOT with a single testkind/log.md event and a pre-existing index.md, patches os.replace to raise, and asserts the old index content survives; pre-fix the direct write_text overwrote the index before any replace.
+
+Verification: python -m pytest tools/streams/test_streams.py -q = 18 passed. Full suite python -m pytest test_seam_all/ tools/history/ tools/streams/ -q = 351 passed, 1 warning, 3 subtests passed in 88.78s. py_compile tools/streams/rebuild_cross_index.py tools/streams/rebuild_index.py = OK. compileall seam_runtime experimental tools scripts installers = OK. verify_integrity OK, verify_routing OK, verify_continuity OK, verify_streams OK. Out of scope preserved: archive chunk schema, event ordering, total_events counting unchanged; .seam/, HISTORY.md, HISTORY_INDEX.md, ROADMAP.md, PROJECT_STATUS.md, REPO_LEDGER.md untouched by the code change.
+---END-ENTRY-#201---
+
+---BEGIN-ENTRY-#202---
+id: 202
+date: 2026-05-19T01:07:10Z
+agent: claude
+status: done
+topics: streams, test, verify, audit
+commits: none
+refs: tools/streams/test_streams.py,PROJECT_STATUS.md
+supersedes: 201
+tokens: 249
+---
+Claude pre-commit review fix for HISTORY#201 (P0-6). DeepSeek's RebuildIndexTests::test_rebuild_index_atomic_on_write_failure patched tools.streams.rebuild_index.STREAMS_ROOT, but rebuild_index.py only imports that symbol without referencing it directly; index_path() and read_log() resolve STREAMS_ROOT via name lookup inside tools.streams.streams_lib at call time. The original patch target was a no-op, the function operated on the real .seam/streams/testkind/ path, and the assertion on tmp_root/testkind/index.md passed regardless of whether the os.replace atomicity fix was in place (a false-positive test). Symptom: the test run leaked .seam/streams/testkind/index.md and .seam/streams/testkind/index.md.tmp into the working tree.
+
+Repointed the patch to tools.streams.streams_lib.STREAMS_ROOT so index_path() and read_log() both resolve to tmp_root. Cleaned the leaked .seam/streams/testkind/ directory. The atomicity assertion now actually exercises the populated-index branch in rebuild_index.py: write_text writes tmp_root/testkind/index.md.tmp, os.replace raises, and the test verifies tmp_root/testkind/index.md retains its pre-call content. Also tightened the inline comment block. Updated PROJECT_STATUS.md handoff to point at this entry.
+
+Verification: python -m pytest tools/streams/test_streams.py -q = 18 passed. Full suite python -m pytest test_seam_all/ tools/history/ tools/streams/ -q = 351 passed, 1 warning, 3 subtests passed. verify_integrity OK, verify_routing OK, verify_continuity OK, verify_streams OK after rebuild_cross_index and history mirror sync. The P0-6 code in rebuild_cross_index.py and rebuild_index.py is unchanged; only the test patch target moved.
+---END-ENTRY-#202---
