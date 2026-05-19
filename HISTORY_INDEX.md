@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 205
-total_tokens: ~42687
-latest_id: 205
+total_entries: 206
+total_tokens: ~43030
+latest_id: 206
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 206 | 2026-05-19 | done | 9dcce7f94f2a6773 | audit,verify,benchmark,lx1 | 205 |
 | 205 | 2026-05-19 | done | b15232394c43045a | audit,security,verify,docs,+ | 204 |
 | 204 | 2026-05-19 | done | b51b7e8518d870f9 | audit,security,verify,history,+ | 203 |
 | 203 | 2026-05-19 | done | 6685b7cf350bebbb | dashboard,verify,status,docs | 202 |
@@ -222,8 +223,8 @@ compact: true
 - alias: count=2 latest=#033, #002
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
-- audit: count=38 latest=#205, #204, #202, #201, #200
-- benchmark: count=51 latest=#198, #197, #189, #188, #187
+- audit: count=39 latest=#206, #205, #204, #202, #201
+- benchmark: count=52 latest=#206, #198, #197, #189, #188
 - bundle: count=2 latest=#015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
@@ -254,7 +255,7 @@ compact: true
 - lexical: count=1 latest=#004
 - linux: count=6 latest=#177, #173, #136, #135, #021
 - locking: count=1 latest=#182
-- lx1: count=5 latest=#197, #088, #018, #011, #006
+- lx1: count=6 latest=#206, #197, #088, #018, #011
 - mcp: count=9 latest=#183, #182, #149, #148, #140
 - memory: count=2 latest=#182, #178
 - mirl: count=21 latest=#145, #132, #131, #130, #129
@@ -291,12 +292,12 @@ compact: true
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=21 latest=#199, #182, #181, #099, #066
-- verify: count=139 latest=#205, #204, #203, #202, #201
+- verify: count=140 latest=#206, #205, #204, #203, #202
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 185
+- done: 186
 - planned: 20

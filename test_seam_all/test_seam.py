@@ -3978,6 +3978,64 @@ class LX1NotationTests(unittest.TestCase):
         self.assertEqual(restored.attrs["end"], 42)
         self.assertAlmostEqual(restored.attrs["score"], 0.95)
 
+    def test_lx1_int_float_type_preservation(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        from seam_runtime.mirl import MIRLRecord, RecordKind
+        record = MIRLRecord(
+            id="span:type-test",
+            kind=RecordKind.SPAN,
+            attrs={
+                "int_zero": 0,
+                "float_zero": 0.0,
+                "int_one": 1,
+                "float_one": 1.0,
+                "int_large": 9223372036854775807,
+                "float_small": 0.0001,
+                "int_negative": -42,
+                "float_negative": -3.14,
+                "float_large": 1.7976931348623157e308,
+            },
+        )
+        line = encode_record(record)
+        restored = decode_record(line)
+        self.assertIsInstance(restored.attrs["int_zero"], int)
+        self.assertIsInstance(restored.attrs["float_zero"], float)
+        self.assertEqual(restored.attrs["int_zero"], 0)
+        self.assertEqual(restored.attrs["float_zero"], 0.0)
+        self.assertIsInstance(restored.attrs["int_one"], int)
+        self.assertIsInstance(restored.attrs["float_one"], float)
+        self.assertEqual(restored.attrs["int_one"], 1)
+        self.assertEqual(restored.attrs["float_one"], 1.0)
+        self.assertIsInstance(restored.attrs["int_large"], int)
+        self.assertEqual(restored.attrs["int_large"], 9223372036854775807)
+        self.assertIsInstance(restored.attrs["float_small"], float)
+        self.assertAlmostEqual(restored.attrs["float_small"], 0.0001)
+        self.assertIsInstance(restored.attrs["int_negative"], int)
+        self.assertEqual(restored.attrs["int_negative"], -42)
+        self.assertIsInstance(restored.attrs["float_negative"], float)
+        self.assertAlmostEqual(restored.attrs["float_negative"], -3.14)
+        self.assertIsInstance(restored.attrs["float_large"], float)
+        self.assertAlmostEqual(restored.attrs["float_large"], 1.7976931348623157e308)
+
+    def test_lx1_mirl_conf_type_preservation(self) -> None:
+        from seam_runtime.lx1 import decode_record, encode_record
+        from seam_runtime.mirl import MIRLRecord, RecordKind, Status
+        record = MIRLRecord(
+            id="clm:conf-test",
+            kind=RecordKind.CLM,
+            ns="local.default",
+            scope="project",
+            conf=0.92,
+            status=Status.ASSERTED,
+            prov=["prov:compile:1"],
+            evidence=["span:1"],
+            attrs={"subject": "ent:x", "predicate": "test", "object": "y"},
+        )
+        line = encode_record(record)
+        restored = decode_record(line)
+        self.assertIsInstance(restored.conf, float)
+        self.assertAlmostEqual(restored.conf, 0.92)
+
 
 if __name__ == "__main__":
     unittest.main()

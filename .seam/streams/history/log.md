@@ -4275,3 +4275,33 @@ Added docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md as the high-level DeepSeek e
 
 Updated PROJECT_STATUS.md to point at HISTORY#205 and REPO_LEDGER.md with a concise durable workflow pointer to the new SOP. No runtime behavior changed. Verification performed before closeout: startup docs read per AGENTS.md, git status reviewed, and this change remained scoped to docs/status/ledger/history. Full runtime tests were not rerun because this is documentation/protocol-only work.
 ---END-ENTRY-#205---
+
+---BEGIN-ENTRY-#206---
+id: 206
+date: 2026-05-19T03:45:45Z
+agent: deepseek
+status: done
+topics: audit, verify, benchmark, lx1
+commits: none
+refs: test_seam_all/test_seam.py,docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md
+supersedes: 205
+tokens: 343
+---
+DeepSeek parallel audit pass per docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md.
+
+Phase 0 (baseline): main at 4b96950, all gates OK. Baseline suite `.venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q` reported 356 passed, 1 warning, 3 subtests passed.
+
+Phase 1 (claim calibration): 5 parallel workers audited runtime/data safety, API/security, tooling/history, installer/dashboard, and benchmark claims against current code. Produced calibrated status tables.
+
+Phase 2 (fix selection): selected LX1 float/int type preservation (P1) as the sole narrow, testable fix. Deferred vector O(N) search, holdout fixtures, SQLite concurrency stress test, history mirror atomicity, CI continuity gates, and MCP/docs gaps as needing operator policy or larger scope.
+
+Phase 3 (test-first fix): added test_lx1_int_float_type_preservation (explicit isinstance checks for int vs float across 9 edge values including zero, negative, large int, very small float, max float) and test_lx1_mirl_conf_type_preservation (verifies conf field stays float through roundtrip). Both tests pass.
+
+Phase 4 (benchmark smoke): seam bench external --plan ran (external runner commands not configured -- expected). seam bench external --quickstart locomo --adapter seam --judge stub passed (10/10 correct, 5.14s, stub judge). seam benchmark run long_context --format json passed (PASS, 2/2 cases).
+
+Phase 5 (adversarial review): diff --check clean, secret/session-link scan clean, WebUI root behavior confirmed intact (App.tsx frames /dashboard.html from public/), no generated artifacts staged, untracked .vscode/ Webui-final-dash/ 'new content' left unstaged.
+
+Phase 6 (full verification): `.venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q` reported 358 passed (+2 new), 1 warning, 3 subtests passed. py_compile seam.py OK. compileall seam_runtime experimental tools scripts installers OK. verify_integrity OK, verify_routing OK, verify_continuity OK, verify_streams OK.
+
+Open: vector O(N) search remains P2, holdout fixtures still need generation, MCP auth-by-design docs gap, append_event crash-safety window (read-all+write-all under lock), history mirror lacks atomic write. All deferred -- need operator direction or larger scope than this pass.
+---END-ENTRY-#206---
