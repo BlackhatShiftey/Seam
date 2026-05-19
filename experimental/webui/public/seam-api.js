@@ -118,6 +118,47 @@
       }
     },
 
+    // Fetch file tree
+    tree: async function (path) {
+      try {
+        const url = path ? '/tree?path=' + encodeURIComponent(path) : '/tree';
+        const data = await _fetch(url);
+        _notifyListeners(true);
+        return data;
+      } catch (err) {
+        if (err.code === 'DISCONNECTED') _notifyListeners(false);
+        throw err;
+      }
+    },
+
+    // Run benchmarks
+    benchmark: async function (suite, persist, holdout) {
+      try {
+        const payload = { suite: suite || 'all', persist: !!persist, holdout: !!holdout };
+        const data = await _fetch('/benchmark', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        _notifyListeners(true);
+        return data;
+      } catch (err) {
+        if (err.code === 'DISCONNECTED') _notifyListeners(false);
+        throw err;
+      }
+    },
+
+    // Get system metrics
+    sysMetrics: async function () {
+      try {
+        const data = await _fetch('/sys-metrics');
+        _notifyListeners(true);
+        return data;
+      } catch (err) {
+        if (err.code === 'DISCONNECTED') _notifyListeners(false);
+        throw err;
+      }
+    },
+
     // Search memory records
     search: async function (query, budget, scope, lens) {
       budget = budget || 5;
@@ -126,6 +167,18 @@
       if (scope) params += '&scope=' + encodeURIComponent(scope);
       try {
         const data = await _fetch('/search?' + params);
+        _notifyListeners(true);
+        return data;
+      } catch (err) {
+        if (err.code === 'DISCONNECTED') _notifyListeners(false);
+        throw err;
+      }
+    },
+
+    // Fetch memory graph trace
+    trace: async function (rootId) {
+      try {
+        const data = await _fetch('/trace?root_id=' + encodeURIComponent(rootId));
         _notifyListeners(true);
         return data;
       } catch (err) {

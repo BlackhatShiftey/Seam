@@ -28,7 +28,7 @@ DEFAULT_DOC_PATHS: tuple[str, ...] = (
 
 
 @dataclass(frozen=True)
-class TestCountFact:
+class CountFactRecord:
     value: int
     scope: tuple[str, ...]
     location: str
@@ -78,10 +78,10 @@ def collect_test_count_facts(
     line_offset: int = 0,
     sequence: int = 0,
     require_explicit_pytest_line: bool = False,
-) -> list[TestCountFact]:
+) -> list[CountFactRecord]:
     """Extract scoped test-count facts from text."""
     repo_root = repo_root.resolve()
-    facts: list[TestCountFact] = []
+    facts: list[CountFactRecord] = []
     source_label = str(source)
     try:
         source_path = Path(source)
@@ -108,7 +108,7 @@ def collect_test_count_facts(
                 continue
             command_scope = _pytest_command_scope_from_context(repo_root, context)
             facts.append(
-                TestCountFact(
+                CountFactRecord(
                     value=int(match.group("count")),
                     scope=command_scope
                     or tuple(str(path.relative_to(repo_root.resolve())) for path in scoped_paths),

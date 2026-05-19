@@ -217,7 +217,21 @@ def read_log(kind: str) -> bytes:
 def write_log(kind: str, data: bytes) -> None:
     p = log_path(kind)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_bytes(data)
+    fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+    try:
+        os.write(fd, data)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    # Best-effort parent-dir fsync (POSIX; Windows raises — swallow there)
+    try:
+        dir_fd = os.open(str(p.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        pass
 
 
 def list_stream_kinds() -> list[str]:

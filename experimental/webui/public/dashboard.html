@@ -3969,27 +3969,35 @@ function SystemResources() {
     }
   }, []);
 
-  // Synthesized live metrics, anchored to the SEAM runtime profile
+  // Live OS metrics polling
   React.useEffect(() => {
-    let cpuBase = 12,memBase = 38,netBase = 4,diskBase = 8,gpuBase = 6;
+    let cpuBase = 12, memBase = 38, netBase = 4, diskBase = 8, gpuBase = 6;
     const i = setInterval(() => {
-      const drift = () => (Math.random() - 0.5) * 4;
-      const newPoint = {
-        cpu: Math.max(2, Math.min(100, cpuBase + drift() * 2 + (Math.random() < 0.1 ? Math.random() * 30 : 0))),
-        mem: Math.max(10, Math.min(95, memBase + drift())),
-        net: Math.max(0, Math.min(40, netBase + drift() * 1.5 + (Math.random() < 0.2 ? Math.random() * 8 : 0))),
-        disk: Math.max(0, Math.min(60, diskBase + drift() * 1.2 + (Math.random() < 0.15 ? Math.random() * 12 : 0))),
-        gpu: Math.max(0, Math.min(100, gpuBase + drift() * 1.8 + (Math.random() < 0.05 ? Math.random() * 40 : 0)))
-      };
-      cpuBase = newPoint.cpu;memBase = newPoint.mem;netBase = newPoint.net;diskBase = newPoint.disk;gpuBase = newPoint.gpu;
-      setNow(newPoint);
-      setHistory((prev) => ({
-        cpu: [...prev.cpu, newPoint.cpu].slice(-60),
-        mem: [...prev.mem, newPoint.mem].slice(-60),
-        net: [...prev.net, newPoint.net].slice(-60),
-        disk: [...prev.disk, newPoint.disk].slice(-60),
-        gpu: [...prev.gpu, newPoint.gpu].slice(-60)
-      }));
+      window.SeamAPI.sysMetrics().then((metrics) => {
+        const drift = () => (Math.random() - 0.5) * 4;
+        // /sys-metrics returns per-metric {value, source, error}; extract value, fall back to last-known live baseline
+        const pick = (m, fallback) => (m && typeof m.value === 'number') ? m.value : fallback;
+        const cpuVal = pick(metrics.cpu, cpuBase);
+        const memVal = pick(metrics.mem, memBase);
+        const diskVal = pick(metrics.disk, diskBase);
+        cpuBase = cpuVal; memBase = memVal; diskBase = diskVal;
+        const newPoint = {
+          cpu: cpuVal,
+          mem: memVal,
+          net: Math.max(0, Math.min(40, netBase + drift() * 1.5 + (Math.random() < 0.2 ? Math.random() * 8 : 0))), // /sys-metrics reports net as unsupported; UI still simulates until a real backend lands
+          disk: diskVal,
+          gpu: Math.max(0, Math.min(100, gpuBase + drift() * 1.8 + (Math.random() < 0.05 ? Math.random() * 40 : 0))) // same: gpu reported unsupported by backend
+        };
+        netBase = newPoint.net; gpuBase = newPoint.gpu;
+        setNow(newPoint);
+        setHistory((prev) => ({
+          cpu: [...prev.cpu, newPoint.cpu].slice(-60),
+          mem: [...prev.mem, newPoint.mem].slice(-60),
+          net: [...prev.net, newPoint.net].slice(-60),
+          disk: [...prev.disk, newPoint.disk].slice(-60),
+          gpu: [...prev.gpu, newPoint.gpu].slice(-60)
+        }));
+      }).catch(() => { /* ignore on disconnect */ });
       // Real JS heap if available (Chrome only)
       if (performance.memory) {
         setPageHeap({
@@ -4162,6 +4170,45 @@ function MemoryFullView() {
   const [tick, setTick] = useState(0);
   // Live API stats for header badges
   const [liveStats, setLiveStats] = useState(null);
+  const totalRecordsLabel = liveStats?.total_records != null
+    ? `${(liveStats.total_records / 1000000).toFixed(2)}M records`
+    : '1.41M records';
+
+  // Live Graph Trace
+  const [graphTrace, setGraphTrace] = useState({ nodes: [], edges: [] });
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTrace = async () => {
+      try {
+        // Try to trace from 'ent:seam' as a hub node
+        const data = await window.SeamAPI.trace('ent:seam');
+        if (!cancelled && data && data.nodes) {
+          setGraphTrace({
+            nodes: data.nodes.map(n => ({
+              id: n.id,
+              label: n.id,
+              kind: n.kind,
+              color: tagColors[n.kind === 'entity' ? '@' : n.kind === 'claim' ? '#' : n.kind === 'event' ? '!' : n.kind === 'relation' ? '>' : n.kind === 'state' ? '~' : '^'] || '#7fe0ff',
+              size: 8 + (n.score || 0.5) * 6,
+              weight: 3,
+              record: n,
+              tag: n.kind === 'entity' ? '@' : n.kind === 'claim' ? '#' : n.kind === 'event' ? '!' : n.kind === 'relation' ? '>' : n.kind === 'state' ? '~' : '^'
+            })),
+            edges: data.edges.map(e => ({
+              from: e.source || e.from,
+              to: e.target || e.to,
+              kind: e.kind || e.label || 'relates_to'
+            }))
+          });
+        }
+      } catch (err) {
+        // Fallback to procedural generation if backend trace fails or missing
+        setGraphTrace({ nodes: [], edges: [] });
+      }
+    };
+    fetchTrace();
+  }, []);
+
   const [liveRecords, setLiveRecords] = useState([]);
   // Live write queue & records — each queue item advances monotonically until done, then moves to records
   const [queue, setQueue] = useState(() => writeQueue.map((w) => ({
@@ -4244,10 +4291,7 @@ function MemoryFullView() {
   const baseRecords = liveRecords.length > 0 ? liveRecords : memoryRecords;
   const allRecords = [...graduated, ...baseRecords].slice(0, 24);
 
-  // Live-aware header stats
-  const totalRecordsLabel = liveStats?.total_records != null
-    ? (liveStats.total_records >= 1000000 ? (liveStats.total_records / 1000000).toFixed(1) + 'M' : liveStats.total_records >= 1000 ? (liveStats.total_records / 1000).toFixed(1) + 'K' : String(liveStats.total_records))
-    : '1.4M';
+  // Live-aware header stats handled above
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', background: 'var(--bg-deep)', color: 'var(--text)' }}>
@@ -4260,7 +4304,12 @@ function MemoryFullView() {
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', gap: 10 }}>
-            {[{ v: totalRecordsLabel, l: 'Records', c: '#7fe0ff' }, { v: '841K', l: 'Graph Edges', c: '#9b6cff' }, { v: '91%', l: 'Recall Acc.', c: '#7efdb9' }, { v: '38ms', l: 'Avg Latency', c: '#f4d676' }].map((s) =>
+            {[
+              { v: totalRecordsLabel, l: 'Records', c: '#7fe0ff' }, 
+              { v: liveStats?.edge_count != null ? (liveStats.edge_count >= 1000 ? (liveStats.edge_count / 1000).toFixed(1) + 'K' : liveStats.edge_count) : '841K', l: 'Graph Edges', c: '#9b6cff' }, 
+              { v: '91%', l: 'Recall Acc.', c: '#7efdb9' }, 
+              { v: '38ms', l: 'Avg Latency', c: '#f4d676' }
+            ].map((s) =>
             <div key={s.l} style={{ textAlign: 'center', padding: '7px 14px', background: 'rgba(8,19,42,0.8)', border: `1px solid ${s.c}30`, borderRadius: 8 }}>
                 <div style={{ fontSize: 20, color: s.c, fontWeight: 600, lineHeight: 1, filter: `drop-shadow(0 0 6px ${s.c})` }}>{s.v}</div>
                 <div style={{ fontSize: 9, color: '#274063', textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 3 }}>{s.l}</div>
@@ -4296,15 +4345,15 @@ function MemoryFullView() {
             </div>
 
             <ObsidianGraph
-            records={allRecords}
-            sources={[
+            records={graphTrace.nodes.length > 0 ? graphTrace.nodes : allRecords}
+            sources={graphTrace.nodes.length > 0 ? [] : [
             { id: 'src:readme', name: 'README.md' },
             { id: 'src:spec', name: 'SEAM_SPEC_V0.1.md' },
             { id: 'src:roadmap', name: 'ROADMAP.md' },
             { id: 'src:cli', name: 'cli.py' },
             { id: 'src:runtime', name: 'runtime.py' }]
             }
-            baseEdges={[
+            baseEdges={graphTrace.edges.length > 0 ? graphTrace.edges : [
             { from: 'src:readme', to: 'clm:1' },
             { from: 'src:readme', to: 'clm:4' },
             { from: 'src:spec', to: 'clm:22' },
@@ -4644,16 +4693,16 @@ function MemoryFullView() {
                     } />
                   </StatSection>
 
-                  <StatSection icon="@" title="Records by Tag" hint="MIRL tag distribution across 1.41M records" color="#7fe0ff">
+                  <StatSection icon="@" title="Records by Tag" hint={`MIRL tag distribution across ${sysStats ? sysStats.total_records.toLocaleString() : '1.41M'} records`} color="#7fe0ff">
                     <StatTable color="#7fe0ff" rows={[
-                    { label: '@ entities', value: '362,184', bar: 0.256, color: '#a6fcff', hint: 'named entities, agents, projects' },
-                    { label: '# claims', value: '284,109', bar: 0.201, color: '#7fe0ff', hint: 'factual assertions' },
-                    { label: '! events', value: '198,442', bar: 0.140, color: '#f4d676', hint: 'timestamped actions' },
-                    { label: '> relations', value: '241,073', bar: 0.171, color: '#9b6cff', hint: 'graph edges as records' },
-                    { label: '~ states', value: '142,206', bar: 0.101, color: '#7efdb9', hint: 'system/project states' },
-                    { label: '^ evidence', value: '101,358', bar: 0.072, color: '#d391ff', hint: 'verified evidence pointers' },
-                    { label: '% sources', value: '64,891', bar: 0.046, color: '#66b8ff', hint: 'origin provenance' },
-                    { label: '= aliases', value: '17,785', bar: 0.013, color: '#8df6ff', hint: 'name/symbol aliasing' }]
+                    { label: '@ entities', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['@'] || 0).toLocaleString() : '362,184', color: '#a6fcff' },
+                    { label: '# claims', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['#'] || 0).toLocaleString() : '284,109', color: '#7fe0ff' },
+                    { label: '! events', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['!'] || 0).toLocaleString() : '198,442', color: '#f4d676' },
+                    { label: '> relations', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['>'] || 0).toLocaleString() : '241,073', color: '#9b6cff' },
+                    { label: '~ states', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['~'] || 0).toLocaleString() : '142,206', color: '#7efdb9' },
+                    { label: '^ evidence', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['^'] || 0).toLocaleString() : '101,358', color: '#d391ff' },
+                    { label: '% sources', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['%'] || 0).toLocaleString() : '64,891', color: '#66b8ff' },
+                    { label: '= aliases', value: sysStats && sysStats.record_kinds ? (sysStats.record_kinds['='] || 0).toLocaleString() : '17,785', color: '#8df6ff' }]
                     } />
                   </StatSection>
 
@@ -4679,8 +4728,8 @@ function MemoryFullView() {
                     { label: 'model', value: 'text-embedding-3-small', hint: 'OpenAI · 1536-dim' },
                     { label: 'dimensionality', value: '1536' },
                     { label: 'distance metric', value: 'cosine' },
-                    { label: 'records embedded', value: '1,400,751', bar: 0.992, color: '#7efdb9' },
-                    { label: 'drifted (stale)', value: '11,297', bar: 0.008, color: '#f4d676', hint: 'newer MIRL update than embed' },
+                    { label: 'records embedded', value: sysStats ? sysStats.vector_entries.toLocaleString() : '1,400,751', color: '#7efdb9' },
+                    { label: 'drifted (stale)', value: '11,297 (mock)', color: '#f4d676', hint: 'newer MIRL update than embed' },
                     { label: 'sqlite backend', value: '99.2%', bar: 0.992 },
                     { label: 'chroma backend', value: '99.2%', bar: 0.992 },
                     { label: 'pgvector backend', value: 'disabled', color: '#5a7a9a' },
@@ -4694,20 +4743,20 @@ function MemoryFullView() {
 
                   <StatSection icon="◇" title="Graph" hint="relation graph over records" color="#d391ff">
                     <StatTable color="#d391ff" rows={[
-                    { label: 'nodes', value: '1,412,048' },
-                    { label: 'edges total', value: '841,203' },
-                    { label: 'avg degree', value: '1.19' },
-                    { label: 'max degree', value: '847', hint: '@SEAM hub' },
-                    { label: 'connected components', value: '142,706' },
-                    { label: 'clustering coefficient', value: '0.31' },
-                    { label: 'edge: relates_to', value: '412,894', bar: 0.491, color: '#9b6cff' },
-                    { label: 'edge: derived_from', value: '184,103', bar: 0.219, color: '#7fe0ff' },
-                    { label: 'edge: contradicts', value: '596', bar: 0.001, color: '#ff6b6b' },
-                    { label: 'edge: supersedes', value: '12,847', bar: 0.015, color: '#f4d676' },
-                    { label: 'edge: source_of', value: '108,442', bar: 0.129, color: '#66b8ff' },
-                    { label: 'edge: alias_of', value: '17,785', bar: 0.021, color: '#8df6ff' },
-                    { label: 'edge: other', value: '104,536', bar: 0.124, color: '#5a7a9a' },
-                    { label: 'avg walk depth (ret)', value: '2.4 hops' }]
+                    { label: 'nodes', value: sysStats ? sysStats.total_records.toLocaleString() : '1,412,048' },
+                    { label: 'edges total', value: sysStats ? sysStats.edge_count.toLocaleString() : '841,203' },
+                    { label: 'avg degree', value: '1.19 (mock)' },
+                    { label: 'max degree', value: '847 (mock)', hint: '@SEAM hub' },
+                    { label: 'connected components', value: '142,706 (mock)' },
+                    { label: 'clustering coefficient', value: '0.31 (mock)' },
+                    { label: 'edge: relates_to', value: '412,894 (mock)', color: '#9b6cff' },
+                    { label: 'edge: derived_from', value: '184,103 (mock)', color: '#7fe0ff' },
+                    { label: 'edge: contradicts', value: '596 (mock)', color: '#ff6b6b' },
+                    { label: 'edge: supersedes', value: '12,847 (mock)', color: '#f4d676' },
+                    { label: 'edge: source_of', value: '108,442 (mock)', color: '#66b8ff' },
+                    { label: 'edge: alias_of', value: '17,785 (mock)', color: '#8df6ff' },
+                    { label: 'edge: other', value: '104,536 (mock)', color: '#5a7a9a' },
+                    { label: 'avg walk depth (ret)', value: '2.4 hops (mock)' }]
                     } />
                   </StatSection>
                 </div>
@@ -4740,16 +4789,28 @@ function MemoryFullView() {
                   </StatSection>
 
                   <StatSection icon="◈" title="Quality Metrics" hint="against holdout fixtures" color="#7fe0ff">
-                    <StatTable color="#7fe0ff" rows={[
-                    { label: 'hit@1', value: '0.74', bar: 0.74 },
-                    { label: 'hit@5', value: '0.91', bar: 0.91, color: '#7efdb9' },
-                    { label: 'hit@10', value: '0.96', bar: 0.96, color: '#7efdb9' },
-                    { label: 'MRR', value: '0.83', bar: 0.83 },
-                    { label: 'nDCG@10', value: '0.87', bar: 0.87 },
-                    { label: 'MAP', value: '0.79', bar: 0.79 },
-                    { label: 'pack token efficiency', value: '0.87', bar: 0.87, color: '#7efdb9' },
-                    { label: 'pack-vs-budget', value: '3,564 / 4,096 tokens' },
-                    { label: 'above-threshold rate', value: '87%', bar: 0.87 }]
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                      <button onClick={triggerBenchmark} disabled={benchRunning} style={{
+                        padding: '4px 10px', background: 'rgba(127,224,255,0.1)', border: '1px solid rgba(127,224,255,0.3)',
+                        borderRadius: 4, color: '#7fe0ff', fontSize: 10, fontFamily: 'var(--font)', cursor: benchRunning ? 'wait' : 'pointer',
+                        opacity: benchRunning ? 0.6 : 1
+                      }}>
+                        {benchRunning ? 'running benchmark...' : 'run benchmarks ⏵'}
+                      </button>
+                    </div>
+                    <StatTable color="#7fe0ff" rows={
+                      benchData && benchData.summary ? [
+                        { label: 'Overall Status', value: benchData.summary.status || 'PASS', color: benchData.summary.status === 'FAIL' ? '#ff6b6b' : '#7efdb9' },
+                        { label: 'Cases Passed', value: `${benchData.summary.passed_cases} / ${benchData.summary.case_count}` },
+                        { label: 'Exactness Rate', value: `${(benchData.summary.exactness_rate * 100).toFixed(1)}%`, bar: benchData.summary.exactness_rate, color: '#7efdb9' },
+                        { label: 'Token Savings (p50)', value: `${(benchData.summary.token_savings_p50 * 100).toFixed(1)}%`, bar: benchData.summary.token_savings_p50 },
+                      ] : [
+                        { label: 'Status', value: 'Not run yet', color: '#5a7a9a' },
+                        { label: 'hit@1', value: '0.74 (mock)', bar: 0.74, color: '#5a7a9a' },
+                        { label: 'hit@5', value: '0.91 (mock)', bar: 0.91, color: '#5a7a9a' },
+                        { label: 'hit@10', value: '0.96 (mock)', bar: 0.96, color: '#5a7a9a' },
+                        { label: 'MAP', value: '0.79 (mock)', bar: 0.79, color: '#5a7a9a' }
+                      ]
                     } />
                   </StatSection>
                 </div>
@@ -4939,6 +5000,26 @@ function App() {
   const [explorerTab, setExplorerTab] = useState('project');
   const [sysFolders, setSysFolders] = useState(new Set(['home']));
   const [sysSearch, setSysSearch] = useState('');
+
+  // Benchmark state
+  const [benchData, setBenchData] = useState(null);
+  const [benchRunning, setBenchRunning] = useState(false);
+  const [sysStats, setSysStats] = useState(null);
+
+  useEffect(() => {
+    window.SeamAPI.stats().then(res => setSysStats(res)).catch(() => {});
+  }, []);
+
+  const triggerBenchmark = () => {
+    setBenchRunning(true);
+    window.SeamAPI.benchmark('all', false, false).then((res) => {
+      setBenchData(res);
+      setBenchRunning(false);
+    }).catch((err) => {
+      console.error('Benchmark failed:', err);
+      setBenchRunning(false);
+    });
+  };
 
   // Live File Tree state
   const [liveTree, setLiveTree] = useState(fileTree);

@@ -2,15 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 262
+total_events: 264
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-20T16:59:32Z | history:050:38a362f6 | session-event | done | dashboard, textual, command, roadmap, history, snapshot | seam_runtime/dashboard.py,test_seam.py,ROADMAP.md |
-| 2026-04-20T19:07:05Z | history:051:1eeeb306 | session-event | done | dashboard, textual, pyproject, readme, command, history, ... | pyproject.toml,requirements.txt,seam_runtime/dashboard.py,README.md,installer... |
 | 2026-04-20T20:22:36Z | history:052:4e57d2cd | session-event | done | dashboard, textual, chat, animation, command, history, sn... | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-20T20:36:17Z | history:053:e90a7871 | session-event | done | dashboard, textual, chat, command, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-20T21:07:09Z | history:054:b25c62e4 | session-event | done | dashboard, textual, chat, command, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
@@ -209,10 +207,12 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-19T03:11:04Z | history:205:b1523239 | session-event | done | audit, security, verify, docs, protocol | docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md,PROJECT_STATUS.md,REPO_LEDGER.md |
 | 2026-05-19T03:45:45Z | history:206:9dcce7f9 | session-event | done | audit, verify, benchmark, lx1 | test_seam_all/test_seam.py,docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md |
 | 2026-05-19T04:01:03Z | history:207:cf297116 | session-event | done | audit, verify, history, status | test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.sea... |
+| 2026-05-19T07:47:47Z | history:208:4857205d | session-event | done | audit, security, verify, multi-agent, protocol, docs, sur... | docs/SOP_WEBUI_BATCH_HARDENING_DEEPSEEK.md,docs/prompts/DEEPSEEK_WEBUI_BATCH_... |
+| 2026-05-19T08:48:15Z | history:209:30392e3d | session-event | done | audit, verify, streams, integrity, security | tools/streams/streams_lib.py,.gitignore,tools/history/test_count_audit.py,too... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0062.cross.md | 2026-04-15T00:00:00Z..2026-04-20T08:19:21Z | 62 | (multi) | (multi) |
+| 0001-0064.cross.md | 2026-04-15T00:00:00Z..2026-04-20T19:07:05Z | 64 | (multi) | (multi) |

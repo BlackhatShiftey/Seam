@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hmac
 import os
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -195,6 +196,156 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
     def stats() -> dict[str, object]:
         return runtime.store.get_stats()
 
+    @app.get("/trace", dependencies=[Depends(guard)])
+    def trace(root_id: str) -> dict[str, object]:
+        try:
+            return runtime.store.trace(root_id).to_dict()
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    @app.get("/tree", dependencies=[Depends(guard)])
+    def tree(path: str = ".") -> dict[str, object]:
+        root = _tree_root()
+        try:
+            start = _resolve_tree_path(root, path)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="outside root")
+        if not start.exists():
+            raise HTTPException(status_code=404, detail="path not found")
+        if not start.is_dir():
+            raise HTTPException(status_code=400, detail="path is not a directory")
+        max_depth = _tree_max_depth()
+        max_entries = _tree_max_entries()
+        counter: list[int] = [0]
+        truncated: list[bool] = [False]
+        tree_nodes = _walk_tree(
+            start, root,
+            depth=0, max_depth=max_depth, max_entries=max_entries,
+            counter=counter, truncated=truncated,
+        )
+        return {
+            "root": str(root),
+            "path": path,
+            "tree": tree_nodes,
+            "truncated": truncated[0],
+            "entries_seen": counter[0],
+            "max_depth": max_depth,
+            "max_entries": max_entries,
+        }
+
+    @app.post("/benchmark", dependencies=[Depends(guard)])
+    def run_benchmark(payload: dict[str, object]) -> dict[str, object]:
+        from .benchmarks import BENCHMARK_SUITES, run_benchmark_suite
+        suite = str(payload.get("suite", "all"))
+        if suite != "all" and suite not in BENCHMARK_SUITES:
+            raise HTTPException(status_code=400, detail="invalid suite")
+        persist = bool(payload.get("persist", False))
+        holdout = bool(payload.get("holdout", False))
+        if holdout:
+            allow = os.environ.get("SEAM_API_ALLOW_BENCHMARK_HOLDOUT") == "1"
+            if not allow:
+                raise HTTPException(
+                    status_code=403,
+                    detail="holdout requires SEAM_API_ALLOW_BENCHMARK_HOLDOUT=1; see REPO_LEDGER Benchmark Publication Policy",
+                )
+            confirm = os.environ.get("SEAM_API_CONFIRM_HOLDOUT") == "1"
+            if not confirm:
+                raise HTTPException(
+                    status_code=403,
+                    detail="holdout requires SEAM_API_CONFIRM_HOLDOUT=1 (mirrors CLI --confirm-holdout)",
+                )
+        try:
+            result = run_benchmark_suite(runtime, suite=suite, persist=persist, holdout=holdout)
+        except ValueError as exc:
+            return {"error": str(exc), "suite": suite, "holdout": holdout}
+        return result
+
+    _last_cpu_times = None
+
+    @app.get("/sys-metrics", dependencies=[Depends(guard)])
+    def sys_metrics() -> dict[str, object]:
+        nonlocal _last_cpu_times
+
+        def _metric_value(value: float) -> dict[str, object]:
+            return {"value": round(value, 1), "source": "live", "error": None}
+
+        def _metric_unavailable(exc: Exception) -> dict[str, object]:
+            return {"value": None, "source": "unavailable", "error": type(exc).__name__}
+
+        def _metric_unsupported() -> dict[str, object]:
+            return {"value": None, "source": "unsupported", "error": None}
+
+        if not sys.platform.startswith("linux"):
+            return {
+                "cpu": _metric_unsupported(),
+                "mem": _metric_unsupported(),
+                "disk": _metric_unsupported(),
+                "gpu": _metric_unsupported(),
+                "net": _metric_unsupported(),
+            }
+
+        # CPU
+        cpu_metric: dict[str, object]
+        try:
+            with open("/proc/stat", "r") as f:
+                cpu_line = f.readline()
+            parts = cpu_line.split()
+            idle = float(parts[4]) + float(parts[5])
+            total = sum(float(p) for p in parts[1:])
+            if _last_cpu_times is not None:
+                last_idle, last_total = _last_cpu_times
+                idle_delta = idle - last_idle
+                total_delta = total - last_total
+                if total_delta > 0:
+                    cpu_metric = _metric_value(100.0 * (1.0 - idle_delta / total_delta))
+                else:
+                    cpu_metric = {"value": None, "source": "live", "error": None}
+            else:
+                cpu_metric = {"value": None, "source": "live", "error": None}
+            _last_cpu_times = (idle, total)
+        except OSError as exc:
+            cpu_metric = _metric_unavailable(exc)
+
+        # Memory
+        mem_metric: dict[str, object]
+        try:
+            mem_total = 0
+            mem_avail = 0
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        mem_total = int(line.split()[1])
+                    elif line.startswith("MemAvailable:"):
+                        mem_avail = int(line.split()[1])
+            if mem_total > 0:
+                mem_metric = _metric_value(100.0 * (1.0 - (mem_avail / mem_total)))
+            else:
+                mem_metric = _metric_unavailable(ValueError("MemTotal zero or missing"))
+        except OSError as exc:
+            mem_metric = _metric_unavailable(exc)
+
+        # Disk — target SEAM data directory filesystem
+        disk_metric: dict[str, object]
+        try:
+            data_dir = Path(runtime.store.path).expanduser().resolve().parent
+            st = os.statvfs(str(data_dir))
+            total = st.f_blocks * st.f_frsize
+            free = st.f_bavail * st.f_frsize
+            if total > 0:
+                disk_metric = _metric_value(100.0 * (1.0 - (free / total)))
+            else:
+                disk_metric = _metric_unavailable(ValueError("zero total capacity"))
+        except (OSError, FileNotFoundError) as exc:
+            disk_metric = _metric_unavailable(exc)
+
+        return {
+            "cpu": cpu_metric,
+            "mem": mem_metric,
+            "disk": disk_metric,
+            "gpu": _metric_unsupported(),
+            "net": _metric_unsupported(),
+        }
+
     @app.post("/compile", dependencies=[Depends(guard)])
     def compile_text(payload: dict[str, object]) -> dict[str, object]:
         text = str(payload.get("text", ""))
@@ -318,6 +469,98 @@ def _is_remote_bind(host: str) -> bool:
 
 def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+# -- tree endpoint helpers ---------------------------------------------------
+
+_TREE_SKIP_NAMES = {"__pycache__", "node_modules", "build", "dist", ".venv", "venv"}
+
+
+def _tree_root() -> Path:
+    raw = os.environ.get("SEAM_API_TREE_ROOT")
+    return Path(raw).resolve() if raw else Path.cwd()
+
+
+def _tree_max_depth() -> int:
+    try:
+        v = int(os.environ.get("SEAM_API_TREE_MAX_DEPTH", "4"))
+    except ValueError:
+        v = 4
+    return max(0, min(v, 16))
+
+
+def _tree_max_entries() -> int:
+    try:
+        v = int(os.environ.get("SEAM_API_TREE_MAX_ENTRIES", "2000"))
+    except ValueError:
+        v = 2000
+    return max(1, min(v, 100000))
+
+
+def _resolve_tree_path(root: Path, requested: str) -> Path:
+    resolved = (root / requested).resolve()
+    if not resolved.is_relative_to(root):
+        raise ValueError("outside root")
+    return resolved
+
+
+def _walk_tree(
+    start: Path,
+    root: Path,
+    *,
+    depth: int = 0,
+    max_depth: int,
+    max_entries: int,
+    counter: list[int],
+    truncated: list[bool],
+) -> list[dict[str, Any]]:
+    if truncated[0]:
+        return []
+    entries: list[dict[str, Any]] = []
+    with os.scandir(start) as dir_entries:
+        for entry in dir_entries:
+                if truncated[0]:
+                    break
+                if entry.name.startswith(".") and entry.name != ".seam":
+                    continue
+                if entry.name in _TREE_SKIP_NAMES:
+                    continue
+                counter[0] += 1
+                if counter[0] > max_entries:
+                    truncated[0] = True
+                    break
+                entry_path = Path(entry.path)
+                rel_id = entry_path.relative_to(root).as_posix() if entry_path.is_relative_to(root) else entry.path
+                if entry.is_dir(follow_symlinks=False):
+                    node: dict[str, Any] = {
+                        "id": rel_id,
+                        "name": entry.name,
+                        "type": "folder",
+                        "children": [],
+                    }
+                    if depth < max_depth:
+                        try:
+                            node["children"] = _walk_tree(
+                                entry_path,
+                                root,
+                                depth=depth + 1,
+                                max_depth=max_depth,
+                                max_entries=max_entries,
+                                counter=counter,
+                                truncated=truncated,
+                            )
+                        except (PermissionError, OSError) as exc:
+                            node["error"] = type(exc).__name__
+                    entries.append(node)
+                else:
+                    lang = entry.name.rsplit(".", 1)[-1] if "." in entry.name else ""
+                    entries.append({
+                        "id": rel_id,
+                        "name": entry.name,
+                        "type": "file",
+                        "lang": lang,
+                    })
+    return sorted(entries, key=lambda x: (x["type"] != "folder", x["name"].lower()))
 
 
 def create_app_from_env() -> Any:

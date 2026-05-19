@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#207` — Codex reviewed and fast-forwarded the DeepSeek audit/debug branch onto `main` at `dc77124082f1`. The branch added LX1 float/int type-preservation tests, corrected the HISTORY#206 topic metadata before landing, regenerated derived history/stream/cross-index files, and reran focused tests, the full active suite, SEAM gates, diff/secret checks, and benchmark smoke. `HISTORY#206` is the DeepSeek parallel audit pass; `HISTORY#205` is the SOP document; `HISTORY#204` is the prior audit remediation pass; `HISTORY#203` is the WebUI finished dashboard wiring commit.
+- Latest continuity handoff is `HISTORY#209` — second leg of the WebUI batch sync-relay covering audit quick-wins: H1 streams write_log fsync durability (file fd + parent-dir fd inside the existing advisory lock), H5 .cursor/ added to gitignore, M8 TestCountFact renamed to CountFactRecord to silence the PytestCollectionWarning, plus the PROJECT_STATUS hybrid_orchestrator ghost-path removal. `HISTORY#208` is the WebUI batch first leg (W1 /tree, W2 /benchmark, W3 /sys-metrics, W4 record_kinds symbol contract, SOP + prompt + ledger authoring, dashboard consumer update). `HISTORY#207` is the prior Codex review of the LX1 type-preservation tests; `HISTORY#206` is the DeepSeek parallel audit pass; `HISTORY#205` is the SOP document; `HISTORY#204` is the prior audit remediation pass; `HISTORY#203` is the WebUI finished dashboard wiring commit.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
@@ -58,7 +58,6 @@ SEAM is operating as a local machine-first memory runtime with:
 
 ## Active Focus
 
-- Deferred: experimental/hybrid_orchestrator/ deletion awaits operator confirmation (Phase 3 audit: no external imports, legacy re-export shim, safe to delete)
 - Deferred: ~113 remaining assertTrue→specific-assertion replacements in test_seam.py (backlog card roadmap:track:F:asserttrue-scrub)
 - Deferred: 10 low-priority backlog items catalogued under Track F (Phase 7)
 - Reduce startup context overhead by relying on compact index + surgical history reads

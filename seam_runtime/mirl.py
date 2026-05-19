@@ -32,6 +32,23 @@ class RecordKind(str, Enum):
     META = "META"
 
 
+SYMBOL_FOR_KIND: dict[RecordKind, str] = {
+    RecordKind.ENT: "@",
+    RecordKind.CLM: "#",
+    RecordKind.EVT: "!",
+    RecordKind.REL: ">",
+    RecordKind.STA: "~",
+    RecordKind.PROV: "^",
+    RecordKind.RAW: "%",
+    RecordKind.SYM: "=",
+    RecordKind.SPAN: "§",
+    RecordKind.PACK: "◇",
+    RecordKind.FLOW: "→",
+    RecordKind.META: "μ",
+}
+assert set(SYMBOL_FOR_KIND.keys()) == set(RecordKind), "SYMBOL_FOR_KIND must cover every RecordKind"
+
+
 class Status(str, Enum):
     ASSERTED = "asserted"
     OBSERVED = "observed"

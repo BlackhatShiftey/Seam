@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tools.history.history_lib import HISTORY_PATH, Entry, parse_entries, read_history_bytes
-from tools.history.test_count_audit import TestCountFact, audit_test_count_claims, collect_test_count_facts
+from tools.history.test_count_audit import CountFactRecord, audit_test_count_claims, collect_test_count_facts
 
 
 HANDOFF_RE = re.compile(r"\bLatest continuity handoff is [`']?HISTORY#(?P<id>\d+)[`']?", re.I)
@@ -138,7 +138,7 @@ def _entry_ref_paths(refs: str) -> list[str]:
 
 def _audit_test_count_precedence(repo_root: Path, history_path: Path) -> list[RecordedFactIssue]:
     entries = _entries(history_path)
-    facts: list[TestCountFact] = []
+    facts: list[CountFactRecord] = []
     for entry in entries:
         facts.extend(
             collect_test_count_facts(
@@ -152,7 +152,7 @@ def _audit_test_count_precedence(repo_root: Path, history_path: Path) -> list[Re
         )
 
     issues: list[RecordedFactIssue] = []
-    latest_by_scope: dict[tuple[str, ...], TestCountFact] = {}
+    latest_by_scope: dict[tuple[str, ...], CountFactRecord] = {}
     for fact in sorted(facts, key=lambda item: item.sequence):
         previous = latest_by_scope.get(fact.scope)
         if previous and fact.value < previous.value:

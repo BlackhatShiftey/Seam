@@ -51,6 +51,7 @@ seam_runtime/_handoff_20260419/
 .seam/surfaces/
 
 # Local editor and agent config
+.cursor/
 .vscode/
 .gemini/
 .opencode/package.json

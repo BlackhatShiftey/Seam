@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 import json
@@ -7,7 +7,7 @@ from contextlib import closing
 from pathlib import Path
 from uuid import uuid4
 
-from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, TraceGraph, utc_now
+from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, SYMBOL_FOR_KIND, TraceGraph, utc_now
 
 
 class SQLiteStore:
@@ -211,6 +211,21 @@ class SQLiteStore:
             benchmark_runs = connection.execute("select count(*) from benchmark_runs").fetchone()[0]
             machine_artifacts = connection.execute("select count(*) from machine_artifacts").fetchone()[0]
             surface_artifacts = connection.execute("select count(*) from surface_artifacts").fetchone()[0]
+            edge_count = connection.execute("select count(*) from ir_edges").fetchone()[0]
+            doc_status_count = connection.execute("select count(*) from document_status").fetchone()[0]
+            
+            kinds_rows = connection.execute("select kind, count(*) as c from ir_records group by kind").fetchall()
+            record_kinds: dict[str, int] = {}
+            for row in kinds_rows:
+                try:
+                    kind_enum = RecordKind(row["kind"])
+                except ValueError:
+                    continue
+                symbol = SYMBOL_FOR_KIND.get(kind_enum)
+                if symbol is None:
+                    continue
+                record_kinds[symbol] = row["c"]
+
         return {
             "total_records": total_records,
             "vector_entries": vector_entries,
@@ -220,6 +235,9 @@ class SQLiteStore:
             "benchmark_runs": benchmark_runs,
             "machine_artifacts": machine_artifacts,
             "surface_artifacts": surface_artifacts,
+            "edge_count": edge_count,
+            "doc_status_count": doc_status_count,
+            "record_kinds": record_kinds,
         }
 
     def list_namespaces(self, limit: int = 100) -> list[str]:
