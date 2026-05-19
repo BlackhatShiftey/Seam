@@ -399,6 +399,7 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
             lens=str(payload.get("lens") or "rag"),
             budget=int(payload.get("pack_budget") or 512),
             mode=str(payload.get("mode") or "context"),
+            persist=bool(payload.get("persist", False)),
         )
         return {"query": query, "candidates": search_result.to_dict()["candidates"], "pack": pack.to_dict()}
 

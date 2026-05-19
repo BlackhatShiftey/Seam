@@ -44,6 +44,23 @@ claim c2:
     return batch.records
 
 
+def _mutate_first_indexable_record(records):
+    from seam_runtime.mirl import MIRLRecord, RecordKind
+
+    mutated = []
+    changed = False
+    for record in records:
+        if not changed and record.kind in {RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL}:
+            data = record.to_dict()
+            data["attrs"]["object"] = "mutated source text"
+            mutated.append(MIRLRecord.from_dict(data))
+            changed = True
+        else:
+            mutated.append(record)
+    assert changed, "fixture must include at least one indexable record to mutate"
+    return mutated
+
+
 def _drop_table(adapter, table_name):
     with adapter._connect() as connection:
         with connection.cursor() as cursor:
@@ -96,5 +113,10 @@ def test_pgvector_real_adapter_stale_records_detects_changes():
         adapter.index_records(records)
         stale_initial = adapter.stale_records(records)
         assert stale_initial == [], f"Expected no stale records right after index, got {stale_initial}"
+        mutated_records = _mutate_first_indexable_record(records)
+        stale_after_mutation = adapter.stale_records(mutated_records)
+        assert stale_after_mutation == [
+            {"record_id": mutated_records[0].id, "reason": "source_changed"}
+        ], f"Expected source_changed after mutation, got {stale_after_mutation}"
     finally:
         _drop_table(adapter, table)

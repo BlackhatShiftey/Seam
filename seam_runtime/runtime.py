@@ -147,7 +147,15 @@ class SeamRuntime:
             payload["context"] = neighbor_timeline(timeline_batch, record_ids)
         return payload
 
-    def pack_ir(self, record_ids: list[str] | None = None, lens: str = "general", budget: int = 512, profile: str = "default", mode: str = "context") -> Pack:
+    def pack_ir(
+        self,
+        record_ids: list[str] | None = None,
+        lens: str = "general",
+        budget: int = 512,
+        profile: str = "default",
+        mode: str = "context",
+        persist: bool = False,
+    ) -> Pack:
         batch = self.store.load_ir(ids=record_ids) if record_ids else self.store.load_ir()
         namespace = batch.records[0].ns if batch.records else None
         pack = pack_records(batch.records, lens=lens, budget=budget, mode=mode, profile=profile, namespace=namespace)
@@ -156,7 +164,8 @@ class SeamRuntime:
             report = self.verify_ir(IRBatch(batch.records + [pack_mirl]))
             if not report.valid:
                 raise ValueError(json.dumps(report.to_dict(), indent=2))
-        self.store.persist_ir(IRBatch([pack_mirl]))
+        if persist:
+            self.store.persist_ir(IRBatch([pack_mirl]))
         return pack
 
     def decompile_ir(self, record_ids: list[str], mode: str = "expanded") -> str:

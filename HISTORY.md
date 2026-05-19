@@ -4417,3 +4417,47 @@ B3 (MCP tools/call round-trip): new tests/audit/test_mcp_tools_call_smoke.py. Sp
 
 Verification: focused tests (pytest tests/audit/test_sys_metrics_honesty.py -q) 7 passed; (pytest tests/audit/test_pgvector_real_adapter.py -q) 3 skipped (no local pgvector); (pytest tests/audit/test_mcp_tools_call_smoke.py -q) 1 passed. Full suite (pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q) 398 passed, 3 skipped, 3 subtests passed. py_compile seam.py OK. compileall seam_runtime experimental tools scripts installers OK. YAML lint of ci.yml OK, pgvector-integration job present. All four SEAM verify gates green, verify_continuity clean (DSN password pattern resolved by splitting PGPASSWORD from URL).
 ---END-ENTRY-#211---
+
+---BEGIN-ENTRY-#212---
+id: 212
+date: 2026-05-19T18:50:18Z
+agent: codex
+status: done
+topics: audit, verify, benchmark, pgvector, mcp, persist, retrieval, history
+commits: none
+refs: tests/audit/test_pgvector_real_adapter.py,tests/audit/test_mcp_stdio_smoke.py,tests/audit/test_mcp_tools_call_smoke.py,tests/audit/test_context_pack_persist_policy.py,tests/audit/test_hybrid_orchestrator_legacy_import.py,seam_runtime/runtime.py,seam_runtime/server.py,seam_runtime/mcp.py,seam_runtime/cli.py,experimental/hybrid_orchestrator,PROJECT_STATUS.md
+supersedes: 211
+tokens: 508
+---
+Codex audit of the DeepSeek CI bench-gate prep and surrounding audit state. Before this pass, git status showed main clean and ahead of origin/main by 6 local commits; the tracked DeepSeek/Codex review work was committed locally but not pushed. This pass found and fixed four concrete issues plus one strategic gap.
+
+B2 pgvector stale-record coverage did not actually mutate source text before calling stale_records(). tests/audit/test_pgvector_real_adapter.py now mutates the first indexable MIRL record and asserts the exact source_changed stale result, so the claimed coverage now exercises the real adapter contract.
+
+MCP stdio smoke helpers in tests/audit/test_mcp_stdio_smoke.py and tests/audit/test_mcp_tools_call_smoke.py used blocking stdout.readline() calls and could hang indefinitely if the subprocess failed before emitting a response. Both helpers now use a 5s select-based timeout and include stderr in failure output when stdout closes.
+
+Context packing had a persistence side effect: SeamRuntime.pack_ir() persisted generated PACK records by default, so REST /context and MCP seam_context also wrote generated packs during read-style retrieval. seam_runtime/runtime.py now defaults pack_ir(..., persist=False), REST and MCP context expose an explicit persist boolean defaulting false, and seam_runtime/cli.py keeps the CLI pack command's previous write behavior with a new --no-persist escape hatch. tests/audit/test_context_pack_persist_policy.py covers runtime default/no-write, explicit persist, REST default/no-write, and MCP default/no-write.
+
+The deleted experimental.hybrid_orchestrator package broke the documented legacy import path and conflicted with prior operator-confirmation policy around removal. Restored experimental/hybrid_orchestrator as thin re-export shims over experimental.retrieval_orchestrator and added tests/audit/test_hybrid_orchestrator_legacy_import.py for package and submodule compatibility.
+
+LLM judge support is already present in the external benchmark framework: seam bench external accepts --judge stub|claude|openai, the common judge/runner/scoring path records judge outcomes, and the LoCoMo stub judge smoke passed 10/10. BIL remains unimplemented beyond roadmap/SOP planning and should stay a Track K decision rather than being implicitly folded into this audit patch.
+
+Verification: focused B1/B2/B3 audit suite passed 9 tests and skipped 3 env-gated pgvector cases. New context persistence policy tests passed 4. Legacy import compatibility tests passed 2. Adjacent context/MCP/pack tests passed 20 with 166 deselected. Full active pytest suite passed 404 tests, skipped 3, and passed 3 subtests. py_compile seam.py and compileall seam_runtime experimental tools scripts installers passed. git diff --check passed. SEAM integrity, routing, and streams gates passed before closeout; continuity initially failed only because the latest snapshot still referenced #211 and this entry/snapshot supersedes it. Benchmark smoke seam bench external --quickstart locomo --adapter seam --judge stub passed 10/10 with judge_score_mean 1.0.
+---END-ENTRY-#212---
+
+---BEGIN-ENTRY-#213---
+id: 213
+date: 2026-05-19T18:54:10Z
+agent: codex
+status: done
+topics: audit, verify, mcp, persist, protocol, history
+commits: none
+refs: seam_runtime/mcp.py,tests/audit/test_context_pack_persist_policy.py,PROJECT_STATUS.md
+supersedes: 212
+tokens: 187
+---
+Follow-up correction to the Codex audit patch in #212. Review of the first context-persistence fix found that adding an optional persist argument to MCP seam_context conflicted with its readOnlyHint=true tool annotation. That was an agent-safety contract issue even though the default stayed read-only.
+
+Resolved by keeping MCP seam_context strictly read-only: seam_runtime/mcp.py no longer advertises or honors a persist argument for seam_context and always calls pack_ir(..., persist=False) through that tool. Runtime pack_ir still defaults to persist=False, CLI pack preserves its historical write behavior with --no-persist, and REST /context remains the API surface with an explicit optional persist boolean.
+
+tests/audit/test_context_pack_persist_policy.py now asserts the MCP seam_context metadata keeps readOnlyHint=true and does not expose a persist input. Focused MCP/context tests passed 7. Full active pytest suite after this correction passed 405 tests, skipped 3, and passed 3 subtests. py_compile seam.py and compileall seam_runtime experimental tools scripts installers passed.
+---END-ENTRY-#213---

@@ -6,6 +6,7 @@ regressions unit tests miss.
 """
 
 import json
+import select
 import subprocess
 import sys
 import pytest
@@ -38,8 +39,16 @@ def _spawn_mcp():
     )
 
 
-def _read_response(proc):
+def _read_response(proc, timeout: float = 5.0):
+    ready, _, _ = select.select([proc.stdout], [], [], timeout)
+    if not ready:
+        pytest.fail(f"MCP subprocess did not emit a response within {timeout:.1f}s")
     line = proc.stdout.readline()
+    if not line:
+        stderr = ""
+        if proc.poll() is not None:
+            stderr = proc.stderr.read().decode(errors="replace")
+        pytest.fail(f"MCP subprocess stdout closed before response; stderr={stderr!r}")
     return json.loads(line)
 
 

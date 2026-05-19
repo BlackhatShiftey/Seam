@@ -344,6 +344,7 @@ def build_parser() -> argparse.ArgumentParser:
     pack_parser.add_argument("--lens", default="general")
     pack_parser.add_argument("--budget", type=int, default=512)
     pack_parser.add_argument("--mode", choices=["exact", "context", "narrative"], default="context")
+    pack_parser.add_argument("--no-persist", dest="persist", action="store_false", default=True)
 
     decompile_parser = subparsers.add_parser("decompile", help="Decompile persisted record ids")
     decompile_parser.add_argument("record_ids")
@@ -901,7 +902,7 @@ def run_cli(argv: list[str] | None = None) -> None:
         )
         return
     if args.command == "pack":
-        print(json.dumps(runtime.pack_ir(record_ids=_split_ids(args.record_ids), lens=args.lens, budget=args.budget, mode=args.mode).to_dict(), indent=2))
+        print(json.dumps(runtime.pack_ir(record_ids=_split_ids(args.record_ids), lens=args.lens, budget=args.budget, mode=args.mode, persist=args.persist).to_dict(), indent=2))
         return
     if args.command == "decompile":
         print(runtime.decompile_ir(record_ids=_split_ids(args.record_ids), mode=args.mode))
@@ -1691,7 +1692,6 @@ def _record_signal(record: dict[str, object]) -> str:
     if "target" in attrs:
         return f"target={attrs.get('target')}"
     return ""
-
 
 
 

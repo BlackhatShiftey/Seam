@@ -226,7 +226,13 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
             lens=str(arguments.get("search_lens") or "general"),
         )
         record_ids = [candidate.record.id for candidate in search_result.candidates]
-        pack = runtime.pack_ir(record_ids=record_ids, lens=lens, budget=pack_budget, mode=mode)
+        pack = runtime.pack_ir(
+            record_ids=record_ids,
+            lens=lens,
+            budget=pack_budget,
+            mode=mode,
+            persist=False,
+        )
         return {
             "type": "result",
             "tool": name,
