@@ -4241,3 +4241,21 @@ Inspection notes: Webui-final-dash/ appears to be the untracked source drop; the
 
 Verification: npm run test in experimental/webui passed for src/api/apiClient.test.ts. npm run build in experimental/webui passed and copied dashboard.html, seam-api.js, tweaks-panel.jsx, and branding assets into dist/. Dev-server smoke with npm run dev -- --host 127.0.0.1 returned HTTP 200 for /, /dashboard.html, and /seam-api.js. REST API itself was not started, so live endpoint behavior remains dependent on seam serve.
 ---END-ENTRY-#203---
+
+---BEGIN-ENTRY-#204---
+id: 204
+date: 2026-05-19T02:42:56Z
+agent: codex
+status: done
+topics: audit, security, verify, history, installer, dashboard
+commits: none
+refs: seam_runtime/runtime.py,seam_runtime/installer.py,seam_runtime/dashboard.py,tools/history/new_entry.py,tools/history/verify_integrity.py,test_seam_all/test_seam.py,tools/history/test_history_tools.py,test_seam_all/test_vector_adapter_table_name_validation.py,docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md,PROJECT_STATUS.md
+supersedes: 203
+tokens: 309
+---
+Continued from the WebUI merge without agents and addressed the next high-confidence deep-audit concerns. Runtime persist rollback now wraps the SQLite rollback path: if vector indexing fails and delete/restore also fails, SEAM logs the touched record ids, preserves the original vector exception as an exception note, and raises a recovery-oriented RuntimeError naming the affected ids. tools/history/new_entry.py now releases the process-wide lock when OS file-lock acquisition raises, preventing an in-process deadlock after lock setup failure. The Windows installer PowerShell PATH update now single-quote-escapes embedded quotes. verify_integrity now requires exact 16-character index hash equality instead of accepting shorter prefixes. Dashboard local env writes now use a helper that sets POSIX files to 0600. The table-name validation test now makes explicit assertions for valid names.
+
+SOP update: docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md now reflects HISTORY#203 WebUI wiring, the no-agent operator constraint, and calibrated audit status: fixed in this cycle, still-open valid items, and stale/already-handled claims. Open items remain vector O(N) search, vector indexing N+1 patterns, path containment policy, dashboard shell remote-exposure policy, and benchmark baseline wiring.
+
+Verification: focused tests passed for runtime rollback failure reporting, PowerShell quoting, dashboard private env permissions, new_entry lock failure cleanup, partial index hash rejection, and vector table-name validation. py_compile passed for touched Python modules/tests. compileall passed for seam_runtime experimental tools scripts installers. Active regression suite `.venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q` reported 356 passed, 1 warning, 3 subtests passed in 90.47s. No benchmark run was performed in this pass.
+---END-ENTRY-#204---

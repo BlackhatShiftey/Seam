@@ -95,8 +95,9 @@ def main(argv: list[str] | None = None) -> int:
     tokens = estimate_tokens(body)
 
     _PROCESS_LOCK.acquire()
-    lock_fd, unlock = _acquire_history_lock()
+    unlock = None
     try:
+        lock_fd, unlock = _acquire_history_lock()
         existing = read_history_bytes()
         entries = parse_entries(existing) if existing else []
         new_id = next_entry_id(entries)
@@ -145,7 +146,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     finally:
         try:
-            unlock()
+            if unlock is not None:
+                unlock()
         finally:
             _PROCESS_LOCK.release()
 

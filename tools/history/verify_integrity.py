@@ -95,7 +95,7 @@ def verify(history_path: Path, index_path: Path) -> tuple[bool, list[str]]:
         if idx_hash is None:
             errors.append(f"Entry #{e.id:03d} missing from INDEX")
             continue
-        if not e.hash_short.startswith(idx_hash):
+        if e.hash_short != idx_hash:
             errors.append(
                 f"Entry #{e.id:03d}: INDEX hash {idx_hash!r} does not match computed {e.hash_short!r}"
             )
@@ -114,4 +114,3 @@ if __name__ == "__main__":
     for err in errors:
         print(f"  - {err}")
     sys.exit(1)
-

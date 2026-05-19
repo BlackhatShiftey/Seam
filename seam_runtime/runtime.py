@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -19,6 +20,9 @@ from .symbols import export_symbol_markdown, propose_symbols
 from .transpile import transpile_python
 from .vector_adapters import PgVectorAdapter, SQLiteVectorAdapter, VectorAdapter
 from .verify import verify_ir
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SeamRuntime:
@@ -92,9 +96,23 @@ class SeamRuntime:
         try:
             self.vector_adapter.index_records(normalized.records)
         except Exception as exc:
-            self.store.delete_ir(touched_ids, include_vectors=False)
-            if previous.records:
-                self.store.persist_ir(previous)
+            try:
+                self.store.delete_ir(touched_ids, include_vectors=False)
+                if previous.records:
+                    self.store.persist_ir(previous)
+            except Exception as rollback_exc:
+                touched_preview = ", ".join(touched_ids[:20])
+                if len(touched_ids) > 20:
+                    touched_preview += f", ... ({len(touched_ids)} total)"
+                LOGGER.exception(
+                    "Vector indexing failed and SQLite rollback failed for record ids: %s",
+                    touched_preview,
+                )
+                rollback_exc.add_note(f"Original vector indexing error: {exc!r}")
+                raise RuntimeError(
+                    "Vector indexing failed and SQLite rollback failed; "
+                    f"manual recovery may be required for record ids: {touched_preview}"
+                ) from rollback_exc
             raise RuntimeError("Vector indexing failed; rolled back SQLite record write") from exc
         return persist_report
 

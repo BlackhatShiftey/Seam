@@ -22,11 +22,12 @@ from seam_runtime.mirl import IRBatch, MIRLRecord, RecordKind, Status
 from seam_runtime.reconcile import reconcile_ir
 from seam_runtime import installer as installer_module
 from seam_runtime.cli import run_cli
-from seam_runtime.dashboard import DEFAULT_CHAT_MODELS, SeamChatClient, TextualDashboardApp, run_dashboard
+from seam_runtime.dashboard import DEFAULT_CHAT_MODELS, SeamChatClient, TextualDashboardApp, _write_private_text_file, run_dashboard
 from seam_runtime.installer import (
     InstallLayout,
     PATH_MARKER_BEGIN,
     _ensure_posix_shell_profiles,
+    _powershell_single_quoted,
     default_runtime_db_path,
     detect_layout,
     install_repo,
@@ -233,6 +234,38 @@ claim c1:
         restored = runtime.store.load_ir(ids=[record.id for record in original.records])
         self.assertEqual({record.id: record.to_dict() for record in restored.records}, original_by_id)
         self.assertGreater(runtime.store.get_stats()["vector_entries"], 0)
+
+    def test_runtime_persist_reports_ids_when_sqlite_rollback_fails(self) -> None:
+        class FailingVectorAdapter:
+            name = "failing-vector"
+
+            def index_records(self, records):
+                raise RuntimeError("vector backend unavailable")
+
+            def search(self, query: str, limit: int = 10) -> dict[str, float]:
+                return {}
+
+        runtime = SeamRuntime(self.db_path)
+        original = runtime.compile_nl("SEAM keeps enough context for manual rollback recovery.")
+        runtime.persist_ir(original)
+        replacement = runtime.compile_nl("Replacement should name touched ids if restore fails.")
+        original_persist_ir = runtime.store.persist_ir
+        calls = 0
+
+        def flaky_persist(batch):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise RuntimeError("restore unavailable")
+            return original_persist_ir(batch)
+
+        runtime.vector_adapter = FailingVectorAdapter()
+        runtime.store.persist_ir = flaky_persist  # type: ignore[method-assign]
+
+        with self.assertRaisesRegex(RuntimeError, "manual recovery may be required") as ctx:
+            runtime.persist_ir(replacement)
+        for record in replacement.records[:2]:
+            self.assertIn(record.id, str(ctx.exception))
 
     @unittest.skipIf(TestClient is None, "fastapi server extra is not installed")
     def test_rest_api_compile_search_context_stats_and_auth(self) -> None:
@@ -3201,6 +3234,11 @@ claim c1:
                 rc_path.unlink()
 
 class InstallerLinuxTests(unittest.TestCase):
+    def test_powershell_single_quote_escaping_doubles_embedded_quotes(self) -> None:
+        quoted = _powershell_single_quoted(r"C:\Users\O'Brien\SEAM")
+        self.assertEqual(quoted, r"'C:\Users\O''Brien\SEAM'")
+        self.assertNotIn("O'Brien", quoted[1:-1])
+
     def test_posix_shim_has_valid_sh_structure(self) -> None:
         shim = render_posix_shim(
             Path("/home/user/.local/share/seam/runtime/bin/seam"),
@@ -3258,6 +3296,14 @@ class InstallerLinuxTests(unittest.TestCase):
                 self.assertEqual(updated, [])
             finally:
                 os.environ["PATH"] = original_path
+
+    @unittest.skipIf(os.name == "nt", "POSIX permissions check")
+    def test_dashboard_private_text_file_uses_owner_only_permissions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env_path = Path(tmp) / "local" / ".env"
+            _write_private_text_file(env_path, "SEAM_API_TOKEN=test\n")
+            self.assertEqual(env_path.read_text(encoding="utf-8"), "SEAM_API_TOKEN=test\n")
+            self.assertEqual(env_path.stat().st_mode & 0o777, 0o600)
 
     def test_linux_installer_sh_delegates_to_python(self) -> None:
         sh_path = Path(__file__).resolve().parents[1] / "installers" / "install_seam_linux.sh"

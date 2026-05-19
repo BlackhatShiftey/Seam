@@ -80,6 +80,15 @@ def _build_retrieval_orchestrator(
     )
 
 
+def _write_private_text_file(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(content)
+    if os.name != "nt":
+        path.chmod(0o600)
+
+
 DEFAULT_CHAT_MODELS = [
     # OpenAI defaults for the stock https://api.openai.com/v1 endpoint.
     "gpt-4o-mini",
@@ -1672,8 +1681,7 @@ if (
                 self._push_result("Settings", "No non-empty settings to save.")
                 return
             try:
-                env_path.parent.mkdir(parents=True, exist_ok=True)
-                env_path.write_text("".join(lines), encoding="utf-8")
+                _write_private_text_file(env_path, "".join(lines))
                 self._push_result("Settings", f"Saved {len(saved_keys)} keys to local env: {env_path}")
             except Exception as exc:
                 self._push_result("Settings", f"Failed to save local env: {exc}")

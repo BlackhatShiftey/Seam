@@ -2,9 +2,10 @@
 
 ## Purpose
 
-This SOP defines the next SEAM deep-audit remediation cycle after
-`HISTORY#197`. It is for future agents debugging and testing SEAM before
-benchmark wiring and benchmark execution, and before any future WebUI wiring.
+This SOP defines the SEAM deep-audit remediation cycle after the Track I and
+WebUI handoff work recorded through `HISTORY#203`. It is for debugging and
+testing SEAM before benchmark wiring and benchmark execution, while preserving
+the now-wired browser dashboard under `experimental/webui/`.
 
 The cycle goal is to convert audit claims into verified fixes, benchmark
 readiness, and auditable closeout records without breaking SEAM continuity,
@@ -25,7 +26,7 @@ active/archive boundaries, or concurrent agent work.
    python -m tools.history.build_context_pack --topics audit verify benchmark --latest 5 --token-budget 1800
    python -m tools.history.build_context_pack --route protocol/context --latest 3 --token-budget 1200
    ```
-4. Treat `HISTORY#197` as the current handoff unless a newer validated entry
+4. Treat `HISTORY#203` as the current handoff unless a newer validated entry
    exists in `HISTORY_INDEX.md`.
 5. Do not expose, copy, summarize, or commit secrets, local `.env` values,
    private tokens, provider session links, chat/share URLs, or transcript URLs.
@@ -34,20 +35,43 @@ active/archive boundaries, or concurrent agent work.
    `installers/`, `docs/`, tests, and root status files.
 7. Avoid inactive or generated paths: `archive/code/`, `docs/archive/`,
    `build/`, `.venv/`, `test_seam/`, caches, and generated artifacts.
-8. Do not wire `experimental/webui/` in this phase. It is functional and should
-   remain a preserved browser dashboard prototype until benchmark readiness is
-   complete and the operator explicitly starts WebUI wiring.
-9. Do not revert or overwrite concurrent edits. Check file ownership before
+8. `experimental/webui/` is now wired at the Vite root to the finished static
+   dashboard in `public/dashboard.html`. Preserve that shell while adding real
+   endpoint coverage; do not replace it with flat demo panes.
+9. Do not use external sub-agents when the operator has explicitly asked for
+   direct local work only.
+10. Do not revert or overwrite concurrent edits. Check file ownership before
    editing and coordinate with other active agents.
-10. Runtime code changes require tests. Documentation-only changes still require
+11. Runtime code changes require tests. Documentation-only changes still require
     diff review and secret/session-link scan.
 
 ## Known Current State
 
 `HISTORY#197` fixed RateLimiter thread safety, SEAM-LX/1 unknown-status
 rejection, dashboard lazy import isolation for `experimental.retrieval_orchestrator`,
-and benchmark temporary SQLite cleanup. Operator priority is debug/test SEAM,
-wire and run benchmarks, then defer WebUI wiring until benchmarks are credible.
+and benchmark temporary SQLite cleanup. `HISTORY#198` added bounded
+`SQLiteStore.load_ir()` pagination, MIRL parse line-context errors, snapshot
+budget metadata, and this SOP. `HISTORY#199` through `HISTORY#202` hardened
+vector SQLite pragmas and the context-stream write/rebuild path. `HISTORY#203`
+wired the finished WebUI dashboard into the Vite root.
+
+Current audit calibration:
+
+- Valid and fixed in this cycle: runtime rollback failure reporting, history
+  process-lock release on file-lock failure, Windows PowerShell single-quote
+  escaping, exact history-index hash verification, dashboard local `.env`
+  owner-only permissions on POSIX, and the table-name validation assertion gap.
+- Valid but still open: vector search is still an O(N) scan of stored vectors,
+  PgVector/SQLite vector indexing still has N+1 query patterns, CLI/dashboard
+  local path containment needs a deliberate operator policy, dashboard shell
+  command execution remains an intentional local operator feature that needs a
+  remote-exposure policy, and production-grade benchmark baselines still need
+  to be wired and run.
+- Stale or already handled in current code: RateLimiter thread safety,
+  `SQLiteStore.load_ir()` pagination, benchmark temp DB cleanup, MIRL malformed
+  line context, snapshot token-budget ambiguity, dashboard experimental import
+  boundary, LX/1 unknown status handling, and `verify_continuity.py`'s
+  `repo_root` unbound-variable claim.
 
 ## Triage Matrix
 
@@ -188,7 +212,7 @@ auth/rate limits, or invalidate benchmark claims, promote it to P0/P1.
 | MIRL parse error context | P3 | MIRL parser/CLI reports | Parse failures include bounded line/column/context without leaking full private input |
 | LX1 float/int type preservation | P1 | SEAM-LX/1 codec | Roundtrip preserves numeric type where the format claims exactness; tests cover int, float, and edge numeric values |
 | Snapshot budget clarity | P3 | history/snapshot tooling docs | Snapshot token/size budget behavior is explicit; no full-history read required to understand it |
-| Dashboard shell guardrails | P0 | dashboard shell/command palette | Shell commands are bounded/disabled as policy requires; tests or smoke checks cover blocked dangerous input |
+| Dashboard shell guardrails | P0 | dashboard shell/command palette | Decide local-only vs remotely exposed policy; shell commands are bounded/disabled as policy requires; tests or smoke checks cover blocked dangerous input |
 | `assertTrue` cleanup | P3 | tests | Replace remaining ambiguous `assertTrue` assertions with specific assertions in touched test areas; no broad churn without owner |
 | Experimental dead-code decision | P3 | `experimental/` docs/code | Decide keep/archive/delete per active import evidence; no archive resurrection; tests prove retained imports still work |
 | Benchmark baseline expansion | P1 | benchmark registry/runs | Baselines cover retrieval, compression, surface, LoCoMo quickstart, and diff/gate expectations with reproducible metadata |

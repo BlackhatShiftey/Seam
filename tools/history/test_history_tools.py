@@ -188,6 +188,28 @@ class TestRebuildIndexIdempotent(TempRepoBase):
 
 
 class TestNewEntryLock(TempRepoBase):
+    def test_new_entry_releases_process_lock_when_file_lock_fails(self):
+        self.write_entries([sample_entry(1)])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+            with patch.object(new_entry_module, "_acquire_history_lock", side_effect=OSError("lock failed")):
+                with self.assertRaises(OSError):
+                    new_entry_module.main([
+                        "--agent", "test",
+                        "--status", "done",
+                        "--topics", "meta",
+                        "--body", "Entry that cannot acquire the file lock",
+                    ])
+
+        acquired = new_entry_module._PROCESS_LOCK.acquire(blocking=False)
+        try:
+            self.assertTrue(acquired, "new_entry left the process lock held after file-lock failure")
+        finally:
+            if acquired:
+                new_entry_module._PROCESS_LOCK.release()
+            else:
+                new_entry_module._PROCESS_LOCK.release()
+
     def test_new_entry_lock_serializes_concurrent_writes(self):
         import concurrent.futures
         self.write_entries([sample_entry(1)])
@@ -237,6 +259,20 @@ class TestVerifyIntegrity(TempRepoBase):
             ok, errs = verify(self.history, self.index)
         self.assertFalse(ok)
         self.assertTrue(any("#001" in e for e in errs))
+
+    def test_verify_rejects_partial_index_hash_match(self):
+        self.write_entries([sample_entry(1)])
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+        text = self.index.read_text(encoding="utf-8")
+        entries = parse_entries(self.history.read_bytes())
+        partial = entries[0].hash_short[:8]
+        self.index.write_text(text.replace(entries[0].hash_short, partial), encoding="utf-8")
+
+        with self.patch_paths():
+            ok, errs = verify(self.history, self.index)
+        self.assertFalse(ok)
+        self.assertTrue(any("does not match" in e for e in errs))
 
 
 class TestSnapshots(TempRepoBase):

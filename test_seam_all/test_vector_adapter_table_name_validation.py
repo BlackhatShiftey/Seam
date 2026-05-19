@@ -5,9 +5,9 @@ from seam_runtime.vector_adapters import PgVectorAdapter, _validate_table_name
 
 class TestTableNameValidation:
     def test_valid_table_names_pass(self):
-        _validate_table_name("seam_vector_index")
-        _validate_table_name("abc123")
-        _validate_table_name("_leading_underscore")
+        assert _validate_table_name("seam_vector_index") is None
+        assert _validate_table_name("abc123") is None
+        assert _validate_table_name("_leading_underscore") is None
 
     def test_semicolon_rejected(self):
         with pytest.raises(ValueError, match="Unsafe"):

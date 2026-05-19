@@ -320,12 +320,17 @@ def _ensure_windows_user_path(target: Path) -> None:
                 "powershell",
                 "-NoProfile",
                 "-Command",
-                f"[Environment]::SetEnvironmentVariable('Path', '{updated}', 'User')",
+                "[Environment]::SetEnvironmentVariable('Path', "
+                f"{_powershell_single_quoted(updated)}, 'User')",
             ],
             check=True,
         )
     if not path_in_environment(target, user_path):
         os.environ["PATH"] = os.environ.get("PATH", "").rstrip(";") + (";" if os.environ.get("PATH") else "") + target_text
+
+
+def _powershell_single_quoted(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 def _ensure_posix_shell_profiles(target: Path) -> list[Path]:
