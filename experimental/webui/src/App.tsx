@@ -1,7 +1,7 @@
 import React from 'react';
 import './index.css';
 
-const ORIGINAL_DASHBOARD_URL = '/seam-dashboard-prototype.html';
+const DASHBOARD_URL = '/dashboard.html';
 
 export default function App() {
   const [failed, setFailed] = React.useState(false);
@@ -11,8 +11,8 @@ export default function App() {
       <main className="prototype-fallback">
         <h1>SEAM dashboard prototype is unavailable</h1>
         <p>
-          Vite should be serving the preserved original from
-          <code> experimental/webui/prototype-backup/</code>.
+          Vite should be serving the finished dashboard from
+          <code> experimental/webui/public/dashboard.html</code>.
         </p>
       </main>
     );
@@ -21,8 +21,8 @@ export default function App() {
   return (
     <iframe
       className="prototype-frame"
-      src={ORIGINAL_DASHBOARD_URL}
-      title="SEAM original dashboard prototype"
+      src={DASHBOARD_URL}
+      title="SEAM dashboard"
       onError={() => setFailed(true)}
     />
   );

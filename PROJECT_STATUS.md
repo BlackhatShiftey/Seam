@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-19 (HISTORY#202 — Claude pre-commit fix to P0-6 atomicity test patch target)
+Last updated: 2026-05-19 (HISTORY#203 — WebUI finished dashboard wiring)
 
 ## Current State
 
@@ -22,13 +22,13 @@ SEAM is operating as a local machine-first memory runtime with:
 - Linux installer supports two explicit modes: default global command install under `~/.local/share/seam`, and `--dev` repo-local Python bootstrap with the external-drive `.venv/lib64` fallback plus SEAM protocol verification; WebUI setup remains separate.
 - Competitive RAG/install polish in progress on `codex/competitive-rag-install-polish`: one-line private install docs, product-first README, document status tracking, progressive memory search/get, `retrieve --mode vector|graph|hybrid|mix`, stdio agent bridge, and vector stale-index reporting
 - Active/inactive code and docs separation enforced via `docs/CODE_LAYOUT.md`, `.rgignore`, and archive paths
-- IDE-like browser dashboard under `experimental/webui/` currently launches the preserved original prototype from `prototype-backup/` at the Vite root so the IDE shell, graphs, settings, terminal, and chat remain visible while the REST-wired TypeScript panes are reworked.
+- IDE-like browser dashboard under `experimental/webui/` now launches the finished static dashboard from `public/dashboard.html` at the Vite root, with `public/seam-api.js` wiring health, stats, compile, search, context, persist, and lossless-compress calls through the local REST API proxy while the TypeScript panes remain rework material.
 - Adaptive SEAM Skill Factory foundation is merged on `main` through PR #21; current tracked code includes Skill Factory primitives and roadmap docs under `seam_runtime/skills/` and `docs/roadmap/SKILL_FACTORY.md`.
 
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#202` — Claude pre-commit fix to the P0-6 atomicity regression test in `tools/streams/test_streams.py::RebuildIndexTests`. The test was patching `tools.streams.rebuild_index.STREAMS_ROOT`, which is a no-op because `index_path()` and `read_log()` resolve `STREAMS_ROOT` via name lookup in `tools.streams.streams_lib`; the patch target was repointed to `tools.streams.streams_lib.STREAMS_ROOT` so the test actually exercises the populated-index branch under `tmp_root`. The P0-6 code change in `HISTORY#201` (atomic cross-index + per-stream index rebuild via tmp + `os.replace`) is unchanged. `HISTORY#200` was file-locked `append_event` for streams (P0-5); `HISTORY#199` was vector.py SQLite pragma alignment (P1-12); `HISTORY#198` was the prior deep-audit follow-up pass (bounded `SQLiteStore.load_ir()` pagination, MIRL parse line-context errors, snapshot `pack_entry_ids`/`skipped_entry_ids`, and `docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md`).
+- Latest continuity handoff is `HISTORY#203` — Codex inspected the finished WebUI source drop, wired the Vite root iframe from the old `prototype-backup` target to `public/dashboard.html`, kept `public/` as the static asset root, documented the finished dashboard/service-layer state, and verified the WebUI with Vitest, Vite build, and a dev-server smoke check. `HISTORY#202` remains the prior Claude pre-commit fix to the P0-6 atomicity regression test patch target; `HISTORY#201` was atomic cross-index + per-stream index rebuild via tmp + `os.replace`; `HISTORY#200` was file-locked `append_event` for streams; `HISTORY#199` was vector.py SQLite pragma alignment; `HISTORY#198` was the prior deep-audit follow-up pass.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.

@@ -4223,3 +4223,21 @@ Repointed the patch to tools.streams.streams_lib.STREAMS_ROOT so index_path() an
 
 Verification: python -m pytest tools/streams/test_streams.py -q = 18 passed. Full suite python -m pytest test_seam_all/ tools/history/ tools/streams/ -q = 351 passed, 1 warning, 3 subtests passed. verify_integrity OK, verify_routing OK, verify_continuity OK, verify_streams OK after rebuild_cross_index and history mirror sync. The P0-6 code in rebuild_cross_index.py and rebuild_index.py is unchanged; only the test patch target moved.
 ---END-ENTRY-#202---
+
+---BEGIN-ENTRY-#203---
+id: 203
+date: 2026-05-19T02:33:34Z
+agent: codex
+status: done
+topics: dashboard, verify, status, docs
+commits: none
+refs: experimental/webui/public/dashboard.html,experimental/webui/public/seam-api.js,experimental/webui/src/App.tsx,experimental/webui/vite.config.ts,experimental/webui/README.md,experimental/webui/RESTORE_NOTES.md,PROJECT_STATUS.md
+supersedes: 202
+tokens: 265
+---
+Inspected the finished WebUI source drop and integrated the active browser dashboard path without using agents. The active app now serves experimental/webui/public as the Vite publicDir, proxies the dashboard REST endpoints (/health, /stats, /compile, /compile-dsl, /search, /context, /persist, /lossless-compress) to SEAM_API_URL or http://127.0.0.1:8765, and frames /dashboard.html from src/App.tsx instead of the old /seam-dashboard-prototype.html backup target. Added the finished dashboard shell, browser REST service layer, tweaks panel, and branding assets under experimental/webui/public/. Updated README.md and RESTORE_NOTES.md to describe the finished dashboard/service-layer state, and updated PROJECT_STATUS.md to make HISTORY#203 the current handoff.
+
+Inspection notes: Webui-final-dash/ appears to be the untracked source drop; the committed active copy is under experimental/webui/public/. The stray untracked file named `new content` contains only TRUNCATED and was not staged. .vscode/ was also left unstaged. Secret-shaped scan of WebUI/source-drop candidates found only placeholder API-key examples, not real credentials.
+
+Verification: npm run test in experimental/webui passed for src/api/apiClient.test.ts. npm run build in experimental/webui passed and copied dashboard.html, seam-api.js, tweaks-panel.jsx, and branding assets into dist/. Dev-server smoke with npm run dev -- --host 127.0.0.1 returned HTTP 200 for /, /dashboard.html, and /seam-api.js. REST API itself was not started, so live endpoint behavior remains dependent on seam serve.
+---END-ENTRY-#203---

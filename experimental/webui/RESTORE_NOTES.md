@@ -26,9 +26,10 @@ The first Vite + React REST-pane rewrite was not visually or structurally equiva
 
 ## Current Fix
 
-- `vite.config.ts` serves `prototype-backup/` as Vite static content.
-- `src/App.tsx` frames `/seam-dashboard-prototype.html` at `http://localhost:5173/`.
-- The TypeScript REST panes remain in `src/panes/` as follow-up implementation material, but they are not the root UI until they can preserve the original shell.
+- `vite.config.ts` serves `public/` as Vite static content and proxies dashboard REST endpoints to the local SEAM API.
+- `src/App.tsx` frames `/dashboard.html` at `http://localhost:5173/`.
+- `public/seam-api.js` provides the browser service layer for health, stats, compile, search, context, persist, and lossless-compress calls.
+- The TypeScript REST panes remain in `src/panes/` as follow-up implementation material; the finished dashboard shell is the root UI.
 
 ## Bug Pass 1
 
