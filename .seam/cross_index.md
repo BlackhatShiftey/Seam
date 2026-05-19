@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 259
+total_events: 260
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-18T00:25:00Z | history:047:72b2b3a5 | session-event | planned | compile, persist, retrieval, search, benchmark, dashboard | PLAN_LOG.md |
 | 2026-04-20T04:12:38Z | history:048:12b41ce4 | session-event | done | history, snapshot, multi-agent, protocol, integrity, ledger | PROJECT_STATUS.md,REPO_LEDGER.md,HISTORY_INDEX.md,AGENTS.md |
 | 2026-04-20T08:19:21Z | history:049:153cb882 | session-event | done | dashboard, textual, command, pyproject, history, snapshot | seam_runtime/dashboard.py,pyproject.toml,test_seam.py |
 | 2026-04-20T16:59:32Z | history:050:38a362f6 | session-event | done | dashboard, textual, command, roadmap, history, snapshot | seam_runtime/dashboard.py,test_seam.py,ROADMAP.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-19T01:07:10Z | history:202:239b6a93 | session-event | done | streams, test, verify, audit | tools/streams/test_streams.py,PROJECT_STATUS.md |
 | 2026-05-19T02:33:34Z | history:203:6685b7cf | session-event | done | dashboard, verify, status, docs | experimental/webui/public/dashboard.html,experimental/webui/public/seam-api.j... |
 | 2026-05-19T02:42:56Z | history:204:b51b7e85 | session-event | done | audit, security, verify, history, installer, dashboard | seam_runtime/runtime.py,seam_runtime/installer.py,seam_runtime/dashboard.py,t... |
+| 2026-05-19T03:11:04Z | history:205:b1523239 | session-event | done | audit, security, verify, docs, protocol | docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md,PROJECT_STATUS.md,REPO_LEDGER.md |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0059.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:24:00Z | 59 | (multi) | (multi) |
+| 0001-0060.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:25:00Z | 60 | (multi) | (multi) |

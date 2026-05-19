@@ -4259,3 +4259,19 @@ SOP update: docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md now reflects HISTORY#20
 
 Verification: focused tests passed for runtime rollback failure reporting, PowerShell quoting, dashboard private env permissions, new_entry lock failure cleanup, partial index hash rejection, and vector table-name validation. py_compile passed for touched Python modules/tests. compileall passed for seam_runtime experimental tools scripts installers. Active regression suite `.venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q` reported 356 passed, 1 warning, 3 subtests passed in 90.47s. No benchmark run was performed in this pass.
 ---END-ENTRY-#204---
+
+---BEGIN-ENTRY-#205---
+id: 205
+date: 2026-05-19T03:11:04Z
+agent: codex
+status: done
+topics: audit, security, verify, docs, protocol
+commits: none
+refs: docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md,PROJECT_STATUS.md,REPO_LEDGER.md
+supersedes: 204
+tokens: 193
+---
+Added docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md as the high-level DeepSeek execution SOP requested by the operator. The SOP gives DeepSeek a step-by-step blueprint for SEAM debugging, systematic audit, verification, benchmark smoke checks, adversarial review, and merge-request preparation while explicitly requiring DeepSeek to use its own parallel worker lanes and preserving the operator constraint that Codex does not use agents. It includes an Anthropic-compatible endpoint sidenote for tool-call/work batching behavior, worker-lane ownership, claim calibration rules, test-first fix criteria, benchmark readiness commands, SEAM continuity closeout, merge-request requirements, a ready-to-send prompt for DeepSeek, and the exact check-my-work prompt DeepSeek must return for Codex review.
+
+Updated PROJECT_STATUS.md to point at HISTORY#205 and REPO_LEDGER.md with a concise durable workflow pointer to the new SOP. No runtime behavior changed. Verification performed before closeout: startup docs read per AGENTS.md, git status reviewed, and this change remained scoped to docs/status/ledger/history. Full runtime tests were not rerun because this is documentation/protocol-only work.
+---END-ENTRY-#205---

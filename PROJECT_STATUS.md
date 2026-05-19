@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-19 (HISTORY#204 — audit concern remediation pass)
+Last updated: 2026-05-19 (HISTORY#205 — DeepSeek parallel audit SOP)
 
 ## Current State
 
@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#204` — Codex addressed the next high-confidence deep-audit concerns after the WebUI merge: runtime vector-index rollback now reports touched record ids if SQLite rollback itself fails, history `new_entry` releases the process lock if OS file-lock acquisition fails, Windows installer PowerShell path updates escape embedded single quotes, history integrity verification rejects partial hash-prefix matches, dashboard local env writes use owner-only POSIX permissions, table-name validation tests now assert the valid path, and the SOP was recalibrated to distinguish valid/open/stale audit claims. Verification: focused tests passed, compile checks passed, and `.venv/bin/python -m pytest test_seam_all/ tools/history/ tools/streams/ -q` reported 356 passed, 1 warning, 3 subtests passed. `HISTORY#203` is the WebUI finished dashboard wiring commit.
+- Latest continuity handoff is `HISTORY#205` — Codex added `docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md`, a high-level execution blueprint and ready-to-send prompt for DeepSeek to run its own parallel-agent SEAM debugging/audit/verification/adversarial-review pass. It includes Anthropic-compatible endpoint tool-call notes, worker-lane ownership, test/benchmark/continuity gates, merge-request requirements, and the required "Codex check my work" prompt DeepSeek must return. `HISTORY#204` remains the prior audit concern remediation pass; `HISTORY#203` is the WebUI finished dashboard wiring commit.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
