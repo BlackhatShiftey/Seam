@@ -161,6 +161,65 @@ class BuildContextPackTests(unittest.TestCase):
         self.assertIn("BEGIN-ENTRY-#", out)
 
 
+class AppendEventLockTests(unittest.TestCase):
+    def test_concurrent_append_event_no_interleaving(self) -> None:
+        import threading
+        from unittest.mock import patch
+        from tools.streams.streams_lib import append_event
+
+        tmp_root = Path(self._testMethodName)
+        tmp_root.mkdir(parents=True, exist_ok=True)
+
+        results = [None, None]
+
+        def _append(result_idx, body):
+            results[result_idx] = append_event(
+                kind="test",
+                header_fields={"status": "done", "topics": "test", "supersedes": "none",
+                               "tokens": "1", "commits": "none", "refs": "none"},
+                body=body,
+                agent="test-agent",
+                date="2026-05-18T00:00:00Z",
+            )
+
+        barrier = threading.Barrier(2)
+
+        def _append_with_barrier(result_idx, body):
+            barrier.wait()
+            _append(result_idx, body)
+
+        with patch("tools.streams.streams_lib.STREAMS_ROOT", tmp_root):
+            t0 = threading.Thread(target=_append_with_barrier, args=(0, "Body from thread 0"), daemon=True)
+            t1 = threading.Thread(target=_append_with_barrier, args=(1, "Body from thread 1"), daemon=True)
+            t0.start()
+            t1.start()
+            t0.join(timeout=5)
+            t1.join(timeout=5)
+
+        self.assertIsNotNone(results[0], "Thread 0 did not complete")
+        self.assertIsNotNone(results[1], "Thread 1 did not complete")
+
+        # Both events must have distinct, sequential ids.
+        ids = {results[0].id, results[1].id}
+        self.assertEqual(ids, {1, 2}, f"Expected ids {{1, 2}}, got {ids}")
+
+        # Read the log directly from tmp_root (patch has exited, so
+        # read_log would use the real repo path).
+        log_data = (tmp_root / "test" / "log.md").read_bytes()
+        from tools.streams.streams_lib import parse_events
+        events = parse_events(log_data, "test")
+        self.assertEqual(len(events), 2)
+        text = log_data.decode("utf-8")
+        self.assertIn("Body from thread 0", text)
+        self.assertIn("Body from thread 1", text)
+
+    def tearDown(self):
+        import shutil
+        path = Path(self._testMethodName)
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
+
+
 class VerifyStreamsTests(unittest.TestCase):
     def test_verify_returns_no_errors_after_seed(self) -> None:
         sync_history_mirror()

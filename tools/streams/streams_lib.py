@@ -17,6 +17,7 @@ optional ":sha8" integrity suffix.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -225,24 +226,62 @@ def list_stream_kinds() -> list[str]:
     return sorted(p.name for p in STREAMS_ROOT.iterdir() if p.is_dir())
 
 
+def _acquire_stream_lock(kind: str):
+    """Acquire an exclusive advisory lock for a stream log.
+
+    Returns a (lock_fd, release_fn) pair. Callers must invoke release_fn in a
+    ``finally`` block.
+    """
+    stream_dir = STREAMS_ROOT / kind
+    stream_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = stream_dir / "log.lock"
+    fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
+    if os.name == "nt":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+
+        def _release():
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            finally:
+                os.close(fd)
+
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+        def _release():
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+
+    return fd, _release
+
+
 def append_event(kind: str, header_fields: dict[str, str], body: str, *, agent: str, date: str) -> StreamEvent:
     """Append a new event to <kind>/log.md and return the parsed event."""
-    data = read_log(kind)
-    events = parse_events(data, kind) if data else []
-    new_id = next_event_id(events)
-    block = format_event(
-        kind=kind,
-        id=new_id,
-        date=date,
-        agent=agent,
-        fields=header_fields,
-        body=body,
-    )
-    if data and not data.endswith(b"\n"):
-        data += b"\n"
-    if data:
-        data += b"\n"
-    data += block.encode("utf-8")
-    write_log(kind, data)
-    events = parse_events(read_log(kind), kind)
-    return events[-1]
+    _lock_fd, _release = _acquire_stream_lock(kind)
+    try:
+        data = read_log(kind)
+        events = parse_events(data, kind) if data else []
+        new_id = next_event_id(events)
+        block = format_event(
+            kind=kind,
+            id=new_id,
+            date=date,
+            agent=agent,
+            fields=header_fields,
+            body=body,
+        )
+        if data and not data.endswith(b"\n"):
+            data += b"\n"
+        if data:
+            data += b"\n"
+        data += block.encode("utf-8")
+        write_log(kind, data)
+        events = parse_events(read_log(kind), kind)
+        return events[-1]
+    finally:
+        _release()

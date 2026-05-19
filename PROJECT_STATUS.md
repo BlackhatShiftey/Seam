@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-18 (HISTORY#199 — vector.py SQLite pragma alignment)
+Last updated: 2026-05-18 (HISTORY#200 — file-locked append_event for streams)
 
 ## Current State
 
@@ -28,7 +28,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#199` — vector.py SQLite pragma alignment (P1-12). `HISTORY#198` was the prior deep-audit follow-up pass with bounded `SQLiteStore.load_ir()` pagination, MIRL parse errors with line context, explicit snapshot `pack_entry_ids` and `skipped_entry_ids`, and `docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md` for the next remediation cycle.
+- Latest continuity handoff is `HISTORY#200` — file-locked `append_event` in `tools/streams/streams_lib.py` (deep-audit item P0-5). Wraps the stream-log read-modify-write in `fcntl.flock(LOCK_EX)` on a sibling `<kind>/log.lock`, mirroring `tools/history/new_entry.py`; Windows fallback uses `msvcrt.locking`. New `tools/streams/test_streams.py::AppendEventLockTests` covers the concurrent-id race. `HISTORY#199` was vector.py SQLite pragma alignment (P1-12); `HISTORY#198` was the prior deep-audit follow-up pass (bounded `SQLiteStore.load_ir()` pagination, MIRL parse line-context errors, snapshot `pack_entry_ids`/`skipped_entry_ids`, and `docs/SOP_DEEP_AUDIT_REMEDIATION_BLUEPRINT.md`).
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.

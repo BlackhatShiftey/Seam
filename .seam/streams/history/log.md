@@ -4169,3 +4169,21 @@ New test file tests/audit/test_vector_pragmas.py (1 test) verifies all four prag
 
 Verification: focused test python3 -m pytest tests/audit/test_vector_pragmas.py = 1 passed. Full suite = 349 passed, 1 warning, 3 subtests passed in 89.81s. py_compile OK. No regressions.
 ---END-ENTRY-#199---
+
+---BEGIN-ENTRY-#200---
+id: 200
+date: 2026-05-19T00:02:24Z
+agent: deepseek
+status: done
+topics: streams, security, verify, audit
+commits: none
+refs: tools/streams/streams_lib.py,tools/streams/test_streams.py
+supersedes: 199
+tokens: 188
+---
+Item P0-5: File-locked append_event. Wrapped the read-modify-write in tools/streams/streams_lib.py::append_event with an fcntl.flock(LOCK_EX) on a sibling <kind>/log.lock file, mirroring tools/history/new_entry.py:38-68 exactly. Windows fallback uses msvcrt.locking. New helper _acquire_stream_lock(kind) returns a (fd, release_fn) pair; append_event holds the lock across read_log + parse + format + write_log + reparse.
+
+New test class AppendEventLockTests in tools/streams/test_streams.py extends the module with one focused test: two threads behind threading.Barrier(2) call append_event concurrently against a tmp STREAMS_ROOT, and the test asserts both events have distinct sequential ids {1, 2} and that both body strings survive in the log. Pre-fix the race collapsed ids to {1}; post-fix both ids appear distinct.
+
+Verification: focused python -m pytest tools/streams/test_streams.py -q -k concurrent_append = 1 passed. Full suite python -m pytest test_seam_all/ tools/history/ tools/streams/ tests/ -q = 350 passed, 1 warning, 3 subtests passed. verify_integrity OK, verify_routing OK, verify_continuity OK, verify_streams OK. py_compile + compileall OK.
+---END-ENTRY-#200---

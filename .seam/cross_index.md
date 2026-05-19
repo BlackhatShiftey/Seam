@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 254
+total_events: 255
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-18T00:20:00Z | history:042:dc8878e5 | session-event | planned | compile, persist, compress, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:21:00Z | history:043:2c4029af | session-event | planned | compile, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:22:00Z | history:044:1dfd1f24 | session-event | planned | persist, vector, pgvector, roadmap, status | PLAN_LOG.md |
 | 2026-04-18T00:23:00Z | history:045:8726b649 | session-event | planned | command, roadmap, status | PLAN_LOG.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-18T10:43:26Z | history:196:34581023 | session-event | done | roadmap, history, verify | ROADMAP.md,docs/roadmap/TRUST_SECURITY_AUDITABILITY.md,.seam/streams/roadmap/... |
 | 2026-05-18T12:01:36Z | history:197:aadd22bd | session-event | done | security, verify, lx1, benchmark, dashboard | seam_runtime/server.py,seam_runtime/lx1.py,seam_runtime/dashboard.py,seam_run... |
 | 2026-05-18T15:31:05Z | history:198:25e22fed | session-event | done | audit, verify, benchmark, docs, history, status | seam_runtime/storage.py,seam_runtime/mirl.py,tools/history/write_snapshot.py,... |
+| 2026-05-19T00:02:24Z | history:200:f75ab478 | session-event | done | streams, security, verify, audit | tools/streams/streams_lib.py,tools/streams/test_streams.py |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0054.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:19:00Z | 54 | (multi) | (multi) |
+| 0001-0055.cross.md | 2026-04-15T00:00:00Z..2026-04-18T00:20:00Z | 55 | (multi) | (multi) |
