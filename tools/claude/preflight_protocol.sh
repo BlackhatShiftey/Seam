@@ -53,6 +53,11 @@ run_gate() {
 
 run_gate "verify_integrity" "$PY" -m tools.history.verify_integrity
 run_gate "verify_routing"   "$PY" -m tools.history.verify_routing
+# --no-recorded-fact-audit is intentionally set because:
+#   1. Recorded-fact audit extractors are still in development
+#   2. Some existing docs contain facts that trigger false positives
+#   3. Precedence false-positives need resolution before enabling
+# To force fact auditing: set SEAM_FORCE_FACT_AUDIT=1 or use --audit-facts in commit message.
 run_gate "verify_continuity" "$PY" -m tools.history.verify_continuity --no-recorded-fact-audit
 run_gate "verify_streams"   "$PY" -m tools.streams.verify_streams
 

@@ -4541,3 +4541,34 @@ Repairs: seam_runtime/benchmark_integrity.py now hashes a stable result projecti
 
 Verification performed with .venv/bin/python: focused BIL/baseline/stub/reproducibility tests passed 24; full active pytest scope test_seam_all/ tools/history/ tools/streams/ tests/ passed 429 tests, skipped 3, and passed 3 subtests; py_compile seam.py passed; compileall seam_runtime benchmarks tools scripts installers passed; git diff --check passed. Benchmark smoke ran LoCoMo quickstart with stub judge, confirmed seal without --allow-stub-seal exits non-zero without traceback, then sealed with --allow-stub-seal as BIL-2 and verified/inspected PASS with 4/4 checks. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, broader CI baseline-source policy, and real latency stabilization remain deferred.
 ---END-ENTRY-#217---
+
+---BEGIN-ENTRY-#218---
+id: 218
+date: 2026-05-20T07:34:43Z
+hash: 9bdeb97a83e32185
+agent: claude
+status: done
+topics: security, audit, verify, mcp, persist, retrieval, vector, pack, surface, dashboard, history, protocol, integrity
+commits: none
+refs: seam_runtime/server.py,seam_runtime/mcp.py,seam_runtime/mcp_protocol.py,seam_runtime/storage.py,seam_runtime/runtime.py,seam_runtime/agent_memory.py,seam_runtime/pack.py,seam_runtime/vector.py,seam_runtime/vector_adapters.py,seam_runtime/evals.py,seam_runtime/dashboard.py,seam_runtime/benchmarks.py,benchmarks/external/locomo/adapters/seam.py,docs/retrieval_gold_fixtures.json,experimental/webui/vite.config.ts,experimental/webui/public/dashboard.html,tools/streams/verify_streams.py,tools/streams/rebuild_index.py,tools/claude/preflight_protocol.sh,test_seam_all/test_seam.py,tests/audit/test_mcp_error_sanitization.py,tests/audit/test_rate_limiter_key_hash.py,tests/audit/test_server_bind_safety.py,tests/audit/test_server_budget_bounds.py,tests/audit/test_stale_edge_cleanup.py,tests/audit/test_reingest_source_dedup.py,tests/audit/test_pgvector_pk_composite.py,tests/audit/test_vector_orphan_detection.py,tests/audit/test_token_aware_pack.py,tests/audit/test_streams_content_hash.py
+supersedes: 217
+tokens: 580
+---
+Claude executed the DeepSeek Parallel Remediation SOP across 7 audit lanes (A-G) using 4 parallel sub-agents in isolated worktrees. All fixes integrated on a single branch and verified.
+
+Lane A (REST/API security): hashed raw Authorization header with SHA-256 for rate-limiter keys (was storing plaintext bearer tokens as dict keys); added FastAPI Query bounds ge=1 le=200 on /search budget; clamped /context budget to [1,200] and pack_budget to [1,65536]; added refusal of non-loopback binds when no SEAM_API_TOKEN is set, gated behind SEAM_API_ALLOW_REMOTE_NO_TOKEN=1 break-glass env.
+
+Lane B (MCP secret hygiene): redacted raw exception text in mcp.py stdio bridge error responses; removed full tool list disclosure from unknown-tool ValueError; removed str(exc) from JSON-RPC parse error and internal error data fields; _call_tool now preserves ValueError/KeyError messages (intentional validation) but redacts all other unexpected exceptions to "Internal tool execution error".
+
+Lane C (memory/persistence): fixed stale CLM graph edges by deleting edges keyed by subject (CLM edges use subject as src_id, not record.id); added CLM subject-change edge cleanup in _persist_edges; added mark_document_superseded_by_source_ref() to SQLiteStore; integrated source_ref dedup into ingest_text() so reingesting changed content under the same source_ref supersedes prior active documents; fixed :memory: mode to use a shared-cache URI (mem_<id>?mode=memory&cache=shared) with an anchor connection so multiple _connect() calls share the same in-memory database.
+
+Lane D (vector/retrieval): changed PgVector primary key from record_id only to composite (record_id, model_name) matching SQLite's vector_index schema; updated ON CONFLICT clause accordingly; added orphan_records() to both SQLiteVectorIndex (NOT EXISTS subquery against ir_records) and PgVectorAdapter (caller-supplied valid_ids); added vector_count() for dashboard metrics.
+
+Lane E (pack token budget): rewrote context mode in pack_records() to enforce budget by actual token count with per-entry token measurement and overflow metadata (overflow key with count and omitted_ids when entries exceed budget). Adjusted retrieval gold fixture pack_budget from 96 (record count) to 512 (token count) and SeamLocomoAdapter default from 8 to 2000.
+
+Lane F (UI/operator): added /tree, /benchmark, /sys-metrics, /trace proxy entries to Vite config; fixed dashboard docker compose commands to use service name pgvector instead of container name seam-pgvector; labeled WebUI demo-only persist/run paths with [DEMO] indicator and API/demo file count display.
+
+Lane G (continuity/auditability): added content hash verification to verify_streams.py (SHA-256 of normalized event bodies compared against content_hash field in index.md, backward-compatible); updated rebuild_index.py to write content_hash on rebuild; documented --no-recorded-fact-audit rationale in preflight_protocol.sh with opt-in instructions.
+
+Verification: .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q -rs -p no:cacheprovider passed 463 tests, skipped 4, subtests 3. All 4 SEAM verify gates green (integrity, continuity, routing, streams). py_compile seam.py and compileall seam_runtime benchmarks tools scripts installers passed with 0 errors. 10 new audit test files added (36 new tests total). git diff --check clean. Secret/session-link scan over full diff negative.
+---END-ENTRY-#218---

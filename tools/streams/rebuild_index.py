@@ -11,6 +11,7 @@ then trusts the root index.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -40,6 +41,11 @@ def rebuild_index(kind: str) -> dict[str, object]:
         os.replace(tmp, index_path(kind))
         return {"kind": kind, "events": 0}
     events = parse_events(data, kind)
+    content_hash = (
+        hashlib.sha256(b"".join(e.raw for e in events)).hexdigest()
+        if events
+        else ""
+    )
     lines: list[str] = [
         f"# {kind.capitalize()} Index",
         "",
@@ -47,12 +53,16 @@ def rebuild_index(kind: str) -> dict[str, object]:
         f"latest_id: {events[-1].id if events else 0}",
         f"source: streams/{kind}/log.md",
         "schema: seam-stream-index/v1",
+    ]
+    if content_hash:
+        lines.append(f"content_hash: {content_hash}")
+    lines.extend([
         "",
         "## entries (newest first)",
         "",
         "| id | date | kind | item | event | hash | supersedes | topics |",
         "|---|---|---|---|---|---|---|---|",
-    ]
+    ])
     for evt in reversed(events):
         topics = evt.fields.get("topics", "")
         topics_disp = topics if len(topics) <= 40 else topics[:37] + "..."

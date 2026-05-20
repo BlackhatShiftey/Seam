@@ -121,7 +121,7 @@ class SeamTests(unittest.TestCase):
             )
             for index in range(3)
         ]
-        pack = pack_ir(IRBatch(records), budget=1)
+        pack = pack_ir(IRBatch(records), budget=60)
         entry_ids = [entry["id"] for entry in pack.payload["entries"]]
         self.assertEqual(entry_ids, ["clm:0"])
         self.assertEqual(pack.refs, entry_ids)
@@ -1397,7 +1397,7 @@ claim c2:
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
         runtime.persist_ir(batch)
         orchestrator = RetrievalOrchestrator(runtime)
-        rag = orchestrator.rag("translator natural language", budget=3, pack_budget=10, include_trace=True)
+        rag = orchestrator.rag("translator natural language", budget=3, pack_budget=2000, include_trace=True)
         self.assertIn("clm:2", rag.candidate_ids)
         self.assertTrue(rag.records)
         self.assertTrue(rag.candidates)

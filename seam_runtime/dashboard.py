@@ -1604,15 +1604,15 @@ if (
 
         @on(Button.Pressed, "#btn-pg-start")
         def _on_btn_pg_start(self, _: Button.Pressed) -> None:  # pragma: no cover
-            self._run_docker_compose("up", "-d", "seam-pgvector", label="pgvector start")
+            self._run_docker_compose("up", "-d", "pgvector", label="pgvector start")
 
         @on(Button.Pressed, "#btn-pg-stop")
         def _on_btn_pg_stop(self, _: Button.Pressed) -> None:  # pragma: no cover
-            self._run_docker_compose("stop", "seam-pgvector", label="pgvector stop")
+            self._run_docker_compose("stop", "pgvector", label="pgvector stop")
 
         @on(Button.Pressed, "#btn-pg-status")
         def _on_btn_pg_status(self, _: Button.Pressed) -> None:  # pragma: no cover
-            self._run_docker_compose("ps", "seam-pgvector", label="pgvector status")
+            self._run_docker_compose("ps", "pgvector", label="pgvector status")
 
         @on(Button.Pressed, "#btn-apply-rest")
         def _on_btn_apply_rest(self, _: Button.Pressed) -> None:  # pragma: no cover

@@ -5,11 +5,14 @@ Checks:
   - History stream mirror matches root HISTORY.md / HISTORY_INDEX.md byte-for-byte.
   - Each stream's index.md exists and references the current log totals.
   - .seam/cross_index.md exists and matches a fresh rebuild for the listed totals.
+  - Each stream's content_hash in index.md matches the computed hash of log.md
+    events (backward-compatible: does not fail if content_hash field is absent).
 
 Exits non-zero on any failure.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -60,6 +63,22 @@ def verify_all() -> list[str]:
                 f"[{kind}] index.md disagrees with log.md event count "
                 f"(expected '{expected_total}')"
             )
+
+        # Content hash verification (backward-compatible: skip if field absent)
+        if events and kind != "history":
+            normalized = b"".join(e.raw for e in events)
+            computed_hash = hashlib.sha256(normalized).hexdigest()
+            expected_match = re.search(
+                r"^content_hash:\s*([0-9a-f]{64})", index_text, re.MULTILINE
+            )
+            if expected_match:
+                expected_hash = expected_match.group(1)
+                if expected_hash != computed_hash:
+                    errors.append(
+                        f"[{kind}] content_hash mismatch: "
+                        f"index={expected_hash[:16]}... "
+                        f"computed={computed_hash[:16]}..."
+                    )
 
     if not CROSS_INDEX_PATH.exists():
         errors.append("cross_index.md missing; run tools.streams.rebuild_cross_index")

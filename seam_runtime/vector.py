@@ -130,6 +130,26 @@ class SQLiteVectorIndex:
                     stale.append({"record_id": record.id, "reason": "dimension_changed"})
         return stale
 
+    def orphan_records(self) -> list[dict[str, object]]:
+        """Return vector rows whose record_id is missing from ir_records."""
+        self.ensure_schema()
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                select v.record_id, v.model_name
+                from vector_index v
+                where not exists (select 1 from ir_records r where r.id = v.record_id)
+                """
+            ).fetchall()
+        return [{"record_id": row["record_id"], "model_name": row["model_name"], "reason": "orphan"} for row in rows]
+
+    def vector_count(self) -> int:
+        """Return total number of vector rows."""
+        self.ensure_schema()
+        with closing(self._connect()) as connection:
+            row = connection.execute("select count(*) from vector_index").fetchone()
+        return row[0] if row else 0
+
     @staticmethod
     def render_record_text(record: MIRLRecord) -> str:
         parts = [record.kind.value]

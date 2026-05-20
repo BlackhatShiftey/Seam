@@ -24,7 +24,7 @@ class RetrievalFixture:
     query: str
     expected_ids: list[str]
     budget: int = 5
-    pack_budget: int = 96
+    pack_budget: int = 512
 
 
 def default_retrieval_fixtures(path: str | Path | None = None) -> list[RetrievalFixture]:
@@ -39,7 +39,7 @@ def default_retrieval_fixtures(path: str | Path | None = None) -> list[Retrieval
             query=item["query"],
             expected_ids=list(item["expected_ids"]),
             budget=int(item.get("budget", 5)),
-            pack_budget=int(item.get("pack_budget", 96)),
+            pack_budget=int(item.get("pack_budget", 512)),
         )
         for item in payload
     ]

@@ -25,11 +25,31 @@ def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: i
         summary = _narrative_summary(ordered, lens=lens)
         return Pack(pack_id=pack_id, mode=mode, lens=lens, refs=refs, payload={"summary": summary}, budget=budget, reversible=False, token_cost=token_count(summary), profile=profile)
 
+    # Context mode: truncate by token budget, not record count.
     entries = [{"id": record.id, "kind": record.kind.value, "signal": _compact_signal(_signal_for_record(record), expansion_to_symbol), "prov": record.prov, "evidence": record.evidence} for record in ordered]
-    included_entries = entries[: max(0, int(budget))]
+
+    # Build payload skeleton to measure overhead tokens
+    skeleton = {"lens": lens, "entries": [], "refs": [], "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
+    overhead_tokens = token_count(json.dumps(skeleton, sort_keys=True, separators=(",", ":")))
+
+    included_entries: list[dict[str, object]] = []
+    overflow_entries: list[dict[str, object]] = []
+    current_tokens = overhead_tokens
+
+    for entry in entries:
+        entry_json = json.dumps(entry, sort_keys=True, separators=(",", ":"))
+        entry_tokens = token_count(entry_json)
+        if current_tokens + entry_tokens <= budget:
+            included_entries.append(entry)
+            current_tokens += entry_tokens
+        else:
+            overflow_entries.append(entry)
+
     refs = [str(entry["id"]) for entry in included_entries]
     pack_id = _pack_id("context", lens, budget, refs)
-    payload = {"lens": lens, "entries": included_entries, "refs": refs, "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
+    payload: dict[str, object] = {"lens": lens, "entries": included_entries, "refs": refs, "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
+    if overflow_entries:
+        payload["overflow"] = {"count": len(overflow_entries), "omitted_ids": [str(e["id"]) for e in overflow_entries]}
     body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return Pack(pack_id=pack_id, mode="context", lens=lens, refs=refs, payload=payload, budget=budget, reversible=False, token_cost=token_count(body), profile=profile)
 

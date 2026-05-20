@@ -15,10 +15,21 @@ class SQLiteStore:
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+        else:
+            # Keep one anchor connection alive so that the shared in-memory
+            # database persists across per-operation connections.
+            self._mem_anchor = sqlite3.connect(
+                f"file:mem_{id(self)}?mode=memory&cache=shared", uri=True, timeout=5.0
+            )
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path, timeout=5.0)
+        if self.path == ":memory:":
+            connection = sqlite3.connect(
+                f"file:mem_{id(self)}?mode=memory&cache=shared", uri=True, timeout=5.0
+            )
+        else:
+            connection = sqlite3.connect(self.path, timeout=5.0)
         connection.row_factory = sqlite3.Row
         if self.path != ":memory:":
             connection.execute("pragma journal_mode=WAL")
@@ -273,6 +284,16 @@ class SQLiteStore:
     def persist_ir(self, batch: IRBatch) -> PersistReport:
         with closing(self._connect()) as connection:
             for record in batch.records:
+                # Capture old CLM subject before overwriting.
+                old_clm_subject: str | None = None
+                if record.kind == RecordKind.CLM:
+                    old_row = connection.execute(
+                        "select payload_json from ir_records where id = ?",
+                        (record.id,),
+                    ).fetchone()
+                    if old_row is not None:
+                        old_attrs = json.loads(old_row[0]).get("attrs", {})
+                        old_clm_subject = old_attrs.get("subject")
                 payload = json.dumps(record.to_dict(), sort_keys=True, separators=(",", ":"))
                 connection.execute(
                     """
@@ -283,7 +304,7 @@ class SQLiteStore:
                     (record.id, record.kind.value, record.ns, record.scope, record.status.value, record.conf, record.t0, record.t1, record.created_at, record.updated_at, payload),
                 )
                 self._persist_specialized(connection, record)
-                self._persist_edges(connection, record)
+                self._persist_edges(connection, record, old_clm_subject=old_clm_subject)
             connection.commit()
         return PersistReport(stored_ids=[record.id for record in batch.records], store_path=self.path)
 
@@ -339,6 +360,18 @@ class SQLiteStore:
             raise KeyError(document_id)
         return _document_status_row(row)
 
+    def mark_document_superseded_by_source_ref(self, source_ref: str, except_document_id: str) -> int:
+        """Mark all other documents with the same source_ref as deleted (superseded)."""
+        now = utc_now()
+        with closing(self._connect()) as connection:
+            cursor = connection.execute(
+                "update document_status set deleted_at = ?, updated_at = ? "
+                "where source_ref = ? and document_id != ? and deleted_at is null",
+                (now, now, source_ref, except_document_id),
+            )
+            connection.commit()
+            return cursor.rowcount
+
     def list_document_status(self, limit: int = 20) -> list[dict[str, object]]:
         with closing(self._connect()) as connection:
             rows = connection.execute(
@@ -375,10 +408,23 @@ class SQLiteStore:
                 (record.id, attrs.get("entity"), attrs.get("activity"), attrs.get("agent"), json.dumps(record.to_dict(), sort_keys=True, separators=(",", ":"))),
             )
 
-    def _persist_edges(self, connection: sqlite3.Connection, record: MIRLRecord) -> None:
+    def _persist_edges(
+        self,
+        connection: sqlite3.Connection,
+        record: MIRLRecord,
+        old_clm_subject: str | None = None,
+    ) -> None:
         # Remove existing edges for this record so that re-persists with
         # changed edge sets do not leave stale edges behind (H2 integrity fix).
         connection.execute("delete from ir_edges where src_id = ?", (record.id,))
+        # Also remove edges keyed by the CLM subject when it differs from record.id.
+        if record.kind == RecordKind.CLM:
+            subject = record.attrs.get("subject")
+            if subject is not None:
+                connection.execute("delete from ir_edges where src_id = ?", (str(subject),))
+            # Clean up edges from the old subject if it changed.
+            if old_clm_subject is not None and old_clm_subject != subject:
+                connection.execute("delete from ir_edges where src_id = ?", (str(old_clm_subject),))
         attrs = record.attrs
         edges: list[tuple[str, str, str]] = []
         if record.kind == RecordKind.REL:

@@ -64,13 +64,14 @@ class PgVectorAdapter:
                 cursor.execute(
                     f"""
                     create table if not exists {self.table_name} (
-                        record_id text primary key,
+                        record_id text not null,
                         model_name text not null,
                         dimension integer not null,
                         source_text text not null,
                         source_hash text not null default '',
                         embedding vector not null,
-                        updated_at text not null
+                        updated_at text not null,
+                        primary key (record_id, model_name)
                     )
                     """
                 )
@@ -109,7 +110,7 @@ class PgVectorAdapter:
                         f"""
                         insert into {self.table_name} (record_id, model_name, dimension, source_text, source_hash, embedding, updated_at)
                         values (%s, %s, %s, %s, %s, %s::vector, %s)
-                        on conflict (record_id) do update
+                        on conflict (record_id, model_name) do update
                         set model_name = excluded.model_name,
                             dimension = excluded.dimension,
                             source_text = excluded.source_text,
@@ -163,6 +164,30 @@ class PgVectorAdapter:
                     elif int(row[1]) != int(self.model.dimension):
                         stale.append({"record_id": record.id, "reason": "dimension_changed"})
         return stale
+
+    def orphan_records(self, valid_record_ids: set[str] | None = None) -> list[dict[str, object]]:
+        """Return vector rows whose record_id is not in valid_record_ids.
+
+        When valid_record_ids is None, returns all vector rows as potentially orphaned
+        (caller must supply canonical IDs from SQLite).
+        """
+        self.ensure_schema()
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"select record_id, model_name from {self.table_name}")
+                rows = cursor.fetchall()
+        if valid_record_ids is None:
+            return [{"record_id": r[0], "model_name": r[1], "reason": "orphan (no canonical set provided)"} for r in rows]
+        return [{"record_id": r[0], "model_name": r[1], "reason": "orphan"} for r in rows if r[0] not in valid_record_ids]
+
+    def vector_count(self) -> int:
+        """Return total number of vector rows."""
+        self.ensure_schema()
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"select count(*) from {self.table_name}")
+                row = cursor.fetchone()
+        return row[0] if row else 0
 
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")

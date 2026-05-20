@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import hmac
 import os
 import sys
@@ -15,12 +16,12 @@ from .mirl import IRBatch
 from .runtime import SeamRuntime
 
 
-def _require_fastapi() -> tuple[Any, Any, Any, Any, Any]:
+def _require_fastapi() -> tuple[Any, Any, Any, Any, Any, Any]:
     try:
-        from fastapi import Depends, FastAPI, Header, HTTPException, Request
+        from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
     except ImportError as exc:  # pragma: no cover - exercised when optional extra is absent
         raise RuntimeError('SEAM server dependencies are not installed. Run: pip install -e ".[server]"') from exc
-    return Depends, FastAPI, Header, HTTPException, Request
+    return Depends, FastAPI, Header, HTTPException, Query, Request
 
 
 def _require_uvicorn() -> Any:
@@ -97,7 +98,7 @@ def _cors_origins_from_env() -> list[str]:
 
 def _client_key(request: Any, authorization: str | None = None) -> str:
     if authorization:
-        return authorization
+        return hashlib.sha256(authorization.encode()).hexdigest()
     client = getattr(request, "client", None)
     return getattr(client, "host", "local") or "local"
 
@@ -152,7 +153,7 @@ async def _send_body_too_large(scope: dict[str, Any], send: Any, max_body_bytes:
 
 
 def create_app(runtime: SeamRuntime | None = None) -> Any:
-    Depends, FastAPI, Header, HTTPException, Request = _require_fastapi()
+    Depends, FastAPI, Header, HTTPException, Query, Request = _require_fastapi()
     # Required: `from __future__ import annotations` defers annotation evaluation,
     # so FastAPI's typing.get_type_hints must find `Request` in module globals.
     # fastapi is a lazy import (optional extra), so we publish it here. Idempotent:
@@ -378,7 +379,7 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
         return result
 
     @app.get("/search", dependencies=[Depends(guard)])
-    def search(query: str, scope: str | None = None, budget: int = 5, lens: str = "general") -> dict[str, object]:
+    def search(query: str, scope: str | None = None, budget: int = Query(default=5, ge=1, le=200), lens: str = "general") -> dict[str, object]:
         return runtime.search_ir(query=query, scope=scope, budget=budget, lens=lens).to_dict()
 
     @app.post("/context", dependencies=[Depends(guard)])
@@ -386,7 +387,7 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
         query = str(payload.get("query", ""))
         if not query.strip():
             raise HTTPException(status_code=400, detail="query is required")
-        budget = int(payload.get("budget") or 5)
+        budget = max(1, min(200, int(payload.get("budget") or 5)))
         search_result = runtime.search_ir(
             query=query,
             scope=payload.get("scope") if isinstance(payload.get("scope"), str) else None,
@@ -397,7 +398,7 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
         pack = runtime.pack_ir(
             record_ids=record_ids,
             lens=str(payload.get("lens") or "rag"),
-            budget=int(payload.get("pack_budget") or 512),
+            budget=max(1, min(65536, int(payload.get("pack_budget") or 512))),
             mode=str(payload.get("mode") or "context"),
             persist=bool(payload.get("persist", False)),
         )
@@ -455,6 +456,12 @@ def _validate_server_safety(host: str, workers: int) -> None:
         raise RuntimeError(
             "SEAM API rate limiting is process-local; use one worker or set "
             "SEAM_API_ALLOW_PROCESS_LOCAL_RATE_LIMIT=1 after placing a shared limiter in front."
+        )
+    if _is_remote_bind(host) and not os.environ.get("SEAM_API_TOKEN") and not _env_truthy("SEAM_API_ALLOW_REMOTE_NO_TOKEN"):
+        raise RuntimeError(
+            "Refusing to bind API to a non-loopback host without an authentication token. "
+            "Set SEAM_API_TOKEN to enable authenticated remote access, bind to 127.0.0.1, "
+            "or set SEAM_API_ALLOW_REMOTE_NO_TOKEN=1 intentionally."
         )
     if os.environ.get("SEAM_API_TOKEN") and _is_remote_bind(host) and not _env_truthy("SEAM_API_ALLOW_INSECURE_REMOTE"):
         raise RuntimeError(

@@ -41,6 +41,22 @@ export default defineConfig({
         target: process.env.SEAM_API_URL || 'http://127.0.0.1:8765',
         changeOrigin: true,
       },
+      '/tree': {
+        target: process.env.SEAM_API_URL || 'http://127.0.0.1:8765',
+        changeOrigin: true,
+      },
+      '/benchmark': {
+        target: process.env.SEAM_API_URL || 'http://127.0.0.1:8765',
+        changeOrigin: true,
+      },
+      '/sys-metrics': {
+        target: process.env.SEAM_API_URL || 'http://127.0.0.1:8765',
+        changeOrigin: true,
+      },
+      '/trace': {
+        target: process.env.SEAM_API_URL || 'http://127.0.0.1:8765',
+        changeOrigin: true,
+      },
       // Keep the /api prefix proxy for the existing TS panes
       '/api': {
         target: process.env.SEAM_API_URL || 'http://127.0.0.1:8765',

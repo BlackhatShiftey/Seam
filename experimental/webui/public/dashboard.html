@@ -1830,6 +1830,12 @@ const MODEL_OPTIONS = [
 
 
 // ── Ingest Panel ─────────────────────────────────────────────────────────
+<!-- DEMO NOTE: Files added without drag-and-drop (e.g. via addDemoFile button
+     or empty drops) are simulated — they lack a _file reference and use
+     a setInterval-driven pipeline that fakes stage progress.  Only files
+     added via real drag-and-drop or the file-picker (<input type=file>)
+     carry a _file reference and call the real SEAM REST API via
+     ingestFileViaAPI() → SeamAPI.compile(). -->
 const ingestStages = ['Select files', 'Parse & chunk', 'Compile MIRL', 'Embed vectors', 'Persist to DB'];
 
 function IngestPanel({ width, onOpenSettings }) {
@@ -2049,13 +2055,15 @@ function IngestPanel({ width, onOpenSettings }) {
   const totalRecords = files.reduce((s, f) => s + f.records, 0);
   const done = files.filter((f) => f.status === 'done').length;
   const running = files.filter((f) => f.status === 'running').length;
+  const demoCount = files.filter((f) => !f._file).length;
+  const realCount = files.filter((f) => !!f._file).length;
 
   return (
     <div style={{ width, flexShrink: 0, overflow: 'hidden', transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)', background: '#030d20', borderRight: '1px solid rgba(47,99,255,0.15)', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{ padding: '7px 12px 0', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#4f8cfb', borderBottom: '1px solid rgba(47,99,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span>Ingest</span>
-        <span style={{ color: '#7efdb9', fontSize: 9 }}>{done}/{files.length} done · {totalRecords} records</span>
+        <span style={{ color: '#7efdb9', fontSize: 9 }}>{done}/{files.length} done · {totalRecords} records{realCount > 0 && demoCount > 0 ? ` · ${realCount} API / ${demoCount} demo` : demoCount > 0 ? ` · [DEMO]` : ''}</span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>

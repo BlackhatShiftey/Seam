@@ -185,7 +185,7 @@ def run_stdio_bridge(runtime: SeamRuntime, input_stream: TextIO | None = None, o
             response = dispatch_tool(runtime, request)
         except Exception as exc:  # pragma: no cover - defensive bridge boundary
             traceback.print_exc(file=sys.stderr)
-            response = {"type": "error", "error": str(exc)}
+            response = {"type": "error", "error": "Internal error processing MCP request"}
         _write(output_stream, response)
 
 
@@ -341,9 +341,7 @@ def dispatch_tool(runtime: SeamRuntime, request: dict[str, object]) -> dict[str,
             mode=mode,
         )
         return {"type": "result", "tool": name, "result": result.to_dict()}
-    raise ValueError(
-        f"Unknown SEAM MCP tool: {name!r}. Known tools: {sorted(TOOL_DESCRIPTIONS)}."
-    )
+    raise ValueError(f"Unknown SEAM MCP tool: {name!r}")
 
 
 def _bounded_int(value: object, *, default: int, low: int, high: int) -> int:

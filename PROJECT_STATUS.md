@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-20 (HISTORY#217 — Track K BIL Phase 1 repair audit)
+Last updated: 2026-05-20 (HISTORY#218 — Parallel audit remediation across 7 lanes)
 
 ## Current State
 
@@ -29,7 +29,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#217` — Codex audited and repaired DeepSeek's follow-up BIL/baseline changes. BIL hashes now use a stable projection that excludes volatile timing fields, stub-judge BIL sealing fails cleanly unless `--allow-stub-seal` is explicit, benchmark gate auto-baseline excludes the candidate path, holdout baseline filtering uses path parts rather than string prefixes, and the unused timing helper/test were removed. The repair handoff SOP is `docs/SOP_TRACK_K_BIL_PHASE1_REPAIR_HANDOFF.md`. `HISTORY#216` is Stage 1 tokenizer unification. `HISTORY#215` is the initial BIL Phase 1 implementation closeout; `HISTORY#214` is its SOP/prompt. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and broader CI baseline-source policy remain deferred.
+- Latest continuity handoff is `HISTORY#218` — Claude executed the DeepSeek Parallel Remediation SOP across 7 audit lanes (A-G) using 4 parallel sub-agents. All lanes integrated and verified: REST/API security (rate-limiter key hashing, budget clamping, remote-bind gate), MCP secret hygiene (exception redaction in error responses), memory/persistence (stale CLM edge cleanup, source_ref reingest dedup, :memory: shared cache), vector/retrieval (PgVector composite PK, orphan detection), pack token budget enforcement with overflow metadata, UI/operator (Vite proxy endpoint coverage, dashboard docker compose service names, WebUI demo labeling), and continuity/auditability (verify_streams content hashes, preflight fact-audit documentation). 463 tests pass, 4 skipped, all 4 SEAM verify gates green. 10 new audit test files. The SOP is `docs/SOP_DEEPSEEK_PARALLEL_AUDIT_EXECUTION.md`. `HISTORY#217` is the prior Track K BIL repair. `HISTORY#216` is Stage 1 tokenizer unification.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.

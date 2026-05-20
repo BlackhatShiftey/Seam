@@ -62,6 +62,8 @@ class SeamRuntime:
         stored_ids: list[str] = []
         if persist:
             stored_ids = self.persist_ir(batch).stored_ids
+            # Mark previous versions of this source as superseded.
+            self.store.mark_document_superseded_by_source_ref(source_ref, except_document_id=document_id)
         document = self.store.upsert_document_status(
             document_id=document_id,
             ns=ns,

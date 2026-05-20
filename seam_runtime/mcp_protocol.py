@@ -57,7 +57,7 @@ def _handle_jsonrpc_line(runtime: SeamRuntime, line: str) -> list[dict[str, obje
     try:
         message = json.loads(line)
     except json.JSONDecodeError as exc:
-        return [_error_response(None, JSONRPC_PARSE_ERROR, "Parse error", str(exc))]
+        return [_error_response(None, JSONRPC_PARSE_ERROR, "Parse error")]
 
     if isinstance(message, list):
         if not message:
@@ -85,7 +85,7 @@ def _handle_jsonrpc_message(runtime: SeamRuntime, message: object) -> dict[str, 
         return _error_response(request_id, exc.code, exc.message, exc.data)
     except Exception as exc:  # pragma: no cover - defensive protocol boundary
         traceback.print_exc(file=sys.stderr)
-        return _error_response(request_id, JSONRPC_INTERNAL_ERROR, "Internal error", str(exc))
+        return _error_response(request_id, JSONRPC_INTERNAL_ERROR, "Internal error")
 
 
 def _dispatch_mcp_method(runtime: SeamRuntime, method: str, params: object) -> dict[str, object]:
@@ -127,12 +127,13 @@ def _dispatch_mcp_method(runtime: SeamRuntime, method: str, params: object) -> d
 def _call_tool(runtime: SeamRuntime, name: str, arguments: dict[str, object]) -> dict[str, object]:
     try:
         response = dispatch_tool(runtime, {"tool": name, "arguments": arguments})
+    except ValueError as exc:
+        return {"content": [{"type": "text", "text": str(exc)}], "isError": True}
+    except KeyError as exc:
+        return {"content": [{"type": "text", "text": str(exc)}], "isError": True}
     except Exception as exc:
         traceback.print_exc(file=sys.stderr)
-        return {
-            "content": [{"type": "text", "text": str(exc)}],
-            "isError": True,
-        }
+        return {"content": [{"type": "text", "text": "Internal tool execution error"}], "isError": True}
     result = response.get("result")
     return {
         "content": [{"type": "text", "text": json.dumps(result, indent=2, sort_keys=True)}],

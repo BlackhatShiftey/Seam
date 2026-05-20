@@ -19,7 +19,7 @@ class SeamLocomoAdapter:
 
     name = "seam"
 
-    def __init__(self, db_path: str | None = None, budget: int = 8) -> None:
+    def __init__(self, db_path: str | None = None, budget: int = 2000) -> None:
         # TODO: default db_path should be tmp_path, not a gitignored project dir
         self._db_root = Path(db_path) if db_path is not None else Path("test_seam/locomo")
         self.budget = budget
