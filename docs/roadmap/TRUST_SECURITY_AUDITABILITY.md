@@ -176,6 +176,12 @@ seam bench publish-transparency benchmark.seam-bundle
 
 Gate: dashboard benchmark claims show integrity level, signer, input hashes, audit linkage, reproducibility status, and verification result. Track I (external memory benchmarks) seals its bundles at the highest BIL level available.
 
+Phase 1 implementation note: current implementation supports BIL-0
+through BIL-2 for benchmark result files and external benchmark bundles.
+BIL-3 through BIL-6 remain planned until signing identity,
+audit-ledger linkage, transparency-log target, and independent-rerun
+policy are decided.
+
 ## Memory Trust Spine Addendum
 
 These items extend Track K from general auditability into active memory-trust behavior. They are intentionally ordered so SEAM learns to detect contradictions before it assigns economic/operational weight or signs state roots.

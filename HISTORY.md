@@ -4479,3 +4479,23 @@ Policy decisions intentionally deferred: BIL-3 signing identity, BIL-4 audit-cha
 
 Non-overlapping Codex smoke while preparing the SOP: .venv/bin/python -m seam bench external --plan --format json exited 0 and showed the expected 9 required benchmark env vars not configured locally; .venv/bin/python -m seam bench external --quickstart locomo --adapter seam --judge stub --output /tmp/seam-current-locomo-stub.json exited 0 and wrote the current stub report. git diff --check passed before closeout.
 ---END-ENTRY-#214---
+
+---BEGIN-ENTRY-#215---
+id: 215
+date: 2026-05-20T02:15:17Z
+agent: codex
+status: done
+topics: benchmark, audit, verify, command, docs, status, history, security
+commits: none
+refs: seam_runtime/benchmark_integrity.py,seam_runtime/cli.py,test_seam_all/test_benchmark_integrity.py,benchmarks/external/README.md,docs/roadmap/TRUST_SECURITY_AUDITABILITY.md,PROJECT_STATUS.md
+supersedes: 214
+tokens: 248
+---
+Reviewed the DeepSeek Track K BIL Phase 1 handback and completed the Codex closeout. DeepSeek added seam_runtime/benchmark_integrity.py, CLI commands for seam bench seal/verify/inspect, BIL unit/CLI/quickstart tests in test_seam_all/test_benchmark_integrity.py, and docs in benchmarks/external/README.md plus docs/roadmap/TRUST_SECURITY_AUDITABILITY.md.
+
+Codex review found one BIL-2 integrity gap: verification checked the stored input_manifest hash but did not require that input_manifest to match the manifest derived from the embedded result. Added test_verify_bundle_detects_manifest_result_mismatch_even_with_recomputed_hashes first, confirmed it failed with PASS where FAIL was expected, then added the input_manifest_matches_result verification check. The BIL-2 quickstart smoke now reports 4/4 verification checks: level, result hash, input manifest hash, and manifest/result consistency.
+
+PROJECT_STATUS.md now reflects BIL Phase 1 as implemented. BIL-3 signing identity, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and CI baseline-source policy remain deferred exactly as scoped by HISTORY#214.
+
+Verification performed with .venv/bin/python: focused BIL tests passed 11; full active pytest scope test_seam_all/ tools/history/ tools/streams/ tests/ passed 416 tests, skipped 3, and passed 3 subtests; py_compile seam.py passed; compileall seam_runtime benchmarks tools scripts installers passed; git diff --check passed. Benchmark smoke ran seam bench external --quickstart locomo --adapter seam --judge stub, sealed the result as BIL-2, verified PASS, and inspected PASS.
+---END-ENTRY-#215---

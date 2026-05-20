@@ -50,3 +50,21 @@ seam bench external locomo --dataset /path/to/locomo.json
 One subdirectory per benchmark. The LoCoMo adapter lives under
 `benchmarks/external/locomo/`. Future adapters follow the same pattern
 with shared infrastructure under `benchmarks/external/common/`.
+
+## Benchmark Integrity Levels
+
+External benchmark results can be sealed into deterministic SEAM benchmark
+bundles:
+
+```bash
+seam bench external --quickstart locomo --adapter seam --judge stub --output locomo-result.json
+seam bench seal locomo-result.json --level BIL-2 --output locomo.seam-bundle.json
+seam bench verify locomo.seam-bundle.json
+seam bench inspect locomo.seam-bundle.json
+```
+
+Current Track K support covers BIL-0 through BIL-2 only. BIL-3 signing,
+BIL-4 audit-chain linkage, BIL-5 transparency logs, and BIL-6 independent
+reruns require operator policy decisions and are not implemented yet.
+LLM judge scores remain informational; sealing records the evidence but
+does not make probabilistic judge scores a deterministic gate.

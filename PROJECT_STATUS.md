@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-19 (HISTORY#214 — Track K BIL Phase 1 DeepSeek SOP authored)
+Last updated: 2026-05-20 (HISTORY#215 — Track K BIL Phase 1 implemented)
 
 ## Current State
 
@@ -9,6 +9,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - MIRL compile/verify/persist/search/context flows in production use
 - External memory benchmark registry + `seam bench external` CLI alias (Track I SOP 0 landed)
 - SEAM LoCoMo adapter with string-match scoring + 60s quickstart fixture (Track I SOP 1 landed; `seam bench external --quickstart locomo`)
+- Benchmark Integrity Level Phase 1 support: deterministic BIL-0 inspection plus BIL-1/BIL-2 benchmark sealing, verification, and inspection via `seam bench seal|verify|inspect`
 - Full Textual interactive TUI dashboard with chat panel, command palette (/, !, ?), MIRL animation, independently scrollable panes, IDE-style explorer tree, status bar, colored RichLog panels, focus zoom toggle, runtime-smoked Settings tab, and live Overview health bars for database, pgvector, API/config, and settings paths
 - Dashboard chat with expanded OpenRouter model defaults (Qwen, DeepSeek, MiMo, Kimi, GLM, Claude, Gemini, Grok, Gemma, Pareto Code Router)
 - First interactive agent-style CLI shell: `seam shell` / `seam chat` for persistent memory remember/search/context/stats/doctor workflows
@@ -28,7 +29,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#214` — Codex authored the DeepSeek execution SOP and paste-ready prompt for Track K BIL Phase 1. The SOP scopes implementation to BIL-0 through BIL-2 benchmark bundles (`seam bench seal|verify|inspect`) and explicitly defers BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and CI baseline-source policy. `HISTORY#213` is the MCP `seam_context` read-only contract correction after the Codex audit; `HISTORY#212` is the Codex audit of the DeepSeek CI bench-gate prep. `HISTORY#211` is the preceding CI bench-gate prep batch (B1 sys_metrics flake fix, B2 pgvector integration CI/tests, B3 MCP tools/call smoke). `HISTORY#210` is the CI hardening batch (CI1-CI3). `HISTORY#209` is the second leg of the prior WebUI batch (H1 streams fsync, H5 .cursor/ gitignore, M8 TestCountFact rename, PROJECT_STATUS ghost-path removal). `HISTORY#208` is the WebUI batch first leg (W1 /tree, W2 /benchmark, W3 /sys-metrics, W4 record_kinds symbol contract, SOP + prompt + ledger authoring, dashboard consumer update). `HISTORY#207` is the prior Codex review of the LX1 type-preservation tests; `HISTORY#206` is the DeepSeek parallel audit pass; `HISTORY#205` is the SOP document; `HISTORY#204` is the prior audit remediation pass.
+- Latest continuity handoff is `HISTORY#215` — DeepSeek implemented Track K BIL Phase 1 and Codex reviewed it, adding a BIL-2 manifest/result consistency regression before closeout. `seam_runtime/benchmark_integrity.py` now supports raw BIL-0 inspection plus BIL-1/BIL-2 deterministic sealing and verification, and `seam bench seal|verify|inspect` exposes the workflow. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and CI baseline-source policy remain deferred. `HISTORY#214` is the SOP/prompt that scoped the work; `HISTORY#213` is the MCP `seam_context` read-only contract correction after the Codex audit; `HISTORY#212` is the Codex audit of the DeepSeek CI bench-gate prep.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
@@ -43,6 +44,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - pgvector real adapter: Docker Compose service `seam-pgvector` (image `pgvector/pgvector:0.8.2-pg18-trixie`, port 55432)
 - Dashboard snapshot/smoke-test behavior
 - Benchmark bundle verification, diff, gate, holdout workflow, and Windows GitHub Actions workflow (see HISTORY#095)
+- Benchmark Integrity Level Phase 1 workflow: `seam bench inspect` reports BIL-0 for raw benchmark results, `seam bench seal --level BIL-1|BIL-2` writes deterministic bundles, and `seam bench verify` checks result hashes, BIL-2 manifest hashes, and BIL-2 manifest/result consistency.
 - `seam bench external --plan` CLI alias and `benchmarks/registry/memory_benchmarks.json` registry
 - External memory benchmark suite (Track I complete): `seam bench external --quickstart locomo` with `--adapter {seam|mem0|zep}` and `--judge {stub|claude|openai}`; Mem0 comparator behind `seam[bench-mem0]` optional extra; Zep comparator behind `seam[bench-zep]` optional extra; three-way SEAM/Mem0/Zep scoring reproducible on quickstart fixture
 - REST API skeleton: `seam serve`, `seam-server`, optional `server` extra, bearer-token protected endpoints, bounded request bodies, env-configurable process-local rate limiting, and remote authenticated bind guardrails

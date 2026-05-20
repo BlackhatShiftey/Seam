@@ -9,6 +9,13 @@ import sys
 from importlib.util import find_spec
 from pathlib import Path
 
+from .benchmark_integrity import (
+    inspect_benchmark_integrity,
+    load_json_payload,
+    seal_benchmark_bundle,
+    verify_benchmark_bundle as verify_integrity_bundle,
+    write_json_payload,
+)
 from .benchmarks import (
     BENCHMARK_SUITES,
     render_benchmark_diff_pretty,
@@ -408,6 +415,20 @@ def build_parser() -> argparse.ArgumentParser:
     bench_external_parser.add_argument("--judge", choices=["none", "stub", "claude", "openai"], default=None, help="LLM judge in addition to string-match scoring")
     bench_external_parser.add_argument("--judge-model", default=None, help="Override the default judge model id")
 
+    bench_seal_parser = bench_subparsers.add_parser("seal", help="Seal a benchmark result as a BIL bundle")
+    bench_seal_parser.add_argument("result", help="Benchmark result JSON path")
+    bench_seal_parser.add_argument("--level", choices=["BIL-1", "BIL-2"], default="BIL-2")
+    bench_seal_parser.add_argument("--output", required=True, help="Write sealed bundle JSON to this path")
+    bench_seal_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    bench_verify_parser = bench_subparsers.add_parser("verify", help="Verify a sealed benchmark BIL bundle")
+    bench_verify_parser.add_argument("bundle", help="Benchmark bundle JSON path")
+    bench_verify_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    bench_inspect_parser = bench_subparsers.add_parser("inspect", help="Inspect benchmark integrity/BIL status")
+    bench_inspect_parser.add_argument("payload", help="Benchmark result or bundle JSON path")
+    bench_inspect_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
 
@@ -703,6 +724,35 @@ def run_cli(argv: list[str] | None = None) -> None:
             Path(args.output).write_text(json.dumps(payload, indent=2), encoding="utf-8")
         print(text)
         raise SystemExit(exit_code)
+
+    if args.command == "bench" and args.bench_command == "seal":
+        result_payload = load_json_payload(args.result)
+        bundle = seal_benchmark_bundle(result_payload, level=args.level)
+        write_json_payload(args.output, bundle)
+        report = inspect_benchmark_integrity(bundle)
+        if args.format == "json":
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(_render_bil_integrity_pretty(report))
+        return
+
+    if args.command == "bench" and args.bench_command == "verify":
+        bundle = load_json_payload(args.bundle)
+        report = verify_integrity_bundle(bundle)
+        if args.format == "json":
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(_render_bil_integrity_pretty({"status": report["status"], "bil": report["bil"], "verification": report}))
+        raise SystemExit(0 if report.get("status") == "PASS" else 1)
+
+    if args.command == "bench" and args.bench_command == "inspect":
+        payload = load_json_payload(args.payload)
+        report = inspect_benchmark_integrity(payload)
+        if args.format == "json":
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print(_render_bil_integrity_pretty(report))
+        raise SystemExit(0 if report.get("status") == "PASS" else 1)
 
     runtime = SeamRuntime(args.db)
 
@@ -1683,6 +1733,26 @@ def _render_lx1_benchmark_pretty(report: dict[str, object]) -> str:
         f"LX/1 chars           : {report.get('compact_chars')}",
         f"Char savings         : {float(report.get('char_savings_ratio', 0)):.1%}",
     ])
+
+
+def _render_bil_integrity_pretty(report: dict[str, object]) -> str:
+    bil = report.get("bil") if isinstance(report.get("bil"), dict) else {}
+    verification = report.get("verification") if isinstance(report.get("verification"), dict) else None
+    lines = [
+        f"SEAM benchmark integrity: {report.get('status')}",
+        f"BIL: {bil.get('level')}",
+        f"Sealed: {bil.get('sealed')}",
+    ]
+    if bil.get("result_hash"):
+        lines.append(f"Result hash: {bil.get('result_hash')}")
+    if bil.get("input_manifest_hash"):
+        lines.append(f"Input manifest hash: {bil.get('input_manifest_hash')}")
+    if verification:
+        failed = [check for check in verification.get("checks", []) if check.get("status") != "PASS"]
+        lines.append(f"Verification checks: {len(verification.get('checks', [])) - len(failed)}/{len(verification.get('checks', []))} passed")
+        for check in failed[:10]:
+            lines.append(f"- {check.get('id')}: {check.get('message')}")
+    return "\n".join(lines)
 
 
 def _record_signal(record: dict[str, object]) -> str:
