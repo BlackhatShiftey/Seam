@@ -4572,3 +4572,33 @@ Lane G (continuity/auditability): added content hash verification to verify_stre
 
 Verification: .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q -rs -p no:cacheprovider passed 463 tests, skipped 4, subtests 3. All 4 SEAM verify gates green (integrity, continuity, routing, streams). py_compile seam.py and compileall seam_runtime benchmarks tools scripts installers passed with 0 errors. 10 new audit test files added (36 new tests total). git diff --check clean. Secret/session-link scan over full diff negative.
 ---END-ENTRY-#218---
+
+---BEGIN-ENTRY-#219---
+id: 219
+date: 2026-05-20T09:35:56Z
+agent: claude-opus-4-7
+status: done
+topics: audit, verify, pgvector, test, docs, history, status, benchmark
+commits: none
+refs: PROJECT_STATUS.md,test_seam_all/test_seam.py,docs/SOP_CRITICAL_BENCHMARKABILITY_FIX.md,docs/SOP_BENCHMARKABLE_STATE_ROADMAP.md
+supersedes: 218
+tokens: 1039
+---
+Audit pass with "never skip tests, launch everything" rule applied. Three real bugs surfaced that prior audits missed by relying on default-config test runs.
+
+Bug 1 (P0, deferred to follow-up SOP): pgvector schema migration is missing for the HISTORY#218 composite-PK change. seam_runtime/vector_adapters.py:74 declares primary key (record_id, model_name) and line 113 references on conflict (record_id, model_name), but the DDL is guarded by create table if not exists. Any pgvector deployment created before #218 keeps its old PRIMARY KEY (record_id) and breaks with psycopg.errors.InvalidColumnReference on every insert. CI is silent because each CI job provisions a fresh pg18 service; fresh local installs are silent for the same reason. Documented in docs/SOP_BENCHMARKABLE_STATE_ROADMAP.md as P0-pg; locally mitigated by DROP TABLE seam_vector_index then letting the adapter recreate the table.
+
+Bug 2 (P1, deferred): seam_runtime/storage.py:218 SQLiteStore.get_stats()["vector_entries"] always queries the SQLite vector_index table even when pgvector is the active backend. Dashboard, REST /stats, MCP seam_stats, and seam doctor all report 0 vectors under pgvector regardless of actual count. PgVectorAdapter.vector_count() already exists from #218; SQLite path needs to delegate. Documented in the roadmap SOP.
+
+Bug 3 (P0b, fixed inline): test_seam_all/test_seam.py SeamTests.setUp did not pop SEAM_PGVECTOR_DSN. With docker pgvector reachable and SEAM_PGVECTOR_DSN exported, two tests failed under the real pgvector backend (test_cli_context_prompt_view_outputs_prompt_ready_text expected a candidate ranking only valid for SQLite vector index; test_runtime_persist_rollback_preserves_existing_records_and_vectors asserted vector_entries > 0 which is always 0 under pgvector per Bug 2). Fix: setUp now backs up and pops SEAM_PGVECTOR_DSN; tearDown restores it. Tests that want pgvector opt in via tests/audit/test_pgvector_*. Full suite under SEAM_PGVECTOR_DSN now passes 467 tests with 0 skipped.
+
+Bug 4 (P0a, documented): text-opacity is not LoCoMo-adapter-specific. Reproduced via seam surface query on a small fixture: lexical=0.00, semantic=0.00, graph=0.00 against the same underscore-joined entity-hash form (seam_memory_runtime_compiles_source_text_mirl_graph_signals_tokyo). The LoCoMo bench retrieval failure is one symptom of a runtime-wide pack-format choice. Adapter patch in SOP_CRITICAL_BENCHMARKABILITY_FIX.md unblocks benchmarks; a separate roadmap conversation is owed about whether pack_records context mode should carry an optional evidence_text projection. Operator decision point flagged in both SOPs.
+
+Continuity gate repair (already applied last commit, restated for the record): PROJECT_STATUS.md:32 had a bare test-count claim with no pytest scope, failing verify_continuity recorded-fact audit. Now names the exact pytest path scope explicitly. verify_continuity OK.
+
+Surfaces exercised end-to-end during this audit (not in prior #218 work): seam doctor PASS; seam serve REST on 127.0.0.1:7891 /health /stats /compile clean; seam_runtime.mcp_protocol stdio initialize + tools/list (16 tools, all seam_* prefix) + tools/call seam_stats + tools/call seam_doctor all isError=false; seam surface compile|verify|query mechanical flow clean.
+
+Two new SOP docs landed: docs/SOP_CRITICAL_BENCHMARKABILITY_FIX.md (minimal LoCoMo adapter patch using evidence-closure + pack_ir mode=exact, with explicit operator decision point on adapter-vs-runtime fix scope) and docs/SOP_BENCHMARKABLE_STATE_ROADMAP.md (sequenced P0a/P0-pg/P0b/P0c → P1 real-judge + Mem0/Zep three-way → P2 full-LoCoMo fixture and pgvector-CI confirmation → P3 ROADMAP P0 tracks A-Web/A-CLI/E1).
+
+Verification: with the local docker pgvector DSN exported via SEAM_PGVECTOR_DSN and PGVECTOR_TEST_DSN (credentials never written into the repo; sourced from an ignored env), .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -rs -p no:cacheprovider passed 467 tests, 0 skipped, 3 subtests. All four SEAM verify gates green (integrity, continuity, routing, streams). REST /health 200, /stats 200, /compile 200. MCP stdio four-message handshake clean. seam doctor PASS (one non-blocking finding: commit gate drift (copy) on the exFAT external drive, operator fix bash tools/git-hooks/install.sh --force).
+---END-ENTRY-#219---

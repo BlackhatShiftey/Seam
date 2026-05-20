@@ -83,6 +83,10 @@ class SeamTests(unittest.TestCase):
     def setUp(self) -> None:
         TEST_ARTIFACT_DIR.mkdir(exist_ok=True)
         self.db_path = TEST_ARTIFACT_DIR / f"test_seam_{uuid4().hex}.db"
+        # Default isolation: assume SQLite vector backend unless a test opts in.
+        # Operator may export SEAM_PGVECTOR_DSN; that's for adapter-specific tests
+        # in tests/audit/, not for SeamTests which exercise the default backend.
+        self._pgvector_dsn_backup = os.environ.pop("SEAM_PGVECTOR_DSN", None)
 
     def tearDown(self) -> None:
         try:
@@ -90,6 +94,8 @@ class SeamTests(unittest.TestCase):
                 self.db_path.unlink()
         except PermissionError:
             pass
+        if self._pgvector_dsn_backup is not None:
+            os.environ["SEAM_PGVECTOR_DSN"] = self._pgvector_dsn_backup
 
     def test_compile_generates_core_records(self) -> None:
         text = (

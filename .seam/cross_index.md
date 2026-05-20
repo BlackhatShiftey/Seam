@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 273
+total_events: 274
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-21T00:00:00Z | roadmap:014:25894f3e | status-change | bootstrap | dashboard, tui, textual | ROADMAP.md:136 |
 | 2026-04-21T02:21:26Z | history:061:c61b823c | session-event | done | dashboard, textual, tui, history, snapshot | seam_runtime/dashboard.py,seam_runtime/ui/animations.py,seam_runtime/ui/bars.... |
 | 2026-04-21T19:36:27Z | history:062:609e5f92 | session-event | done | dashboard, textual, windows, history, snapshot | launch_dashboard.bat,seam_runtime/installer.py,installers/install_seam.py,pyp... |
 | 2026-04-21T19:49:14Z | history:063:00bb98b6 | session-event | done | installer, dashboard, textual, windows, history, snapshot | seam_runtime/installer.py,installers/install_seam.py,scripts/bootstrap_seam.p... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-20T03:12:17Z | history:216:45c3fc22 | session-event | done | benchmark, audit, verify, history, streams, command, docs... | seam_runtime/tokenization.py,tools/tokenization.py,seam_runtime/mirl.py,tools... |
 | 2026-05-20T04:47:38Z | history:217:7eab9308 | session-event | done | benchmark, audit, verify, command, docs, status, history,... | seam_runtime/benchmark_integrity.py,seam_runtime/benchmark_baseline_policy.py... |
 | 2026-05-20T07:34:43Z | history:218:bbeb7960 | session-event | done | security, audit, verify, mcp, persist, retrieval, vector,... | seam_runtime/server.py,seam_runtime/mcp.py,seam_runtime/mcp_protocol.py,seam_... |
+| 2026-05-20T09:35:56Z | history:219:a514a615 | session-event | done | audit, verify, pgvector, test, docs, history, status, ben... | PROJECT_STATUS.md,test_seam_all/test_seam.py,docs/SOP_CRITICAL_BENCHMARKABILI... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0073.cross.md | 2026-04-15T00:00:00Z..2026-04-20T21:48:15Z | 73 | (multi) | (multi) |
+| 0001-0074.cross.md | 2026-04-15T00:00:00Z..2026-04-21T00:00:00Z | 74 | (multi) | (multi) |
