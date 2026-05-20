@@ -112,6 +112,14 @@ Worker lanes:
      registry, quickstart flows.
    - Focus: reproducible smoke runs, gate/diff readiness, temp artifact cleanup,
      no generated bundle commits unless explicitly promoted.
+   - **Track M context:** Track M (Competitive Position & Market Entry) is the
+     current operator-designated competitive priority. P0 blocks market entry:
+     wire SEAM into `mem0ai/memory-benchmarks` harness then run full LoCoMo,
+     LongMemEval, and BEAM-1M. See `docs/roadmap/COMPETITIVE_ROADMAP.md` and
+     PR #31 (branch `claude/remote-control-AD6Di`, draft, pending merge).
+     Engineering prerequisite check: can `seam.recall(query)` return ranked
+     results with scores; can `seam.remember(messages)` ingest multi-turn
+     dialogue; is there a clean Python API entry point beyond CLI/REST/MCP.
 
 6. Adversarial Reviewer
    - Scope: read-only review over the full integrated diff.
