@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 217
-total_tokens: ~48049
-latest_id: 217
+total_entries: 218
+total_tokens: ~48361
+latest_id: 218
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 218 | 2026-05-20 | done | ac99657e35bf9e3b | roadmap,benchmark,plan,docs,+ | 217 |
 | 217 | 2026-05-20 | done | 7eab930807fea085 | benchmark,audit,verify,command,+ | 216 |
 | 216 | 2026-05-20 | done | 45c3fc22d472b915 | benchmark,audit,verify,history,+ | 215 |
 | 215 | 2026-05-20 | done | 9560b39d5e73ec59 | benchmark,audit,verify,command,+ | 214 |
@@ -235,7 +236,7 @@ compact: true
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
 - audit: count=50 latest=#217, #216, #215, #214, #213
-- benchmark: count=58 latest=#217, #216, #215, #214, #212
+- benchmark: count=59 latest=#218, #217, #216, #215, #214
 - bundle: count=2 latest=#015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
@@ -250,7 +251,7 @@ compact: true
 - dashboard: count=63 latest=#204, #203, #197, #163, #162
 - diff: count=4 latest=#153, #093, #092, #037
 - docker: count=3 latest=#149, #085, #084
-- docs: count=14 latest=#217, #216, #215, #214, #208
+- docs: count=15 latest=#218, #217, #216, #215, #214
 - doctor: count=8 latest=#170, #169, #140, #139, #138
 - extras: count=1 latest=#022
 - fixture: count=5 latest=#187, #145, #092, #039, #008
@@ -277,7 +278,7 @@ compact: true
 - pack: count=1 latest=#183
 - persist: count=22 latest=#213, #212, #199, #181, #047
 - pgvector: count=21 latest=#212, #211, #179, #149, #121
-- plan: count=13 latest=#214, #180, #176, #171, #170
+- plan: count=14 latest=#218, #214, #180, #176, #171
 - protocol: count=59 latest=#213, #210, #208, #205, #195
 - pyproject: count=4 latest=#094, #051, #049, #022
 - rank: count=3 latest=#017, #005, #001
@@ -286,7 +287,7 @@ compact: true
 - registry: count=1 latest=#178
 - retrieval: count=16 latest=#212, #189, #188, #187, #181
 - retry: count=1 latest=#182
-- roadmap: count=47 latest=#196, #193, #191, #180, #178
+- roadmap: count=48 latest=#218, #196, #193, #191, #180
 - roundtrip: count=2 latest=#007, #006
 - salvage: count=1 latest=#179
 - sbert: count=3 latest=#023, #022, #011
@@ -294,7 +295,7 @@ compact: true
 - security: count=15 latest=#217, #215, #214, #210, #209
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=105 latest=#166, #164, #156, #155, #150
-- status: count=81 latest=#217, #215, #207, #203, #198
+- status: count=82 latest=#218, #217, #215, #207, #203
 - storage: count=1 latest=#182
 - streams: count=7 latest=#216, #210, #209, #202, #201
 - surface: count=2 latest=#208, #145
@@ -311,5 +312,5 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 197
+- done: 198
 - planned: 20

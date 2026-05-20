@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 272
+total_events: 273
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-20T21:48:15Z | history:060:4ea6cae9 | session-event | done | dashboard, textual, chat, command, tui, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-21T00:00:00Z | roadmap:014:25894f3e | status-change | bootstrap | dashboard, tui, textual | ROADMAP.md:136 |
 | 2026-04-21T02:21:26Z | history:061:c61b823c | session-event | done | dashboard, textual, tui, history, snapshot | seam_runtime/dashboard.py,seam_runtime/ui/animations.py,seam_runtime/ui/bars.... |
 | 2026-04-21T19:36:27Z | history:062:609e5f92 | session-event | done | dashboard, textual, windows, history, snapshot | launch_dashboard.bat,seam_runtime/installer.py,installers/install_seam.py,pyp... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-20T02:15:17Z | history:215:9560b39d | session-event | done | benchmark, audit, verify, command, docs, status, history,... | seam_runtime/benchmark_integrity.py,seam_runtime/cli.py,test_seam_all/test_be... |
 | 2026-05-20T03:12:17Z | history:216:45c3fc22 | session-event | done | benchmark, audit, verify, history, streams, command, docs... | seam_runtime/tokenization.py,tools/tokenization.py,seam_runtime/mirl.py,tools... |
 | 2026-05-20T04:47:38Z | history:217:7eab9308 | session-event | done | benchmark, audit, verify, command, docs, status, history,... | seam_runtime/benchmark_integrity.py,seam_runtime/benchmark_baseline_policy.py... |
+| 2026-05-20T12:00:00Z | history:218:ac99657e | session-event | done | roadmap, benchmark, plan, docs, status | docs/roadmap/COMPETITIVE_ROADMAP.md,ROADMAP.md,PROJECT_STATUS.md |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0072.cross.md | 2026-04-15T00:00:00Z..2026-04-20T21:40:28Z | 72 | (multi) | (multi) |
+| 0001-0073.cross.md | 2026-04-15T00:00:00Z..2026-04-20T21:48:15Z | 73 | (multi) | (multi) |

@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-20 (HISTORY#217 — Track K BIL Phase 1 repair audit)
+Last updated: 2026-05-20 (HISTORY#218 — Track M competitive roadmap ingested)
 
 ## Current State
 
@@ -29,7 +29,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#217` — Codex audited and repaired DeepSeek's follow-up BIL/baseline changes. BIL hashes now use a stable projection that excludes volatile timing fields, stub-judge BIL sealing fails cleanly unless `--allow-stub-seal` is explicit, benchmark gate auto-baseline excludes the candidate path, holdout baseline filtering uses path parts rather than string prefixes, and the unused timing helper/test were removed. The repair handoff SOP is `docs/SOP_TRACK_K_BIL_PHASE1_REPAIR_HANDOFF.md`. `HISTORY#216` is Stage 1 tokenizer unification. `HISTORY#215` is the initial BIL Phase 1 implementation closeout; `HISTORY#214` is its SOP/prompt. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and broader CI baseline-source policy remain deferred.
+- Latest continuity handoff is `HISTORY#218` — Track M competitive roadmap added to ROADMAP.md and docs/roadmap/COMPETITIVE_ROADMAP.md. See HISTORY#217 for the preceding BIL/baseline repair audit. BIL hashes now use a stable projection that excludes volatile timing fields, stub-judge BIL sealing fails cleanly unless `--allow-stub-seal` is explicit, benchmark gate auto-baseline excludes the candidate path, holdout baseline filtering uses path parts rather than string prefixes, and the unused timing helper/test were removed. The repair handoff SOP is `docs/SOP_TRACK_K_BIL_PHASE1_REPAIR_HANDOFF.md`. `HISTORY#216` is Stage 1 tokenizer unification. `HISTORY#215` is the initial BIL Phase 1 implementation closeout; `HISTORY#214` is its SOP/prompt. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and broader CI baseline-source policy remain deferred.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
@@ -70,6 +70,7 @@ SEAM is operating as a local machine-first memory runtime with:
 - Make the full functional visual-memory loop shippable: documents compile into directly readable MIRL/RC, MIRL/RC packs into SEAM-HS/1 PNG surfaces, stored surfaces remain addressable by metadata/hash, query/context can read the embedded payload directly from the image surface without restoring the original document, and the surface benchmark gates stored lookup plus repair at 100%
 - Keep this private GitHub repo as the source-of-truth home for runtime files while leaving generated/operator user surfaces out of git unless deliberately promoted as fixtures or docs assets; future user-file sets belong in a separate repo
 - Keep roadmap execution tied to history entries and supersedes chains
+- Track M (Competitive Position & Market Entry) defines the priority chain for market entry: P0 = run LoCoMo/LongMemEval/BEAM-1M on standard harness (blocks everything); P1 = engineering gaps from P0; P2 = product surface; P3 = differentiation; P4 = revenue. See docs/roadmap/COMPETITIVE_ROADMAP.md.
 - Turn the competitive plan into shippable surfaces: finish README/install polish, graph/vector/mix retrieval hardening, agent bridge docs, and benchmark coverage without breaking existing CLI aliases
 - Build the Agent Compiler workstream from `docs/roadmap/AGENT_COMPILER.md`: compile canonical SEAM protocol into model-specific adapters, benchmark those adapters, and audit installed local skills before applying changes.
 - Continue hardening `experimental/webui/` as the SEAM browser dashboard/REST API GUI: preserve the original IDE-like shell first, then port real endpoint coverage into that shell without regressing graphs, settings, terminal, or chat.

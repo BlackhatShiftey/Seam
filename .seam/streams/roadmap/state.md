@@ -9,7 +9,7 @@ Regenerate: `python -m tools.streams.roadmap_parser --emit-state`.
 - `roadmap:track:A-Web` — since 2026-05-10 via history:163 — topics: dashboard, webui, command
 - `roadmap:track:E1` — since 2026-04-30 via history:121 — topics: pgvector, vector, docker
 
-## planned (33)
+## planned (42)
 
 - `roadmap:track:A2` — since 2026-04-18 via none — topics: benchmark, dashboard, animation
 - `roadmap:track:A3` — since 2026-04-18 via none — topics: benchmark, dashboard, graph
@@ -44,6 +44,15 @@ Regenerate: `python -m tools.streams.roadmap_parser --emit-state`.
 - `roadmap:track:K17` — since 2026-05-18 via history:196 — topics: integrity, audit, snapshot
 - `roadmap:track:K18` — since 2026-05-18 via history:196 — topics: retrieval, rank, audit
 - `roadmap:track:L` — since 2026-05-15 via history:180 — topics: agent, compiler, skills
+- `roadmap:track:M` — since 2026-05-20 via history:218 — topics: benchmark, roadmap, plan, docs
+- `roadmap:track:M:P0.1` — since 2026-05-20 via history:218 — topics: benchmark, retrieval, command
+- `roadmap:track:M:P0.2` — since 2026-05-20 via history:218 — topics: benchmark, retrieval
+- `roadmap:track:M:P0.3` — since 2026-05-20 via history:218 — topics: benchmark, retrieval, verify
+- `roadmap:track:M:P0.4` — since 2026-05-20 via history:218 — topics: benchmark, retrieval, vector
+- `roadmap:track:M:P1` — since 2026-05-20 via history:218 — topics: benchmark, retrieval, rank
+- `roadmap:track:M:P2` — since 2026-05-20 via history:218 — topics: command, mcp, installer
+- `roadmap:track:M:P3` — since 2026-05-20 via history:218 — topics: benchmark, compress, retrieval
+- `roadmap:track:M:P4` — since 2026-05-20 via history:218 — topics: docs, audit, ledger
 
 ## later (3)
 

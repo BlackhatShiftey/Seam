@@ -1490,6 +1490,140 @@ phase: 4
 
 ---
 
+## Track M — Competitive Position & Market Entry
+
+<!-- seam:item
+id: roadmap:track:M
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: none
+topics: benchmark, roadmap, plan, docs
+priority: 0
+phase: 0
+-->
+
+**Status:** Planned strategic track.
+**Canonical spec:** `docs/roadmap/COMPETITIVE_ROADMAP.md`.
+
+Standard benchmark runs (LoCoMo, LongMemEval, BEAM) and the market-entry work they unblock. Internal benchmarks validate engineering correctness; standard benchmarks validate competitive position. Nothing ships to users until P0 is validated. Track I built the infrastructure; Track M runs the real datasets and publishes the numbers.
+
+---
+
+<!-- seam:item
+id: roadmap:track:M:P0.1
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: none
+topics: benchmark, retrieval, command
+priority: 0
+phase: 1
+-->
+
+**M:P0.1 — Wire SEAM into mem0's open-source benchmark harness.** Clone `github.com/mem0ai/memory-benchmarks` and implement a SEAM adapter exposing `add()` and `search()` through the interface the harness expects. Prerequisite check: can `seam.recall(query)` return ranked results with scores; can `seam.remember(messages)` ingest multi-turn LoCoMo dialogue; is SQLite retrieval stable at ~50 long conversations; is there a clean Python API entry point. Without a LoCoMo score on the standard harness, SEAM cannot enter the competitive conversation credibly. Attach SEAM provenance trace to every benchmark answer — raw input → MIRL record → retrieval path → answer derivation — as a differentiator regardless of score.
+
+<!-- seam:item
+id: roadmap:track:M:P0.2
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P0.1
+topics: benchmark, retrieval
+priority: 0
+phase: 1
+-->
+
+**M:P0.2 — Run LoCoMo.** 1,540 questions, 50 long-term chat histories, 4 categories (single-hop, multi-hop, open-domain, temporal). LLM-as-a-Judge scoring matched to mem0's methodology. Publish per-category breakdown; never aggregate without showing components. Temporal and multi-hop categories are the primary signal; abstention (open-domain) false positives are worse than low recall.
+
+<!-- seam:item
+id: roadmap:track:M:P0.3
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P0.1
+topics: benchmark, retrieval, verify
+priority: 0
+phase: 1
+-->
+
+**M:P0.3 — Run LongMemEval.** 500 questions, 5 categories, multi-session with knowledge updates. Tests what LoCoMo does not: update/supersession ("I moved to Berlin" must suppress "I live in Tokyo") and abstention calibration. If SEAM lacks an update/supersession mechanism this benchmark exposes it immediately — which is the point.
+
+<!-- seam:item
+id: roadmap:track:M:P0.4
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P0.1
+topics: benchmark, retrieval, vector
+priority: 0
+phase: 2
+-->
+
+**M:P0.4 — Run BEAM (1M track).** 100 conversations up to 10M tokens, 2,000 probing questions, 10 capability categories. Mem0 scores 64.1 — well below their LoCoMo numbers. An architecture with offline consolidation (`seam sleep`) should perform better at scale. Run 1M first; BEAM-10M is aspirational. Run BEAM-1M before and after any consolidation pass to measure the delta.
+
+---
+
+<!-- seam:item
+id: roadmap:track:M:P1
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P0.2
+topics: benchmark, retrieval, rank
+priority: 1
+phase: 2
+-->
+
+**M:P1 — Engineering gaps exposed by benchmarks.** Sequence fixes as benchmarks reveal them; do not pre-optimize. Four likely gaps: (1) temporal retrieval ranking — weight recency/ordering in the ranking function, not just semantic similarity; MIRL timestamps are already there, the question is whether ranking uses them. (2) Knowledge update/supersession — newer assertions suppress older ones at retrieval time without deleting the old record (provenance preserved). (3) Multi-hop retrieval — iterative query or broader context retrieval when single-query is insufficient. (4) Abstention calibration — confidence threshold so retrieval returns "unknown" rather than the best-available guess when no memory clears the bar.
+
+---
+
+<!-- seam:item
+id: roadmap:track:M:P2
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P1
+topics: command, mcp, installer
+priority: 2
+phase: 3
+-->
+
+**M:P2 — Ship the product surface.** Only after P0 numbers exist and P1 gaps are addressed. Five items: (1) `pip install seam-memory` three-line quickstart (SQLite default, zero external deps); (2) `seam serve` MCP on stdio or HTTP, registered on the MCP registry; (3) `seam trace <memory_id>` provenance lineage command — demoable in 30 seconds; (4) `seam import --from mem0` reading mem0 JSON exports into MIRL with explicit provenance gap flagging; (5) `seam import --from memory-md` ingesting MEMORY.md / USER.md files into MIRL records (largest migration surface by user count).
+
+---
+
+<!-- seam:item
+id: roadmap:track:M:P3
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P2
+topics: benchmark, compress, retrieval
+priority: 3
+phase: 4
+-->
+
+**M:P3 — Differentiation features.** Three items: (1) `seam sleep` offline consolidation engine — promotes episodic MIRL records to semantic, extracts procedural graph patterns, resolves contradictions, compacts the retrieval index; run BEAM-1M before/after and publish the delta; (2) Framework integrations — LangGraph (highest leverage), OpenClaw (direct competitive comparison), one TypeScript framework (Mastra or Vercel AI SDK); (3) Token efficiency benchmarking — measure tokens-per-retrieval on the same datasets as mem0 (~6,900 baseline), publish if MIRL compression wins.
+
+---
+
+<!-- seam:item
+id: roadmap:track:M:P4
+status: planned
+status-since: 2026-05-20
+status-by: history:218
+supersedes: roadmap:track:M:P3
+topics: docs, audit, ledger
+priority: 4
+phase: 5
+-->
+
+**M:P4 — Revenue surface.** Three items: (1) Enterprise provenance for regulated industries — SEAM's provenance chain is a compliance feature for HIPAA/SOC2/GDPR agent deployments; (2) Paid support tier over an open-source core — priority support, custom MIRL type definitions, deployment consulting, consolidation engine SLA; (3) Hosted consolidation service — `seam sleep --cloud` sends anonymized MIRL records to a consolidation endpoint and returns refined records while data stays local in SQLite.
+
+---
+
 ## Recommended Course — Priority Order
 
 Use this section for current priority. Older planned entries `HISTORY#028`-
@@ -1530,6 +1664,16 @@ Next plug-and-play target - external memory benchmark credibility
 - I3: First three required adapters (LoCoMo, ConvoMem, MemBench)
 - I4: First three required comparators (Mem0, Zep/Graphiti, Letta/MemGPT)
 
+Competitive position — P0 blocks market entry (see docs/roadmap/COMPETITIVE_ROADMAP.md)
+- M:P0.1: Wire SEAM adapter into mem0's open-source harness (prerequisite check first)
+- M:P0.2: Run full LoCoMo — 1,540 questions, 4 categories, LLM-as-a-Judge
+- M:P0.3: Run LongMemEval — 500 questions, knowledge updates, abstention
+- M:P0.4: Run BEAM 1M — 100 conversations, 2,000 probing questions, scale test
+- M:P1: Address engineering gaps exposed by P0 runs (temporal ranking, supersession, multi-hop, abstention)
+- M:P2: Ship product surface after P0+P1 (pip install, MCP registry, seam trace, import adapters)
+- M:P3: Differentiation — seam sleep consolidation, framework integrations, token efficiency
+- M:P4: Revenue surface — enterprise provenance, paid tier, hosted consolidation
+
 Later - benchmark credibility, scale, and adaptive context loop
 - H2: Improvement streams (deferred ~4 weeks of H1 operational data; see CONTEXT_STREAMS.md §12)
 - H3: Retrieval integration with stream filters (after H1 substrate stable)
@@ -1544,6 +1688,7 @@ Later - benchmark credibility, scale, and adaptive context loop
 - E2: Multi-tenant namespacing
 
 Major workstreams scheduled after the plug-and-play target lands
+- Track M: Competitive position — standard benchmarks → engineering gaps → product surface → differentiation → revenue (see docs/roadmap/COMPETITIVE_ROADMAP.md)
 - Track L: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
 - Track J: Prompt codec optimization (TOON / SEAM-RC / SEAM-LX evaluation)
 - Track K: Trust, security, lineage, auditability (capabilities, audit ledger, BIL benchmark bundles)

@@ -4541,3 +4541,21 @@ Repairs: seam_runtime/benchmark_integrity.py now hashes a stable result projecti
 
 Verification performed with .venv/bin/python: focused BIL/baseline/stub/reproducibility tests passed 24; full active pytest scope test_seam_all/ tools/history/ tools/streams/ tests/ passed 429 tests, skipped 3, and passed 3 subtests; py_compile seam.py passed; compileall seam_runtime benchmarks tools scripts installers passed; git diff --check passed. Benchmark smoke ran LoCoMo quickstart with stub judge, confirmed seal without --allow-stub-seal exits non-zero without traceback, then sealed with --allow-stub-seal as BIL-2 and verified/inspected PASS with 4/4 checks. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, broader CI baseline-source policy, and real latency stabilization remain deferred.
 ---END-ENTRY-#217---
+
+---BEGIN-ENTRY-#218---
+id: 218
+date: 2026-05-20T12:00:00Z
+agent: claude-sonnet-4-6
+status: done
+topics: roadmap, benchmark, plan, docs, status
+commits: none
+refs: docs/roadmap/COMPETITIVE_ROADMAP.md,ROADMAP.md,PROJECT_STATUS.md
+supersedes: 217
+tokens: 312
+---
+Added Track M — Competitive Position & Market Entry — to ROADMAP.md and created docs/roadmap/COMPETITIVE_ROADMAP.md with the full competitive roadmap ingested from the operator's strategic planning document.
+
+Track M encodes the P0-P4 priority chain: P0 is standard benchmark integration (LoCoMo, LongMemEval, BEAM-1M) and blocks everything else; P1 is engineering gaps exposed by those runs; P2 is the product surface (pip install, MCP registry, seam trace, import adapters); P3 is differentiation features (seam sleep consolidation, framework integrations, token efficiency benchmarking); P4 is the revenue surface (enterprise provenance, paid tier, hosted consolidation). Nine seam:item markers added for M, M:P0.1, M:P0.2, M:P0.3, M:P0.4, M:P1, M:P2, M:P3, M:P4. Recommended Course updated to place M:P0-P4 items explicitly in the current priority sequence. Track M consumes Track I infrastructure; its P0 runs are the next step after the plug-and-play target lands.
+
+Verification: roadmap parser to be run next to refresh roadmap/state.md; verify_continuity and verify_streams to follow. No runtime code changed; doc-only update. No private credentials or session links introduced.
+---END-ENTRY-#218---
