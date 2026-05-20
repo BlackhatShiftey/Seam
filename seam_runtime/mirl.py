@@ -340,7 +340,8 @@ class Artifact:
 
 
 def token_count(text: str) -> int:
-    return len([token for token in text.replace("\n", " ").split(" ") if token])
+    from .tokenization import count_tokens
+    return count_tokens(text)
 
 
 def cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float:

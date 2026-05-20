@@ -216,9 +216,8 @@ def format_entry(
 
 
 def estimate_tokens(text: str) -> int:
-    """Rough token estimate: word count × 1.3."""
-    words = len(text.split())
-    return int(words * 1.3)
+    from tools.tokenization import count_tokens
+    return count_tokens(text)
 
 
 def compute_entry_hash(raw: bytes) -> str:

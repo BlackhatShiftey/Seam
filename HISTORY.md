@@ -4499,3 +4499,27 @@ PROJECT_STATUS.md now reflects BIL Phase 1 as implemented. BIL-3 signing identit
 
 Verification performed with .venv/bin/python: focused BIL tests passed 11; full active pytest scope test_seam_all/ tools/history/ tools/streams/ tests/ passed 416 tests, skipped 3, and passed 3 subtests; py_compile seam.py passed; compileall seam_runtime benchmarks tools scripts installers passed; git diff --check passed. Benchmark smoke ran seam bench external --quickstart locomo --adapter seam --judge stub, sealed the result as BIL-2, verified PASS, and inspected PASS.
 ---END-ENTRY-#215---
+
+---BEGIN-ENTRY-#216---
+id: 216
+date: 2026-05-20T03:12:17Z
+agent: claude-opus-4-7
+status: done
+topics: benchmark, audit, verify, history, streams, command, docs, tokenizer
+commits: none
+refs: seam_runtime/tokenization.py,tools/tokenization.py,seam_runtime/mirl.py,tools/history/history_lib.py,tools/streams/streams_lib.py,tools/streams/bloat_report.py,tools/history/test_history_tools.py,REPO_LEDGER.md,PROJECT_STATUS.md
+supersedes: 215
+tokens: 637
+---
+Stage 1 tokenizer unification. Switched four word-count heuristics — seam_runtime/mirl.py:token_count, tools/history/history_lib.py:estimate_tokens, tools/streams/streams_lib.py:estimate_tokens, tools/streams/bloat_report.py:tokens — to the canonical cl100k_base tokenizer via two thin sibling helpers (seam_runtime/tokenization.py and tools/tokenization.py). tiktoken is already a hard runtime dep (pyproject.toml:19) and seam_runtime/lossless.py already used the real tokenizer for its compression paths; this closes the heuristic gaps so pack budgeting (seam_runtime/pack.py:_records_token_cost via mirl.token_count), history entry token fields, streams entry token fields, build_context_pack --token-budget enforcement, and bloat reporting all use the same authoritative count.
+
+Motivation: REPO_LEDGER Benchmark Publication Policy requires reporting tokenizer/dependency state in published claims; the four heuristic call sites silently violated that contract for every pack/history/streams number. The previous word*1.3 fallback understated JSON/code by 2.5x and code-with-no-spaces by an order of magnitude (e.g. a 100-char run of repeated bytes counted as 1 token instead of 13).
+
+Architecture: two sibling helpers instead of one shared module so tools/ verify gates do not trigger seam_runtime/__init__.py's heavy import chain (which pulls runtime.py, benchmarks.py, embeddings, storage). Both helpers wrap tiktoken cl100k_base with an lru_cached encoder loader and a math.ceil(bytes/4) fallback if tiktoken is unavailable; the canonical and fallback labels are exposed via count_tokens_with_label for callers that need to report estimator identity.
+
+Bloat numbers re-measured under cl100k_base and updated in REPO_LEDGER line 112: roadmap status read 93.5 percent to 88.4 percent, history map read 90.5 percent to 89.5 percent, cross-stream recent read 91.0 percent to 88.6 percent. Reductions remain strong; the previously documented numbers were derived from word*1.3 and overstated savings. Existing HISTORY.md per-entry tokens: fields are unchanged because they are frozen at entry-write time per the append-only temporal chain rule; new entries from this commit forward use tiktoken.
+
+Deferred to Stage 2 (follow-up DeepSeek SOP): the naive _tokens split in seam_runtime/retrieval.py is unchanged here (it produces lexical tokens for scoring, not counts); BIL-2 input manifest extension with tokenizer/git_sha/dep versions; long-context flag tokenizer rework in benchmarks.py. These all depend on Stage 1 landing and are safely parallelizable after.
+
+Verification: .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q passed 416 tests, skipped 3, subtests 3. py_compile across seam_runtime and tools passed with 0 errors. All four SEAM verify gates green (integrity, continuity, routing, streams). bloat_report regenerated cleanly with the new numbers.
+---END-ENTRY-#216---

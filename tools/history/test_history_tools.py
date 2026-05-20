@@ -142,7 +142,7 @@ class TestFormatAndParse(unittest.TestCase):
         self.assertEqual(len(entries[0].hash), 64)
 
     def test_estimate_tokens(self):
-        self.assertEqual(estimate_tokens("one two three four five"), 6)
+        self.assertEqual(estimate_tokens("one two three four five"), 5)
 
     def test_next_entry_id(self):
         self.assertEqual(next_entry_id([]), 1)

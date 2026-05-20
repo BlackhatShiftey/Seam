@@ -13,7 +13,8 @@ from tools.streams.streams_lib import REPO_ROOT, STREAMS_ROOT, CROSS_INDEX_PATH
 
 
 def tokens(text: str) -> int:
-    return int(len(text.split()) * 1.3)
+    from tools.tokenization import count_tokens
+    return count_tokens(text)
 
 
 def measure(label: str, path: Path) -> dict[str, object]:

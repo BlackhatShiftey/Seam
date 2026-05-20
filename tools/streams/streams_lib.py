@@ -202,7 +202,8 @@ def format_event(
 
 
 def estimate_tokens(text: str) -> int:
-    return int(len(text.split()) * 1.3)
+    from tools.tokenization import count_tokens
+    return count_tokens(text)
 
 
 def next_event_id(events: list[StreamEvent]) -> int:

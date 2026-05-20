@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 270
+total_events: 271
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-20T21:34:16Z | history:058:e2494df1 | session-event | done | dashboard, textual, command, tui, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-20T21:40:28Z | history:059:4fb5512c | session-event | done | dashboard, textual, command, tui, history, snapshot | test_seam.py |
 | 2026-04-20T21:48:15Z | history:060:4ea6cae9 | session-event | done | dashboard, textual, chat, command, tui, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-21T00:00:00Z | roadmap:014:25894f3e | status-change | bootstrap | dashboard, tui, textual | ROADMAP.md:136 |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-19T18:54:10Z | history:213:2850402b | session-event | done | audit, verify, mcp, persist, protocol, history | seam_runtime/mcp.py,tests/audit/test_context_pack_persist_policy.py,PROJECT_S... |
 | 2026-05-20T00:37:49Z | history:214:152513ad | session-event | done | benchmark, audit, verify, docs, plan, security, history | docs/SOP_TRACK_K_BIL_PHASE1_DEEPSEEK.md,docs/prompts/DEEPSEEK_TRACK_K_BIL_PHA... |
 | 2026-05-20T02:15:17Z | history:215:9560b39d | session-event | done | benchmark, audit, verify, command, docs, status, history,... | seam_runtime/benchmark_integrity.py,seam_runtime/cli.py,test_seam_all/test_be... |
+| 2026-05-20T03:12:17Z | history:216:45c3fc22 | session-event | done | benchmark, audit, verify, history, streams, command, docs... | seam_runtime/tokenization.py,tools/tokenization.py,seam_runtime/mirl.py,tools... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0070.cross.md | 2026-04-15T00:00:00Z..2026-04-20T21:29:02Z | 70 | (multi) | (multi) |
+| 0001-0071.cross.md | 2026-04-15T00:00:00Z..2026-04-20T21:34:16Z | 71 | (multi) | (multi) |

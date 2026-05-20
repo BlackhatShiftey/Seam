@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 215
-total_tokens: ~46919
-latest_id: 215
+total_entries: 216
+total_tokens: ~47556
+latest_id: 216
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 216 | 2026-05-20 | done | 45c3fc22d472b915 | benchmark,audit,verify,history,+ | 215 |
 | 215 | 2026-05-20 | done | 9560b39d5e73ec59 | benchmark,audit,verify,command,+ | 214 |
 | 214 | 2026-05-20 | done | 152513add789f409 | benchmark,audit,verify,docs,+ | 213 |
 | 213 | 2026-05-19 | done | 2850402bf002767a | audit,verify,mcp,persist,+ | 212 |
@@ -232,15 +233,15 @@ compact: true
 - alias: count=2 latest=#033, #002
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
-- audit: count=48 latest=#215, #214, #213, #212, #211
-- benchmark: count=56 latest=#215, #214, #212, #211, #206
+- audit: count=49 latest=#216, #215, #214, #213, #212
+- benchmark: count=57 latest=#216, #215, #214, #212, #211
 - bundle: count=2 latest=#015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
 - ci: count=2 latest=#211, #191
 - classification: count=11 latest=#177, #176, #171, #170, #169
 - codec: count=13 latest=#132, #131, #130, #129, #128
-- command: count=60 latest=#215, #190, #189, #188, #185
+- command: count=61 latest=#216, #215, #190, #189, #188
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
@@ -248,7 +249,7 @@ compact: true
 - dashboard: count=63 latest=#204, #203, #197, #163, #162
 - diff: count=4 latest=#153, #093, #092, #037
 - docker: count=3 latest=#149, #085, #084
-- docs: count=12 latest=#215, #214, #208, #205, #203
+- docs: count=13 latest=#216, #215, #214, #208, #205
 - doctor: count=8 latest=#170, #169, #140, #139, #138
 - extras: count=1 latest=#022
 - fixture: count=5 latest=#187, #145, #092, #039, #008
@@ -256,7 +257,7 @@ compact: true
 - graph: count=2 latest=#099, #030
 - handoff: count=7 latest=#190, #186, #176, #136, #135
 - harden: count=1 latest=#182
-- history: count=148 latest=#215, #214, #213, #212, #207
+- history: count=149 latest=#216, #215, #214, #213, #212
 - holdout: count=4 latest=#152, #093, #092, #036
 - installer: count=13 latest=#204, #177, #173, #169, #100
 - integrity: count=6 latest=#209, #133, #103, #102, #101
@@ -294,19 +295,20 @@ compact: true
 - snapshot: count=105 latest=#166, #164, #156, #155, #150
 - status: count=80 latest=#215, #207, #203, #198, #184
 - storage: count=1 latest=#182
-- streams: count=6 latest=#210, #209, #202, #201, #200
+- streams: count=7 latest=#216, #210, #209, #202, #201
 - surface: count=2 latest=#208, #145
 - test: count=1 latest=#202
 - tests: count=3 latest=#192, #191, #182
 - textual: count=17 latest=#108, #106, #063, #062, #061
+- tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=21 latest=#199, #182, #181, #099, #066
-- verify: count=149 latest=#215, #214, #213, #212, #211
+- verify: count=150 latest=#216, #215, #214, #213, #212
 - windows: count=12 latest=#125, #123, #091, #084, #083
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 195
+- done: 196
 - planned: 20

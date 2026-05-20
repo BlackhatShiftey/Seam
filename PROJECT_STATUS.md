@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-20 (HISTORY#215 — Track K BIL Phase 1 implemented)
+Last updated: 2026-05-20 (HISTORY#216 — tokenizer unification, pack/history/streams now use cl100k_base)
 
 ## Current State
 
@@ -29,7 +29,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#215` — DeepSeek implemented Track K BIL Phase 1 and Codex reviewed it, adding a BIL-2 manifest/result consistency regression before closeout. `seam_runtime/benchmark_integrity.py` now supports raw BIL-0 inspection plus BIL-1/BIL-2 deterministic sealing and verification, and `seam bench seal|verify|inspect` exposes the workflow. BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and CI baseline-source policy remain deferred. `HISTORY#214` is the SOP/prompt that scoped the work; `HISTORY#213` is the MCP `seam_context` read-only contract correction after the Codex audit; `HISTORY#212` is the Codex audit of the DeepSeek CI bench-gate prep.
+- Latest continuity handoff is `HISTORY#216` — Stage 1 tokenizer unification. `seam_runtime/mirl.py:token_count`, `tools/history/history_lib.py:estimate_tokens`, `tools/streams/streams_lib.py:estimate_tokens`, and `tools/streams/bloat_report.py:tokens` now delegate to two thin sibling helpers (`seam_runtime/tokenization.py`, `tools/tokenization.py`) that wrap tiktoken cl100k_base. `seam_runtime/lossless.py` already used the real tokenizer for compression; this closes the remaining heuristic gaps for pack budgeting, history/streams entry token fields, and bloat reporting. REPO_LEDGER H1 bloat numbers re-measured under cl100k_base. Stage 2 (retrieval._tokens alignment, BIL-2 manifest extension with tokenizer/git_sha/dep versions, long-context flag tokenizer) is deferred to a follow-up DeepSeek SOP. `HISTORY#215` is the Codex closeout of Track K BIL Phase 1 (seal/verify/inspect for BIL-0/1/2); `HISTORY#214` is its SOP/prompt; BIL-3 signing, BIL-4 audit-chain linkage, BIL-5 transparency logs, BIL-6 independent reruns, and CI baseline-source policy remain deferred.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
