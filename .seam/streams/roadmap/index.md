@@ -4,6 +4,7 @@ total_events: 55
 latest_id: 55
 source: streams/roadmap/log.md
 schema: seam-stream-index/v1
+content_hash: 5ad20fb35fa8da4a3aa4de1668ca33cbed7a722ef9728a70c75cdfeb35b34e4e
 
 ## entries (newest first)
 
