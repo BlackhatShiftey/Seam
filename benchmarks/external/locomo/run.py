@@ -22,15 +22,18 @@ from pathlib import Path
 
 from benchmarks.external.common.dataset import load_locomo_cases, load_quickstart_cases
 from benchmarks.external.common.judge import build_judge
-from benchmarks.external.common.runner import run_benchmark
+from benchmarks.external.common.runner import (
+    run_benchmark_grouped,
+    run_benchmark_grouped_parallel,
+)
 
 
-def build_adapter(name: str):
+def build_adapter(name: str, answerer: str | None = None, answerer_model: str | None = None):
     """Lazy-import factory so SEAM-only runs don't require Mem0/Zep installed."""
     if name == "seam":
         from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
 
-        return SeamLocomoAdapter()
+        return SeamLocomoAdapter(answerer=answerer, answerer_model=answerer_model)
     if name == "mem0":
         from benchmarks.external.locomo.adapters.mem0 import Mem0LocomoAdapter
 
@@ -98,6 +101,10 @@ def _validate_locomo_categories(cases) -> list[str]:
     return issues
 
 
+def _locomo_scope_id(case) -> str:
+    return case.case_id.split("::", 1)[0]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LoCoMo benchmark runner for SEAM")
     parser.add_argument(
@@ -151,6 +158,23 @@ def main() -> None:
         action="store_true",
         help="Validate dataset and print counts without executing the benchmark",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of independent case workers for full runs",
+    )
+    parser.add_argument(
+        "--answerer",
+        choices=["none", "openai", "claude"],
+        default="none",
+        help="Generate a short answer from retrieved context (default: none)",
+    )
+    parser.add_argument(
+        "--answerer-model",
+        default=None,
+        help="Override the default answerer model id",
+    )
     args = parser.parse_args()
 
     dataset_path = args.dataset_path or args.dataset
@@ -184,19 +208,32 @@ def main() -> None:
         print(json.dumps(report, indent=2))
         raise SystemExit(0 if report["valid"] else 1)
 
-    # Build adapter
-    adapter = build_adapter(args.adapter)
-
-    # Build judge
-    judge = build_judge(args.judge, model=args.judge_model)
+    answerer = None if args.answerer == "none" else args.answerer
 
     # Run benchmark
-    report = run_benchmark(
-        adapter=adapter,
-        cases=cases,
-        dataset_source=source,
-        judge=judge,
-    )
+    if args.workers > 1:
+        report = run_benchmark_grouped_parallel(
+            adapter_factory=lambda: build_adapter(args.adapter, answerer=answerer, answerer_model=args.answerer_model),
+            adapter_name=args.adapter,
+            cases=cases,
+            scope_id=_locomo_scope_id,
+            dataset_source=source,
+            judge_factory=(
+                lambda: build_judge(args.judge, model=args.judge_model)
+                if args.judge is not None else None
+            ),
+            workers=args.workers,
+        )
+    else:
+        adapter = build_adapter(args.adapter, answerer=answerer, answerer_model=args.answerer_model)
+        judge = build_judge(args.judge, model=args.judge_model)
+        report = run_benchmark_grouped(
+            adapter=adapter,
+            cases=cases,
+            scope_id=_locomo_scope_id,
+            dataset_source=source,
+            judge=judge,
+        )
 
     # Output
     report_json = json.dumps(report, indent=2, default=str)

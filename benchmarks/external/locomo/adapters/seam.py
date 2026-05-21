@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import time as _time
 from pathlib import Path
 
 from benchmarks.external.common.types import AdapterAnswer, ConversationTurn
@@ -25,11 +27,15 @@ class SeamLocomoAdapter:
         db_path: str | None = None,
         budget: int = 2000,
         include_evidence_closure: bool = True,
+        answerer: str | None = None,
+        answerer_model: str | None = None,
     ) -> None:
         # TODO: default db_path should be tmp_path, not a gitignored project dir
         self._db_root = Path(db_path) if db_path is not None else Path("test_seam/locomo")
         self.budget = budget
         self.include_evidence_closure = include_evidence_closure
+        self._answerer = answerer
+        self._answerer_model = answerer_model
 
     # ------------------------------------------------------------------
     # Protocol methods
@@ -64,8 +70,6 @@ class SeamLocomoAdapter:
         natural-language evidence into symbolic records, so this adapter follows
         evidence/provenance and SPAN-to-RAW links before returning source text.
         """
-        import time as _time
-
         from seam_runtime.runtime import SeamRuntime  # lazy
 
         rt = _open_runtime(self._db_path(scope_id))
@@ -87,10 +91,32 @@ class SeamLocomoAdapter:
             pack_dict = pack.to_dict() if hasattr(pack, "to_dict") else {}
             retrieved_context = json.dumps(pack_dict, sort_keys=True, indent=2)
 
+        generated = None
+        answer_latency_ms = None
+        if self._answerer:
+            t1 = _time.monotonic()
+            generated = self._generate_answer(question, retrieved_context)
+            answer_latency_ms = (_time.monotonic() - t1) * 1000.0
+
         return AdapterAnswer(
             retrieved_context=retrieved_context,
+            generated_answer=generated,
             retrieval_latency_ms=retrieval_latency_ms,
+            answer_latency_ms=answer_latency_ms,
         )
+
+    def _generate_answer(self, question: str, context: str) -> str:
+        prompt = (
+            "Answer the question using ONLY the context. "
+            "If the answer is not in the context, say 'unknown'. "
+            "Reply with the shortest possible answer, no preamble.\n\n"
+            f"Context:\n{context}\n\nQuestion: {question}\nAnswer:"
+        )
+        if self._answerer == "openai":
+            return _openai_short_answer(self._answerer_model or "gpt-4o-mini", prompt)
+        if self._answerer == "claude":
+            return _claude_short_answer(self._answerer_model or "claude-haiku-4-5-20251001", prompt)
+        raise ValueError(f"unknown answerer {self._answerer!r}")
 
     def _build_evidence_context(self, rt, result) -> str:
         """Build a bounded text context from candidate evidence closure."""
@@ -174,3 +200,53 @@ def _trim_context(text: str, budget: int) -> str:
     if budget <= 0 or len(text) <= budget:
         return text
     return text[:budget]
+
+
+def _uses_completion_token_budget(model: str) -> bool:
+    model_id = model.lower()
+    return model_id.startswith(("gpt-5", "o1", "o3", "o4"))
+
+
+def _openai_short_answer(model: str, prompt: str, max_tokens: int = 64) -> str:
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise RuntimeError(
+            "openai answerer requires the openai package. "
+            "Install with: pip install openai"
+        ) from exc
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("openai answerer requires OPENAI_API_KEY in the environment")
+    client = OpenAI(api_key=api_key)
+    request: dict = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0,
+    }
+    if _uses_completion_token_budget(model):
+        request["max_completion_tokens"] = max_tokens
+    else:
+        request["max_tokens"] = max_tokens
+    response = client.chat.completions.create(**request)
+    return (response.choices[0].message.content or "").strip()
+
+
+def _claude_short_answer(model: str, prompt: str, max_tokens: int = 64) -> str:
+    try:
+        from anthropic import Anthropic
+    except ImportError as exc:
+        raise RuntimeError(
+            "claude answerer requires the anthropic package. "
+            "Install with: pip install anthropic"
+        ) from exc
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("claude answerer requires ANTHROPIC_API_KEY in the environment")
+    client = Anthropic(api_key=api_key)
+    response = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text.strip()
