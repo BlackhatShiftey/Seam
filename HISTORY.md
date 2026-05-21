@@ -4700,3 +4700,29 @@ Verification: PYTHONPATH=. .venv/bin/pytest on the new and modified test surface
 
 Next step: rebuild HISTORY_INDEX.md, refresh the history stream mirror and cross-index, write a bounded snapshot, run the verify chain, and (operator-authorized) push the branch and merge to main.
 ---END-ENTRY-#223---
+
+---BEGIN-ENTRY-#224---
+id: 224
+date: 2026-05-21T17:07:38Z
+agent: claude
+status: done
+topics: protocol, history, multi-agent, verify, docs, handoff
+commits: f13fc5d
+refs: tools/git/scan_stale_branches.py,tools/git/__init__.py,AGENTS.md
+supersedes: 223
+tokens: 724
+---
+Stale-branch prevention measures landed after the worktree/branch cleanup in HISTORY#223. Three layers, ordered cheapest-to-most-value, none of which enforce hard blocks on day-to-day operations.
+
+Layer 1 (GitHub side, applied via gh api): repo setting delete_branch_on_merge flipped from false to true. From now on, GitHub auto-deletes the head branch of any PR when that PR is merged. This alone would have prevented the historical accumulation of origin/deepseek/production-readiness-remediation, origin/skill-factory-foundation, origin/claude/add-claude-documentation-tVSOm, and origin/claude/update-claude-docs-OdTzR — all branches that lingered for weeks after their PRs merged. No code, no maintenance.
+
+Layer 2 (commit f13fc5d, tools/git/scan_stale_branches.py): on-demand branch classifier that walks every local and remote branch and assigns one of six classes — on-main (0 unique commits vs main, safe to delete), merged-pr (PR state from gh CLI is MERGED or CLOSED, safe to delete), unique-and-stale (unique commits, no open PR, last commit older than the --stale-days threshold, REVIEW before deletion), unique-and-fresh (active work, leave), open-pr (DRAFT or OPEN PR backing it, keep), and protected (in the allowlist for main / handoff/archive / backup/* / roadmap-*, keep by policy). Output is advisory — the scanner never deletes anything. The operator runs it when they want or wires it into seam doctor as an optional check. JSON output is supported with --json for piping into other tools.
+
+Layer 3 (commit f13fc5d, AGENTS.md Session End): explicit protocol nudge that any worktree created during an agent session must be finished (committed, pushed, removed) or abandoned (removed-anyway) before session end. Any working branch must be pushed if the work is real, deleted locally if the work is fully merged. The nudge cites HISTORY#223 as the failure-mode reference (the locked Gemini worktree with dirty state on a 30-commits-stale base) and points operators at the scanner and the new GitHub auto-delete setting so the next agent in the chain has the full picture.
+
+Rejected alternatives: hard pre-commit / pre-push hooks for branch-cleanup checks (false positives on legitimate long-lived branches add noise to every git operation), required branch-naming conventions (too restrictive for a multi-agent repo with differing per-agent norms), and age-based auto-deletion (would have silently dropped audit-fixes-phase2, which contained unique commits that required manual verification before deletion).
+
+Verification: scanner exercised against current branch state and produced clean output — 1 unique-and-fresh (pr-31-track-m), 1 open-pr (origin/claude/remote-control-AD6Di backing PR#31), 3 protected (handoff/archive, backup/local-pgvector-bootstrap, roadmap-trust-security-manual). Bug caught during exercise — origin/HEAD's short name is just "origin" rather than "origin/HEAD", which produced a false on-main entry; fixed inline before commit. Baseline verify chain was clean before the commit; rerun pending after this entry, index rebuild, snapshot, and stream mirror refresh.
+
+Next step: rebuild HISTORY_INDEX.md, refresh the history stream mirror and cross-index, write a bounded snapshot, run the verify chain, and (operator-authorized) push to origin/main.
+---END-ENTRY-#224---

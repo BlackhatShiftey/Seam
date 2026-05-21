@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 278
+total_events: 279
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-25T00:00:00Z | roadmap:016:5bd090a4 | status-change | bootstrap | dashboard, chat, command | ROADMAP.md:395 |
 | 2026-04-25T04:22:49Z | history:064:3c8f79c9 | session-event | done | protocol, multi-agent, mcp, history | seam_runtime/config.toml |
 | 2026-04-25T06:13:35Z | history:065:1917870c | session-event | done | dashboard, windows, command, readme, history, snapshot | README.md,installers/README.md,scripts/windows/launch_dashboard.bat |
 | 2026-04-25T06:55:46Z | history:066:c8d28059 | session-event | done | pgvector, vector, verify, windows, command, history, snap... | docker-compose.yaml,.env,seam_runtime/vector_adapters.py,seam.py |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-21T03:53:02Z | history:221:a202dc65 | session-event | done | benchmark, audit, verify, command, docs, status, history | benchmarks/external/common/dataset.py,tests/audit/test_locomo_full_dataset_ro... |
 | 2026-05-21T13:40:54Z | history:222:978c2fec | session-event | done | audit, verify, mcp, security, test, retrieval, history, p... | experimental/retrieval_orchestrator/adapters.py,tests/audit/test_chroma_sync_... |
 | 2026-05-21T14:37:12Z | history:223:d5a079a6 | session-event | done | benchmark, locomo, longmemeval, beam, retrieval, vector, ... | seam_runtime/vector.py,tests/audit/test_raw_vector_indexable.py,seam_runtime/... |
+| 2026-05-21T17:07:38Z | history:224:1586813e | session-event | done | protocol, history, multi-agent, verify, docs, handoff | tools/git/scan_stale_branches.py,tools/git/__init__.py,AGENTS.md |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0078.cross.md | 2026-04-15T00:00:00Z..2026-04-25T00:00:00Z | 78 | (multi) | (multi) |
+| 0001-0079.cross.md | 2026-04-15T00:00:00Z..2026-04-25T00:00:00Z | 79 | (multi) | (multi) |
