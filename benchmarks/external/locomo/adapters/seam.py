@@ -180,9 +180,25 @@ def _format_turn(turn: ConversationTurn) -> str:
 
 def _open_runtime(db_path: Path):
     """Open (or reopen) a SeamRuntime for a per-scope SQLite database."""
+    from seam_runtime.models import SentenceTransformerModel, embedding_settings_from_env
     from seam_runtime.runtime import SeamRuntime  # lazy
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    settings = embedding_settings_from_env()
+    if settings.provider in {"hash", "local", "deterministic"}:
+        try:
+            model = SentenceTransformerModel(model_name="BAAI/bge-small-en-v1.5")
+        except Exception as exc:
+            raise RuntimeError(
+                "LoCoMo benchmark requires a real embedding model. "
+                "Install with `pip install sentence-transformers`, "
+                "or set SEAM_EMBEDDING_PROVIDER=openai with a valid "
+                "SEAM_EMBEDDING_API_KEY_ENV. "
+                f"Default-model load failed: {exc}"
+            ) from exc
+        return SeamRuntime(str(db_path), embedding_model=model)
+
     return SeamRuntime(str(db_path))
 
 
