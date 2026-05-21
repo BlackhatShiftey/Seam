@@ -4640,3 +4640,31 @@ Setup uncovered a real compatibility bug: `benchmarks/external/common/dataset.py
 
 Verification: focused LoCoMo routing/evidence tests passed 13. Official downloaded LoCoMo dry-run via `seam bench external locomo --dataset-path "$LOCOMO_DATASET_PATH" --dry-run --format json` passed with 1,542 answerable cases, valid=true, fixture hash `85401eeabfbcdb0f18fac328809ef9a828bbc84ae3aed74b9c32f8996d49e2c3`, and no validation issues. Full active suite with Docker `seam-pgvector` env-derived `PGVECTOR_TEST_DSN` and `SEAM_PGVECTOR_DSN` passed 511 tests, 0 skipped, 3 subtests. `git diff --check`, py_compile/compileall, and all four SEAM gates passed.
 ---END-ENTRY-#221---
+
+---BEGIN-ENTRY-#222---
+id: 222
+date: 2026-05-21T13:40:54Z
+agent: claude
+status: done
+topics: audit, verify, mcp, security, test, retrieval, history, protocol
+commits: e6312c4,7ac8a55,a3fbfea,84e4778
+refs: experimental/retrieval_orchestrator/adapters.py,tests/audit/test_chroma_sync_default.py,test_seam_all/test_seam.py,seam_runtime/storage.py,tests/audit/test_ir_edges_fk_migration.py,seam_runtime/mcp_protocol.py,tests/audit/test_mcp_line_cap.py,seam_runtime/mcp.py,tests/audit/test_mcp_artifact_containment.py
+supersedes: 221
+tokens: 823
+---
+Claude reviewed DeepSeek's claimed P3 Fixes 6-9 (architectural hygiene batch) and committed each item individually per the sync-relay protocol. One real defect was caught and patched before commit; the other three landed as-submitted with documented follow-up notes.
+
+Fix 6 (commit e6312c4): ChromaSemanticAdapter.sync_on_search default flipped from True to False so persistent-index sync is opt-in. Matches the P3 Fix 2 "no silent fallback" principle. test_seam.py:1381 updated to pass sync_on_search=True explicitly. Follow-up: experimental/retrieval_orchestrator/orchestrator.py builds the adapter without specifying the flag, so chroma-backend users (CLI --vector-backend chroma, dashboard with chroma, benchmarks RAG path) now get stale indexes until they call sync_persistent_indexes manually; default benchmark backend is "seam" so LoCoMo scoring is unaffected.
+
+Fix 7 (commit 7ac8a55): SQLiteStore._ensure_schema now sweeps ir_edges rows whose src_id or dst_id has the 'clm:' record-ID prefix but no matching ir_records row. Virtual-entity endpoints (ent:turn:*) are preserved. Test verifies orphan removal, legit-edge survival, and virtual-edge survival. Cosmetic note: the accompanying "pragma foreign_keys = on" inside _ensure_schema is a no-op for protection — SQLite pragmas are per-connection and ir_edges has no declared FK; the orphan sweep itself is the load-bearing protection.
+
+Fix 8 (commit a3fbfea): MCP stdio server line cap is now genuinely bounded. Original DeepSeek submission used "for raw_line in stream" which reads each line fully into memory before checking size — a 10 GB no-newline line would OOM the process before rejection. Claude rewrote _read_capped_lines to detect a binary buffer on the stream and use readline(MAX_BYTES + 1) so oversized input is truncated at I/O. Oversized lines are drained in 8 KiB chunks until the next newline. The in-band string sentinel "__SEAM_MCP_OVERSIZED_LINE__" was also replaced with a module-level object() identity sentinel so a legitimate payload containing the literal string cannot be misrouted. Test count grew from 4 to 5 to cover the collision-resistance case.
+
+Fix 9 (commit 84e4778): _resolve_registered_surface_path now resolves the stored artifact_path with Path.resolve(strict=False) and requires the result to live under allowed_root (SEAM_SURFACE_ROOT env var, defaulting to the parent of the runtime SQLite store path). Paths outside the allowed root raise PermissionError; SEAM_SURFACE_ROOT provides the documented escape for legitimate non-default surface layouts.
+
+Verification: .venv/bin/pytest tests/audit/test_chroma_sync_default.py tests/audit/test_ir_edges_fk_migration.py tests/audit/test_mcp_line_cap.py tests/audit/test_mcp_artifact_containment.py passed 11 tests. Chroma regression test_seam.py::test_chroma_semantic_adapter passed under the new explicit sync_on_search=True. Baseline verify chain (integrity / routing / continuity / streams) was clean before the commits.
+
+Out of scope for this entry: the worktree still carries uncommitted P2 fixes (benchmarks/external/* runners, locomo adapter, mcp.py, storage.py, vector.py, cli.py, nl.py, webui dashboard.html) plus four other untracked audit test files (test_conversation_turn_compile.py, test_openai_judge_gpt5.py, test_raw_vector_indexable.py) and the P2/P3 SOP docs. Those remain to be reviewed and committed per the same sync-relay flow. run_a.json (a quickstart benchmark output) sits at repo root and should either be moved under benchmarks/runs/ or gitignored.
+
+Next step: walk the remaining P2 worktree items before declaring "all six P2 fixes merged on main" — the P3 SOP's stated prerequisite.
+---END-ENTRY-#222---

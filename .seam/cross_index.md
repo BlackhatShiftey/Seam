@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 276
+total_events: 277
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-21T19:49:14Z | history:063:00bb98b6 | session-event | done | installer, dashboard, textual, windows, history, snapshot | seam_runtime/installer.py,installers/install_seam.py,scripts/bootstrap_seam.p... |
 | 2026-04-25T00:00:00Z | roadmap:015:6c0e78ce | status-change | bootstrap | dashboard, animation, mirl | ROADMAP.md:270 |
 | 2026-04-25T00:00:00Z | roadmap:016:5bd090a4 | status-change | bootstrap | dashboard, chat, command | ROADMAP.md:395 |
 | 2026-04-25T04:22:49Z | history:064:3c8f79c9 | session-event | done | protocol, multi-agent, mcp, history | seam_runtime/config.toml |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-20T09:35:56Z | history:219:a514a615 | session-event | done | audit, verify, pgvector, test, docs, history, status, ben... | PROJECT_STATUS.md,test_seam_all/test_seam.py,docs/SOP_CRITICAL_BENCHMARKABILI... |
 | 2026-05-21T02:47:05Z | history:220:a230b025 | session-event | done | benchmark, audit, verify, pgvector, vector, command, docs... | benchmarks/external/README.md,benchmarks/external/locomo/adapters/seam.py,ben... |
 | 2026-05-21T03:53:02Z | history:221:a202dc65 | session-event | done | benchmark, audit, verify, command, docs, status, history | benchmarks/external/common/dataset.py,tests/audit/test_locomo_full_dataset_ro... |
+| 2026-05-21T13:40:54Z | history:222:978c2fec | session-event | done | audit, verify, mcp, security, test, retrieval, history, p... | experimental/retrieval_orchestrator/adapters.py,tests/audit/test_chroma_sync_... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0076.cross.md | 2026-04-15T00:00:00Z..2026-04-21T19:36:27Z | 76 | (multi) | (multi) |
+| 0001-0077.cross.md | 2026-04-15T00:00:00Z..2026-04-21T19:49:14Z | 77 | (multi) | (multi) |
