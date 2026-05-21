@@ -119,7 +119,7 @@ class SeamRuntime:
             raise RuntimeError("Vector indexing failed; rolled back SQLite record write") from exc
         return persist_report
 
-    def search_ir(self, query: str, lens: str = "general", scope: str | None = None, budget: int = 5, include_raw: bool = False) -> SearchResult:
+    def search_ir(self, query: str, lens: str = "general", scope: str | None = None, budget: int = 5, include_raw: bool = False, temporal_window = None) -> SearchResult:
         from .bm25 import BM25Index
 
         batch = self.store.load_ir(scope=scope)
@@ -133,7 +133,7 @@ class SeamRuntime:
                     content = record.attrs.get("content")
                     if isinstance(content, str) and content:
                         bm25.add(record.id, content)
-        return search_batch(batch, query=query, scope=scope, limit=max(1, budget), vector_scores=vector_scores, namespace=namespace, include_raw=include_raw, bm25_index=bm25)
+        return search_batch(batch, query=query, scope=scope, limit=max(1, budget), vector_scores=vector_scores, namespace=namespace, include_raw=include_raw, bm25_index=bm25, temporal_window=temporal_window)
 
     def ingest_conversation_turn(
         self,

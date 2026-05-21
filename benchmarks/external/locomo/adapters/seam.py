@@ -86,11 +86,15 @@ class SeamLocomoAdapter:
             if sub:
                 questions = sub[: self._decomposer_max_subq] + [question]
 
+        from seam_runtime.temporal import detect_temporal_tokens, parse_iso
+
+        temporal_window = self._build_temporal_window(question)
+
         closures: list[set[str]] = []
         retrieval_latency_ms = 0.0
         for q in questions:
             t0 = _time.monotonic()
-            result = rt.search_ir(q, scope="thread", budget=self.budget, include_raw=True)
+            result = rt.search_ir(q, scope="thread", budget=self.budget, include_raw=True, temporal_window=temporal_window)
             retrieval_latency_ms += (_time.monotonic() - t0) * 1000.0
             if result.candidates:
                 closures.append(self._collect_closure_ids(result))
@@ -137,6 +141,25 @@ class SeamLocomoAdapter:
         if self._answerer == "claude":
             return _claude_short_answer(self._answerer_model or "claude-haiku-4-5-20251001", prompt)
         raise ValueError(f"unknown answerer {self._answerer!r}")
+
+    def _build_temporal_window(self, question: str):
+        from datetime import timedelta
+
+        from seam_runtime.temporal import detect_temporal_tokens, parse_iso
+
+        tokens = detect_temporal_tokens(question)
+        if not tokens:
+            return None
+        parsed = []
+        for token in tokens:
+            dt = parse_iso(token)
+            if dt:
+                parsed.append(dt)
+        if not parsed:
+            return None
+        earliest = min(parsed) - timedelta(days=30)
+        latest = max(parsed) + timedelta(days=30)
+        return (earliest, latest)
 
     def _decompose(self, question: str) -> list[str]:
         prompt = (
