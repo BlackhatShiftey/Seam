@@ -32,6 +32,7 @@ class SeamLocomoAdapter:
         decomposer: str | None = None,
         decomposer_model: str | None = None,
         decomposer_max_subq: int = 3,
+        abstain_threshold: float = 0.0,
     ) -> None:
         # TODO: default db_path should be tmp_path, not a gitignored project dir
         self._db_root = Path(db_path) if db_path is not None else Path("test_seam/locomo")
@@ -42,6 +43,7 @@ class SeamLocomoAdapter:
         self._decomposer = decomposer
         self._decomposer_model = decomposer_model
         self._decomposer_max_subq = decomposer_max_subq
+        self._abstain_threshold = abstain_threshold
 
     # ------------------------------------------------------------------
     # Protocol methods
@@ -92,12 +94,14 @@ class SeamLocomoAdapter:
 
         closures: list[set[str]] = []
         retrieval_latency_ms = 0.0
+        top_score = 0.0
         for q in questions:
             t0 = _time.monotonic()
             result = rt.search_ir(q, scope="thread", budget=self.budget, include_raw=True, temporal_window=temporal_window)
             retrieval_latency_ms += (_time.monotonic() - t0) * 1000.0
             if result.candidates:
                 closures.append(self._collect_closure_ids(result))
+                top_score = max(top_score, result.candidates[0].score)
 
         merged = set().union(*closures) if closures else set()
 
@@ -118,9 +122,12 @@ class SeamLocomoAdapter:
         generated = None
         answer_latency_ms = None
         if self._answerer:
-            t1 = _time.monotonic()
-            generated = self._generate_answer(question, retrieved_context)
-            answer_latency_ms = (_time.monotonic() - t1) * 1000.0
+            if self._abstain_threshold > 0.0 and top_score < self._abstain_threshold:
+                generated = "unknown"
+            else:
+                t1 = _time.monotonic()
+                generated = self._generate_answer(question, retrieved_context)
+                answer_latency_ms = (_time.monotonic() - t1) * 1000.0
 
         return AdapterAnswer(
             retrieved_context=retrieved_context,

@@ -46,10 +46,14 @@ def aggregate_judge_scores(verdicts: list) -> dict:
         return {"judge_score_mean": None, "judge_count": 0}
     _score = lambda v: v.score if hasattr(v, "score") else v["score"]
     _verdict = lambda v: v.verdict if hasattr(v, "verdict") else v["verdict"]
-    return {
+    result = {
         "judge_score_mean": sum(_score(v) for v in seen) / len(seen),
         "judge_count": len(seen),
         "correct_count": sum(1 for v in seen if _verdict(v) == "correct"),
         "partial_count": sum(1 for v in seen if _verdict(v) == "partial"),
         "incorrect_count": sum(1 for v in seen if _verdict(v) == "incorrect"),
     }
+    abstain = sum(1 for v in seen if _verdict(v) == "abstain")
+    if abstain > 0:
+        result["abstain_count"] = abstain
+    return result

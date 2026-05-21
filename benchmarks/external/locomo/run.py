@@ -28,7 +28,7 @@ from benchmarks.external.common.runner import (
 )
 
 
-def build_adapter(name: str, answerer: str | None = None, answerer_model: str | None = None, decomposer: str | None = None, decomposer_model: str | None = None, decomposer_max_subq: int = 3):
+def build_adapter(name: str, answerer: str | None = None, answerer_model: str | None = None, decomposer: str | None = None, decomposer_model: str | None = None, decomposer_max_subq: int = 3, abstain_threshold: float = 0.0):
     """Lazy-import factory so SEAM-only runs don't require Mem0/Zep installed."""
     if name == "seam":
         from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
@@ -37,6 +37,7 @@ def build_adapter(name: str, answerer: str | None = None, answerer_model: str | 
             answerer=answerer, answerer_model=answerer_model,
             decomposer=decomposer, decomposer_model=decomposer_model,
             decomposer_max_subq=decomposer_max_subq,
+            abstain_threshold=abstain_threshold,
         )
     if name == "mem0":
         from benchmarks.external.locomo.adapters.mem0 import Mem0LocomoAdapter
@@ -207,6 +208,12 @@ def main() -> None:
         default=3,
         help="Max sub-questions for decomposition (default: 3)",
     )
+    parser.add_argument(
+        "--abstain-threshold",
+        type=float,
+        default=0.0,
+        help="Abstain threshold: emit 'unknown' when top score is below this value (default: 0.0)",
+    )
     args = parser.parse_args()
 
     dataset_path = args.dataset_path or args.dataset
@@ -251,6 +258,7 @@ def main() -> None:
                 args.adapter, answerer=answerer, answerer_model=args.answerer_model,
                 decomposer=decomposer, decomposer_model=args.decomposer_model,
                 decomposer_max_subq=args.decomposer_max_subq,
+                abstain_threshold=args.abstain_threshold,
             ),
             adapter_name=args.adapter,
             cases=cases,
@@ -268,6 +276,7 @@ def main() -> None:
             args.adapter, answerer=answerer, answerer_model=args.answerer_model,
             decomposer=decomposer, decomposer_model=args.decomposer_model,
             decomposer_max_subq=args.decomposer_max_subq,
+            abstain_threshold=args.abstain_threshold,
         )
         judge = build_judge(args.judge, model=args.judge_model)
         report = run_benchmark_grouped(
