@@ -224,7 +224,7 @@ class SQLiteStore:
             surface_artifacts = connection.execute("select count(*) from surface_artifacts").fetchone()[0]
             edge_count = connection.execute("select count(*) from ir_edges").fetchone()[0]
             doc_status_count = connection.execute("select count(*) from document_status").fetchone()[0]
-            
+
             kinds_rows = connection.execute("select kind, count(*) as c from ir_records group by kind").fetchall()
             record_kinds: dict[str, int] = {}
             for row in kinds_rows:
@@ -236,6 +236,83 @@ class SQLiteStore:
                 if symbol is None:
                     continue
                 record_kinds[symbol] = row["c"]
+
+            # ── Edge kind distribution ──
+            edge_kinds_rows = connection.execute(
+                "select edge_type, count(*) as c from ir_edges group by edge_type"
+            ).fetchall()
+            edge_kinds: dict[str, int] = {row["edge_type"]: row["c"] for row in edge_kinds_rows}
+
+            # ── Degree statistics ──
+            # avg degree = 2 * edges / nodes  (each edge contributes degree to both endpoints)
+            avg_degree = round(2.0 * edge_count / total_records, 2) if total_records > 0 else 0.0
+            max_degree_row = connection.execute(
+                "select node_id, total_deg from ("
+                "  select node_id, sum(deg) as total_deg from ("
+                "    select src_id as node_id, count(*) as deg from ir_edges group by src_id"
+                "    union all"
+                "    select dst_id as node_id, count(*) as deg from ir_edges group by dst_id"
+                "  ) group by node_id"
+                ") order by total_deg desc limit 1"
+            ).fetchone()
+            max_degree = max_degree_row["total_deg"] if max_degree_row else 0
+            max_degree_node = max_degree_row["node_id"] if max_degree_row else None
+
+            # ── Connected components (lightweight estimate via isolated node count) ──
+            # Nodes that appear in edges (either side)
+            connected_nodes = connection.execute(
+                "select count(distinct n) from ("
+                "  select src_id as n from ir_edges"
+                "  union"
+                "  select dst_id as n from ir_edges"
+                ")"
+            ).fetchone()[0]
+            isolated_nodes = total_records - connected_nodes if total_records > connected_nodes else 0
+
+            # ── Vector index metadata ──
+            vector_models_rows = connection.execute(
+                "select model_name, dimension, count(*) as c from vector_index group by model_name, dimension"
+            ).fetchall()
+            vector_models = [
+                {"model": row["model_name"], "dimension": row["dimension"], "count": row["c"]}
+                for row in vector_models_rows
+            ]
+
+            # Drifted vectors: vectors whose updated_at is older than the record's updated_at
+            drifted_vectors = connection.execute(
+                "select count(*) from vector_index v"
+                " join ir_records r on v.record_id = r.id"
+                " where r.updated_at > v.updated_at"
+            ).fetchone()[0]
+
+            # ── Document status breakdown ──
+            doc_status_rows = connection.execute(
+                "select extraction_status, indexed_status, count(*) as c"
+                " from document_status group by extraction_status, indexed_status"
+            ).fetchall()
+            doc_statuses: dict[str, int] = {}
+            for row in doc_status_rows:
+                key = f"{row['extraction_status']}/{row['indexed_status']}"
+                doc_statuses[key] = row["c"]
+
+            # ── Ingest pipeline: today's documents ──
+            today_prefix = utc_now()[:10]  # "YYYY-MM-DD"
+            docs_today = connection.execute(
+                "select count(*) from document_status where created_at >= ?",
+                (today_prefix,),
+            ).fetchone()[0]
+            records_today = connection.execute(
+                "select count(*) from ir_records where created_at >= ?",
+                (today_prefix,),
+            ).fetchone()[0]
+
+            # ── Superseded / contradicted counts ──
+            superseded_count = connection.execute(
+                "select count(*) from ir_records where status = 'superseded'"
+            ).fetchone()[0]
+            contradicted_count = connection.execute(
+                "select count(*) from ir_records where status = 'contradicted'"
+            ).fetchone()[0]
 
         return {
             "total_records": total_records,
@@ -249,6 +326,19 @@ class SQLiteStore:
             "edge_count": edge_count,
             "doc_status_count": doc_status_count,
             "record_kinds": record_kinds,
+            "edge_kinds": edge_kinds,
+            "avg_degree": avg_degree,
+            "max_degree": max_degree,
+            "max_degree_node": max_degree_node,
+            "connected_nodes": connected_nodes,
+            "isolated_nodes": isolated_nodes,
+            "vector_models": vector_models,
+            "drifted_vectors": drifted_vectors,
+            "doc_statuses": doc_statuses,
+            "docs_today": docs_today,
+            "records_today": records_today,
+            "superseded_count": superseded_count,
+            "contradicted_count": contradicted_count,
         }
 
     def list_namespaces(self, limit: int = 100) -> list[str]:
