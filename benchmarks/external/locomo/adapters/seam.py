@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -45,10 +46,11 @@ class SeamLocomoAdapter:
         from seam_runtime.runtime import SeamRuntime  # lazy
 
         text = _format_turn(turn)
+        turn_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
         rt = _open_runtime(self._db_path(scope_id))
-        rt.ingest_text(
+        rt.ingest_conversation_turn(
             text=text,
-            source_ref=f"locomo:{scope_id}:turn",
+            source_ref=f"locomo:{scope_id}:turn:{turn_hash}",
             ns=f"locomo:{scope_id}",
             scope="thread",
             persist=True,

@@ -125,6 +125,47 @@ class SeamRuntime:
         namespace = batch.records[0].ns if batch.records else None
         return search_batch(batch, query=query, scope=scope, limit=max(1, budget), vector_scores=vector_scores, namespace=namespace, include_raw=include_raw)
 
+    def ingest_conversation_turn(
+        self,
+        text: str,
+        source_ref: str = "local://input",
+        ns: str = "local.default",
+        scope: str = "thread",
+        persist: bool = True,
+    ) -> IngestReport:
+        from .nl import compile_conversation_turn
+
+        document_id = stable_document_id(source_ref, text)
+        batch = namespace_ingest_batch(
+            compile_conversation_turn(text, source_ref=source_ref, ns=ns, scope=scope),
+            document_id,
+        )
+        stored_ids: list[str] = []
+        if persist:
+            stored_ids = self.persist_ir(batch).stored_ids
+            self.store.mark_document_superseded_by_source_ref(
+                source_ref, except_document_id=document_id
+            )
+        document = self.store.upsert_document_status(
+            document_id=document_id,
+            ns=ns,
+            scope=scope,
+            source_ref=source_ref,
+            source_hash=source_hash(text),
+            byte_count=len(text.encode("utf-8")),
+            chunk_count=max(1, len(batch.kind(RecordKind.SPAN))),
+            extraction_status="compiled",
+            indexed_status="indexed" if persist else "not_indexed",
+            metadata={
+                "record_count": len(batch.records),
+                "indexable_count": len([
+                    r for r in batch.records
+                    if r.kind in {RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL, RecordKind.RAW}
+                ]),
+            },
+        )
+        return IngestReport(document=document, stored_ids=stored_ids)
+
     def memory_search(self, query: str, scope: str | None = None, budget: int = 5) -> dict[str, object]:
         result = self.search_ir(query, scope=scope, budget=budget)
         scores = {candidate.record.id: candidate.score for candidate in result.candidates}
