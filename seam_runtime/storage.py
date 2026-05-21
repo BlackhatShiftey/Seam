@@ -210,7 +210,28 @@ class SQLiteStore:
                 create unique index if not exists idx_projection_record_kind on projection_index (record_id, projection_kind);
                 """
             )
+            connection.execute("pragma foreign_keys = on")
+            self._cleanup_orphan_edges(connection)
             connection.commit()
+
+    def _cleanup_orphan_edges(self, connection: sqlite3.Connection) -> None:
+        """Remove edges whose src or dst references a record that no longer exists.
+
+        ir_edges uses virtual entity IDs (e.g. ``ent:turn:xxx``) for CLM
+        subject-based edges, so FK constraints are not feasible.  Instead we
+        run a best-effort orphan sweep at open time: edges where *both* src_id
+        and dst_id look like record IDs but are missing from ir_records are
+        removed.  Edges with at least one virtual-entity-style endpoint are
+        left alone.
+        """
+        connection.execute(
+            "delete from ir_edges "
+            "where src_id like 'clm:%' and src_id not in (select id from ir_records)"
+        )
+        connection.execute(
+            "delete from ir_edges "
+            "where dst_id like 'clm:%' and dst_id not in (select id from ir_records)"
+        )
 
     def get_stats(self) -> dict[str, object]:
         with closing(self._connect()) as connection:
