@@ -159,6 +159,15 @@ def main() -> None:
         help="Override the default judge model id",
     )
     parser.add_argument(
+        "--judge-batch",
+        action="store_true",
+        help=(
+            "Submit judge (and cross-judge) calls via the provider's Batch API "
+            "(50%% discount, up to 24h async SLA). Recommended for full runs only; "
+            "leave off for interactive/quickstart runs."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate dataset and print counts without executing the benchmark",
@@ -269,6 +278,7 @@ def main() -> None:
                 if args.judge is not None else None
             ),
             judge_cross=judge_cross,
+            judge_batch=args.judge_batch,
             workers=args.workers,
         )
     else:
@@ -286,6 +296,7 @@ def main() -> None:
             dataset_source=source,
             judge=judge,
             judge_cross=judge_cross,
+            judge_batch=args.judge_batch,
         )
 
     # Output

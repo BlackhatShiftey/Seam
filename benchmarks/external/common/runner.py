@@ -10,6 +10,7 @@ from typing import Callable
 
 from benchmarks.external.common.types import AdapterAnswer, BenchmarkCase, MemorySystemAdapter
 from benchmarks.external.common.scoring import aggregate_judge_scores, context_recall, exact_match, token_f1
+from benchmarks.external.common.judge import JudgeBatchItem, JudgeVerdict
 
 RESULT_VERSION = "SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1"
 
@@ -31,6 +32,7 @@ def run_benchmark(
     cases: list[BenchmarkCase],
     dataset_source: str = "unknown",
     judge: object | None = None,
+    judge_batch: bool = False,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict:
     """Run adapter against cases and return a RunReport dict.
@@ -46,13 +48,19 @@ def run_benchmark(
     run_started_at = datetime.now(timezone.utc).isoformat()
     case_results: list[dict] = []
 
+    batch_judge = _select_batch_judge(judge, judge_batch)
+    sync_judge = None if batch_judge is not None else judge
+
     total = len(cases)
     for idx, case in enumerate(cases):
-        case_entry = _run_case(adapter, case, judge)
+        case_entry = _run_case(adapter, case, sync_judge)
         case_results.append(case_entry)
 
         if progress:
             progress(idx + 1, total)
+
+    if batch_judge is not None:
+        _finalize_judge_batch(case_results, batch_judge, key="judge")
 
     elapsed = time.time() - started_ts
     return _build_report(
@@ -71,6 +79,7 @@ def run_benchmark_parallel(
     cases: list[BenchmarkCase],
     dataset_source: str = "unknown",
     judge_factory: Callable[[], object | None] | None = None,
+    judge_batch: bool = False,
     workers: int = 4,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict:
@@ -81,6 +90,7 @@ def run_benchmark_parallel(
             cases=cases,
             dataset_source=dataset_source,
             judge=judge_factory() if judge_factory else None,
+            judge_batch=judge_batch,
             progress=progress,
         )
 
@@ -89,10 +99,18 @@ def run_benchmark_parallel(
     total = len(cases)
     case_results: list[dict | None] = [None] * total
 
+    # When batching the judge, do not score per case in workers; score once at
+    # the end against a single judge instance.
+    batch_judge = (
+        _select_batch_judge(judge_factory() if judge_factory else None, judge_batch)
+        if judge_batch
+        else None
+    )
+
     def _worker(index: int, case: BenchmarkCase) -> tuple[int, dict]:
         adapter = adapter_factory()
-        judge = judge_factory() if judge_factory else None
-        return index, _run_case(adapter, case, judge)
+        worker_judge = None if batch_judge is not None else (judge_factory() if judge_factory else None)
+        return index, _run_case(adapter, case, worker_judge)
 
     completed = 0
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -107,13 +125,17 @@ def run_benchmark_parallel(
             if progress:
                 progress(completed, total)
 
+    final_results = [case for case in case_results if case is not None]
+    if batch_judge is not None:
+        _finalize_judge_batch(final_results, batch_judge, key="judge")
+
     elapsed = time.time() - started_ts
     return _build_report(
         adapter_name=adapter_name,
         dataset_source=dataset_source,
         run_started_at=run_started_at,
         elapsed=elapsed,
-        case_results=[case for case in case_results if case is not None],
+        case_results=final_results,
     )
 
 
@@ -125,6 +147,7 @@ def run_benchmark_grouped(
     dataset_source: str = "unknown",
     judge: object | None = None,
     judge_cross: object | None = None,
+    judge_batch: bool = False,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict:
     """Run cases grouped by shared conversation scope, ingesting each scope once."""
@@ -134,16 +157,22 @@ def run_benchmark_grouped(
     case_results: list[dict] = []
     completed = 0
 
+    batch_judge = _select_batch_judge(judge, judge_batch)
+    sync_judge = None if batch_judge is not None else judge
+
     for scope, group in _group_cases(cases, scope_id).items():
         adapter.reset(scope)
         for turn in group[0].conversation:
             adapter.ingest_turn(scope, turn)
         for case in group:
             answer = adapter.answer(scope, case.question)
-            case_results.append(_score_case(case, answer, judge))
+            case_results.append(_score_case(case, answer, sync_judge))
             completed += 1
             if progress:
                 progress(completed, total)
+
+    if batch_judge is not None:
+        _finalize_judge_batch(case_results, batch_judge, key="judge")
 
     elapsed = time.time() - started_ts
     return _build_report(
@@ -153,6 +182,7 @@ def run_benchmark_grouped(
         elapsed=elapsed,
         case_results=case_results,
         judge_cross=judge_cross,
+        judge_batch=judge_batch,
     )
 
 
@@ -165,6 +195,7 @@ def run_benchmark_grouped_parallel(
     dataset_source: str = "unknown",
     judge_factory: Callable[[], object | None] | None = None,
     judge_cross: object | None = None,
+    judge_batch: bool = False,
     workers: int = 4,
     progress: Callable[[int, int], None] | None = None,
 ) -> dict:
@@ -177,6 +208,7 @@ def run_benchmark_grouped_parallel(
             dataset_source=dataset_source,
             judge=judge_factory() if judge_factory else None,
             judge_cross=judge_cross,
+            judge_batch=judge_batch,
             progress=progress,
         )
 
@@ -187,14 +219,20 @@ def run_benchmark_grouped_parallel(
     total = len(cases)
     case_results: list[dict | None] = [None] * total
 
+    batch_judge = (
+        _select_batch_judge(judge_factory() if judge_factory else None, judge_batch)
+        if judge_batch
+        else None
+    )
+
     def _worker(scope: str, group: list[BenchmarkCase]) -> list[dict]:
         adapter = adapter_factory()
-        judge = judge_factory() if judge_factory else None
+        worker_judge = None if batch_judge is not None else (judge_factory() if judge_factory else None)
         adapter.reset(scope)
         for turn in group[0].conversation:
             adapter.ingest_turn(scope, turn)
         return [
-            _score_case(case, adapter.answer(scope, case.question), judge)
+            _score_case(case, adapter.answer(scope, case.question), worker_judge)
             for case in group
         ]
 
@@ -212,15 +250,69 @@ def run_benchmark_grouped_parallel(
             if progress:
                 progress(completed, total)
 
+    final_results = [case for case in case_results if case is not None]
+    if batch_judge is not None:
+        _finalize_judge_batch(final_results, batch_judge, key="judge")
+
     elapsed = time.time() - started_ts
     return _build_report(
         adapter_name=adapter_name,
         dataset_source=dataset_source,
         run_started_at=run_started_at,
         elapsed=elapsed,
-        case_results=[case for case in case_results if case is not None],
+        case_results=final_results,
         judge_cross=judge_cross,
+        judge_batch=judge_batch,
     )
+
+
+def _select_batch_judge(judge: object | None, judge_batch: bool) -> object | None:
+    """Return the judge if it supports score_batch and batch mode was requested."""
+    if not judge_batch or judge is None:
+        return None
+    if callable(getattr(judge, "score_batch", None)):
+        return judge
+    return None
+
+
+def _finalize_judge_batch(case_results: list[dict], judge: object, *, key: str) -> None:
+    """Submit one batch job for all cases and fill ``case[key]`` with results.
+
+    Expects each case to carry ``_judge_question``, ``_judge_gold``, and
+    ``_prediction`` placeholders left by ``_score_case`` when the sync judge
+    was skipped. Per-case errors land as ``{"error": str}`` so the existing
+    error-tolerant aggregation continues to work.
+    """
+    items = [
+        JudgeBatchItem(
+            custom_id=str(case.get("case_id")),
+            question=str(case.get("_judge_question", "")),
+            gold=str(case.get("_judge_gold", "")),
+            pred=str(case.get("_prediction", "")),
+        )
+        for case in case_results
+    ]
+    try:
+        verdicts = judge.score_batch(items)
+    except Exception as exc:
+        for case in case_results:
+            case[key] = {"error": f"judge batch failed: {exc}"}
+        return
+    for case in case_results:
+        cid = str(case.get("case_id"))
+        value = verdicts.get(cid)
+        if isinstance(value, JudgeVerdict):
+            case[key] = {
+                "verdict": value.verdict,
+                "score": value.score,
+                "rationale": value.rationale,
+                "judge_name": value.judge_name,
+                "judge_model": value.judge_model,
+            }
+        elif isinstance(value, Exception):
+            case[key] = {"error": str(value)}
+        else:
+            case[key] = {"error": "judge batch returned no entry for case"}
 
 
 def _group_cases(
@@ -297,6 +389,7 @@ def _build_report(
     elapsed: float,
     case_results: list[dict],
     judge_cross: object | None = None,
+    judge_batch: bool = False,
 ) -> dict:
     total = len(case_results)
 
@@ -327,26 +420,29 @@ def _build_report(
     # Cross-check with a second judge when configured
     integrity_hash_excludes: list[str] = []
     if judge_cross is not None:
-        cross_verdicts: list[dict] = []
-        for case in case_results:
-            pred = case.get("_prediction", "")
-            try:
-                verdict = judge_cross.score(
-                    question=case.get("_judge_question", ""),
-                    gold=case.get("_judge_gold", ""),
-                    pred=pred,
-                )
-                cross_entry = {
-                    "verdict": verdict.verdict,
-                    "score": verdict.score,
-                    "rationale": verdict.rationale,
-                    "judge_name": verdict.judge_name,
-                    "judge_model": verdict.judge_model,
-                }
-            except Exception as exc:
-                cross_entry = {"error": str(exc)}
-            case["judge_cross"] = cross_entry
-            cross_verdicts.append(cross_entry)
+        batch_cross = _select_batch_judge(judge_cross, judge_batch)
+        if batch_cross is not None:
+            _finalize_judge_batch(case_results, batch_cross, key="judge_cross")
+        else:
+            for case in case_results:
+                pred = case.get("_prediction", "")
+                try:
+                    verdict = judge_cross.score(
+                        question=case.get("_judge_question", ""),
+                        gold=case.get("_judge_gold", ""),
+                        pred=pred,
+                    )
+                    cross_entry = {
+                        "verdict": verdict.verdict,
+                        "score": verdict.score,
+                        "rationale": verdict.rationale,
+                        "judge_name": verdict.judge_name,
+                        "judge_model": verdict.judge_model,
+                    }
+                except Exception as exc:
+                    cross_entry = {"error": str(exc)}
+                case["judge_cross"] = cross_entry
+        cross_verdicts = [case.get("judge_cross", {}) for case in case_results]
         scorable = [v for v in cross_verdicts if "verdict" in v]
         if scorable:
             cross_agg = aggregate_judge_scores(scorable)

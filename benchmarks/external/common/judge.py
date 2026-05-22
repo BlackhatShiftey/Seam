@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import io
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Protocol
+
+# Constant polling interval for batch jobs. Anthropic / OpenAI batches run for
+# minutes-to-hours; exponential backoff buys nothing here.
+JUDGE_BATCH_POLL_SECONDS = 30
+# Hard upper bound shared by both providers (Anthropic + OpenAI batch limits).
+JUDGE_BATCH_MAX_REQUESTS = 100_000
 
 DEFAULT_JUDGE_PROMPT = """You are an impartial scorer for a memory-benchmark question.
 
@@ -44,10 +52,22 @@ class JudgeVerdict:
     judge_model: str
 
 
+@dataclass(frozen=True)
+class JudgeBatchItem:
+    custom_id: str
+    question: str
+    gold: str
+    pred: str
+
+
 class Judge(Protocol):
     name: str
     model: str
     def score(self, *, question: str, gold: str, pred: str) -> JudgeVerdict: ...
+    # Optional batch scoring via the provider's Message Batches / Batch API
+    # (50% discount, async). When present, the runner can defer all judge
+    # calls to one async batch instead of per-case sync requests.
+    # def score_batch(self, items: list[JudgeBatchItem]) -> dict[str, JudgeVerdict | Exception]: ...
 
 
 class StubJudge:
@@ -109,6 +129,86 @@ class ClaudeJudge:
             raise RuntimeError(f"judge request failed: {type(exc).__name__}") from exc
         return _verdict_from_json_text(response.content[0].text, judge_name=self.name, judge_model=self.model)
 
+    def score_batch(
+        self,
+        items: list[JudgeBatchItem],
+        *,
+        poll_seconds: float = JUDGE_BATCH_POLL_SECONDS,
+    ) -> dict[str, JudgeVerdict | Exception]:
+        """Submit all items as one Anthropic Message Batches job (50% discount).
+
+        Returns a mapping ``custom_id -> JudgeVerdict | Exception``. Caller is
+        responsible for placing the verdicts back into per-case report rows.
+        """
+        if not items:
+            return {}
+        if len(items) > JUDGE_BATCH_MAX_REQUESTS:
+            raise ValueError(
+                f"batch exceeds provider limit: {len(items)} > {JUDGE_BATCH_MAX_REQUESTS}"
+            )
+        seen_ids: set[str] = set()
+        requests_payload: list[dict] = []
+        for item in items:
+            if item.custom_id in seen_ids:
+                raise ValueError(f"duplicate custom_id in batch: {item.custom_id!r}")
+            seen_ids.add(item.custom_id)
+            prompt = DEFAULT_JUDGE_PROMPT.format(
+                question=item.question, gold=item.gold, pred=item.pred
+            )
+            requests_payload.append(
+                {
+                    "custom_id": item.custom_id,
+                    "params": {
+                        "model": self.model,
+                        "max_tokens": 256,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
+                }
+            )
+
+        batch = self._client.messages.batches.create(requests=requests_payload)
+        batch_id = batch.id
+        while True:
+            current = self._client.messages.batches.retrieve(batch_id)
+            status = getattr(current, "processing_status", None)
+            if status == "ended":
+                break
+            if status in {"canceling", "canceled"}:
+                raise RuntimeError(f"judge batch ended with status {status!r}")
+            time.sleep(poll_seconds)
+
+        results: dict[str, JudgeVerdict | Exception] = {}
+        for entry in self._client.messages.batches.results(batch_id):
+            custom_id = getattr(entry, "custom_id", None)
+            if custom_id is None:
+                continue
+            result_obj = getattr(entry, "result", None)
+            result_type = getattr(result_obj, "type", None)
+            if result_type == "succeeded":
+                message = getattr(result_obj, "message", None)
+                content = getattr(message, "content", None) or []
+                text = ""
+                for block in content:
+                    btext = getattr(block, "text", None)
+                    if isinstance(btext, str):
+                        text = btext
+                        break
+                try:
+                    results[custom_id] = _verdict_from_json_text(
+                        text, judge_name=self.name, judge_model=self.model
+                    )
+                except ValueError as exc:
+                    results[custom_id] = exc
+            else:
+                error_obj = getattr(result_obj, "error", None)
+                msg = getattr(error_obj, "message", None) or f"batch result {result_type!r}"
+                results[custom_id] = RuntimeError(f"judge batch entry failed: {msg}")
+        for item in items:
+            results.setdefault(
+                item.custom_id, RuntimeError("judge batch returned no entry for custom_id")
+            )
+        return results
+
 
 class OpenAIJudge:
     name = "openai"
@@ -156,6 +256,156 @@ class OpenAIJudge:
             raise RuntimeError(f"judge request failed: {type(exc).__name__}") from exc
         text = response.choices[0].message.content or ""
         return _verdict_from_json_text(text, judge_name=self.name, judge_model=self.model)
+
+    def _build_batch_request(self, item: JudgeBatchItem) -> dict:
+        prompt = DEFAULT_JUDGE_PROMPT.format(
+            question=item.question, gold=item.gold, pred=item.pred
+        )
+        body: dict = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+        }
+        if self._uses_completion_token_budget(self.model):
+            body["max_completion_tokens"] = 512
+            body["reasoning_effort"] = "minimal"
+        else:
+            body["max_tokens"] = 256
+        return {
+            "custom_id": item.custom_id,
+            "method": "POST",
+            "url": "/v1/chat/completions",
+            "body": body,
+        }
+
+    def score_batch(
+        self,
+        items: list[JudgeBatchItem],
+        *,
+        poll_seconds: float = JUDGE_BATCH_POLL_SECONDS,
+    ) -> dict[str, JudgeVerdict | Exception]:
+        """Submit all items as one OpenAI Batch API job (50% discount).
+
+        Uploads a JSONL of chat-completion requests, creates the batch, polls
+        until terminal, downloads the output file, and parses verdicts. Returns
+        a mapping ``custom_id -> JudgeVerdict | Exception``.
+        """
+        if not items:
+            return {}
+        if len(items) > JUDGE_BATCH_MAX_REQUESTS:
+            raise ValueError(
+                f"batch exceeds provider limit: {len(items)} > {JUDGE_BATCH_MAX_REQUESTS}"
+            )
+        batches_api = getattr(self._client, "batches", None)
+        files_api = getattr(self._client, "files", None)
+        if batches_api is None or files_api is None:
+            raise RuntimeError(
+                "OpenAIJudge.score_batch requires openai>=1.13 with Batch API support"
+            )
+
+        seen_ids: set[str] = set()
+        jsonl_lines: list[str] = []
+        for item in items:
+            if item.custom_id in seen_ids:
+                raise ValueError(f"duplicate custom_id in batch: {item.custom_id!r}")
+            seen_ids.add(item.custom_id)
+            jsonl_lines.append(json.dumps(self._build_batch_request(item)))
+        jsonl_blob = ("\n".join(jsonl_lines) + "\n").encode("utf-8")
+        upload = files_api.create(
+            file=("judge-batch.jsonl", io.BytesIO(jsonl_blob)),
+            purpose="batch",
+        )
+        batch = batches_api.create(
+            input_file_id=upload.id,
+            endpoint="/v1/chat/completions",
+            completion_window="24h",
+        )
+        batch_id = batch.id
+        while True:
+            current = batches_api.retrieve(batch_id)
+            status = getattr(current, "status", None)
+            if status == "completed":
+                output_file_id = getattr(current, "output_file_id", None)
+                error_file_id = getattr(current, "error_file_id", None)
+                break
+            if status in {"failed", "expired", "cancelled", "cancelling"}:
+                raise RuntimeError(f"judge batch ended with status {status!r}")
+            time.sleep(poll_seconds)
+
+        results: dict[str, JudgeVerdict | Exception] = {}
+        if output_file_id:
+            output_blob = files_api.content(output_file_id)
+            text_blob = _decode_file_content(output_blob)
+            for line in text_blob.splitlines():
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                custom_id = entry.get("custom_id")
+                if not custom_id:
+                    continue
+                response = entry.get("response") or {}
+                body = response.get("body") or {}
+                status_code = response.get("status_code")
+                error = entry.get("error")
+                if error or (status_code is not None and status_code >= 400):
+                    msg = (error or {}).get("message") if isinstance(error, dict) else str(error)
+                    results[custom_id] = RuntimeError(
+                        f"judge batch entry failed: {msg or status_code!r}"
+                    )
+                    continue
+                choices = body.get("choices") or []
+                text = ""
+                if choices:
+                    message = choices[0].get("message") or {}
+                    text = message.get("content") or ""
+                try:
+                    results[custom_id] = _verdict_from_json_text(
+                        text, judge_name=self.name, judge_model=self.model
+                    )
+                except ValueError as exc:
+                    results[custom_id] = exc
+        if error_file_id:
+            error_blob = files_api.content(error_file_id)
+            text_blob = _decode_file_content(error_blob)
+            for line in text_blob.splitlines():
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                custom_id = entry.get("custom_id")
+                if not custom_id:
+                    continue
+                err = entry.get("error") or {}
+                msg = err.get("message") if isinstance(err, dict) else str(err)
+                results[custom_id] = RuntimeError(f"judge batch entry failed: {msg!r}")
+        for item in items:
+            results.setdefault(
+                item.custom_id, RuntimeError("judge batch returned no entry for custom_id")
+            )
+        return results
+
+
+def _decode_file_content(blob) -> str:
+    """Normalize the openai files.content() return value to text."""
+    if isinstance(blob, str):
+        return blob
+    if isinstance(blob, bytes):
+        return blob.decode("utf-8")
+    text = getattr(blob, "text", None)
+    if isinstance(text, str):
+        return text
+    content = getattr(blob, "content", None)
+    if isinstance(content, bytes):
+        return content.decode("utf-8")
+    if isinstance(content, str):
+        return content
+    read = getattr(blob, "read", None)
+    if callable(read):
+        data = read()
+        if isinstance(data, bytes):
+            return data.decode("utf-8")
+        if isinstance(data, str):
+            return data
+    raise RuntimeError(f"cannot decode OpenAI file content of type {type(blob).__name__}")
 
 
 def build_judge(name: str | None, model: str | None = None) -> Judge | None:

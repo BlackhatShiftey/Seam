@@ -4870,3 +4870,17 @@ tokens: 182
 ---
 Added docs/prompts/DEEPSEEK_TRACK_M_BATCH_JUDGE_ADVISED_PROMPT.md as a complete ready-to-paste claude-ds prompt with the Track M batch-judge review ADVISOR_TASK_PACKET already inserted, so the operator no longer has to replace the placeholder in docs/prompts/DEEPSEEK_ADVISED_EXECUTOR_PROMPT.md manually. The packet keeps DeepSeek bounded to the batch judge files/tests, requires a clean branch, forbids commits/pushes/history edits, blocks live provider-call assumptions, and requires ADVISOR_ESCALATION for architecture/scope/missing-context uncertainty. Updated PROJECT_STATUS.md to point at HISTORY#231. Verification before history append: git diff --check on the new prompt passed; secret/session-link scan of the prompt found no hits. Unrelated local benchmark/judge/test edits remain unstaged and were not touched by this prompt artifact.
 ---END-ENTRY-#231---
+
+---BEGIN-ENTRY-#232---
+id: 232
+date: 2026-05-22T08:50:21Z
+agent: codex
+status: done
+topics: benchmark, verify, command, history, status
+commits: none
+refs: benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,benchmarks/external/locomo/run.py,test_seam_all/test_locomo_judge_batch.py,PROJECT_STATUS.md
+supersedes: 231
+tokens: 398
+---
+Landed Judge Batch API Phase A from the Claude handoff in HANDOFF_BATCH_API.md. Scope committed: benchmarks/external/common/judge.py adds JudgeBatchItem plus opt-in score_batch implementations for ClaudeJudge and OpenAIJudge using Anthropic Message Batches and OpenAI Batch API request shapes; benchmarks/external/common/runner.py adds judge_batch plumbing for sequential, parallel, grouped, and grouped-parallel runners, including batch finalization for primary judge and judge_cross without treating provider errors as incorrect answers; benchmarks/external/locomo/run.py exposes --judge-batch; test_seam_all/test_locomo_judge_batch.py adds 16 no-network batch-mode tests. Phase B answerer batching remains deferred pending real Track M P4 cost data. Verification before this entry: .venv/bin/python -m pytest test_seam_all/test_locomo_judge_batch.py -q passed 16 tests; .venv/bin/python -m pytest tests/audit/test_bench_stub_seal_gate.py tests/audit/test_benchmark_endpoint_safety.py -q passed 9 tests; .venv/bin/python -m pytest tests/audit/test_openai_judge_gpt5.py -q passed 3 tests; .venv/bin/python -m pytest test_seam_all/test_locomo_judge.py test_seam_all/test_benchmark_integrity.py -q exited 0 to 100%; git diff --check passed. Not committed in this entry: HANDOFF_BATCH_API.md handoff artifact and unrelated local edits in tests/audit/test_bench_stub_seal_gate.py and tests/audit/test_benchmark_endpoint_safety.py remain outside the staged batch-judge slice unless separately reviewed. Next step: rebuild derived history/stream/cross-index state, write a snapshot, run the verify chain, commit through the canonical pre-commit hook, then decide whether to run Track M P4 full baseline with --judge-batch or move into P4 score-improvement items.
+---END-ENTRY-#232---

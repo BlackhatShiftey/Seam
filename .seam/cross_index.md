@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 286
+total_events: 287
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-25T16:02:11Z | history:071:c51553c0 | session-event | done | dashboard, chat, command, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-25T16:04:41Z | history:072:a5e9b009 | session-event | done | dashboard, chat, command, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-25T16:05:15Z | history:073:0b7972bf | session-event | done | dashboard, chat, command, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py |
 | 2026-04-25T16:10:22Z | history:074:603e38f2 | session-event | done | dashboard, chat, command, readme, verify, history, snapshot | docs/setup.md,README.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-22T06:25:30Z | history:229:cd21a37f | session-event | done | audit, history, snapshot, verify, security, benchmark, ha... | HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/streams/history/log.md,.s... |
 | 2026-05-22T07:46:11Z | history:230:db816fc2 | session-event | done | docs, ledger, protocol, multi-agent, history, verify | docs/SOP_ADVISOR_EXECUTOR_LOOP.md,docs/prompts/DEEPSEEK_ADVISED_EXECUTOR_PROM... |
 | 2026-05-22T07:56:51Z | history:231:bccee17e | session-event | done | docs, protocol, multi-agent, benchmark, history, verify | docs/prompts/DEEPSEEK_TRACK_M_BATCH_JUDGE_ADVISED_PROMPT.md,PROJECT_STATUS.md |
+| 2026-05-22T08:50:21Z | history:232:cf622b5f | session-event | done | benchmark, verify, command, history, status | benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,benc... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0086.cross.md | 2026-04-15T00:00:00Z..2026-04-25T15:18:13Z | 86 | (multi) | (multi) |
+| 0001-0087.cross.md | 2026-04-15T00:00:00Z..2026-04-25T16:02:11Z | 87 | (multi) | (multi) |
