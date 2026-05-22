@@ -88,7 +88,14 @@ class _MultiPatch:
             setattr(mod, name, value)
 
 
-def sample_entry(id: int, *, status: str = "done", supersedes: str = "none", topics: str = "meta") -> str:
+def sample_entry(
+    id: int,
+    *,
+    status: str = "done",
+    supersedes: str = "none",
+    topics: str = "meta",
+    refs: str = "none",
+) -> str:
     return format_entry(
         id=id,
         date="2026-04-18T12:00:00Z",
@@ -96,7 +103,7 @@ def sample_entry(id: int, *, status: str = "done", supersedes: str = "none", top
         status=status,
         topics=topics.split(","),
         commits="none",
-        refs="none",
+        refs=refs,
         supersedes=supersedes,
         tokens=10,
         body=f"Body of entry {id}.",
@@ -293,6 +300,24 @@ class TestSnapshots(TempRepoBase):
         self.assertIn("Body of entry 1.", payload["pack"])
         self.assertIn("Body of entry 3.", payload["pack"])
 
+    def test_write_snapshot_uses_atomic_replace(self):
+        self.write_entries([sample_entry(1)])
+        from tools.history import write_snapshot as ws
+        if not hasattr(ws, "os"):
+            ws.os = __import__("os")  # type: ignore[attr-defined]
+        with self.patch_paths():
+            rebuild(self.history, self.index)
+            with patch("tools.history.write_snapshot.os.replace", wraps=__import__("os").replace) as replace:
+                snap_path = write_snapshot(
+                    agent="claude-test",
+                    entry_ids=[1],
+                    token_budget=9999,
+                    snapshots_dir=self.snaps,
+                )
+
+        self.assertTrue(snap_path.exists())
+        replace.assert_called_once()
+
     def test_snapshot_records_pack_entries_skipped_by_token_budget(self):
         self.write_entries([sample_entry(1), sample_entry(2), sample_entry(3)])
         with self.patch_paths():
@@ -424,6 +449,19 @@ class TestContextPack(TempRepoBase):
         entries = parse_entries(self.history.read_bytes())
         pack = build_context_pack(entries, latest=1, token_budget=999)
         self.assertIn("invalid bytes", pack.pack)
+
+    def test_refs_pattern_is_literal_not_regex(self):
+        self.write_entries(
+            [
+                sample_entry(1, refs="docs/(literal).md"),
+                sample_entry(2, refs="docs/other.md"),
+            ]
+        )
+        entries = parse_entries(self.history.read_bytes())
+
+        pack = build_context_pack(entries, latest=0, refs_pattern="docs/(literal).md", token_budget=999)
+
+        self.assertEqual(pack.included_ids, [1])
 
 
 class TestVerifyContinuity(TempRepoBase):

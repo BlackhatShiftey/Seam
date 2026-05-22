@@ -3137,6 +3137,23 @@ claim c1:
 
         asyncio.run(_check())
 
+    def test_textual_dashboard_blocks_shell_subprocess_by_default(self) -> None:
+        if find_spec("textual") is None:
+            self.skipTest("textual is not installed")
+        runtime = SeamRuntime(self.db_path)
+        app = TextualDashboardApp(runtime)
+
+        async def _check() -> None:
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app.process_command("!python -c \"print('unsafe-shell-ran')\"")
+                await pilot.pause()
+                result_text = "\n".join(app.result_lines)
+                self.assertIn("Shell execution is disabled", result_text)
+                self.assertNotIn("unsafe-shell-ran", result_text)
+
+        asyncio.run(_check())
+
     def test_textual_dashboard_double_question_forces_chat_outside_agent_mode(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")

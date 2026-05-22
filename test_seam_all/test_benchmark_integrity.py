@@ -44,6 +44,13 @@ def _external_result() -> dict:
     }
 
 
+def _external_unjudged_result() -> dict:
+    result = _external_result()
+    for case in result["cases"]:
+        case.pop("judge", None)
+    return result
+
+
 def test_seal_bil2_external_result_has_manifest_and_hashes():
     bundle = seal_benchmark_bundle(_external_result(), level="BIL-2", allow_stub_seal=True)
 
@@ -57,6 +64,25 @@ def test_seal_bil2_external_result_has_manifest_and_hashes():
     assert bundle["input_manifest"]["judge"]["present"] is True
     assert bundle["input_manifest"]["judge"]["judge_names"] == ["stub"]
     assert bundle["input_manifest"]["judge"]["judge_models"] == ["stub-1"]
+
+
+def test_external_manifest_preserves_metadata_for_new_result_version():
+    result = _external_result()
+    result["version"] = "SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/2"
+
+    manifest = build_input_manifest(result)
+
+    assert manifest["benchmark"] == "locomo"
+    assert manifest["adapter"] == "seam"
+    assert manifest["dataset"] == {"source": "quickstart", "case_count": 2}
+    assert manifest["case_ids"] == ["case-a", "case-b"]
+    assert manifest["judge"]["present"] is True
+    assert manifest["judge"]["judge_names"] == ["stub"]
+
+
+def test_unjudged_external_result_refuses_bil2_by_default():
+    with pytest.raises(ValueError, match="unjudged benchmark result cannot be sealed above BIL-0"):
+        seal_benchmark_bundle(_external_unjudged_result(), level="BIL-2")
 
 
 def test_seal_bil1_has_no_input_manifest_hash():

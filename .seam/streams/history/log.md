@@ -4726,3 +4726,119 @@ Verification: scanner exercised against current branch state and produced clean 
 
 Next step: rebuild HISTORY_INDEX.md, refresh the history stream mirror and cross-index, write a bounded snapshot, run the verify chain, and (operator-authorized) push to origin/main.
 ---END-ENTRY-#224---
+
+---BEGIN-ENTRY-#225---
+id: 225
+date: 2026-05-21T18:21:11Z
+agent: codex
+status: in-progress
+topics: audit, security, benchmark, verify, history, snapshot, dashboard, surface
+commits: none
+refs: benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,seam_runtime/benchmark_integrity.py,seam_runtime/server.py,seam_runtime/dashboard.py,seam_runtime/holographic.py,seam_runtime/storage.py,tools/git-hooks/pre-commit,tools/history/build_context_pack.py,tools/history/write_snapshot.py,experimental/webui/src/api/apiClient.ts,experimental/webui/public/seam-api.js,docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md
+supersedes: 224
+tokens: 576
+---
+Started remediation of the 2026-05-21 security/benchmark findings and stopped at a handoff boundary per operator request. Fixed first-slice issues: external benchmark context-only retrieval no longer earns answer EM/F1, cross-judge now receives real question/gold/prediction, StubJudge abstains instead of scoring correct, provider judge request/parse failures surface as errors, external result manifests preserve adapter/dataset/judge metadata for future version strings, unjudged external results refuse BIL-1/BIL-2 sealing by default, /benchmark ValueError returns HTTP 400, pre-commit fails closed when Python is missing, SQLiteStore memory anchors can be closed/context-managed, history context-pack --refs matching is literal, snapshot writes are atomic via temp file and os.replace, holographic surface encode has a configurable payload-size guard, dashboard subprocess shell execution is disabled unless SEAM_DASHBOARD_ALLOW_SHELL=1, WebUI bearer tokens moved from localStorage to sessionStorage with legacy-key cleanup, pytest config moved into pytest.ini, and httpx was added to the dashboard extra.
+
+Focused verification passed: .venv/bin/python -m pytest test_seam_all/test_locomo_judge.py test_seam_all/test_locomo_zep_adapter.py test_seam_all/test_benchmark_integrity.py test_seam_all/test_git_hooks.py test_seam_all/test_server_benchmark_endpoint.py test_seam_all/test_storage_lifecycle.py test_seam_all/test_holographic_safety.py tools/history/test_history_tools.py::TestContextPack::test_refs_pattern_is_literal_not_regex tools/history/test_history_tools.py::TestSnapshots::test_write_snapshot_uses_atomic_replace tests/audit/test_openai_judge_gpt5.py test_seam_all/test_seam.py::SeamTests::test_textual_dashboard_bang_runs_shell_commands test_seam_all/test_seam.py::SeamTests::test_textual_dashboard_blocks_shell_subprocess_by_default (57 passed in 258.88s). WebUI focused verification passed from experimental/webui: npm test -- --run src/api/apiClient.test.ts (11 passed). git diff --check passed. A broad .venv/bin/python -m pytest run was intentionally interrupted with SIGINT after 93 passed in 576.13s; treat it as incomplete, not passing.
+
+Wrote docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md for DeepSeek continuation. It assigns disjoint parallel-agent scopes for benchmark/BIL truth, runtime/API/storage safety, operator surface safety, history/tooling/surface hardening, final integration, and a fresh full audit for the next problem set. The pre-existing local edit to test_seam_all/test_locomo_runner_cli.py changing quickstart timeout 60s to 180s was present before this Codex pass and was not authored by this pass.
+---END-ENTRY-#225---
+
+---BEGIN-ENTRY-#226---
+id: 226
+date: 2026-05-21T18:22:19Z
+agent: codex
+status: done
+topics: status, history, snapshot, verify, audit, security, benchmark
+commits: none
+refs: PROJECT_STATUS.md,docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 225
+tokens: 113
+---
+Closed the security/benchmark remediation handoff after HISTORY#225 by updating PROJECT_STATUS.md to point future agents at HISTORY#225 and docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md. This entry exists because continuity verification correctly rejected the stale PROJECT_STATUS.md pointer after the first handoff entry.
+
+No additional code fixes were made after HISTORY#225. Verification to rerun after this entry: rebuild history stream mirror and cross-index, write a fresh snapshot, then run verify_integrity, verify_routing, verify_continuity, and verify_streams.
+---END-ENTRY-#226---
+
+---BEGIN-ENTRY-#227---
+id: 227
+date: 2026-05-21T18:22:55Z
+agent: codex
+status: done
+topics: status, history, snapshot, verify, audit, security, benchmark
+commits: none
+refs: PROJECT_STATUS.md,docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots
+supersedes: 226
+tokens: 131
+---
+Final status-pointer closeout for the Codex security/benchmark remediation stopping point. PROJECT_STATUS.md now names HISTORY#227 as the latest continuity handoff and points to HISTORY#225 plus docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md for the actual remediation scope and DeepSeek continuation plan.
+
+This entry corrects the sequencing mistake in HISTORY#226, which recorded a status update before the status file was adjusted to the final latest-entry id. No additional code fixes were made after HISTORY#225. Verification to rerun after this entry: history mirror, cross-index, snapshot, integrity, routing, continuity, and streams.
+---END-ENTRY-#227---
+
+---BEGIN-ENTRY-#228---
+id: 228
+date: 2026-05-21T23:38:48Z
+agent: claude
+status: done
+topics: docs, handoff, benchmark, locomo, retrieval, vector, protocol
+commits: f587220
+refs: docs/SOP_TRACK_M_P4_SCORE_IMPROVEMENTS_AND_MEASUREMENT.md
+supersedes: 224
+tokens: 576
+---
+Wrote the next-handoff SOP for DeepSeek: docs/SOP_TRACK_M_P4_SCORE_IMPROVEMENTS_AND_MEASUREMENT.md. It composes two coupled operations into one sync-relay pass — establish a baseline real-judge LoCoMo measurement on current main (long-deferred from the P1 SOP, never actually executed because the prior run_a.json was retrieval-only with no answerer), then land the three remaining operator-earmarked next-track score-improvement items, then re-measure.
+
+The three score-improvement items in order: temporal distance scoring (replace P3 Fix 4's binary temporal-token filter with a calendar-distance score over question date references and candidate timestamps), cross-encoder re-ranker (optional second-stage re-rank over top-K bi-encoder results, gated by --rerank cross-encoder, falls back to existing ranking when off), and embedding model upgrade (make a real SBERT embedding the SeamRuntime default with hash fallback only behind an explicit env var, extending P3 Fix 2's "no silent fallback" principle to the library default path). BEAM directory ingestion and LongMemEval haystack_date wiring — the other two items from the operator's earlier "next-track" list — already landed via commit 051778c in HISTORY#223.
+
+Sync-relay hard rules carried forward: DeepSeek never commits; Claude reviews each diff and commits per item; each fix gets one focused commit with at least one tests/audit regression; quickstart smoke must hold context_recall_mean >= 0.90 between fixes; ranking weights cannot change without an A/B report; no silent embedding fallback; no datasets, secrets, session URLs, or result bundles committed to the repo.
+
+Baseline + final measurement protocol: run quickstart (10 cases) and full LoCoMo (1,542 answerable cases) before any code change, seal both as BIL-2; repeat after the three fixes land; diff the bundles with seam benchmark diff. The handback must report per-fix attribution where possible, bundle hashes for both runs, EM/F1/context_recall deltas, and any rejected approaches.
+
+Verification: SOP committed at f587220, baseline verify chain was clean before the commit (Integrity OK, Routing OK, Continuity OK, streams OK), rerun pending after this entry + index rebuild + snapshot. The paste-ready DeepSeek prompt was emitted inline in the chat per the operator's preference (memory: "DeepSeek prompts go inline in chat — always emit the paste-ready prompt in a fenced block inside the chat response").
+
+Next step: rebuild HISTORY_INDEX, refresh history stream mirror and cross-index, write a bounded snapshot, run the verify chain, and (operator-authorized) push the bookkeeping commit and SOP commit to origin/main so DeepSeek can pull when it picks up the handoff.
+---END-ENTRY-#228---
+
+---BEGIN-ENTRY-#229---
+id: 229
+date: 2026-05-22T06:25:30Z
+agent: claude
+status: done
+topics: audit, history, snapshot, verify, security, benchmark, handoff, multi-agent
+commits: none
+refs: HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md,.seam/cross_index_archive/0001-0084.cross.md,.seam/snapshots,benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,seam_runtime/benchmark_integrity.py,seam_runtime/server.py,seam_runtime/dashboard.py,seam_runtime/storage.py,seam_runtime/holographic.py,experimental/webui/src/api/apiClient.ts,experimental/webui/src/api/apiClient.test.ts,experimental/webui/src/panes/SettingsPane.tsx,experimental/webui/public/seam-api.js,tools/history/build_context_pack.py,tools/history/write_snapshot.py,tools/git-hooks/pre-commit,pyproject.toml,pytest.ini,test_seam_all/test_git_hooks.py,test_seam_all/test_holographic_safety.py,test_seam_all/test_server_benchmark_endpoint.py,test_seam_all/test_storage_lifecycle.py,test_seam_all/test_locomo_judge.py,test_seam_all/test_benchmark_integrity.py,test_seam_all/test_locomo_zep_adapter.py,test_seam_all/test_locomo_runner_cli.py,test_seam_all/test_seam.py,tests/audit/test_openai_judge_gpt5.py,tools/history/test_history_tools.py,docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md
+supersedes: 228
+tokens: 1143
+---
+Committed the in-progress security/benchmark remediation slice from HISTORY#225 and closed the continuity layer that had drifted between HISTORY#225 (codex, in-progress) and HISTORY#228 (claude, P4 SOP). Operator-authorized after a full audit on 2026-05-22 found verify_continuity and verify_streams red on main, 36 uncommitted files sitting on top of HEAD f587220, and two open handoff slices overlapping in time.
+
+Scope of committed code/tests (the original #225 Codex remediation, unchanged by this entry):
+- Benchmark truth: benchmarks/external/common/judge.py (StubJudge abstains; provider errors raise; strict JSON parsing) and benchmarks/external/common/runner.py (EM/F1 only when generated_answer is present; judge errors recorded as errors not incorrect).
+- BIL integrity: seam_runtime/benchmark_integrity.py (version prefix match; unjudged external results refuse BIL-1/BIL-2 without explicit allow_stub_seal).
+- HTTP correctness: seam_runtime/server.py (/benchmark ValueError now returns HTTP 400, not 200 with error body).
+- Sandbox-by-default: seam_runtime/dashboard.py (shell subprocess execution gated behind SEAM_DASHBOARD_ALLOW_SHELL=1).
+- Storage lifecycle: seam_runtime/storage.py (SQLiteStore.close() + context manager; in-memory anchor closeable).
+- DoS guard: seam_runtime/holographic.py (encode_surface enforces SEAM_SURFACE_MAX_PAYLOAD_BYTES with 64MiB default).
+- WebUI token hygiene: experimental/webui/src/api/apiClient.ts (bearer token sessionStorage with legacy localStorage cleanup), experimental/webui/src/api/apiClient.test.ts, experimental/webui/src/panes/SettingsPane.tsx, experimental/webui/public/seam-api.js.
+- Tool correctness: tools/history/build_context_pack.py (--refs literal match), tools/history/write_snapshot.py (atomic tempfile + os.replace), tools/git-hooks/pre-commit (fail closed on missing Python).
+- Config consolidation: pyproject.toml (httpx added to dash extra), pytest.ini (consolidated pytest config).
+- New tests: test_seam_all/test_git_hooks.py, test_seam_all/test_holographic_safety.py, test_seam_all/test_server_benchmark_endpoint.py, test_seam_all/test_storage_lifecycle.py; expanded test_seam_all/test_locomo_judge.py, test_seam_all/test_benchmark_integrity.py, test_seam_all/test_locomo_zep_adapter.py, test_seam_all/test_locomo_runner_cli.py, test_seam_all/test_seam.py, tests/audit/test_openai_judge_gpt5.py, tools/history/test_history_tools.py.
+
+Continuity layer refresh in this entry (the actual closeout work):
+- Rebuilt .seam/streams/history/{log,index}.md from HISTORY.md via tools.streams.history_adapter so the streams mirror matches the canonical log.
+- Rebuilt .seam/cross_index.md and rotated archive chunk to .seam/cross_index_archive/0001-0084.cross.md (the prior 0001-0079 chunk is superseded and removed from active state) via tools.streams.rebuild_cross_index. New total 284 events (200 hot, 84 cold).
+- Rebuilt HISTORY_INDEX.md to include this entry via tools.history.rebuild_index.
+- Updated PROJECT_STATUS.md to name HISTORY#229 as the latest continuity handoff and to remove the stale HISTORY#227 pointer that recorded-fact audit was rejecting.
+- Wrote a fresh snapshot under .seam/snapshots/ referencing HISTORY#229.
+
+Verification: focused 7-file SOP regression set (test_locomo_judge, test_benchmark_integrity, test_git_hooks, test_server_benchmark_endpoint, test_storage_lifecycle, test_holographic_safety, tools/history/test_history_tools) passed exit 0 to 100% via .venv/bin/python -m pytest --tb=short -q. SOP's narrower "57 passed in 258.88s" claim is consistent. Broad pytest test_seam_all/ tests/audit/ run was interrupted again at ~13% during the audit (likely test_pgvector_real_adapter or test_locomo_runner_cli 180s timeout cases); full-broad-suite status remains unverified. All four verify gates (integrity, routing, continuity, streams) green after this entry, index rebuild, mirror rebuild, cross-index rebuild, snapshot write, and PROJECT_STATUS update.
+
+Carry-forward facts not changed by this commit:
+- HISTORY#228's Track M P4 DeepSeek SOP (docs/SOP_TRACK_M_P4_SCORE_IMPROVEMENTS_AND_MEASUREMENT.md) remains the next planned execution and is unchanged.
+- The pre-existing local edit in test_seam_all/test_locomo_runner_cli.py changing quickstart timeout from 60s to 180s predates the Codex pass and is preserved per the SOP's "do not revert unless operator asks" rule.
+- HEAD before this commit was f587220 (HISTORY#228 SOP). origin/main was 1 commit behind that. This commit and any follow-up push remain operator-authorized; no automatic push was performed.
+
+Next step: operator-authorized push to origin/main when ready, then DeepSeek can pull and execute the Track M P4 SOP (#228) against the now-stable baseline. The remaining open items from the audit (vector O(N), schema migration, structured logging, real-judge benchmark bundle, path containment policy, multi-worker rate-limit story) remain on the backlog and should be picked up only after this slice is pushed.
+---END-ENTRY-#229---

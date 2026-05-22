@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import struct
 import zlib
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ SURFACE_MAGIC_BYTES = b"SEAM-HS/1\n"
 SURFACE_MODES = ("bw1", "rgb", "rgb24", "rgba32", "rgba64")
 SURFACE_PAYLOAD_FORMATS = ("auto", "MIRL", "SEAM-RC/1", "SEAM-LX/1", "bytes")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+DEFAULT_MAX_SURFACE_PAYLOAD_BYTES = 64 * 1024 * 1024
 
 
 @dataclass
@@ -165,6 +167,12 @@ def encode_surface(
     mode = _normalize_surface_mode(mode)
     if mode not in SURFACE_MODES:
         raise ValueError(f"Unsupported holographic surface mode: {mode}")
+    max_payload_bytes = _max_surface_payload_bytes()
+    if max_payload_bytes and len(payload) > max_payload_bytes:
+        raise ValueError(
+            "Holographic surface payload exceeds configured limit: "
+            f"{len(payload)} bytes > {max_payload_bytes} bytes"
+        )
     resolved_format = _detect_payload_format(payload) if payload_format == "auto" else payload_format
     if resolved_format not in SURFACE_PAYLOAD_FORMATS or resolved_format == "auto":
         raise ValueError(f"Unsupported holographic payload format: {payload_format}")
@@ -353,6 +361,19 @@ def _looks_like_mirl(payload: bytes) -> bool:
 
 def _normalize_surface_mode(mode: str) -> str:
     return "rgb24" if mode == "rgb" else mode
+
+
+def _max_surface_payload_bytes() -> int:
+    raw = os.environ.get("SEAM_SURFACE_MAX_PAYLOAD_BYTES")
+    if raw is None or raw.strip() == "":
+        return DEFAULT_MAX_SURFACE_PAYLOAD_BYTES
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError("SEAM_SURFACE_MAX_PAYLOAD_BYTES must be an integer") from exc
+    if value < 0:
+        raise ValueError("SEAM_SURFACE_MAX_PAYLOAD_BYTES must be non-negative")
+    return value
 
 
 def _container_to_pixels(container: bytes, mode: str) -> tuple[int, int, bytes, int, int, int]:

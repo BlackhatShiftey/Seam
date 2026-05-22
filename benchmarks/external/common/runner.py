@@ -246,13 +246,13 @@ def _run_case(adapter: MemorySystemAdapter, case: BenchmarkCase, judge: object |
 def _score_case(case: BenchmarkCase, answer: AdapterAnswer, judge: object | None) -> dict:
     cr = context_recall(answer.retrieved_context, case.gold_answer)
 
-    pred = answer.generated_answer or answer.retrieved_context
+    pred = answer.generated_answer if answer.generated_answer is not None else ""
     if answer.generated_answer is not None:
         em = exact_match(answer.generated_answer, case.gold_answer)
         f1 = token_f1(answer.generated_answer, case.gold_answer)
     else:
-        em = exact_match(answer.retrieved_context, case.gold_answer)
-        f1 = token_f1(answer.retrieved_context, case.gold_answer)
+        em = 0.0
+        f1 = 0.0
 
     case_entry: dict = {
         "case_id": case.case_id,
@@ -265,6 +265,8 @@ def _score_case(case: BenchmarkCase, answer: AdapterAnswer, judge: object | None
         "retrieval_latency_ms": answer.retrieval_latency_ms,
         "answer_latency_ms": answer.answer_latency_ms,
         "_prediction": pred,
+        "_judge_question": case.question,
+        "_judge_gold": case.gold_answer,
     }
 
     if judge is not None:
@@ -330,8 +332,8 @@ def _build_report(
             pred = case.get("_prediction", "")
             try:
                 verdict = judge_cross.score(
-                    question=case.get("case_id", ""),
-                    gold="",
+                    question=case.get("_judge_question", ""),
+                    gold=case.get("_judge_gold", ""),
                     pred=pred,
                 )
                 cross_entry = {
@@ -345,9 +347,11 @@ def _build_report(
                 cross_entry = {"error": str(exc)}
             case["judge_cross"] = cross_entry
             cross_verdicts.append(cross_entry)
-        cross_agg = aggregate_judge_scores(cross_verdicts)
-        for key, value in cross_agg.items():
-            scores[f"judge_cross_{key}"] = value
+        scorable = [v for v in cross_verdicts if "verdict" in v]
+        if scorable:
+            cross_agg = aggregate_judge_scores(scorable)
+            for key, value in cross_agg.items():
+                scores[f"judge_cross_{key}"] = value
         primary_verdicts = [
             c.get("judge", {}).get("verdict")
             for c in case_results
@@ -366,12 +370,24 @@ def _build_report(
     # Per-category score breakdown when cases carry category metadata
     _add_per_category_scores(scores, case_results)
 
-    integrity_exclude_keys = {"retrieval_latency_ms", "answer_latency_ms", "judge", "_prediction", "judge_cross"}
+    integrity_exclude_keys = {
+        "retrieval_latency_ms",
+        "answer_latency_ms",
+        "judge",
+        "_prediction",
+        "_judge_question",
+        "_judge_gold",
+        "judge_cross",
+    }
     stable_cases = [
         {k: v for k, v in c.items() if k not in integrity_exclude_keys}
         for c in case_results
     ]
     integrity = _integrity_hash(stable_cases, scores)
+
+    for case in case_results:
+        case.pop("_judge_question", None)
+        case.pop("_judge_gold", None)
 
     report: dict = {
         "version": RESULT_VERSION,

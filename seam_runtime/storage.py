@@ -13,6 +13,7 @@ from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, SYMBOL_F
 class SQLiteStore:
     def __init__(self, path: str | Path = "seam.db") -> None:
         self.path = str(path)
+        self._mem_anchor: sqlite3.Connection | None = None
         if self.path != ":memory:":
             Path(self.path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
         else:
@@ -36,6 +37,17 @@ class SQLiteStore:
         connection.execute("pragma busy_timeout=5000")
         connection.execute("pragma foreign_keys=ON")
         return connection
+
+    def close(self) -> None:
+        if self._mem_anchor is not None:
+            self._mem_anchor.close()
+            self._mem_anchor = None
+
+    def __enter__(self) -> "SQLiteStore":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     def _init_schema(self) -> None:
         with closing(self._connect()) as connection:

@@ -89,9 +89,18 @@ function getStoredValue(key: string): string | null {
   }
 }
 
+function getSessionValue(key: string): string | null {
+  try {
+    globalThis.localStorage?.removeItem(key);
+    return globalThis.sessionStorage?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function getClient() {
   const baseUrl = (getStoredValue(BASE_KEY) || DEFAULT_BASE_URL).replace(/\/$/, '');
-  const token = getStoredValue(TOKEN_KEY) || '';
+  const token = getSessionValue(TOKEN_KEY) || '';
   return { baseUrl, token };
 }
 

@@ -22,7 +22,8 @@
 
   function getToken() {
     try {
-      return localStorage.getItem(TOKEN_KEY) || '';
+      localStorage.removeItem(TOKEN_KEY);
+      return sessionStorage.getItem(TOKEN_KEY) || '';
     } catch {
       return '';
     }
@@ -269,8 +270,9 @@
     configure: function (baseUrl, token) {
       try {
         if (baseUrl !== undefined) localStorage.setItem(BASE_KEY, baseUrl || '');
-        if (token !== undefined) localStorage.setItem(TOKEN_KEY, token || '');
-      } catch (_) { /* localStorage unavailable */ }
+        localStorage.removeItem(TOKEN_KEY);
+        if (token !== undefined) sessionStorage.setItem(TOKEN_KEY, token || '');
+      } catch (_) { /* storage unavailable */ }
     },
 
     // Utility: get current config

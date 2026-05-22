@@ -5,15 +5,16 @@ const TOKEN_KEY = 'seam-webui-api-token';
 
 export default function SettingsPane() {
   const [baseUrl, setBaseUrl] = React.useState(localStorage.getItem(BASE_KEY) || 'http://127.0.0.1:8765');
-  const [token, setToken] = React.useState(localStorage.getItem(TOKEN_KEY) || '');
+  const [token, setToken] = React.useState(sessionStorage.getItem(TOKEN_KEY) || '');
   const [saved, setSaved] = React.useState(false);
 
   function handleSave() {
     localStorage.setItem(BASE_KEY, baseUrl);
+    localStorage.removeItem(TOKEN_KEY);
     if (token.trim()) {
-      localStorage.setItem(TOKEN_KEY, token);
+      sessionStorage.setItem(TOKEN_KEY, token);
     } else {
-      localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_KEY);
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);

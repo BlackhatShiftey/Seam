@@ -9,14 +9,23 @@ import {
   fetchLosslessCompress,
 } from './apiClient';
 
-function installStorage(values: Record<string, string> = {}) {
+function installStorage(values: Record<string, string> = {}, sessionValues: Record<string, string> = {}) {
   const store = new Map(Object.entries(values));
+  const sessionStore = new Map(Object.entries(sessionValues));
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
       getItem: vi.fn((key: string) => store.get(key) ?? null),
       setItem: vi.fn((key: string, value: string) => store.set(key, value)),
       removeItem: vi.fn((key: string) => store.delete(key)),
+    },
+  });
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: {
+      getItem: vi.fn((key: string) => sessionStore.get(key) ?? null),
+      setItem: vi.fn((key: string, value: string) => sessionStore.set(key, value)),
+      removeItem: vi.fn((key: string) => sessionStore.delete(key)),
     },
   });
 }
@@ -81,9 +90,10 @@ describe('apiClient', () => {
     );
   });
 
-  it('adds bearer authorization from local storage', async () => {
+  it('adds bearer authorization from session storage', async () => {
     installStorage({
       'seam-webui-api-url': 'http://127.0.0.1:9999/',
+    }, {
       'seam-webui-api-token': 'test-token',
     });
     const fetchMock = installFetch(Response.json({ total_records: 3 }));

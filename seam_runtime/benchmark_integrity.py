@@ -18,6 +18,11 @@ VOLATILE_RESULT_HASH_KEYS = {
 }
 
 
+def _is_external_memory_result(result: dict[str, Any]) -> bool:
+    version = result.get("version")
+    return isinstance(version, str) and version.startswith("SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/")
+
+
 def canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -54,7 +59,7 @@ def stable_result_hash_input(value: Any) -> Any:
 
 
 def build_input_manifest(result: dict[str, Any]) -> dict[str, Any]:
-    if result.get("version") == "SEAM-EXTERNAL-MEMORY-BENCHMARK-RESULT/1":
+    if _is_external_memory_result(result):
         cases = result.get("cases") or []
         case_ids = sorted(str(case.get("case_id")) for case in cases if case.get("case_id") is not None)
         judge_entries = [case.get("judge") for case in cases if isinstance(case.get("judge"), dict)]
@@ -116,6 +121,11 @@ def seal_benchmark_bundle(
     if level in {"BIL-1", "BIL-2"} and not allow_stub_seal:
         for case in result.get("cases") or []:
             judge = case.get("judge")
+            if _is_external_memory_result(result) and not isinstance(judge, dict):
+                raise ValueError(
+                    "unjudged benchmark result cannot be sealed above BIL-0; "
+                    "pass allow_stub_seal=True to override"
+                )
             if isinstance(judge, dict) and judge.get("judge_name") in {
                 "stub",
                 "stub-informational-only",

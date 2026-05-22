@@ -84,8 +84,10 @@ def test_openai_judge_surfaces_request_error_type_without_secret_values():
     completions = FailingCompletions()
     judge = _judge_with_fake_client("gpt-5-nano", completions)
 
-    verdict = judge.score(question="Where?", gold="Tokyo", pred="Tokyo")
-
-    assert verdict.verdict == "incorrect"
-    assert verdict.score == 0.0
-    assert "BadRequestError" in verdict.rationale
+    try:
+        judge.score(question="Where?", gold="Tokyo", pred="Tokyo")
+    except RuntimeError as exc:
+        assert "BadRequestError" in str(exc)
+        assert "unsupported parameter" not in str(exc)
+    else:
+        raise AssertionError("expected judge request failure to raise")

@@ -275,5 +275,5 @@ def test_combined_zep_adapter_with_stub_judge() -> None:
     cases = _minimal_cases(2)
     report = run_benchmark(adapter=adapter, cases=cases, judge=StubJudge())
     assert report["adapter"] == "zep"
-    assert report["scores"]["judge_score_mean"] == 1.0
-    assert report["cases"][0]["judge"]["verdict"] == "correct"
+    assert report["scores"]["judge_score_mean"] == 0.0
+    assert report["cases"][0]["judge"]["verdict"] == "abstain"

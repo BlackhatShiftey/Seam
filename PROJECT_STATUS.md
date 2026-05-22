@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-21 (HISTORY#221 — Official LoCoMo dataset setup/parser fix)
+Last updated: 2026-05-22 (HISTORY#229 — Security/benchmark remediation slice committed; continuity closeout)
 
 ## Current State
 
@@ -30,7 +30,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#221` — official LoCoMo setup exposed and fixed a parser compatibility gap. `snap-research/locomo`'s public `data/locomo10.json` uses numbered `session_N` fields and includes 444 answerless adversarial rows; the Track M loader now supports that official shape and skips answerless rows for this answerable-QA runner. Local operator env scaffold is `/home/terrabyte/.config/seam/track_m.env` with `LOCOMO_DATASET_PATH` pointing at `/home/terrabyte/seam_benchmarks/track_m/locomo/locomo10.json`; no secrets were written. Dry-run reports 1,542 answerable cases and fixture hash `85401eeabfbcdb0f18fac328809ef9a828bbc84ae3aed74b9c32f8996d49e2c3`. Full no-skip active suite with Docker pgvector env passed 511 tests and 3 subtests. `HISTORY#220` remains the Track M P0 merge handoff; `docs/SOP_TRACK_M_P1_REAL_BENCHMARK_RUNS.md` is still the next operator handoff for real judges and BIL-2 publication evidence.
+- Latest continuity handoff is `HISTORY#229` — the in-progress Codex security/benchmark remediation slice from `HISTORY#225` is now committed alongside the continuity-layer refresh (streams mirror, cross-index, snapshot, status pointer). `docs/SOP_DEEPSEEK_SECURITY_BENCHMARK_REMEDIATION.md` remains the DeepSeek parallel-agent continuation handoff. `docs/SOP_TRACK_M_P4_SCORE_IMPROVEMENTS_AND_MEASUREMENT.md` (from `HISTORY#228`) is the next planned execution. Focused 7-file SOP regression test set passed exit 0 to 100% under `.venv/bin/python -m pytest --tb=short -q`; broad `pytest test_seam_all/ tests/audit/` was interrupted at ~13% during the 2026-05-22 audit and remains unverified. The pre-existing local edit in `test_seam_all/test_locomo_runner_cli.py` changing quickstart timeout from 60s to 180s predates the Codex pass and is preserved.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.

@@ -158,7 +158,7 @@ def build_context_pack(
         all_ref_patterns.extend(refs_patterns)
 
     for pattern in all_ref_patterns:
-        rx = re.compile(pattern, re.IGNORECASE)
+        rx = re.compile(re.escape(pattern), re.IGNORECASE)
         for e in reversed(entries):
             if rx.search(e.refs) or rx.search(e.body):
                 selected.add(e.id)

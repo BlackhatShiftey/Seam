@@ -258,7 +258,7 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
         try:
             result = run_benchmark_suite(runtime, suite=suite, persist=persist, holdout=holdout)
         except ValueError as exc:
-            return {"error": str(exc), "suite": suite, "holdout": holdout}
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return result
 
     _last_cpu_times = None

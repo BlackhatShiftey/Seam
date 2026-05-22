@@ -5,6 +5,7 @@ import argparse
 import datetime as _dt
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -110,7 +111,9 @@ def write_snapshot(
                 out_path = candidate
                 break
             suffix += 1
-    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp_path = out_path.with_name(f".{out_path.name}.tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(tmp_path, out_path)
     return out_path
 
 

@@ -51,11 +51,32 @@ class Judge(Protocol):
 
 
 class StubJudge:
-    """Deterministic judge used by tests. Marks everything correct."""
-    name = "stub"
+    """Deterministic smoke-test judge that never claims correctness."""
+    name = "stub-informational-only"
     model = "stub-1"
     def score(self, *, question, gold, pred) -> JudgeVerdict:
-        return JudgeVerdict("correct", 1.0, "stub always returns correct", self.name, self.model)
+        return JudgeVerdict("abstain", 0.0, "stub does not score correctness", self.name, self.model)
+
+
+def _strip_json_fence(text: str) -> str:
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        text = "\n".join(line for line in lines if not line.startswith("```"))
+    return text.strip()
+
+
+def _verdict_from_json_text(text: str, *, judge_name: str, judge_model: str) -> JudgeVerdict:
+    try:
+        data = json.loads(_strip_json_fence(text))
+    except json.JSONDecodeError as exc:
+        raise ValueError("judge returned unparseable JSON") from exc
+    verdict = data.get("verdict")
+    score_map = {"correct": 1.0, "partial": 0.5, "incorrect": 0.0, "abstain": 0.0}
+    if verdict not in score_map:
+        raise ValueError("judge returned invalid verdict")
+    rationale = str(data.get("rationale") or "judge returned no rationale")
+    return JudgeVerdict(verdict, score_map[verdict], rationale, judge_name, judge_model)
 
 
 class ClaudeJudge:
@@ -84,20 +105,9 @@ class ClaudeJudge:
                 max_tokens=256,
                 messages=[{"role": "user", "content": prompt}],
             )
-            text = response.content[0].text
-            text = text.strip()
-            if text.startswith("```"):
-                lines = text.split("\n")
-                text = "\n".join(l for l in lines if not l.startswith("```"))
-                text = text.strip()
-            data = json.loads(text)
-            verdict = data.get("verdict", "incorrect")
-            rationale = data.get("rationale", "judge returned unparseable JSON")
-        except Exception:
-            verdict = "incorrect"
-            rationale = "judge returned unparseable JSON"
-        score_map = {"correct": 1.0, "partial": 0.5, "incorrect": 0.0}
-        return JudgeVerdict(verdict, score_map.get(verdict, 0.0), rationale, self.name, self.model)
+        except Exception as exc:
+            raise RuntimeError(f"judge request failed: {type(exc).__name__}") from exc
+        return _verdict_from_json_text(response.content[0].text, judge_name=self.name, judge_model=self.model)
 
 
 class OpenAIJudge:
@@ -142,23 +152,10 @@ class OpenAIJudge:
             response = self._client.chat.completions.create(
                 **request,
             )
-            text = response.choices[0].message.content or ""
-            text = text.strip()
-            if text.startswith("```"):
-                lines = text.split("\n")
-                text = "\n".join(l for l in lines if not l.startswith("```"))
-                text = text.strip()
-            data = json.loads(text)
-            verdict = data.get("verdict", "incorrect")
-            rationale = data.get("rationale", "judge returned unparseable JSON")
-        except json.JSONDecodeError:
-            verdict = "incorrect"
-            rationale = "judge returned unparseable JSON"
         except Exception as exc:
-            verdict = "incorrect"
-            rationale = f"judge request failed: {type(exc).__name__}"
-        score_map = {"correct": 1.0, "partial": 0.5, "incorrect": 0.0}
-        return JudgeVerdict(verdict, score_map.get(verdict, 0.0), rationale, self.name, self.model)
+            raise RuntimeError(f"judge request failed: {type(exc).__name__}") from exc
+        text = response.choices[0].message.content or ""
+        return _verdict_from_json_text(text, judge_name=self.name, judge_model=self.model)
 
 
 def build_judge(name: str | None, model: str | None = None) -> Judge | None:

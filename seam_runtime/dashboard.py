@@ -1339,6 +1339,10 @@ if (
                 self._append_chat_activity("shell", f"!{shell_command}", str(exc))
 
         def _run_shell_subprocess(self, command: str) -> subprocess.CompletedProcess[str]:
+            if os.environ.get("SEAM_DASHBOARD_ALLOW_SHELL") != "1":
+                raise PermissionError(
+                    "Shell execution is disabled by default; set SEAM_DASHBOARD_ALLOW_SHELL=1 to enable subprocess commands."
+                )
             timeout_seconds = float(os.environ.get("SEAM_SHELL_TIMEOUT_SECONDS", "45"))
             if os.name == "nt":
                 return subprocess.run(
