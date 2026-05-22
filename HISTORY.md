@@ -4856,3 +4856,17 @@ tokens: 333
 ---
 Added the Advisor/Executor loop protocol for the operator's requested high-reasoning advisor plus cheaper DeepSeek executor workflow. New docs/SOP_ADVISOR_EXECUTOR_LOOP.md defines Advisor authority (Codex now, true Opus when available), DeepSeek/claude-ds executor boundaries, ADVISOR_TASK_PACKET, ADVISOR_ESCALATION, ADVISOR_PLAN, ADVISOR_TAKEOVER, and EXECUTOR_HANDOFF formats, review gates, and the improvement loop that turns repeat DeepSeek mistakes into ledger cards. Added docs/prompts/DEEPSEEK_ADVISED_EXECUTOR_PROMPT.md as the paste-ready claude-ds prompt for Advisor-authored packets. Added docs/superpowers/plans/2026-05-22-advisor-executor-loop.md as the implementation plan record. Updated docs/ledgers/agents/deepseek.md with C6 requiring DeepSeek to escalate missing context, ambiguous design, pre-existing failing tests, insufficient scope, or contradictory command output instead of inventing strategy. Updated REPO_LEDGER.md with the stable policy pointer and PROJECT_STATUS.md with this latest handoff plus the Track M P4 quickstart-baseline note. Verification before history append: git diff --check passed; doc scan found only a self-referential scan-command line in the plan and no secret value or private session URL. Unrelated local benchmark/judge/test edits were already present or appeared concurrently and were not touched or staged by this protocol slice. Required closeout after this entry: rebuild index, rebuild history stream mirror, rebuild cross-index, write snapshot, then run integrity/routing/continuity/streams gates.
 ---END-ENTRY-#230---
+
+---BEGIN-ENTRY-#231---
+id: 231
+date: 2026-05-22T07:56:51Z
+agent: codex
+status: done
+topics: docs, protocol, multi-agent, benchmark, history, verify
+commits: none
+refs: docs/prompts/DEEPSEEK_TRACK_M_BATCH_JUDGE_ADVISED_PROMPT.md,PROJECT_STATUS.md
+supersedes: 230
+tokens: 182
+---
+Added docs/prompts/DEEPSEEK_TRACK_M_BATCH_JUDGE_ADVISED_PROMPT.md as a complete ready-to-paste claude-ds prompt with the Track M batch-judge review ADVISOR_TASK_PACKET already inserted, so the operator no longer has to replace the placeholder in docs/prompts/DEEPSEEK_ADVISED_EXECUTOR_PROMPT.md manually. The packet keeps DeepSeek bounded to the batch judge files/tests, requires a clean branch, forbids commits/pushes/history edits, blocks live provider-call assumptions, and requires ADVISOR_ESCALATION for architecture/scope/missing-context uncertainty. Updated PROJECT_STATUS.md to point at HISTORY#231. Verification before history append: git diff --check on the new prompt passed; secret/session-link scan of the prompt found no hits. Unrelated local benchmark/judge/test edits remain unstaged and were not touched by this prompt artifact.
+---END-ENTRY-#231---
