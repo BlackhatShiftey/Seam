@@ -4842,3 +4842,17 @@ Carry-forward facts not changed by this commit:
 
 Next step: operator-authorized push to origin/main when ready, then DeepSeek can pull and execute the Track M P4 SOP (#228) against the now-stable baseline. The remaining open items from the audit (vector O(N), schema migration, structured logging, real-judge benchmark bundle, path containment policy, multi-worker rate-limit story) remain on the backlog and should be picked up only after this slice is pushed.
 ---END-ENTRY-#229---
+
+---BEGIN-ENTRY-#230---
+id: 230
+date: 2026-05-22T07:46:11Z
+agent: codex
+status: done
+topics: docs, ledger, protocol, multi-agent, history, verify
+commits: none
+refs: docs/SOP_ADVISOR_EXECUTOR_LOOP.md,docs/prompts/DEEPSEEK_ADVISED_EXECUTOR_PROMPT.md,docs/superpowers/plans/2026-05-22-advisor-executor-loop.md,docs/ledgers/agents/deepseek.md,REPO_LEDGER.md,PROJECT_STATUS.md
+supersedes: 229
+tokens: 333
+---
+Added the Advisor/Executor loop protocol for the operator's requested high-reasoning advisor plus cheaper DeepSeek executor workflow. New docs/SOP_ADVISOR_EXECUTOR_LOOP.md defines Advisor authority (Codex now, true Opus when available), DeepSeek/claude-ds executor boundaries, ADVISOR_TASK_PACKET, ADVISOR_ESCALATION, ADVISOR_PLAN, ADVISOR_TAKEOVER, and EXECUTOR_HANDOFF formats, review gates, and the improvement loop that turns repeat DeepSeek mistakes into ledger cards. Added docs/prompts/DEEPSEEK_ADVISED_EXECUTOR_PROMPT.md as the paste-ready claude-ds prompt for Advisor-authored packets. Added docs/superpowers/plans/2026-05-22-advisor-executor-loop.md as the implementation plan record. Updated docs/ledgers/agents/deepseek.md with C6 requiring DeepSeek to escalate missing context, ambiguous design, pre-existing failing tests, insufficient scope, or contradictory command output instead of inventing strategy. Updated REPO_LEDGER.md with the stable policy pointer and PROJECT_STATUS.md with this latest handoff plus the Track M P4 quickstart-baseline note. Verification before history append: git diff --check passed; doc scan found only a self-referential scan-command line in the plan and no secret value or private session URL. Unrelated local benchmark/judge/test edits were already present or appeared concurrently and were not touched or staged by this protocol slice. Required closeout after this entry: rebuild index, rebuild history stream mirror, rebuild cross-index, write snapshot, then run integrity/routing/continuity/streams gates.
+---END-ENTRY-#230---

@@ -150,3 +150,27 @@ When Claude catches a new DeepSeek failure mode:
 4. Fold the rule into the next SOP's "Hard constraints" section so
    DeepSeek hits the rule before the verify gate.
 5. Append a HISTORY entry citing this ledger update.
+
+---
+
+## C6 — Strategy invention instead of Advisor escalation
+
+**Mistake**: DeepSeek continues past missing context, ambiguous design,
+pre-existing failing tests, insufficient file scope, or contradictory command
+output by inventing a local strategy and editing anyway.
+
+**Root cause**: DeepSeek is strong at code generation but weaker at preserving
+SEAM's cross-agent authority boundary. When the prompt says "execute", a
+cold-start session may treat unclear architecture as an implementation detail.
+
+**Rule**: Under `docs/SOP_ADVISOR_EXECUTOR_LOOP.md`, DeepSeek is the Executor,
+not the architect. If a decision affects architecture, scope, history
+protocol, benchmark claims, credential handling, or files outside the packet's
+`allowed_files`, stop and emit `ADVISOR_ESCALATION`. Do not create a new plan,
+broaden the diff, or make a compensating history/protocol edit.
+
+**Detection command Claude runs**:
+```
+git diff --name-only | sort -u
+rg -n "ADVISOR_ESCALATION|ADVISOR_TASK_PACKET|EXECUTOR_HANDOFF" docs/ docs/prompts/
+```
