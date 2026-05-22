@@ -44,6 +44,7 @@ class SeamLocomoAdapter:
         self._decomposer_model = decomposer_model
         self._decomposer_max_subq = decomposer_max_subq
         self._abstain_threshold = abstain_threshold
+        self._scope_anchor_by_id = {}
 
     # ------------------------------------------------------------------
     # Protocol methods
@@ -53,13 +54,20 @@ class SeamLocomoAdapter:
         """Drop the per-scope database file (and any WAL artefacts)."""
         db = self._db_path(scope_id)
         _remove_db_files(db)
+        self._scope_anchor_by_id.pop(scope_id, None)
 
     def ingest_turn(self, scope_id: str, turn: ConversationTurn) -> None:
         """Compile a conversation turn to MIRL and persist it in the
         scope's database."""
         from seam_runtime.runtime import SeamRuntime  # lazy
+        from seam_runtime.temporal import parse_iso
 
         text = _format_turn(turn)
+        turn_dt = parse_iso(turn.timestamp)
+        if turn_dt is not None:
+            current_anchor = self._scope_anchor_by_id.get(scope_id)
+            if current_anchor is None or turn_dt < current_anchor:
+                self._scope_anchor_by_id[scope_id] = turn_dt
         turn_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
         rt = _open_runtime(self._db_path(scope_id))
         rt.ingest_conversation_turn(
@@ -88,16 +96,22 @@ class SeamLocomoAdapter:
             if sub:
                 questions = sub[: self._decomposer_max_subq] + [question]
 
-        from seam_runtime.temporal import detect_temporal_tokens, parse_iso
-
         temporal_window = self._build_temporal_window(question)
+        temporal_reference = self._build_temporal_reference(scope_id, question)
 
         closures: list[set[str]] = []
         retrieval_latency_ms = 0.0
         top_score = 0.0
         for q in questions:
             t0 = _time.monotonic()
-            result = rt.search_ir(q, scope="thread", budget=self.budget, include_raw=True, temporal_window=temporal_window)
+            result = rt.search_ir(
+                q,
+                scope="thread",
+                budget=self.budget,
+                include_raw=True,
+                temporal_window=temporal_window,
+                temporal_reference=temporal_reference,
+            )
             retrieval_latency_ms += (_time.monotonic() - t0) * 1000.0
             if result.candidates:
                 closures.append(self._collect_closure_ids(result))
@@ -167,6 +181,14 @@ class SeamLocomoAdapter:
         earliest = min(parsed) - timedelta(days=30)
         latest = max(parsed) + timedelta(days=30)
         return (earliest, latest)
+
+    def _build_temporal_reference(self, scope_id: str, question: str):
+        from seam_runtime.temporal import parse_temporal_reference
+
+        return parse_temporal_reference(
+            question,
+            anchor=self._scope_anchor_by_id.get(scope_id),
+        )
 
     def _decompose(self, question: str) -> list[str]:
         prompt = (

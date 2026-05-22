@@ -8,10 +8,10 @@ from typing import Iterable
 from .bm25 import BM25Index
 from .mirl import IRBatch, MIRLRecord, RecordKind, SearchCandidate, SearchResult, cosine_similarity, iter_textual_fields
 from .symbols import build_symbol_maps
-from .temporal import parse_iso
+from .temporal import parse_iso, temporal_distance_score
 
 
-def search_batch(batch: IRBatch, query: str, scope: str | None = None, limit: int = 5, vector_scores: dict[str, float] | None = None, namespace: str | None = None, include_raw: bool = False, bm25_index: BM25Index | None = None, temporal_window: tuple[datetime, datetime] | None = None) -> SearchResult:
+def search_batch(batch: IRBatch, query: str, scope: str | None = None, limit: int = 5, vector_scores: dict[str, float] | None = None, namespace: str | None = None, include_raw: bool = False, bm25_index: BM25Index | None = None, temporal_window: tuple[datetime, datetime] | None = None, temporal_reference: datetime | None = None) -> SearchResult:
     _, symbol_to_expansion = build_symbol_maps(batch.records, namespace=namespace)
     expanded_query = _expand_query(query, symbol_to_expansion)
     tokens = _tokens(expanded_query)
@@ -35,7 +35,9 @@ def search_batch(batch: IRBatch, query: str, scope: str | None = None, limit: in
             lexical = max(lexical, bm25_scores[record.id] / max(max_bm25, 1.0))
         semantic = vector_scores.get(record.id, _semantic_score(record, query_vector))
         graph_bonus = _graph_score(record, tokens, graph)
-        if temporal_window is not None:
+        if temporal_reference is not None:
+            temporal = temporal_distance_score(temporal_reference, parse_iso(record.t0))
+        elif temporal_window is not None:
             t0_parsed = parse_iso(record.t0)
             if t0_parsed and temporal_window[0] <= t0_parsed <= temporal_window[1]:
                 temporal = 1.0
