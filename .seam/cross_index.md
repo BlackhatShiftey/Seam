@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 289
+total_events: 290
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-25T16:10:22Z | history:074:603e38f2 | session-event | done | dashboard, chat, command, readme, verify, history, snapshot | docs/setup.md,README.md |
 | 2026-04-25T16:14:02Z | history:075:8206c379 | session-event | done | readme, ledger, handoff, history, snapshot, protocol | docs/README.md,docs/archive/README.md,REPO_LEDGER.md,README.md |
 | 2026-04-25T16:22:00Z | history:076:51d52ebc | session-event | done | readme, ledger, history, protocol, verify, snapshot | archive/README.md,archive/code/README.md,docs/CODE_LAYOUT.md,REPO_LEDGER.md,.... |
 | 2026-04-25T16:23:56Z | history:077:b7ed0ec9 | session-event | done | protocol, search, readme, ledger, verify, history, snapshot | AGENTS.md,.rgignore,docs/CODE_LAYOUT.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-22T08:50:21Z | history:232:cf622b5f | session-event | done | benchmark, verify, command, history, status | benchmarks/external/common/judge.py,benchmarks/external/common/runner.py,benc... |
 | 2026-05-22T09:38:42Z | history:233:563a0f5c | session-event | done | benchmark, retrieval, verify, history, status | seam_runtime/temporal.py,seam_runtime/retrieval.py,seam_runtime/runtime.py,be... |
 | 2026-05-22T12:52:58Z | history:234:c7001cf4 | session-event | done | benchmark, bugfix, locomo, verify, history, status | benchmarks/external/locomo/adapters/seam.py,PROJECT_STATUS.md |
+| 2026-05-23T03:58:36Z | history:235:66be1596 | session-event | done | benchmark, retrieval, verify, history, status | benchmarks/external/locomo/rerank.py,benchmarks/external/locomo/run.py,benchm... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0089.cross.md | 2026-04-15T00:00:00Z..2026-04-25T16:05:15Z | 89 | (multi) | (multi) |
+| 0001-0090.cross.md | 2026-04-15T00:00:00Z..2026-04-25T16:10:22Z | 90 | (multi) | (multi) |

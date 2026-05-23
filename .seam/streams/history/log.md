@@ -4930,3 +4930,23 @@ Verification before this entry: .venv/bin/python -m pytest test_seam_all/test_lo
 
 Next step: rebuild HISTORY_INDEX, refresh the history stream mirror and cross-index, write a fresh snapshot, run integrity/routing/continuity/streams gates, update PROJECT_STATUS pointer, then commit. Step 0b (full 1,542-case LoCoMo) stays operator-gated - estimated <$1 on gpt-5-nano judge + gpt-5-mini answerer, wall time ~2-3 hours. Phase B answerer batching remains deferred pending Step 0b cost data per HISTORY#232.
 ---END-ENTRY-#234---
+
+---BEGIN-ENTRY-#235---
+id: 235
+date: 2026-05-23T03:58:36Z
+agent: codex
+status: done
+topics: benchmark, retrieval, verify, history, status
+commits: none
+refs: benchmarks/external/locomo/rerank.py,benchmarks/external/locomo/run.py,benchmarks/external/locomo/adapters/seam.py,tests/audit/test_cross_encoder_rerank.py,PROJECT_STATUS.md
+supersedes: 234
+tokens: 574
+---
+Landed Track M P4 Step 2 cross-encoder reranker after advisor review of the DeepSeek executor handoff. Scope: benchmarks/external/locomo/rerank.py adds cross_encoder_rerank with a clear sentence-transformers install error and an LRU model cache so the CrossEncoder is not reloaded for every top-K rerank call; benchmarks/external/locomo/run.py adds --rerank {none,cross-encoder} and forwards it only into the SEAM adapter path; benchmarks/external/locomo/adapters/seam.py adds rerank configuration and re-sorts top-K retrieval candidates by cross-encoder scores when enabled, leaving default behavior unchanged when rerank is off; tests/audit/test_cross_encoder_rerank.py adds deterministic no-network tests for score forwarding, missing dependency behavior, cache reuse, adapter ordering, default-off behavior, and CLI factory wiring.
+
+Advisor review changes made before commit: strengthened the executor's reorder test to assert actual candidate order and score replacement instead of only checking that context stayed populated; changed the missing-dependency test to simulate an absent sentence_transformers module rather than deleting an attribute from an installed module; changed the adapter import to use seam_runtime.mirl.iter_textual_fields directly; added the cross-encoder model cache plus regression because constructing CrossEncoder on every rerank call would make quickstart/full runs unnecessarily slow and memory-heavy.
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/test_cross_encoder_rerank.py -q passed 11 tests; .venv/bin/python -m pytest tests/audit/test_temporal_distance_score.py tests/audit/test_temporal_filter.py -q passed 11 tests; .venv/bin/python -m pytest tests/audit/test_locomo_adapter_evidence_text.py -q passed 3 tests; .venv/bin/python -m pytest test_seam_all/test_locomo_judge.py -q -k "not parallel" passed 20 tests; git diff --check passed; no-paid enabled-reranker smoke CUDA_VISIBLE_DEVICES= .venv/bin/python -m benchmarks.external.locomo.run --quickstart --judge stub --rerank cross-encoder --output /tmp/p4_step2_rerank_stub_quickstart.json exited 0 with 10 cases and context_recall_mean 0.9633333333333333. No paid API calls, no full LoCoMo run, no ranking weight changes, and no Step 3 embedding-default work were performed.
+
+Next step: rebuild derived history/stream/cross-index state, write a snapshot, run integrity/routing/continuity/streams gates, commit, push to main, then proceed to Track M P4 Step 3 only after advisor/operator direction. Step 0b full baseline and Step 4 final measurement remain operator-gated paid runs.
+---END-ENTRY-#235---

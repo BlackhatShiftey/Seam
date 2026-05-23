@@ -28,7 +28,7 @@ from benchmarks.external.common.runner import (
 )
 
 
-def build_adapter(name: str, answerer: str | None = None, answerer_model: str | None = None, decomposer: str | None = None, decomposer_model: str | None = None, decomposer_max_subq: int = 3, abstain_threshold: float = 0.0):
+def build_adapter(name: str, answerer: str | None = None, answerer_model: str | None = None, decomposer: str | None = None, decomposer_model: str | None = None, decomposer_max_subq: int = 3, abstain_threshold: float = 0.0, rerank: str | None = None):
     """Lazy-import factory so SEAM-only runs don't require Mem0/Zep installed."""
     if name == "seam":
         from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
@@ -38,6 +38,7 @@ def build_adapter(name: str, answerer: str | None = None, answerer_model: str | 
             decomposer=decomposer, decomposer_model=decomposer_model,
             decomposer_max_subq=decomposer_max_subq,
             abstain_threshold=abstain_threshold,
+            rerank=rerank,
         )
     if name == "mem0":
         from benchmarks.external.locomo.adapters.mem0 import Mem0LocomoAdapter
@@ -223,6 +224,12 @@ def main() -> None:
         default=0.0,
         help="Abstain threshold: emit 'unknown' when top score is below this value (default: 0.0)",
     )
+    parser.add_argument(
+        "--rerank",
+        choices=["none", "cross-encoder"],
+        default="none",
+        help="Re-rank top-K bi-encoder results with a cross-encoder (default: none)",
+    )
     args = parser.parse_args()
 
     dataset_path = args.dataset_path or args.dataset
@@ -258,6 +265,7 @@ def main() -> None:
 
     answerer = None if args.answerer == "none" else args.answerer
     decomposer = None if args.decomposer == "none" else args.decomposer
+    rerank = None if args.rerank == "none" else args.rerank
     judge_cross = build_judge(args.judge_cross, model=args.judge_cross_model) if args.judge_cross != "none" else None
 
     # Run benchmark
@@ -268,6 +276,7 @@ def main() -> None:
                 decomposer=decomposer, decomposer_model=args.decomposer_model,
                 decomposer_max_subq=args.decomposer_max_subq,
                 abstain_threshold=args.abstain_threshold,
+                rerank=rerank,
             ),
             adapter_name=args.adapter,
             cases=cases,
@@ -287,6 +296,7 @@ def main() -> None:
             decomposer=decomposer, decomposer_model=args.decomposer_model,
             decomposer_max_subq=args.decomposer_max_subq,
             abstain_threshold=args.abstain_threshold,
+            rerank=rerank,
         )
         judge = build_judge(args.judge, model=args.judge_model)
         report = run_benchmark_grouped(

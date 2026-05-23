@@ -33,6 +33,9 @@ class SeamLocomoAdapter:
         decomposer_model: str | None = None,
         decomposer_max_subq: int = 3,
         abstain_threshold: float = 0.0,
+        rerank: str | None = None,
+        rerank_top_k: int = 20,
+        rerank_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2",
     ) -> None:
         # TODO: default db_path should be tmp_path, not a gitignored project dir
         self._db_root = Path(db_path) if db_path is not None else Path("test_seam/locomo")
@@ -44,6 +47,9 @@ class SeamLocomoAdapter:
         self._decomposer_model = decomposer_model
         self._decomposer_max_subq = decomposer_max_subq
         self._abstain_threshold = abstain_threshold
+        self._rerank = rerank if rerank != "none" else None
+        self._rerank_top_k = rerank_top_k
+        self._rerank_model = rerank_model
         self._scope_anchor_by_id = {}
 
     # ------------------------------------------------------------------
@@ -114,6 +120,8 @@ class SeamLocomoAdapter:
             )
             retrieval_latency_ms += (_time.monotonic() - t0) * 1000.0
             if result.candidates:
+                if self._rerank == "cross-encoder" and len(result.candidates) > 1:
+                    result = self._rerank_candidates(q, result)
                 closures.append(self._collect_closure_ids(result))
                 top_score = max(top_score, result.candidates[0].score)
 
@@ -214,6 +222,26 @@ class SeamLocomoAdapter:
             closure_ids.update(candidate.record.evidence or [])
             closure_ids.update(candidate.record.prov or [])
         return closure_ids
+
+    def _rerank_candidates(self, query: str, result):
+        """Re-rank the top-K candidates with a cross-encoder and return a new
+        SearchResult with re-scored, re-sorted candidates."""
+        from seam_runtime.mirl import iter_textual_fields
+
+        from benchmarks.external.locomo.rerank import cross_encoder_rerank
+
+        top_k = result.candidates[: self._rerank_top_k]
+        rest = result.candidates[self._rerank_top_k :]
+
+        texts = [" ".join(iter_textual_fields(c.record)) for c in top_k]
+        scores = cross_encoder_rerank(query, texts, model=self._rerank_model)
+
+        for candidate, score in zip(top_k, scores):
+            candidate.score = score
+
+        top_k.sort(key=lambda c: c.score, reverse=True)
+        result.candidates[:] = top_k + list(rest)
+        return result
 
     def _build_evidence_context_from_ids(self, rt, closure_ids: set[str]) -> str:
         """Build a bounded text context from a set of record IDs."""
