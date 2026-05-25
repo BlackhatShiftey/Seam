@@ -5401,3 +5401,21 @@ Changes: `.github/workflows/ci.yml` broad `test-and-benchmark` install now uses 
 
 Verification: focused repro command passed 10 targeted failures: `.venv/bin/python -m pytest tests/audit/test_bench_stub_seal_gate.py::test_non_stub_bil2_succeeds tests/audit/test_benchmark_endpoint_safety.py::test_benchmark_holdout_allowed_with_env tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving tests/audit/test_mcp_artifact_containment.py::test_env_override_restores_permissive_behavior tests/audit/test_streams_fsync.py::test_write_log_fsyncs_file_and_directory tests/audit/test_sys_metrics_honesty.py::test_sys_metrics_cpu_unavailable_on_permission_error tests/audit/test_sys_metrics_honesty.py::test_sys_metrics_disk_targets_data_dir tests/audit/test_locomo_adapter_real_embedding.py::test_open_runtime_surfaces_missing_sbert tests/audit/test_github_pr_gates.py -q`. LoCoMo focused suite passed 33 tests: `.venv/bin/python -m pytest test_seam_all/test_locomo_seam_adapter.py tests/audit/test_abstain_threshold.py tests/audit/test_locomo_adapter_evidence_text.py tests/audit/test_locomo_decomposer.py tests/audit/test_cross_encoder_rerank.py tests/audit/test_locomo_adapter_real_embedding.py -q`. Full local equivalent of the broad CI pytest command passed with exit 0: `.venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q`. Post-test CI commands passed locally: `python3 -m tools.history.verify_integrity && python3 -m tools.history.verify_continuity && python3 -m tools.history.verify_routing && python3 -m tools.streams.verify_streams`; `.venv/bin/python -m seam benchmark run all --output /tmp/seam-ci-benchmark-bundle.json --format json && .venv/bin/python -m seam benchmark gate /tmp/seam-ci-benchmark-bundle.json` (gate PASS, 45/45 checks, bundle hash `6bf9907c69224dedb97e7f50711a75e8658996bcefacc31d0d59f50490673b65`); `.venv/bin/python -m tools.run_external_memory_benchmarks --plan --scope all --format json --output /tmp/seam-external-memory-benchmark-plan.json`. `git diff --check` passed. No paid API calls were made.
 ---END-ENTRY-#254---
+
+---BEGIN-ENTRY-#255---
+id: 255
+date: 2026-05-25T20:36:15Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: test_seam_all/test_git_hooks.py,tools/streams/streams_lib.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 254
+tokens: 328
+---
+PR #34 Windows CI follow-up after commit 7fc3ce0. GitHub Actions run 26418345669 showed all non-broad gates passing and ubuntu-latest broad test-and-benchmark passing, with windows-latest broad test-and-benchmark failing two Windows-specific cases: test_seam_all/test_git_hooks.py::test_pre_commit_refuses_when_python_missing hard-coded /bin/bash, and tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving still allowed same-process Windows threads to overwrite the stream log.
+
+Fixes: test_git_hooks now resolves bash with shutil.which and skips only when bash is unavailable, while still removing python from PATH for the hook contract under test. tools/streams/streams_lib.py now wraps the existing OS advisory file lock in a per-lock-path threading.Lock, so same-process Windows threads serialize the read/next-id/write section before the inter-process lock is released.
+
+Verification before this entry: targeted local pytest passed for test_seam_all/test_git_hooks.py::test_pre_commit_refuses_when_python_missing and tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving. Full local broad CI pytest command passed: .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q.
+---END-ENTRY-#255---

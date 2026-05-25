@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import os
+import pytest
 import shutil
 import subprocess
 from pathlib import Path
 
 
 def test_pre_commit_refuses_when_python_missing(tmp_path: Path) -> None:
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is required for the pre-commit hook smoke test")
+
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     for command in ("git", "grep"):
@@ -18,7 +23,7 @@ def test_pre_commit_refuses_when_python_missing(tmp_path: Path) -> None:
     env["PATH"] = str(bin_dir)
 
     result = subprocess.run(
-        ["/bin/bash", "tools/git-hooks/pre-commit"],
+        [bash, "tools/git-hooks/pre-commit"],
         capture_output=True,
         text=True,
         env=env,
