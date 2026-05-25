@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 306
+total_events: 307
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-27T00:00:00Z | roadmap:017:9d994ead | status-change | bootstrap | benchmark, holdout, fixture | ROADMAP.md:570 |
 | 2026-04-27T00:00:00Z | roadmap:018:4f81bdd3 | status-change | bootstrap | benchmark, diff, verify | ROADMAP.md:595 |
 | 2026-04-27T00:00:00Z | roadmap:019:f43cb95d | status-change | bootstrap | command, persist, retrieval | ROADMAP.md:826 |
 | 2026-04-27T04:14:02Z | history:091:003eb8d5 | session-event | done | dashboard, tui, command, compress, windows, verify, histo... | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-25T12:59:52Z | history:249:edf07639 | session-event | done | protocol, security, verify, history, status | AGENTS.md,REPO_LEDGER.md,PROJECT_STATUS.md,GitHub-PR:32 |
 | 2026-05-25T13:51:15Z | history:250:d76f57b7 | session-event | done | protocol, verify, history, status, security | PROJECT_STATUS.md,GitHub-PR:31,GitHub-PR:32,GitHub-branch:main |
 | 2026-05-25T17:37:36Z | history:251:2938605e | session-event | done | persist, retrieval, benchmark, command, verify, history, ... | benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py... |
+| 2026-05-25T17:39:47Z | history:252:f6bcabd9 | session-event | done | protocol, verify, history, status | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.s... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0106.cross.md | 2026-04-15T00:00:00Z..2026-04-26T23:29:00Z | 106 | (multi) | (multi) |
+| 0001-0107.cross.md | 2026-04-15T00:00:00Z..2026-04-27T00:00:00Z | 107 | (multi) | (multi) |

@@ -5341,3 +5341,21 @@ Tests in `tests/audit/test_locomo_adapter_retrieval_event_writer.py` cover defau
 
 Next step: H2 slice 3 remains the BIL-2 backfill tool that reads LoCoMo result bundles into retrieval_event rows with stale_source set according to the HISTORY#240/#242 freshness boundary. Scoring-weight tuning and policy promotion remain blocked on dev/holdout split and `seam improvement review` per HISTORY#243.
 ---END-ENTRY-#251---
+
+---BEGIN-ENTRY-#252---
+id: 252
+date: 2026-05-25T17:39:47Z
+agent: codex
+status: done
+topics: protocol, verify, history, status
+commits: none
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/cross_index.md,.seam/snapshots
+supersedes: 251
+tokens: 317
+---
+Closed the H2 writer branch-tracking loop after HISTORY#251 by pushing `codex/h2-slice-2-retrieval-event-writer` and opening draft PR #34 (`[codex] Add H2 retrieval event writer hook`) against `main`.
+
+This entry exists because HISTORY#251 recorded the code and branch hygiene before the GitHub draft PR was created. The PR now keeps the branch from becoming an orphan remote and aligns with the AGENTS.md GitHub PR workflow added in HISTORY#249. Updated PROJECT_STATUS.md to name HISTORY#252 as the latest handoff and to state that the HISTORY#251 work is tracked by draft PR #34. The stale closed-PR branch `origin/claude/remote-control-AD6Di` remains deleted, and `python3 -m tools.git.scan_stale_branches` after the push classified the local and remote H2 branch as unique-and-fresh rather than stale.
+
+Verification before this closeout entry: `git status --short --branch` was clean except for being on the pushed H2 branch; `python3 -m tools.git.scan_stale_branches` showed `codex/h2-slice-2-retrieval-event-writer` and `origin/codex/h2-slice-2-retrieval-event-writer` as `UNIQUE-AND-FRESH`, with only protected allowlist branches remaining. Draft PR creation returned PR #34 with head SHA `63ac11380e5b06f385b4130351bdc5b6e8d933ec`. No paid API calls were made.
+---END-ENTRY-#252---

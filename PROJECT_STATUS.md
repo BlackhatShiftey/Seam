@@ -1,6 +1,6 @@
 # SEAM Project Status
 
-Last updated: 2026-05-25 (HISTORY#251 - H2 retrieval-event writer hook)
+Last updated: 2026-05-25 (HISTORY#252 - H2 writer PR tracking closeout)
 
 ## Current State
 
@@ -30,7 +30,7 @@ SEAM is operating as a local machine-first memory runtime with:
 ## Current Resume Point
 
 - `main` is the source-of-truth branch. After pulling, verify local `HEAD` equals `origin/main` before starting new work.
-- Latest continuity handoff is `HISTORY#251` - H2 retrieval-event writer hook. The local `codex/h2-slice-2-retrieval-event-writer` branch was rebased onto `origin/main` after the repo-hygiene merge, the stale closed-PR remote branch `origin/claude/remote-control-AD6Di` was deleted, and the LoCoMo SEAM adapter now has an opt-in retrieval_event writer plus `benchmarks.external.locomo.run` CLI plumbing via `--record-retrieval-events` and `--retrieval-event-run-id`. `HISTORY#250` remains the GitHub PR stack closeout: PR #32 was squash-merged, PR #31 was closed as superseded/conflicting, and `gh pr list --state open --limit 50` returned no open PRs. `HISTORY#246` records the active GitHub ruleset `Protect main (PR + hygiene gates)`, and `HISTORY#249` records the `AGENTS.md` PR workflow for future agents. The broader `test-and-benchmark` matrix remains advisory and still fails on pre-existing CI dependency/platform issues. Step 4 final paid measurement remains operator-gated.
+- Latest continuity handoff is `HISTORY#252` - H2 writer PR tracking closeout. Branch `codex/h2-slice-2-retrieval-event-writer` is pushed and tracked by draft PR #34 for the HISTORY#251 H2 retrieval_event writer hook. The stale closed-PR remote branch `origin/claude/remote-control-AD6Di` was deleted during the same maintenance pass. `HISTORY#250` remains the GitHub PR stack closeout: PR #32 was squash-merged, PR #31 was closed as superseded/conflicting, and `gh pr list --state open --limit 50` returned no open PRs at that time. `HISTORY#246` records the active GitHub ruleset `Protect main (PR + hygiene gates)`, and `HISTORY#249` records the `AGENTS.md` PR workflow for future agents. The broader `test-and-benchmark` matrix remains advisory and still fails on pre-existing CI dependency/platform issues. Step 4 final paid measurement remains operator-gated.
 - A fresh Linux clone should run `sh ./installers/install_seam_linux.sh --dev`, then verify local `HEAD` equals `origin/main` before starting new work.
 - GitHub PR state as of 2026-05-18: PRs #22, #18, #23, #25 (SOP 0), #26, #27 (SOP 1), #28 (SOP 2), #29 (SOPs 3+4), and #30 (production readiness remediation) merged. Track I (SOPs 0-4) is complete on `main`. PR #19 is still draft, conflicting, and must be treated as a partial extraction source because its branch contains private-session-link material in commit metadata. PR #24 (Track I 5-SOP handoff series) was draft and is superseded.
 - **Track I COMPLETE milestone.** Next track is the operator's choice per ROADMAP.md: Track J (Prompt Codec), Track K (Trust/Security/Auditability + BIL bundles), Track L (Agent/Skills Compiler), or Track H Phase 2-4 (improvement streams, retrieval integration, generalized library streams). Do not resume from already-merged branches or stale squash-merged PR refs. Do not propose or start Tracks J/K/L without operator direction.
