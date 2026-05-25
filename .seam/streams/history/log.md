@@ -5493,3 +5493,21 @@ Fix: .gitattributes now forces LF checkout for canonical append-only history and
 
 Verification before this entry: local verify_integrity/verify_continuity/verify_routing/verify_streams were clean before the attribute change; the CI failure scope was isolated to Windows checkout line endings in the integrity gate.
 ---END-ENTRY-#259---
+
+---BEGIN-ENTRY-#260---
+id: 260
+date: 2026-05-25T21:24:33Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 259
+tokens: 237
+---
+PR #34 Windows CI follow-up after commit b38ba69. GitHub Actions run 26420060280 passed pytest, history integrity, and all non-broad gates, but windows-latest test-and-benchmark failed the post-test continuity gate because a clean GitHub checkout has no local .seam/snapshots/ snapshot for the newly appended latest history entry.
+
+Fix: .github/workflows/ci.yml now runs python -m tools.history.verify_continuity --no-snapshot in the clean-checkout CI matrix. This skips only the local snapshot-presence check that cannot be satisfied from ignored local snapshot artifacts, while retaining integrity, supersedes, secret scan, routing, and recorded-fact continuity checks. Local session-end protocol still runs full verify_continuity with snapshots present. tests/audit/test_github_pr_gates.py now asserts the CI workflow keeps this clean-checkout form explicit.
+
+Verification before this entry: tests/audit/test_github_pr_gates.py passed locally.
+---END-ENTRY-#260---
