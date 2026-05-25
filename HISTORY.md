@@ -5317,3 +5317,27 @@ Closed PR #31 (`claude/remote-control-AD6Di`) as superseded/conflicting rather t
 
 Verification before this entry: `gh pr list --state open --limit 50 --json number,title,isDraft,headRefName,baseRefName,updatedAt,mergeStateStatus,url` returned an empty list after the closeout. `gh pr view 32 --json number,state,mergedAt,mergedBy,mergeCommit,url,headRefName` reported state `MERGED`, merged at `2026-05-25T13:50:11Z`, merge commit `52db6c00751cce1dfee7b121a6d51887457d8915`. `gh pr view 31 --json number,state,closedAt,mergedAt,headRefName,url` reported state `CLOSED`, closed at `2026-05-25T13:50:19Z`, and `mergedAt: null`. `git ls-remote --heads origin codex/repo-hygiene-ruleset-record claude/remote-control-AD6Di main` returned only `refs/heads/main` at `52db6c00751cce1dfee7b121a6d51887457d8915`.
 ---END-ENTRY-#250---
+
+---BEGIN-ENTRY-#251---
+id: 251
+date: 2026-05-25T17:37:36Z
+agent: codex
+status: done
+topics: persist, retrieval, benchmark, command, verify, history, status, protocol
+commits: none
+refs: benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py,tests/audit/test_locomo_adapter_retrieval_event_writer.py,PROJECT_STATUS.md
+supersedes: 250
+tokens: 938
+---
+Landed H2 retrieval-feedback slice 2: the LoCoMo SEAM adapter can now append retrieval_event rows during answer runs when explicitly enabled, and the external LoCoMo runner exposes the opt-in CLI plumbing.
+
+Branch hygiene first: the working branch `codex/h2-slice-2-retrieval-event-writer` had zero committed changes versus `origin/main` but contained local uncommitted H2 writer work. I stashed that local work, switched to `main`, recreated the branch from `origin/main` at HISTORY#250, restored the patch, and continued from the current source-of-truth base. `python3 -m tools.git.scan_stale_branches` then showed one closed-PR remote branch, `origin/claude/remote-control-AD6Di`, categorized as `MERGED-PR DELETE`; `git push origin --delete claude/remote-control-AD6Di` removed it. `gh pr list --state open --limit 50 --json number,title,headRefName` returned `[]`. `.venv/bin/python -m tools.ci.github_maintenance_report --output /tmp/seam-github-maintenance.md --json-output /tmp/seam-github-maintenance.json` could not run in this shell because `GITHUB_TOKEN` was not set; the GitHub CLI checks above used the existing `gh` auth instead.
+
+Runtime change in `benchmarks/external/locomo/adapters/seam.py`: `SeamLocomoAdapter` now accepts `record_retrieval_events` and `run_id`, defaults recording off, honors `SEAM_RECORD_RETRIEVAL_EVENTS` and `SEAM_RUN_ID`, lazily generates a stable per-adapter run id when enabled without one, and writes one retrieval_event row for the primary question after retrieval/optional rerank/optional answer generation. Rows include scope `locomo:<scope_id>`, query, candidate ids, ranks, scores, reason strings, context hash when context exists, generated answer when present, source_kind `live`, and diagnostic extra fields for top score, retrieval latency, answer latency, sub-questions, and answerer diagnostics. Empty retrieval still records an event with empty candidates. Instrumentation failures are swallowed so diagnostic writes cannot invalidate a benchmark answer pass.
+
+CLI change in `benchmarks/external/locomo/run.py`: `build_adapter` forwards `record_retrieval_events` and `retrieval_event_run_id` to the SEAM adapter. The runner accepts `--record-retrieval-events` and `--retrieval-event-run-id`, and forwards both through the single-worker and worker-factory paths. Default behavior is unchanged unless the flag or environment variable enables recording.
+
+Tests in `tests/audit/test_locomo_adapter_retrieval_event_writer.py` cover default-off behavior, constructor-enabled writes, environment-enabled writes, auto-generated run ids, empty-candidate events, diagnostic write failure isolation, env truth parsing, build_adapter forwarding, and CLI parser/runner forwarding. Verification: the two new CLI-plumbing tests failed before the `run.py` change with the expected unexpected-kwarg and unrecognized-argument errors, then `.venv/bin/python -m pytest tests/audit/test_locomo_adapter_retrieval_event_writer.py -q` passed 9 tests. Focused adjacent suites passed: `.venv/bin/python -m pytest tests/audit/test_locomo_adapter_retrieval_event_writer.py tests/audit/test_retrieval_event_store.py tests/audit/test_locomo_adapter_evidence_text.py -q` passed 29 tests; `.venv/bin/python -m pytest tests/audit/test_cross_encoder_rerank.py tests/audit/test_locomo_decomposer.py tests/audit/test_abstain_threshold.py -q` passed 16 tests. `git diff --check` passed. No paid API calls were made.
+
+Next step: H2 slice 3 remains the BIL-2 backfill tool that reads LoCoMo result bundles into retrieval_event rows with stale_source set according to the HISTORY#240/#242 freshness boundary. Scoring-weight tuning and policy promotion remain blocked on dev/holdout split and `seam improvement review` per HISTORY#243.
+---END-ENTRY-#251---
