@@ -35,6 +35,40 @@ If you created a working branch: push it if the work is real, delete it locally 
 
 Use `tools/history/*` scripts for the canonical history protocol and `tools/streams/*` scripts for the multi-stream substrate (history mirror, roadmap, experience, cross-index). Run `python -m tools.git.scan_stale_branches` on-demand to audit branch health; the repo has `delete_branch_on_merge` enabled on GitHub so merged PR branches auto-delete.
 
+## GitHub PR Workflow
+
+- `main` is the source-of-truth branch and is protected by the GitHub ruleset
+  `Protect main (PR + hygiene gates)`. Do not direct-push to `main`. Use a
+  branch and PR for repo changes unless the operator explicitly authorizes a
+  time-boxed emergency bypass; record that bypass in `HISTORY.md` and remove it
+  immediately after use.
+- Before starting or resuming branch work, run `git status --short --branch`.
+  If unrelated dirty files are present, name them in the handoff and keep them
+  out of the PR unless the operator explicitly says to combine workstreams.
+- Before starting new work from `main`, fetch/pull and verify local `HEAD`
+  matches `origin/main`. When resuming an existing PR branch, verify the branch
+  tracks the intended remote PR head and note any base drift or conflicts.
+- Open or update a draft PR for material branch work once the branch has a
+  coherent reviewable slice. PR bodies must summarize scope, verification,
+  remaining risks, and any intentionally excluded dirty files or workstreams.
+- Required merge checks for `main` are `repo-hygiene`, `chroma-real-smoke`, and
+  `locomo-quickstart-bil2`. Treat `test-and-benchmark` matrix failures as
+  advisory unless the ruleset changes; summarize advisory failures in the PR or
+  history, and fix them in a separate CI cleanup branch unless they were caused
+  by the current PR.
+- Keep PRs moving. A PR should end in one of four states: merged, closed as
+  superseded/abandoned, actively draft with a current handoff, or blocked with a
+  concrete blocker recorded. Do not leave old draft PRs or remote branches
+  ambiguous.
+- Use the scheduled/manual repository-maintenance workflow, or locally run
+  `GITHUB_TOKEN=$(gh auth token) python -m tools.ci.github_maintenance_report`,
+  to audit open PRs, stale PRs, and stale branches without PRs. Stale branches
+  should be deleted if merged/abandoned, turned into a PR if real, or recorded
+  as intentionally retained.
+- Before marking a PR ready to merge, ensure the session-end history/snapshot
+  protocol is complete, required checks pass on the pushed head, and candidate
+  files have been scanned for secret-shaped values and provider session URLs.
+
 ## Context Loop
 
 Bounded reading protocol that keeps session-start cost flat as the repo grows. Three phases:

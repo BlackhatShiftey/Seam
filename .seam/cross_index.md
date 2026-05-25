@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 303
+total_events: 304
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-26T23:19:09Z | history:088:298a382c | session-event | done | mirl, compress, lx1, codec, search, verify, history, snap... | seam_runtime/lossless.py,seam_runtime/cli.py,seam.py,test_seam.py,docs/MIRL_V... |
 | 2026-04-26T23:25:45Z | history:089:575647b9 | session-event | done | benchmark, mirl, compress, verify, history, snapshot | seam_runtime/benchmarks.py,test_seam.py,docs/MIRL_V1.md,docs/ledgers/runtime/... |
 | 2026-04-26T23:29:00Z | history:090:b354c9c9 | session-event | done | benchmark, mirl, compress, verify, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/lossless.py,test_seam.py,docs/MIRL_V1... |
 | 2026-04-27T00:00:00Z | roadmap:017:9d994ead | status-change | bootstrap | benchmark, holdout, fixture | ROADMAP.md:570 |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-25T12:33:37Z | history:246:8a53e31a | session-event | done | security, protocol, verify, history, status | PROJECT_STATUS.md,REPO_LEDGER.md,GitHub-ruleset:15143368 |
 | 2026-05-25T12:37:57Z | history:247:bb5fbd5f | session-event | in-progress | security, protocol, verify, history, status | PROJECT_STATUS.md,.github/workflows/repository-maintenance.yml,tools/ci/githu... |
 | 2026-05-25T12:45:28Z | history:248:19849f93 | session-event | done | security, protocol, verify, history, status | PROJECT_STATUS.md,.github/workflows/repository-maintenance.yml,tools/ci/githu... |
+| 2026-05-25T12:59:52Z | history:249:edf07639 | session-event | done | protocol, security, verify, history, status | AGENTS.md,REPO_LEDGER.md,PROJECT_STATUS.md,GitHub-PR:32 |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0103.cross.md | 2026-04-15T00:00:00Z..2026-04-26T23:02:05Z | 103 | (multi) | (multi) |
+| 0001-0104.cross.md | 2026-04-15T00:00:00Z..2026-04-26T23:19:09Z | 104 | (multi) | (multi) |

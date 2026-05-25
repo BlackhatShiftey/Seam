@@ -5275,3 +5275,25 @@ Verification before this entry: `.venv/bin/python -m pytest tests/audit/test_git
 
 Scope boundary: the unrelated H2 retrieval-event writer-hook changes in `benchmarks/external/locomo/adapters/seam.py` and `tests/audit/test_locomo_adapter_retrieval_event_writer.py` stayed unstaged and are not part of PR #32.
 ---END-ENTRY-#248---
+
+---BEGIN-ENTRY-#249---
+id: 249
+date: 2026-05-25T12:59:52Z
+agent: codex
+status: done
+topics: protocol, security, verify, history, status
+commits: none
+refs: AGENTS.md,REPO_LEDGER.md,PROJECT_STATUS.md,GitHub-PR:32
+supersedes: 248
+tokens: 344
+---
+Updated the cross-agent protocol so the new GitHub PR workflow is visible in `AGENTS.md`, not only in `REPO_LEDGER.md` and GitHub ruleset state.
+
+Added `AGENTS.md` section `GitHub PR Workflow`. It tells every agent that `main` is protected by `Protect main (PR + hygiene gates)`, direct pushes to `main` are disallowed unless the operator explicitly authorizes a time-boxed emergency bypass, and bypass use must be recorded in history and removed after use. It also requires branch-start/resume status checks, explicit handling of unrelated dirty files, draft PRs for material reviewable slices, current PR bodies, and required merge checks `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2`.
+
+The new workflow closes the main operational gap from HISTORY#248: the repository had enforcement for merging to `main`, but agents still needed first-read instructions for keeping PRs moving. `AGENTS.md` now says stale PRs and branches must end as merged, closed/superseded/abandoned, actively draft with a current handoff, or blocked with a concrete recorded blocker. It also directs agents to the repository-maintenance report or local `GITHUB_TOKEN=$(gh auth token) python -m tools.ci.github_maintenance_report` run for open/stale PR and branch audits, and says advisory `test-and-benchmark` matrix failures should be summarized or handled on a separate CI cleanup branch unless caused by the current PR.
+
+Updated `REPO_LEDGER.md` with a durable pointer to the `AGENTS.md` PR workflow because this changes cross-agent protocol. Updated `PROJECT_STATUS.md` so the current handoff points at HISTORY#249 and keeps PR #32 / PR #31 / unrelated H2 dirty-file state explicit.
+
+Scope boundary: the unrelated H2 retrieval-event writer-hook changes in `benchmarks/external/locomo/adapters/seam.py` and `tests/audit/test_locomo_adapter_retrieval_event_writer.py` stayed unstaged and are not part of PR #32.
+---END-ENTRY-#249---
