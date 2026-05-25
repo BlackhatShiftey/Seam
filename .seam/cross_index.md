@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 313
+total_events: 314
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-28T00:00:00Z | roadmap:020:b96511a9 | status-change | bootstrap | readme, docs, installer | ROADMAP.md:1007 |
 | 2026-04-28T00:00:00Z | roadmap:021:2c04a920 | status-change | bootstrap | docs, readme, doctor | ROADMAP.md:1034 |
 | 2026-04-28T08:16:31Z | history:095:0c54f0e9 | session-event | done | benchmark, verify, command, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/runtime.py,seam_runtime/cli.py,seam.p... |
 | 2026-04-28T09:07:41Z | history:096:efb0e297 | session-event | done | benchmark, verify, command, history, snapshot | .github/workflows/ci.yml,HISTORY.md,HISTORY_INDEX.md |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-25T20:45:46Z | history:256:d310e523 | session-event | done | verify, windows, protocol, history, status | tools/streams/test_streams.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.... |
 | 2026-05-25T20:54:52Z | history:257:b4959999 | session-event | done | verify, windows, protocol, history, status | tools/streams/streams_lib.py,tools/streams/test_streams.py,PROJECT_STATUS.md,... |
 | 2026-05-25T21:05:09Z | history:258:73267294 | session-event | done | verify, windows, protocol, history, status | tools/streams/streams_lib.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.s... |
+| 2026-05-25T21:14:05Z | history:259:e2b36892 | session-event | done | verify, windows, protocol, history, status | .gitattributes,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/hi... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0113.cross.md | 2026-04-15T00:00:00Z..2026-04-27T09:26:17Z | 113 | (multi) | (multi) |
+| 0001-0114.cross.md | 2026-04-15T00:00:00Z..2026-04-28T00:00:00Z | 114 | (multi) | (multi) |

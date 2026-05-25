@@ -5475,3 +5475,21 @@ Fix: tools/streams/streams_lib.py now appends only the newly rendered event bloc
 
 Verification before this entry: targeted stream append concurrency test passed locally, and the full tools/streams test module passed locally with append-only event writes.
 ---END-ENTRY-#258---
+
+---BEGIN-ENTRY-#259---
+id: 259
+date: 2026-05-25T21:14:05Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: .gitattributes,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 258
+tokens: 236
+---
+PR #34 Windows CI follow-up after commit 36c1169. GitHub Actions run 26419777390 passed pytest and every check except the post-test history integrity gate on windows-latest. The failure reported HISTORY_INDEX.md entry hashes not matching computed HISTORY.md hashes from entry #001 onward, which indicates Windows checkout newline conversion changed HISTORY.md bytes before hashing.
+
+Fix: .gitattributes now forces LF checkout for canonical append-only history and derived stream/index artifacts: HISTORY.md, HISTORY_INDEX.md, .seam/streams/**, .seam/cross_index.md, and .seam/cross_index_archive/**. This preserves the byte-level hash contract on Windows runners without changing the history hash algorithm.
+
+Verification before this entry: local verify_integrity/verify_continuity/verify_routing/verify_streams were clean before the attribute change; the CI failure scope was isolated to Windows checkout line endings in the integrity gate.
+---END-ENTRY-#259---
