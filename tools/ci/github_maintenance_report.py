@@ -160,6 +160,28 @@ def list_remote_branches() -> list[dict[str, Any]]:
     return branches
 
 
+def resolve_github_token() -> str:
+    """Resolve a GitHub API token without printing or persisting it.
+
+    CI provides GITHUB_TOKEN/GH_TOKEN as environment variables. Local operator
+    shells often only have `gh auth login`, which stores the token in the OS
+    keyring. In that case, ask gh for the token and keep it process-local.
+    """
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        return token
+    try:
+        completed = subprocess.run(
+            ["gh", "auth", "token"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return ""
+    return completed.stdout.strip()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build a SEAM GitHub maintenance report")
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BlackhatShiftey/Seam"))
@@ -168,9 +190,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json-output", default="github-maintenance-report.json")
     args = parser.parse_args(argv)
 
-    token = os.environ.get("GITHUB_TOKEN")
+    token = resolve_github_token()
     if not token:
-        raise SystemExit("GITHUB_TOKEN is required to fetch pull requests")
+        raise SystemExit(
+            "GITHUB_TOKEN, GH_TOKEN, or a logged-in GitHub CLI is required to fetch pull requests"
+        )
     report = build_report(
         prs=fetch_open_prs(args.repo, token),
         branches=list_remote_branches(),

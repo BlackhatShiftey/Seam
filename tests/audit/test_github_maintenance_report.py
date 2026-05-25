@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from tools.ci.github_maintenance_report import build_report, render_markdown
+from tools.ci.github_maintenance_report import build_report, render_markdown, resolve_github_token
 
 
 def test_maintenance_report_flags_stale_prs_and_unowned_branches() -> None:
@@ -140,3 +140,62 @@ def test_maintenance_report_redacts_session_links_from_rendered_fields() -> None
     assert "chatgpt.com" not in markdown
     assert "chat.openai.com" not in markdown
     assert "<redacted-session-url>" in markdown
+
+
+def test_resolve_github_token_prefers_github_token_env(monkeypatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "env-token")
+    monkeypatch.setenv("GH_TOKEN", "gh-env-token")
+
+    def fail_run(*_args, **_kwargs):
+        raise AssertionError("gh auth token should not run when env token exists")
+
+    monkeypatch.setattr("tools.ci.github_maintenance_report.subprocess.run", fail_run)
+
+    assert resolve_github_token() == "env-token"
+
+
+def test_resolve_github_token_uses_gh_token_env(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.setenv("GH_TOKEN", "gh-env-token")
+
+    def fail_run(*_args, **_kwargs):
+        raise AssertionError("gh auth token should not run when GH_TOKEN exists")
+
+    monkeypatch.setattr("tools.ci.github_maintenance_report.subprocess.run", fail_run)
+
+    assert resolve_github_token() == "gh-env-token"
+
+
+def test_resolve_github_token_falls_back_to_gh_auth_token(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    calls = []
+
+    class Completed:
+        stdout = "keyring-token\n"
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return Completed()
+
+    monkeypatch.setattr("tools.ci.github_maintenance_report.subprocess.run", fake_run)
+
+    assert resolve_github_token() == "keyring-token"
+    assert calls == [
+        (
+            ["gh", "auth", "token"],
+            {"check": True, "capture_output": True, "text": True},
+        )
+    ]
+
+
+def test_resolve_github_token_returns_empty_when_gh_auth_unavailable(monkeypatch) -> None:
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+
+    def fake_run(*_args, **_kwargs):
+        raise FileNotFoundError("gh not installed")
+
+    monkeypatch.setattr("tools.ci.github_maintenance_report.subprocess.run", fake_run)
+
+    assert resolve_github_token() == ""

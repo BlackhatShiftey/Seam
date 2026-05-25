@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 307
+total_events: 308
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-27T00:00:00Z | roadmap:018:4f81bdd3 | status-change | bootstrap | benchmark, diff, verify | ROADMAP.md:595 |
 | 2026-04-27T00:00:00Z | roadmap:019:f43cb95d | status-change | bootstrap | command, persist, retrieval | ROADMAP.md:826 |
 | 2026-04-27T04:14:02Z | history:091:003eb8d5 | session-event | done | dashboard, tui, command, compress, windows, verify, histo... | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md |
 | 2026-04-27T06:01:51Z | history:092:33be794f | session-event | done | benchmark, diff, holdout, fixture, verify, roadmap, readm... | seam_runtime/benchmarks.py,seam_runtime/cli.py,seam_runtime/runtime.py,seam.p... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-25T13:51:15Z | history:250:d76f57b7 | session-event | done | protocol, verify, history, status, security | PROJECT_STATUS.md,GitHub-PR:31,GitHub-PR:32,GitHub-branch:main |
 | 2026-05-25T17:37:36Z | history:251:2938605e | session-event | done | persist, retrieval, benchmark, command, verify, history, ... | benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py... |
 | 2026-05-25T17:39:47Z | history:252:f6bcabd9 | session-event | done | protocol, verify, history, status | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.s... |
+| 2026-05-25T19:28:36Z | history:253:2e18e819 | session-event | done | security, protocol, verify, history, status | tools/ci/github_maintenance_report.py,tests/audit/test_github_maintenance_rep... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0107.cross.md | 2026-04-15T00:00:00Z..2026-04-27T00:00:00Z | 107 | (multi) | (multi) |
+| 0001-0108.cross.md | 2026-04-15T00:00:00Z..2026-04-27T00:00:00Z | 108 | (multi) | (multi) |

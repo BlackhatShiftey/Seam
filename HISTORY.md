@@ -5359,3 +5359,25 @@ This entry exists because HISTORY#251 recorded the code and branch hygiene befor
 
 Verification before this closeout entry: `git status --short --branch` was clean except for being on the pushed H2 branch; `python3 -m tools.git.scan_stale_branches` showed `codex/h2-slice-2-retrieval-event-writer` and `origin/codex/h2-slice-2-retrieval-event-writer` as `UNIQUE-AND-FRESH`, with only protected allowlist branches remaining. Draft PR creation returned PR #34 with head SHA `63ac11380e5b06f385b4130351bdc5b6e8d933ec`. No paid API calls were made.
 ---END-ENTRY-#252---
+
+---BEGIN-ENTRY-#253---
+id: 253
+date: 2026-05-25T19:28:36Z
+agent: codex
+status: done
+topics: security, protocol, verify, history, status
+commits: none
+refs: tools/ci/github_maintenance_report.py,tests/audit/test_github_maintenance_report.py,PROJECT_STATUS.md
+supersedes: 252
+tokens: 465
+---
+Fixed the local GitHub maintenance report token-routing mismatch discovered after HISTORY#252.
+
+Root cause: `tools.ci.github_maintenance_report` only read `GITHUB_TOKEN`, while local operator sessions authenticate GitHub CLI through the OS keyring. `gh` commands worked, but `.venv/bin/python -m tools.ci.github_maintenance_report ...` failed with `GITHUB_TOKEN is required to fetch pull requests` because no CI-style token variable was exported. The token was not missing; it was available to `gh auth status` through keyring auth and was deliberately not printed.
+
+Change in `tools/ci/github_maintenance_report.py`: added `resolve_github_token()`, which prefers `GITHUB_TOKEN`, then `GH_TOKEN`, then falls back to `gh auth token` with captured output and process-local use only. If none are available, the script exits with a clearer message: `GITHUB_TOKEN, GH_TOKEN, or a logged-in GitHub CLI is required to fetch pull requests`. The token is never logged, written, or rendered in reports.
+
+Tests in `tests/audit/test_github_maintenance_report.py`: added coverage that `GITHUB_TOKEN` wins without invoking `gh`, `GH_TOKEN` is accepted, `gh auth token` is used when env vars are unset, and an unavailable GitHub CLI returns an empty token. The test first failed with an ImportError for missing `resolve_github_token`, then passed after the implementation.
+
+Verification: `.venv/bin/python -m pytest tests/audit/test_github_maintenance_report.py -q` passed 8 tests. `.venv/bin/python -m tools.ci.github_maintenance_report --output /tmp/seam-github-maintenance.md --json-output /tmp/seam-github-maintenance.json` now succeeded without exported `GITHUB_TOKEN`/`GH_TOKEN` and rendered status `PASS`: 1 open PR (#34 draft), 0 stale PRs, 0 stale branches without PR. `git diff --check` passed. No token value was printed or recorded; no paid API calls were made.
+---END-ENTRY-#253---
