@@ -5145,3 +5145,29 @@ Guardrails added: K14 and K18 remain Track K items rather than wholesale Track K
 
 No runtime code changed in this entry. No paid answerer, judge, or decomposer calls were made.
 ---END-ENTRY-#243---
+
+---BEGIN-ENTRY-#244---
+id: 244
+date: 2026-05-25T08:49:55Z
+agent: claude
+status: done
+topics: persist, retrieval, verify, history, audit
+commits: none
+refs: seam_runtime/storage.py,tests/audit/test_retrieval_event_store.py,PROJECT_STATUS.md
+supersedes: 243
+tokens: 510
+---
+Landed H2 substrate slice 1: the canonical retrieval_event table in SQLiteStore, append-only by contract, with read/count API and validation. This is the storage layer the Track M retrieval-feedback loop will write to. The writer hook in SeamLocomoAdapter and the BIL-2 backfill tool are separate follow-up entries so each lands testable on its own.
+
+Change in seam_runtime/storage.py: new retrieval_event table created in _init_schema() alongside ir_records/vector_index/benchmark_runs, with autoincrement event_id, ts, run_id, scope, query, candidate_ids_json, ranks_json, scores_json, reasons_json, context_hash, gold_answer, gold_hit_ids_json, context_recall, judge_score, answer, source_kind, source_ref, stale_source (default 0), schema_version (default 1), extra_json. Three indexes: idx_retrieval_event_run, idx_retrieval_event_ts, idx_retrieval_event_stale. Schema matches the field list specified in docs/roadmap/CONTEXT_STREAMS.md section 12.5.
+
+API added on SQLiteStore: write_retrieval_event(...) returns the new event_id and validates required fields (run_id, query, source_kind) plus alignment of ranks/scores with candidate_ids; iter_retrieval_events(run_id=, scope=, include_stale=True, limit=None) returns rows newest-first via SELECT * with optional WHERE filters; count_retrieval_events(...) mirrors the same filter contract. Module-level _retrieval_event_row(row) deserializes JSON columns into Python lists/dicts so consumers get typed structures, not raw text. No update_/delete_/purge_/edit_ method exists; the append-only contract is enforced by absence, not by hook.
+
+Stale-source flag is a write-time required boolean (default False) that records whether the source bundle predates HISTORY#240 retrieval fixes / HISTORY#242 SQLite order fix. Backfill of pre-fix BIL-2 bundles must set stale_source=True so scoring-weight tuning and reranker training can filter them out with include_stale=False. Per CONTEXT_STREAMS section 12.5 and HISTORY#243 guardrails, the flag must not be flipped after the fact.
+
+Tests in tests/audit/test_retrieval_event_store.py (9 cases, all green): table+indexes present; minimal write returns event_id, second write increments, fields round-trip via iter; full-field write round-trips ranks/scores/reasons/context_hash/gold/recall/judge/answer/extra; stale flag round-trips and filters correctly via include_stale; iter filters by run_id, scope, both, and limit; append-only contract has no update/delete/purge/edit method; validation rejects empty run_id/query/source_kind and misaligned ranks/scores; empty candidate_ids is a valid recordable outcome (query returned nothing is itself useful signal).
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/test_retrieval_event_store.py -q passed 9 tests; .venv/bin/python -m pytest tests/audit/test_sqlite_load_order.py test_seam_all/test_storage_lifecycle.py -q passed 4 tests (no regression on the existing storage path); .venv/bin/python -c "import seam_runtime.storage" imports cleanly. No paid API calls were made. No runtime code outside SQLiteStore changed; the LoCoMo adapter and runner are untouched in this slice.
+
+Next step: slice 2 - opt-in writer hook in SeamLocomoAdapter.answer() that emits a retrieval_event per case when a --record-retrieval-events flag is set on benchmarks/external/locomo/run.py; default off so existing tests stay stable. Slice 3 - tools/h2/backfill_from_bil2.py that reads a BIL-2 LoCoMo result bundle and writes retrieval_event rows with stale_source flagged based on the bundle's git_sha relative to HISTORY#240 / HISTORY#242 commit SHAs. Slice 4 - dev/holdout split helper before any scoring-weight tuning. No autonomous ranking change yet; all policy promotion still goes through seam improvement review per HISTORY#243.
+---END-ENTRY-#244---

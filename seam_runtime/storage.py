@@ -207,6 +207,28 @@ class SQLiteStore:
                     metadata_json text not null,
                     updated_at text not null
                 );
+                create table if not exists retrieval_event (
+                    event_id integer primary key autoincrement,
+                    ts text not null,
+                    run_id text not null,
+                    scope text,
+                    query text not null,
+                    candidate_ids_json text not null,
+                    ranks_json text,
+                    scores_json text,
+                    reasons_json text,
+                    context_hash text,
+                    gold_answer text,
+                    gold_hit_ids_json text,
+                    context_recall real,
+                    judge_score real,
+                    answer text,
+                    source_kind text not null,
+                    source_ref text,
+                    stale_source integer not null default 0,
+                    schema_version integer not null default 1,
+                    extra_json text
+                );
                 create index if not exists idx_ir_records_kind on ir_records (kind);
                 create index if not exists idx_ir_records_ns_scope on ir_records (ns, scope);
                 create index if not exists idx_document_status_source on document_status (source_ref);
@@ -220,6 +242,9 @@ class SQLiteStore:
                 create index if not exists idx_surface_artifacts_source on surface_artifacts (source_ref);
                 create index if not exists idx_benchmark_cases_family on benchmark_cases (family);
                 create unique index if not exists idx_projection_record_kind on projection_index (record_id, projection_kind);
+                create index if not exists idx_retrieval_event_run on retrieval_event (run_id);
+                create index if not exists idx_retrieval_event_ts on retrieval_event (ts);
+                create index if not exists idx_retrieval_event_stale on retrieval_event (stale_source);
                 """
             )
             connection.execute("pragma foreign_keys = on")
@@ -991,6 +1016,167 @@ class SQLiteStore:
             }
             for row in rows
         ]
+
+    def write_retrieval_event(
+        self,
+        *,
+        run_id: str,
+        query: str,
+        candidate_ids: list[str],
+        source_kind: str,
+        ts: str | None = None,
+        scope: str | None = None,
+        ranks: list[int] | None = None,
+        scores: list[float] | None = None,
+        reasons: list[str] | None = None,
+        context_hash: str | None = None,
+        gold_answer: str | None = None,
+        gold_hit_ids: list[str] | None = None,
+        context_recall: float | None = None,
+        judge_score: float | None = None,
+        answer: str | None = None,
+        source_ref: str | None = None,
+        stale_source: bool = False,
+        extra: dict[str, object] | None = None,
+    ) -> int:
+        """Append a retrieval-outcome event (H2 substrate). Returns new event_id.
+
+        Append-only by contract: there is no update/delete API. Callers must
+        not mutate prior events. Stale-source flagging is required for
+        backfill from pre-fix bundles; do not flip the flag after the fact.
+        """
+        if not run_id:
+            raise ValueError("run_id is required")
+        if not query:
+            raise ValueError("query is required")
+        if not source_kind:
+            raise ValueError("source_kind is required")
+        if ranks is not None and len(ranks) != len(candidate_ids):
+            raise ValueError("ranks must align with candidate_ids")
+        if scores is not None and len(scores) != len(candidate_ids):
+            raise ValueError("scores must align with candidate_ids")
+        with closing(self._connect()) as connection:
+            cursor = connection.execute(
+                """
+                insert into retrieval_event (
+                    ts, run_id, scope, query,
+                    candidate_ids_json, ranks_json, scores_json, reasons_json,
+                    context_hash, gold_answer, gold_hit_ids_json,
+                    context_recall, judge_score, answer,
+                    source_kind, source_ref, stale_source, schema_version, extra_json
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ts or utc_now(),
+                    run_id,
+                    scope,
+                    query,
+                    json.dumps(list(candidate_ids), separators=(",", ":")),
+                    json.dumps(list(ranks), separators=(",", ":")) if ranks is not None else None,
+                    json.dumps(list(scores), separators=(",", ":")) if scores is not None else None,
+                    json.dumps(list(reasons), separators=(",", ":")) if reasons is not None else None,
+                    context_hash,
+                    gold_answer,
+                    json.dumps(list(gold_hit_ids), separators=(",", ":")) if gold_hit_ids is not None else None,
+                    context_recall,
+                    judge_score,
+                    answer,
+                    source_kind,
+                    source_ref,
+                    1 if stale_source else 0,
+                    1,
+                    json.dumps(extra, sort_keys=True, separators=(",", ":")) if extra is not None else None,
+                ),
+            )
+            event_id = cursor.lastrowid
+            connection.commit()
+        return int(event_id)
+
+    def iter_retrieval_events(
+        self,
+        *,
+        run_id: str | None = None,
+        scope: str | None = None,
+        include_stale: bool = True,
+        limit: int | None = None,
+    ) -> list[dict[str, object]]:
+        """Read retrieval events. Newest first by event_id.
+
+        Defaults include stale-flagged events; callers training rankers should
+        pass include_stale=False explicitly.
+        """
+        clauses: list[str] = []
+        params: list[object] = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        if scope is not None:
+            clauses.append("scope = ?")
+            params.append(scope)
+        if not include_stale:
+            clauses.append("stale_source = 0")
+        where = (" where " + " and ".join(clauses)) if clauses else ""
+        sql = f"select * from retrieval_event{where} order by event_id desc"
+        if limit is not None:
+            sql += " limit ?"
+            params.append(int(limit))
+        with closing(self._connect()) as connection:
+            rows = connection.execute(sql, tuple(params)).fetchall()
+        return [_retrieval_event_row(row) for row in rows]
+
+    def count_retrieval_events(
+        self,
+        *,
+        run_id: str | None = None,
+        scope: str | None = None,
+        include_stale: bool = True,
+    ) -> int:
+        clauses: list[str] = []
+        params: list[object] = []
+        if run_id is not None:
+            clauses.append("run_id = ?")
+            params.append(run_id)
+        if scope is not None:
+            clauses.append("scope = ?")
+            params.append(scope)
+        if not include_stale:
+            clauses.append("stale_source = 0")
+        where = (" where " + " and ".join(clauses)) if clauses else ""
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                f"select count(*) from retrieval_event{where}", tuple(params)
+            ).fetchone()
+        return int(row[0])
+
+
+def _retrieval_event_row(row: sqlite3.Row) -> dict[str, object]:
+    def _maybe_json(value):
+        if value is None:
+            return None
+        return json.loads(value)
+
+    return {
+        "event_id": int(row["event_id"]),
+        "ts": row["ts"],
+        "run_id": row["run_id"],
+        "scope": row["scope"],
+        "query": row["query"],
+        "candidate_ids": _maybe_json(row["candidate_ids_json"]) or [],
+        "ranks": _maybe_json(row["ranks_json"]),
+        "scores": _maybe_json(row["scores_json"]),
+        "reasons": _maybe_json(row["reasons_json"]),
+        "context_hash": row["context_hash"],
+        "gold_answer": row["gold_answer"],
+        "gold_hit_ids": _maybe_json(row["gold_hit_ids_json"]),
+        "context_recall": row["context_recall"],
+        "judge_score": row["judge_score"],
+        "answer": row["answer"],
+        "source_kind": row["source_kind"],
+        "source_ref": row["source_ref"],
+        "stale_source": bool(row["stale_source"]),
+        "schema_version": int(row["schema_version"]),
+        "extra": _maybe_json(row["extra_json"]),
+    }
 
 
 def _document_status_row(row: sqlite3.Row) -> dict[str, object]:
