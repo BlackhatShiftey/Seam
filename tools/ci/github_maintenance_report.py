@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import urllib.request
 from datetime import datetime, timezone
@@ -16,6 +17,15 @@ PROTECTED_BRANCH_PREFIXES = (
     "origin/handoff/archive",
     "origin/backup/",
     "origin/roadmap-",
+)
+
+SENSITIVE_TEXT_PATTERNS = (
+    re.compile(
+        r"https?://[^\s\)\]\}>\"']*(?:claude\.ai|chatgpt\.com|chat\.openai\.com|cursor\.com|/share/|session(?:=|/)|thread(?:=|/))[^\s\)\]\}>\"']*",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:sk-or-v1-|sk-ant-|sk-)[A-Za-z0-9_-]{16,}\b"),
+    re.compile(r"\b(?:ghp_|github_pat_)[A-Za-z0-9_]{20,}\b"),
 )
 
 
@@ -43,8 +53,8 @@ def build_report(
         if idle_days >= stale_days:
             stale_branches.append(
                 {
-                    "name": name,
-                    "sha": branch.get("sha"),
+                    "name": _safe_text(name),
+                    "sha": _safe_text(str(branch.get("sha", ""))),
                     "idle_days": idle_days,
                     "committed_at": _format_time(committed_at),
                 }
@@ -89,11 +99,14 @@ def render_markdown(report: dict[str, Any]) -> str:
     if not open_prs:
         lines.append("- None")
     for pr in open_prs:
-        draft = " draft" if pr.get("draft") else ""
-        lines.append(
-            f"- #{pr['number']}{draft}: {pr['title']} "
-            f"({pr['url']}) - updated {pr['idle_days']}d ago, head `{pr['head_ref']}`"
-        )
+        lines.append(_format_pr_line(pr))
+
+    lines.extend(["", "## Stale PRs", ""])
+    stale_prs = report.get("stale_prs", [])
+    if not stale_prs:
+        lines.append("- None")
+    for pr in stale_prs:
+        lines.append(_format_pr_line(pr))
 
     lines.extend(["", "## Stale Branches Without PR", ""])
     branches = report.get("stale_branches_without_pr", [])
@@ -174,10 +187,10 @@ def _pr_summary(pr: dict[str, Any], now: datetime) -> dict[str, Any]:
     created_at = _parse_time(str(pr.get("created_at", "")))
     return {
         "number": pr.get("number"),
-        "title": pr.get("title"),
-        "url": pr.get("html_url"),
+        "title": _safe_text(str(pr.get("title", ""))),
+        "url": _safe_text(str(pr.get("html_url", ""))),
         "draft": bool(pr.get("draft")),
-        "head_ref": _head_ref(pr),
+        "head_ref": _safe_text(_head_ref(pr)),
         "created_at": _format_time(created_at),
         "updated_at": _format_time(updated_at),
         "age_days": _age_days(now, created_at),
@@ -192,6 +205,21 @@ def _head_ref(pr: dict[str, Any]) -> str:
 
 def _is_protected_branch(name: str) -> bool:
     return any(name == prefix or name.startswith(prefix) for prefix in PROTECTED_BRANCH_PREFIXES)
+
+
+def _format_pr_line(pr: dict[str, Any]) -> str:
+    draft = " draft" if pr.get("draft") else ""
+    return (
+        f"- #{pr['number']}{draft}: {pr['title']} "
+        f"({pr['url']}) - updated {pr['idle_days']}d ago, head `{pr['head_ref']}`"
+    )
+
+
+def _safe_text(value: str) -> str:
+    safe = value
+    for pattern in SENSITIVE_TEXT_PATTERNS:
+        safe = pattern.sub("<redacted-session-url>", safe)
+    return safe
 
 
 def _parse_time(value: str) -> datetime:

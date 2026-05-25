@@ -68,3 +68,75 @@ def test_maintenance_report_markdown_is_actionable_without_secrets() -> None:
     assert "#31" in markdown
     assert "https://github.example/pr/31" in markdown
     assert "updated 13d ago" in markdown
+
+
+def test_maintenance_report_lists_stale_prs_separately() -> None:
+    now = datetime(2026, 5, 25, tzinfo=timezone.utc)
+    report = build_report(
+        prs=[
+            {
+                "number": 31,
+                "title": "Old draft",
+                "html_url": "https://github.example/pr/31",
+                "draft": True,
+                "head": {"ref": "old/draft"},
+                "created_at": "2026-05-01T00:00:00Z",
+                "updated_at": "2026-05-10T00:00:00Z",
+            },
+            {
+                "number": 32,
+                "title": "Fresh draft",
+                "html_url": "https://github.example/pr/32",
+                "draft": True,
+                "head": {"ref": "fresh/draft"},
+                "created_at": "2026-05-24T00:00:00Z",
+                "updated_at": "2026-05-24T00:00:00Z",
+            },
+        ],
+        branches=[],
+        now=now,
+        stale_days=7,
+    )
+
+    markdown = render_markdown(report)
+
+    assert "## Stale PRs" in markdown
+    stale_section = markdown.split("## Stale PRs", 1)[1].split("## Stale Branches Without PR", 1)[0]
+    assert "#31 draft: Old draft" in stale_section
+    assert "#32" not in stale_section
+
+
+def test_maintenance_report_redacts_session_links_from_rendered_fields() -> None:
+    now = datetime(2026, 5, 25, tzinfo=timezone.utc)
+    claude_session_url = "https://claude." "ai/chat/session-local"
+    chatgpt_session_url = "https://chatgpt." "com/share/local"
+    openai_session_url = "https://chat.openai." "com/c/local"
+    report = build_report(
+        prs=[
+            {
+                "number": 31,
+                "title": f"Contains {claude_session_url}",
+                "html_url": "https://github.example/pr/31",
+                "draft": True,
+                "head": {"ref": f"branch/{chatgpt_session_url}"},
+                "created_at": "2026-05-01T00:00:00Z",
+                "updated_at": "2026-05-10T00:00:00Z",
+            }
+        ],
+        branches=[
+            {
+                "name": f"origin/branch/{openai_session_url}",
+                "sha": "abc",
+                "committed_at": "2026-05-01T00:00:00Z",
+            }
+        ],
+        now=now,
+        stale_days=7,
+    )
+
+    markdown = render_markdown(report)
+
+    assert "claude.ai" not in markdown
+    assert "chatgpt.com" not in markdown
+    assert "chat.openai.com" not in markdown
+    assert "<redacted-session-url>" in markdown

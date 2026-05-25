@@ -5249,3 +5249,29 @@ GitHub CI observation after HISTORY#245: required jobs `repo-hygiene`, `chroma-r
 
 Next steps for new session: inspect this branch, keep `benchmarks/external/locomo/adapters/seam.py` out of the repo-hygiene commit, decide whether to finish and commit the maintenance workflow as HISTORY#247 or split HISTORY#246 documentation from the maintenance workflow, then push the branch and open a PR through the newly enforced main ruleset.
 ---END-ENTRY-#247---
+
+---BEGIN-ENTRY-#248---
+id: 248
+date: 2026-05-25T12:45:28Z
+agent: codex
+status: done
+topics: security, protocol, verify, history, status
+commits: none
+refs: PROJECT_STATUS.md,.github/workflows/repository-maintenance.yml,tools/ci/github_maintenance_report.py,tests/audit/test_github_maintenance_report.py,GitHub-PR:31,GitHub-PR:32,GitHub-ruleset:15143368
+supersedes: 247
+tokens: 554
+---
+Finished the repo-hygiene PR workflow review on branch `codex/repo-hygiene-ruleset-record` for draft PR #32.
+
+Repository maintenance workflow status: `.github/workflows/repository-maintenance.yml` remains advisory only, runs on Monday schedule plus manual dispatch, checks out full history, builds Markdown and JSON artifacts, and does not block PRs. `tools/ci/github_maintenance_report.py` now renders stale PRs in their own Markdown section instead of only counting them in the summary, and sanitizes rendered/JSON PR titles, PR URLs, branch names, and SHAs for provider session URLs and secret-shaped tokens before writing report artifacts. `tests/audit/test_github_maintenance_report.py` now covers stale PR section rendering and session-link redaction in addition to stale PR/branch classification.
+
+GitHub state inspected: ruleset `15143368` is still `Protect main (PR + hygiene gates)`, active on `refs/heads/main`, with no bypass actors, deletion and non-fast-forward blocked, pull requests required, and strict latest-code required status checks for `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2`. Open PRs were PR #32 (`codex/repo-hygiene-ruleset-record`, draft, mergeable) and PR #31 (`claude/remote-control-AD6Di`, draft, conflicting). While inspecting open PRs, PR #31's generated assistant session-link trailer was found and redacted from the PR body via the GitHub REST pull-request update endpoint; a follow-up non-printing check confirmed no matching provider session URL remains in that body.
+
+Live maintenance report run after the code change used `GITHUB_TOKEN=$(gh auth token) .venv/bin/python -m tools.ci.github_maintenance_report --output /tmp/seam-github-maintenance-report.md --json-output /tmp/seam-github-maintenance-report.json`; it reported PASS with 2 open PRs, 0 stale PRs, and 0 stale branches without PR at threshold 7 days. This is advisory state only; PR #31 still needs an operator decision because it is conflicting draft work, and its update timestamp was refreshed by the body cleanup.
+
+PR #32 check status: required checks `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2` passed. Advisory checks `pgvector-integration` and `registry-plan` passed. Advisory `test-and-benchmark (ubuntu-latest)` and `test-and-benchmark (windows-latest)` failed; GitHub logs show the dominant Ubuntu failures are still missing `sentence_transformers` in LoCoMo/cross-encoder paths plus existing benchmark endpoint/stub-seal cases, and Windows still includes the missing `sentence_transformers` failure plus pre-existing Windows path/git-hook test failures. These matrix jobs are intentionally not required by the ruleset and should be fixed in a separate CI cleanup branch.
+
+Verification before this entry: `.venv/bin/python -m pytest tests/audit/test_github_maintenance_report.py -q` passed 4 tests after the new tests failed red first; `.venv/bin/python -m py_compile tools/ci/github_maintenance_report.py tests/audit/test_github_maintenance_report.py` passed; PyYAML parsed `.github/workflows/ci.yml`, `.github/workflows/external-memory-benchmarks.yml`, and `.github/workflows/repository-maintenance.yml`; `git diff --check` passed; `python3 -m tools.history.load_snapshot latest` verified snapshot `20260525-123816-084016-codex.json`.
+
+Scope boundary: the unrelated H2 retrieval-event writer-hook changes in `benchmarks/external/locomo/adapters/seam.py` and `tests/audit/test_locomo_adapter_retrieval_event_writer.py` stayed unstaged and are not part of PR #32.
+---END-ENTRY-#248---
