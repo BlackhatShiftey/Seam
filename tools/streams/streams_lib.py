@@ -237,6 +237,25 @@ def write_log(kind: str, data: bytes) -> None:
         pass
 
 
+def append_log(kind: str, data: bytes) -> None:
+    p = log_path(kind)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    try:
+        os.write(fd, data)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    try:
+        dir_fd = os.open(str(p.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        pass
+
+
 def list_stream_kinds() -> list[str]:
     if not STREAMS_ROOT.exists():
         return []
@@ -309,12 +328,13 @@ def append_event(kind: str, header_fields: dict[str, str], body: str, *, agent: 
             fields=header_fields,
             body=body,
         )
+        append_bytes = b""
         if data and not data.endswith(b"\n"):
-            data += b"\n"
+            append_bytes += b"\n"
         if data:
-            data += b"\n"
-        data += block.encode("utf-8")
-        write_log(kind, data)
+            append_bytes += b"\n"
+        append_bytes += block.encode("utf-8")
+        append_log(kind, append_bytes)
         events = parse_events(read_log(kind), kind)
         return events[-1]
     finally:

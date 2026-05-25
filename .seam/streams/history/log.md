@@ -5457,3 +5457,21 @@ Fixes: tools/streams/streams_lib.py now uses one process-wide stream append mute
 
 Verification before this entry: targeted stream append concurrency test passed locally, and the full tools/streams test module passed locally with the new mutex and isolated test root.
 ---END-ENTRY-#257---
+
+---BEGIN-ENTRY-#258---
+id: 258
+date: 2026-05-25T21:05:09Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tools/streams/streams_lib.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 257
+tokens: 225
+---
+PR #34 Windows CI follow-up after commit 5db92a3. GitHub Actions run 26419447360 passed every check except windows-latest test-and-benchmark; the remaining failure was still tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving with the final log containing one event.
+
+Fix: tools/streams/streams_lib.py now appends only the newly rendered event block under the stream lock instead of rewriting the whole log from a read-modify-write buffer. This removes the overwrite class directly; even if Windows scheduling delays a writer, a later append does not truncate another writer's already-written event. The existing process-wide in-process mutex and OS advisory lock remain in place.
+
+Verification before this entry: targeted stream append concurrency test passed locally, and the full tools/streams test module passed locally with append-only event writes.
+---END-ENTRY-#258---
