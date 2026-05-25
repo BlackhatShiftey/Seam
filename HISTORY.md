@@ -5197,3 +5197,55 @@ Verification before this entry: `tests/audit/test_github_pr_gates.py` failed bef
 
 Next step: after this entry, rebuild derived history/stream/cross-index state, write a snapshot, and run integrity/routing/continuity/streams gates. Branch protection on GitHub should require the new `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2` checks before merge.
 ---END-ENTRY-#245---
+
+---BEGIN-ENTRY-#246---
+id: 246
+date: 2026-05-25T12:33:37Z
+agent: codex
+status: done
+topics: security, protocol, verify, history, status
+commits: none
+refs: PROJECT_STATUS.md,REPO_LEDGER.md,GitHub-ruleset:15143368
+supersedes: 245
+tokens: 574
+---
+Tightened the GitHub main-branch repository ruleset so the PR hygiene gates from HISTORY#245 are enforcement, not advisory.
+
+External GitHub setting changed via `gh api`: repository ruleset id `15143368` is now named `Protect main (PR + hygiene gates)`, target `branch`, enforcement `active`, conditions include only `refs/heads/main`, and `bypass_actors` is empty. The rules now block branch deletion, block non-fast-forward updates, require pull requests, and require strict latest-code status checks for `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2`. The prior ruleset name was `Protect main (owner-only updates)` and allowed bypass for a repository role plus the operator user; the direct push of HISTORY#237-HISTORY#245 succeeded only because that bypass existed. After this change, future main updates should go through PRs unless the operator deliberately reintroduces a time-boxed emergency bypass.
+
+Intentionally did not require the existing full `test-and-benchmark` matrix yet because recent GitHub history shows the CI workflow has had failures and the current post-HISTORY#245 run was still in progress when the ruleset was updated. The newly required checks are the repo-management checks added and locally verified in HISTORY#245: no-paid BIL-2 LoCoMo quickstart, real Chroma smoke, and diff/secret hygiene.
+
+Updated `REPO_LEDGER.md` to make the main ruleset policy durable and `PROJECT_STATUS.md` to point future agents at this ruleset handoff. No runtime code changed and no paid API calls were made.
+
+Verification before this entry: `gh api repos/BlackhatShiftey/Seam/rulesets/15143368` returned enforcement active, no bypass actors, and rules for deletion, non_fast_forward, pull_request, and required_status_checks with contexts `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2`. `gh api repos/BlackhatShiftey/Seam/rules/branches/main` returned the same effective rules for `main`. Current GitHub CI run for commit `d654310` already had `repo-hygiene`, `chroma-real-smoke`, `locomo-quickstart-bil2`, and `pgvector-integration` completed successfully; the two full test-and-benchmark matrix jobs were still in progress and are not required by the ruleset yet.
+
+Next step: send this history/ledger documentation update through the new PR path rather than direct-pushing to main. After the full matrix is stable, consider adding `test-and-benchmark (ubuntu-latest)` and `test-and-benchmark (windows-latest)` to required checks in a separate measured ruleset update.
+---END-ENTRY-#246---
+
+---BEGIN-ENTRY-#247---
+id: 247
+date: 2026-05-25T12:37:57Z
+agent: codex
+status: in-progress
+topics: security, protocol, verify, history, status
+commits: none
+refs: PROJECT_STATUS.md,.github/workflows/repository-maintenance.yml,tools/ci/github_maintenance_report.py,tests/audit/test_github_maintenance_report.py
+supersedes: 246
+tokens: 700
+---
+Handoff for continuing repo hygiene in the next session.
+
+Current branch: `codex/repo-hygiene-ruleset-record`. Base includes pushed `main` at HISTORY#245 (`d654310`). This branch has HISTORY#246 recorded for the external GitHub ruleset change, plus an in-progress repository-maintenance workflow that is not committed yet.
+
+Completed external GitHub setting: ruleset id `15143368` is now `Protect main (PR + hygiene gates)`, active on `refs/heads/main`, with empty bypass actors. Effective rules verified through `gh api repos/BlackhatShiftey/Seam/rules/branches/main`: deletion blocked, non-fast-forward blocked, pull request required, and strict required status checks for `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2`. The direct-push bypass that allowed HISTORY#237-HISTORY#245 to land on main has been removed.
+
+In-progress repo-maintenance files added but not yet committed: `.github/workflows/repository-maintenance.yml` (scheduled Monday + manual workflow), `tools/ci/github_maintenance_report.py` (builds Markdown/JSON report from GitHub open PRs plus remote branch ages), and `tests/audit/test_github_maintenance_report.py` (unit tests for stale PR and stale branch detection). The maintenance workflow is intentionally advisory: it uploads a report artifact and does not block PRs.
+
+Verification already run for the in-progress maintenance code: `.venv/bin/python -m pytest tests/audit/test_github_maintenance_report.py -q` passed 2 tests after the module was implemented. Workflow YAML parsed cleanly for `.github/workflows/ci.yml`, `.github/workflows/external-memory-benchmarks.yml`, and `.github/workflows/repository-maintenance.yml`. `git diff --check` passed before this entry. Local generated artifact `lossless_textual_14fff5fe7bde4193b5b0687e9fb2fd69.txt` was removed.
+
+Known dirty file not owned by this repo-hygiene handoff: `benchmarks/external/locomo/adapters/seam.py` has H2 retrieval-event writer-hook changes (`record_retrieval_events`, run_id, `_record_retrieval_event`, env flags) that were already dirty when the maintenance workflow handoff was being prepared. Do not stage, revert, or include that file in the repo-hygiene PR unless the operator explicitly asks to combine workstreams.
+
+GitHub CI observation after HISTORY#245: required jobs `repo-hygiene`, `chroma-real-smoke`, `locomo-quickstart-bil2`, and `pgvector-integration` completed successfully for `d654310`. The older full `test-and-benchmark` matrix failed on missing `sentence_transformers` in LoCoMo tests plus pre-existing Windows/path/test issues, so those jobs are deliberately not required by the ruleset yet. Next session should either leave them advisory or create a separate CI-fix branch for sbert installation / test marker cleanup.
+
+Next steps for new session: inspect this branch, keep `benchmarks/external/locomo/adapters/seam.py` out of the repo-hygiene commit, decide whether to finish and commit the maintenance workflow as HISTORY#247 or split HISTORY#246 documentation from the maintenance workflow, then push the branch and open a PR through the newly enforced main ruleset.
+---END-ENTRY-#247---

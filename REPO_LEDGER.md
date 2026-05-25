@@ -78,6 +78,12 @@ and `HISTORY_INDEX.md`.
   --check`, and a non-printing secret/session URL scan. Paid answerer, judge,
   decomposer, or full LoCoMo runs remain operator-gated and must not be added
   to default PR CI.
+- GitHub `main` is protected by repository ruleset `Protect main (PR +
+  hygiene gates)`: no bypass actors, no deletion, no non-fast-forward update,
+  pull request required, and `repo-hygiene`, `chroma-real-smoke`, and
+  `locomo-quickstart-bil2` required with strict latest-code status checks.
+  Do not reintroduce direct-push bypass except as a time-boxed emergency
+  with a follow-up HISTORY entry.
 - Benchmark evidence proves SEAM value but never expands license rights; hosted,
   SaaS, commercial, embedded, redistribution, customer-deployment, or
   closed-source use still requires a separate written commercial license.
