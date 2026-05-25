@@ -5297,3 +5297,23 @@ Updated `REPO_LEDGER.md` with a durable pointer to the `AGENTS.md` PR workflow b
 
 Scope boundary: the unrelated H2 retrieval-event writer-hook changes in `benchmarks/external/locomo/adapters/seam.py` and `tests/audit/test_locomo_adapter_retrieval_event_writer.py` stayed unstaged and are not part of PR #32.
 ---END-ENTRY-#249---
+
+---BEGIN-ENTRY-#250---
+id: 250
+date: 2026-05-25T13:51:15Z
+agent: codex
+status: done
+topics: protocol, verify, history, status, security
+commits: none
+refs: PROJECT_STATUS.md,GitHub-PR:31,GitHub-PR:32,GitHub-branch:main
+supersedes: 249
+tokens: 309
+---
+Closed the GitHub PR stack after the repo-hygiene workflow landed.
+
+Merged PR #32 (`codex/repo-hygiene-ruleset-record`) after required checks `repo-hygiene`, `chroma-real-smoke`, and `locomo-quickstart-bil2` passed on pushed head `71c77c46392a1fc3384eb1e9e15df96bae112aad`. The PR was marked ready, then squash-merged through GitHub as merge commit `52db6c00751cce1dfee7b121a6d51887457d8915` with the branch deleted by GitHub. Advisory `test-and-benchmark (ubuntu-latest)` and `test-and-benchmark (windows-latest)` were still failing on the known pre-existing CI dependency/platform issues and remain separate cleanup work per the AGENTS.md PR workflow.
+
+Closed PR #31 (`claude/remote-control-AD6Di`) as superseded/conflicting rather than merging it. The branch was stale draft work, conflicted with current `main`, and Track M/benchmark roadmap state had already moved forward through later mainline history. GitHub deleted the remote branch during PR closeout.
+
+Verification before this entry: `gh pr list --state open --limit 50 --json number,title,isDraft,headRefName,baseRefName,updatedAt,mergeStateStatus,url` returned an empty list after the closeout. `gh pr view 32 --json number,state,mergedAt,mergedBy,mergeCommit,url,headRefName` reported state `MERGED`, merged at `2026-05-25T13:50:11Z`, merge commit `52db6c00751cce1dfee7b121a6d51887457d8915`. `gh pr view 31 --json number,state,closedAt,mergedAt,headRefName,url` reported state `CLOSED`, closed at `2026-05-25T13:50:19Z`, and `mergedAt: null`. `git ls-remote --heads origin codex/repo-hygiene-ruleset-record claude/remote-control-AD6Di main` returned only `refs/heads/main` at `52db6c00751cce1dfee7b121a6d51887457d8915`.
+---END-ENTRY-#250---
