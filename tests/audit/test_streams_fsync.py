@@ -19,8 +19,13 @@ def test_write_log_fsyncs_file_and_directory():
 
         write_log("test_kind", b"hello fsync test")
 
-        assert spy_fsync.call_count >= 2, f"expected >= 2 fsync calls, got {spy_fsync.call_count}"
-        assert spy_open.call_count >= 2, f"expected >= 2 open calls, got {spy_open.call_count}"
+        expected_calls = 1 if os.name == "nt" else 2
+        assert spy_fsync.call_count >= expected_calls, (
+            f"expected >= {expected_calls} fsync calls, got {spy_fsync.call_count}"
+        )
+        assert spy_open.call_count >= expected_calls, (
+            f"expected >= {expected_calls} open calls, got {spy_open.call_count}"
+        )
 
 
 def test_write_log_fsync_file_called_in_finally():

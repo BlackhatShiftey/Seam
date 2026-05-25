@@ -255,6 +255,9 @@ def _acquire_stream_lock(kind: str):
         fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
         if os.name == "nt":
             import msvcrt
+            if os.path.getsize(lock_path) == 0:
+                os.write(fd, b"\0")
+            os.lseek(fd, 0, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
 
             def _release():
