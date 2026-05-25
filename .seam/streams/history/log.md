@@ -5439,3 +5439,21 @@ Fix: the stream append concurrency test now joins each writer with a 30 second t
 
 Verification before this entry: targeted local pytest passed for tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving.
 ---END-ENTRY-#256---
+
+---BEGIN-ENTRY-#257---
+id: 257
+date: 2026-05-25T20:54:52Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tools/streams/streams_lib.py,tools/streams/test_streams.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 256
+tokens: 229
+---
+PR #34 Windows CI follow-up after commit a865992. GitHub Actions run 26419146231 passed every check except windows-latest test-and-benchmark; the remaining failure was still tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving, with returned ids sequential but the final test log containing only one event.
+
+Fixes: tools/streams/streams_lib.py now uses one process-wide stream append mutex around the OS advisory lock instead of a per-path lock, removing same-process Windows overwrite races for all stream writes. tools/streams/test_streams.py now uses an isolated tempfile root for the concurrency test and keeps the patched stream root active until both writer threads are complete.
+
+Verification before this entry: targeted stream append concurrency test passed locally, and the full tools/streams test module passed locally with the new mutex and isolated test root.
+---END-ENTRY-#257---

@@ -270,12 +270,14 @@ class BuildContextPackTests(unittest.TestCase):
 
 class AppendEventLockTests(unittest.TestCase):
     def test_concurrent_append_event_no_interleaving(self) -> None:
+        import shutil
         import threading
+        import tempfile
         from unittest.mock import patch
         from tools.streams.streams_lib import append_event
 
-        tmp_root = Path(self._testMethodName)
-        tmp_root.mkdir(parents=True, exist_ok=True)
+        tmp_root = Path(tempfile.mkdtemp(prefix=f"{self._testMethodName}-"))
+        self.addCleanup(lambda: shutil.rmtree(tmp_root, ignore_errors=True))
 
         results = [None, None]
 

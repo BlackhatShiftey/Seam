@@ -27,8 +27,7 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STREAMS_ROOT = REPO_ROOT / ".seam" / "streams"
 CROSS_INDEX_PATH = REPO_ROOT / ".seam" / "cross_index.md"
-_THREAD_LOCKS_GUARD = threading.Lock()
-_THREAD_LOCKS: dict[str, threading.Lock] = {}
+_STREAM_APPEND_THREAD_LOCK = threading.Lock()
 
 
 def delim_for(kind: str) -> str:
@@ -253,10 +252,7 @@ def _acquire_stream_lock(kind: str):
     stream_dir = STREAMS_ROOT / kind
     stream_dir.mkdir(parents=True, exist_ok=True)
     lock_path = stream_dir / "log.lock"
-    lock_key = str(lock_path.resolve())
-    with _THREAD_LOCKS_GUARD:
-        thread_lock = _THREAD_LOCKS.setdefault(lock_key, threading.Lock())
-    thread_lock.acquire()
+    _STREAM_APPEND_THREAD_LOCK.acquire()
     fd = -1
     try:
         fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
@@ -275,7 +271,7 @@ def _acquire_stream_lock(kind: str):
                     try:
                         os.close(fd)
                     finally:
-                        thread_lock.release()
+                        _STREAM_APPEND_THREAD_LOCK.release()
 
         else:
             import fcntl
@@ -288,13 +284,13 @@ def _acquire_stream_lock(kind: str):
                     try:
                         os.close(fd)
                     finally:
-                        thread_lock.release()
+                        _STREAM_APPEND_THREAD_LOCK.release()
 
         return fd, _release
     except Exception:
         if fd >= 0:
             os.close(fd)
-        thread_lock.release()
+        _STREAM_APPEND_THREAD_LOCK.release()
         raise
 
 
