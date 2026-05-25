@@ -590,15 +590,23 @@ class SQLiteStore:
         if scope:
             query += " and scope = ?"
             params.append(scope)
-        if limit is not None:
+        if limit is not None and not ids:
             query += " order by id limit ? offset ?"
             params.extend([limit, offset])
-        elif offset:
+        elif offset and not ids:
             query += " order by id limit -1 offset ?"
             params.append(offset)
         with closing(self._connect()) as connection:
             rows = connection.execute(query, params).fetchall()
-        return IRBatch([MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows])
+        records = [MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows]
+        if ids:
+            by_id = {record.id: record for record in records}
+            records = [by_id[record_id] for record_id in ids if record_id in by_id]
+            if offset:
+                records = records[offset:]
+            if limit is not None:
+                records = records[:limit]
+        return IRBatch(records)
 
     def delete_ir(self, ids: list[str], include_vectors: bool = True) -> None:
         if not ids:

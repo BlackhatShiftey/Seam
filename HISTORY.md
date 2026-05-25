@@ -5097,3 +5097,27 @@ Durable benchmark archive: copied `/tmp/seam-track-m/{step0b_*,current_fix2_*,cu
 
 Next step: do failure-mode analysis from `AUDIT_NOTES.md` on the warm DB instead of re-running cold. Candidate score levers in priority order: (1) investigate why retrieval is query-independent per conversation - the 0.494742 plateau likely reflects ranking quality at search_top_k=20 since the right turn is being missed; (2) broaden `detect_temporal_tokens` patterns so `parse_temporal_reference` actually fires; (3) add answerer-side instrumentation under `--keep-db --answerer openai --judge stub --limit 20` to characterize the 325 "unknown despite high recall" cases without paying for a 1542-case judge run.
 ---END-ENTRY-#241---
+
+---BEGIN-ENTRY-#242---
+id: 242
+date: 2026-05-25T02:50:25Z
+agent: codex
+status: done
+topics: benchmark, retrieval, search, rank, verify, history, status
+commits: none
+refs: seam_runtime/storage.py,tests/audit/test_sqlite_load_order.py,PROJECT_STATUS.md
+supersedes: 241
+tokens: 729
+---
+Fixed the real SQLite record-order gap in the LoCoMo evidence path.
+
+Root cause: HISTORY#240 preserved ranked ID order inside `SeamLocomoAdapter`, but `SQLiteStore.load_ir(ids=...)` still used a SQL `where id in (...)` query without preserving the caller's requested ID order. SQLite returned rows in primary-key order in practice, so `_build_evidence_context_from_ids()` could still put lower-ranked RAW evidence before higher-ranked evidence before the 2000-character context trim. A fake-store test in `tests/audit/test_locomo_adapter_evidence_text.py` passed because the fake store returned records in input order; it did not exercise the real SQLite behavior. A direct reproduction before the fix returned `['raw:a', 'raw:z']` for `load_ir(ids=['raw:z', 'raw:a'])`.
+
+Change: `SQLiteStore.load_ir(ids=...)` now reorders fetched `MIRLRecord`s according to the input `ids` list, then applies Python-side `offset` and `limit` for ID-filtered calls. Non-ID pagination keeps the existing SQL `order by id limit/offset` behavior. Added `tests/audit/test_sqlite_load_order.py` with two red-green regressions: direct `SQLiteStore.load_ir(ids=...)` order preservation, and `SeamLocomoAdapter._build_evidence_context_from_ids()` preserving ranked RAW order against a real SQLite store.
+
+Verification: the new test file failed before the fix with two failures (`raw:a` before `raw:z`, and the distractor preceding the answer evidence), then passed after the fix. Focused tests passed: `.venv/bin/python -m pytest tests/audit/test_sqlite_load_order.py tests/audit/test_locomo_adapter_evidence_text.py test_seam_all/test_storage_lifecycle.py -q` passed 15 tests; `.venv/bin/python -m pytest tests/audit/test_sqlite_load_order.py tests/audit/test_locomo_adapter_evidence_text.py tests/audit/test_cross_encoder_rerank.py tests/audit/test_temporal_distance_score.py tests/audit/test_bm25_lexical_channel.py tests/audit/test_locomo_decomposer.py -q` passed 37 tests.
+
+No-paid LoCoMo measurement after the fix used the official local dataset path `/home/terrabyte/seam_benchmarks/track_m/locomo/locomo10.json`, first 100 cases, warm DB `/tmp/seam-track-m/iter_db`, `answerer=None`, `judge=None`, and direct adapter construction because `--search-top-k` is not yet a CLI flag. Results: k=20 context_recall_mean=0.5283084138, k=50 0.5221536519, k=100 0.5207250805, k=200 0.5163361916. This improves the current measured no-paid 100-case slice over HISTORY#241's 0.494742, but it does not justify raising the default `search_top_k`; k=20 remains the best measured setting in this sweep. No paid answerer, judge, or decomposer calls were made.
+
+Next step: keep `search_top_k=20` as the default unless a later measured run beats it. If more sweep ergonomics are needed, add a separate `--search-top-k` CLI flag with parser/build_adapter tests before running more no-paid sweeps. The broader remaining score levers are still temporal parsing for official LoCoMo timestamp/question wording and paid answerer diagnostics under explicit operator approval.
+---END-ENTRY-#242---
