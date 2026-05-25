@@ -9,7 +9,7 @@ CI_YML = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
 
 VERIFY_STEPS = [
     "python -m tools.history.verify_integrity",
-    "python -m tools.history.verify_continuity",
+    "python -m tools.history.verify_continuity --no-snapshot",
     "python -m tools.history.verify_routing",
     "python -m tools.streams.verify_streams",
 ]

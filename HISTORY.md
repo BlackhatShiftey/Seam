@@ -5511,3 +5511,21 @@ Fix: .github/workflows/ci.yml now runs python -m tools.history.verify_continuity
 
 Verification before this entry: tests/audit/test_github_pr_gates.py passed locally.
 ---END-ENTRY-#260---
+
+---BEGIN-ENTRY-#261---
+id: 261
+date: 2026-05-25T21:35:57Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tests/audit/test_ci_verify_gates.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 260
+tokens: 197
+---
+PR #34 CI verify-step audit follow-up after commit cc3f377. GitHub Actions run 26420377244 had both ubuntu-latest and windows-latest broad test-and-benchmark jobs failing only the CI audit tests that still expected the exact old continuity command, even though the workflow was intentionally changed to python -m tools.history.verify_continuity --no-snapshot for clean GitHub checkouts.
+
+Fix: tests/audit/test_ci_verify_gates.py now expects python -m tools.history.verify_continuity --no-snapshot in the ordered CI verify-step contract. This keeps local session-end verification stricter while making the CI audit match the clean-checkout workflow that cannot contain ignored local snapshot artifacts.
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/test_ci_verify_gates.py tests/audit/test_github_pr_gates.py -q passed locally.
+---END-ENTRY-#261---
