@@ -5419,3 +5419,23 @@ Fixes: test_git_hooks now resolves bash with shutil.which and skips only when ba
 
 Verification before this entry: targeted local pytest passed for test_seam_all/test_git_hooks.py::test_pre_commit_refuses_when_python_missing and tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving. Full local broad CI pytest command passed: .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q.
 ---END-ENTRY-#255---
+
+---BEGIN-ENTRY-#256---
+id: 256
+date: 2026-05-25T20:45:46Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tools/streams/test_streams.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 255
+tokens: 314
+---
+PR #34 Windows CI follow-up after commit cc7828a. GitHub Actions run 26418841412 passed repo-hygiene, registry-plan, chroma-real-smoke, pgvector-integration, locomo-quickstart-bil2, and ubuntu-latest test-and-benchmark, but windows-latest test-and-benchmark still failed tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving.
+
+Root cause: the Windows log showed both append threads returned distinct sequential ids, but the final temp log read saw only one event. The test used join(timeout=5) and then exited the patched STREAMS_ROOT context even if a slower Windows writer was still alive. That could let the second writer finish after the patch reverted, making the test inspect the temp root while the late writer completed elsewhere.
+
+Fix: the stream append concurrency test now joins each writer with a 30 second timeout and asserts both threads are no longer alive before leaving the patched root context. This keeps the test's root override active for the entire append critical section while still failing boundedly on a real deadlock.
+
+Verification before this entry: targeted local pytest passed for tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving.
+---END-ENTRY-#256---
