@@ -31,7 +31,6 @@ Current implementation:
 Compatibility:
 
 - the canonical package path is `experimental.retrieval_orchestrator`
-- the legacy import path `experimental.hybrid_orchestrator` still resolves
 - the legacy class names `HybridOrchestrator`, `HybridSearchResult`, and `HybridCandidate` remain as aliases
 
 Suggested next architecture steps:
