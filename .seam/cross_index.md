@@ -2,15 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 317
+total_events: 319
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-28T09:28:36Z | history:097:0ed9bdd4 | session-event | done | dashboard, tui, command, verify, status, history, snapshot | seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_I... |
-| 2026-04-28T12:24:27Z | history:098:39c54d3f | session-event | done | dashboard, tui, command, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_I... |
 | 2026-04-28T12:59:30Z | history:099:237f4349 | session-event | done | readme, installer, retrieval, vector, graph, mcp, command... | README.md,docs/setup.md,installers/README.md,docs/RAG_ARCHITECTURE.md,seam_ru... |
 | 2026-04-28T13:03:41Z | history:100:9147396c | session-event | done | installer, readme, security, verify, history, snapshot | installers/README.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-04-28T13:09:02Z | history:101:f3d8709b | session-event | done | history, integrity, verify, snapshot | HISTORY.md,HISTORY_INDEX.md |
@@ -209,10 +207,12 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-25T21:24:33Z | history:260:3af70289 | session-event | done | verify, windows, protocol, history, status | .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,PROJECT_STATUS.m... |
 | 2026-05-25T21:35:57Z | history:261:9d37437e | session-event | done | verify, windows, protocol, history, status | tests/audit/test_ci_verify_gates.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDE... |
 | 2026-05-26T05:42:57Z | history:262:7d02e345 | session-event | done | retrieval, benchmark, bundle, verify, history, protocol | tools/h2/__init__.py,tools/h2/backfill_bundle.py,tests/audit/test_h2_backfill... |
+| 2026-05-26T11:34:45Z | history:263:e16bf8c8 | session-event | done | security, protocol, verify, history, status | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,experimental/retrieval_orchestr... |
+| 2026-05-26T11:47:25Z | history:264:4ddd19ed | session-event | done | security, protocol, verify, history, status | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.s... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0117.cross.md | 2026-04-15T00:00:00Z..2026-04-28T09:07:41Z | 117 | (multi) | (multi) |
+| 0001-0119.cross.md | 2026-04-15T00:00:00Z..2026-04-28T12:24:27Z | 119 | (multi) | (multi) |
