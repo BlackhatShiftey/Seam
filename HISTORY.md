@@ -5595,3 +5595,34 @@ Verification: git check-ignore shows .env.local and .env are ignored by .gitigno
 
 PR #36 remains scoped to tracked repo cleanup: dead experimental/hybrid_orchestrator removal, canonical retrieval_orchestrator alias guard, stale README compatibility claim removal, history/status/stream artifacts, and the pre-commit hook reinstall evidence. The old local key value was not read or recorded, and its plaintext cannot be reconstructed from git.
 ---END-ENTRY-#264---
+
+---BEGIN-ENTRY-#265---
+id: 265
+date: 2026-05-26T17:30:36Z
+agent: claude
+status: done
+topics: retrieval, benchmark, fixture, verify, history, protocol
+commits: none
+refs: tools/h2/holdout_split.py,tests/audit/test_h2_holdout_split.py,PROJECT_STATUS.md
+supersedes: 264
+tokens: 1117
+---
+Landed H2 substrate slice 4: deterministic dev/holdout split helper for benchmark case_ids. Stops the structural foot-gun of "tune on the full 1542-case set, then claim improvement on the same 1542-case set" by partitioning case_ids into a dev pool (for ranker/policy tuning) and a holdout pool (preserved for publish-time only). Slice 5 (seam improvement review) is the consumer that will block ranking-policy proposals whose tuning touched holdout case_ids.
+
+New module tools/h2/holdout_split.py with module + CLI: assign_one(case_id, salt, ratio) is the deterministic primitive (sha256(salt + ":" + case_id), first 4 bytes reduced to a uniform bucket in [0.0, 1.0), DEV if bucket < ratio else HOLDOUT); compute_assignments(case_ids, salt, ratio) maps the table; SplitAssignment(salt, ratio, dataset_source, assignments) is the frozen dataclass holding a manifest's content (validates ratio in (0.0, 1.0) and rejects unknown split labels); load_manifest(path) and save_manifest(path, assignment) round-trip JSON with schema seam-holdout-split/v1 and sorted assignment keys for stable git diffs; update_manifest(manifest_path, source, salt=DEFAULT_SALT, ratio=DEFAULT_RATIO, rewrite=False) is the idempotent operator-facing entry: creates the manifest if missing, appends any new case_ids from the source dataset under the existing salt/ratio without disturbing prior assignments, refuses to recompute when salt or ratio changes unless rewrite=True; dev_case_ids / holdout_case_ids / is_holdout are consumer helpers; UpdateReport(added, existing, dev_count, holdout_count, salt_changed, ratio_changed) is the per-run summary. CLI flags: --source (quickstart string resolves to the bundled fixture; otherwise a LoCoMo JSON path), --manifest (required path; created if missing), --salt (default seam-locomo-v1), --ratio (default 0.8), --rewrite (explicit opt-in for salt/ratio recompute).
+
+Manifest format (JSON):
+- schema: seam-holdout-split/v1
+- salt: hash salt active for this manifest
+- ratio: dev fraction
+- dataset_source: provenance label (e.g. "quickstart" or a path)
+- assignments: {case_id: "dev" | "holdout"}, sorted by key
+
+The manifest is intended to be committed to the repo so the split is part of git history. Changing the active salt or ratio after a manifest exists is an audit-worthy event requiring --rewrite; rewriting is what flips assignments under operators' feet, so it should leave a HISTORY/PR trail.
+
+Tests in tests/audit/test_h2_holdout_split.py (20 cases, all green): assign_one is deterministic per (salt, case_id); different salts flip at least one case across the quickstart fixture; ratio=0.0/1.0/out-of-range rejected; compute_assignments covers every case_id exactly once with valid labels; extreme ratios (0.99 / 0.01) bias the buckets as expected; SplitAssignment rejects invalid ratio + unknown labels; manifest round-trips via save+load with assignment keys sorted; load_manifest rejects wrong schema; dev_case_ids and holdout_case_ids form a partition; is_holdout matches assignment and returns False for unknown case_ids; update_manifest creates a missing manifest with defaults; re-running with the same inputs is idempotent (added=[]); re-running against a larger dataset appends new case_ids without disturbing existing ones; salt change without rewrite raises ValueError; ratio change without rewrite raises ValueError; --rewrite under a salt change recomputes every assignment and flips at least one; CLI creates the manifest, prints a summary line, and exits 0; CLI also rejects salt change without --rewrite.
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/test_h2_holdout_split.py -q passed 20 tests; .venv/bin/python -m pytest tests/audit/test_h2_holdout_split.py tests/audit/test_h2_backfill_bundle.py tests/audit/test_retrieval_event_store.py tests/audit/test_locomo_adapter_retrieval_event_writer.py tests/audit/test_locomo_adapter_evidence_text.py -q passed 60 tests covering all H2 substrate code paths; .venv/bin/python -m pytest tests/audit/ -q passed the full audit suite (6 skips, no failures); CLI smoke at the repo root produced a manifest from the quickstart fixture with 8 dev / 2 holdout (10 total) and a follow-up idempotent re-run reported added=0 unchanged=10. No paid API calls. No provider session URLs, API keys, or local .env values written into commits, snapshots, or this entry.
+
+Next step: rebuild HISTORY_INDEX, refresh streams + cross-index, write snapshot, run verify_integrity + verify_routing + verify_continuity + verify_streams. After this PR merges, slice 5 (seam improvement review) becomes the next H2 work item; it reads the substrate, surfaces ranking-policy proposals, and gates approval on the holdout assignment built here. Materialising the actual benchmarks/external/locomo/holdout_assignment.json against the real LoCoMo dataset is operator-gated and not done in this slice.
+---END-ENTRY-#265---
