@@ -5529,3 +5529,29 @@ Fix: tests/audit/test_ci_verify_gates.py now expects python -m tools.history.ver
 
 Verification before this entry: .venv/bin/python -m pytest tests/audit/test_ci_verify_gates.py tests/audit/test_github_pr_gates.py -q passed locally.
 ---END-ENTRY-#261---
+
+---BEGIN-ENTRY-#262---
+id: 262
+date: 2026-05-26T05:42:57Z
+agent: claude
+status: done
+topics: retrieval, benchmark, bundle, verify, history, protocol
+commits: none
+refs: tools/h2/__init__.py,tools/h2/backfill_bundle.py,tests/audit/test_h2_backfill_bundle.py,PROJECT_STATUS.md
+supersedes: 261
+tokens: 1123
+---
+Landed H2 substrate slice 3: BIL-2 backfill tool that reconstructs retrieval_event rows from existing LoCoMo result bundles, joining bundle case_id back to the source dataset for question + gold_answer. This unblocks slice 4 (dev/holdout split) and slice 5 (improvement review) by populating the substrate with historical evidence without requiring new paid runs.
+
+New module tools/h2/__init__.py and tools/h2/backfill_bundle.py: load_source_cases(source) resolves the literal string "quickstart" to benchmarks/external/locomo/fixtures/quickstart.json via load_quickstart_cases(); any other value is treated as a path passed to load_locomo_cases(). build_case_index(cases) builds the case_id -> BenchmarkCase join map. _scope_from_case_id(case_id) parses LoCoMo's {sample_id}::q{index} convention into scope=f"locomo:{sample_id}"; returns None for malformed ids so the writer falls back to an adapter-level scope. derive_run_id(bundle, path) prefers run_started_at+adapter (timestamp stripped of separators for a sortable, SQL-safe id) and falls back to bundle filename stem. backfill_bundle(bundle_path, source, store, run_id=None, stale=True) reads the bundle, joins each case to the source dataset, writes one retrieval_event row per matched case via SQLiteStore.write_retrieval_event, and returns a BackfillSummary(bundle_path, run_id, cases_in_bundle, events_written, cases_skipped_no_match, cases_skipped_invalid). main(argv) provides the argparse CLI: --bundle (repeatable), --source (required), --db (required), optional --run-id, optional --no-stale.
+
+Field mapping per row: query and gold_answer come from the joined source case; candidate_ids is [] (bundles do not preserve per-candidate record ids, scores, or reasons); context_recall and judge_score (when present) come from the bundle's scores and judge subdicts; answer falls back to answerer_diagnostics.content_preview (the first 120 chars of the prediction, since the full _prediction is popped before bundle serialization); context_hash is sha256 of retrieved_context when save_context=True was used during the run; source_kind is "backfill"; source_ref is f"bundle:{bundle_basename}::{case_id}"; stale_source defaults to True so backfilled rows are never confused with live training data; extra carries bundle_path, category, em/f1 scores, latencies, judge subset, and answerer_diagnostics for slice 4/5 introspection.
+
+Stale-by-default rationale: per docs/roadmap/CONTEXT_STREAMS.md and ROADMAP.md L1282-1287, bundles produced before HISTORY#240/HISTORY#242 used a different retrieval/loader path and their reconstructed events are diagnostic-only. The --no-stale flag is an explicit override for operators who know the bundle is post-fix. Default conservative because the substrate is the canonical training-data feed for slice 5 ranking proposals.
+
+Tests in tests/audit/test_h2_backfill_bundle.py (11 cases, all green): quickstart source resolves to bundled fixture; unknown source path raises FileNotFoundError; scope derivation strips ::q{n} suffix and returns None on malformed; derive_run_id prefers timestamp over filename; round-trip of a quickstart bundle writes one event per case with empty skip counters; populated event carries joined query/gold, parsed scope, empty candidate_ids, recall+judge from bundle, content_preview as answer, sha256 context_hash, stale=True provenance, source_ref pattern, and an extra dict with category/latencies/scores/judge; save_context=False leaves context_hash + answer null while preserving recall; cases not in the source dataset are counted as no-match and skipped; --no-stale writes stale_source=False so include_stale=False filtering finds the row; explicit --run-id groups events from multiple bundles under one id; CLI main() prints a per-bundle summary line plus the total and exits 0.
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/test_h2_backfill_bundle.py tests/audit/test_retrieval_event_store.py tests/audit/test_locomo_adapter_retrieval_event_writer.py tests/audit/test_locomo_adapter_evidence_text.py -q passed 40 tests with no failures; .venv/bin/python -m pytest tests/audit/ -q passed the full audit suite (the two pre-existing failures from before PR #34 are no longer present, confirmed by zero failures on the green dot output); end-to-end CLI smoke synthesized a 10-case bundle from the quickstart fixture, ran python -m tools.h2.backfill_bundle against it, and confirmed 10 rows written with correct joined fields (query, gold_answer pulled from source case, scope=locomo:conv-3 parsed from case_id, source_kind=backfill, stale_source=True). No paid API calls were made. No provider session URLs, API keys, or local .env values were written into commits, snapshots, or this entry.
+
+Next step: rebuild HISTORY_INDEX, refresh streams substrate, write snapshot, run verify_integrity + verify_routing + verify_continuity. Slice 4 (dev/holdout split helper) and slice 5 (seam improvement review) remain. The substrate is now writable both live (slice 2 hook) and from history (slice 3 backfill); slice 4 needs a populated DB to split.
+---END-ENTRY-#262---
