@@ -5317,3 +5317,215 @@ Closed PR #31 (`claude/remote-control-AD6Di`) as superseded/conflicting rather t
 
 Verification before this entry: `gh pr list --state open --limit 50 --json number,title,isDraft,headRefName,baseRefName,updatedAt,mergeStateStatus,url` returned an empty list after the closeout. `gh pr view 32 --json number,state,mergedAt,mergedBy,mergeCommit,url,headRefName` reported state `MERGED`, merged at `2026-05-25T13:50:11Z`, merge commit `52db6c00751cce1dfee7b121a6d51887457d8915`. `gh pr view 31 --json number,state,closedAt,mergedAt,headRefName,url` reported state `CLOSED`, closed at `2026-05-25T13:50:19Z`, and `mergedAt: null`. `git ls-remote --heads origin codex/repo-hygiene-ruleset-record claude/remote-control-AD6Di main` returned only `refs/heads/main` at `52db6c00751cce1dfee7b121a6d51887457d8915`.
 ---END-ENTRY-#250---
+
+---BEGIN-ENTRY-#251---
+id: 251
+date: 2026-05-25T17:37:36Z
+agent: codex
+status: done
+topics: persist, retrieval, benchmark, command, verify, history, status, protocol
+commits: none
+refs: benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py,tests/audit/test_locomo_adapter_retrieval_event_writer.py,PROJECT_STATUS.md
+supersedes: 250
+tokens: 938
+---
+Landed H2 retrieval-feedback slice 2: the LoCoMo SEAM adapter can now append retrieval_event rows during answer runs when explicitly enabled, and the external LoCoMo runner exposes the opt-in CLI plumbing.
+
+Branch hygiene first: the working branch `codex/h2-slice-2-retrieval-event-writer` had zero committed changes versus `origin/main` but contained local uncommitted H2 writer work. I stashed that local work, switched to `main`, recreated the branch from `origin/main` at HISTORY#250, restored the patch, and continued from the current source-of-truth base. `python3 -m tools.git.scan_stale_branches` then showed one closed-PR remote branch, `origin/claude/remote-control-AD6Di`, categorized as `MERGED-PR DELETE`; `git push origin --delete claude/remote-control-AD6Di` removed it. `gh pr list --state open --limit 50 --json number,title,headRefName` returned `[]`. `.venv/bin/python -m tools.ci.github_maintenance_report --output /tmp/seam-github-maintenance.md --json-output /tmp/seam-github-maintenance.json` could not run in this shell because `GITHUB_TOKEN` was not set; the GitHub CLI checks above used the existing `gh` auth instead.
+
+Runtime change in `benchmarks/external/locomo/adapters/seam.py`: `SeamLocomoAdapter` now accepts `record_retrieval_events` and `run_id`, defaults recording off, honors `SEAM_RECORD_RETRIEVAL_EVENTS` and `SEAM_RUN_ID`, lazily generates a stable per-adapter run id when enabled without one, and writes one retrieval_event row for the primary question after retrieval/optional rerank/optional answer generation. Rows include scope `locomo:<scope_id>`, query, candidate ids, ranks, scores, reason strings, context hash when context exists, generated answer when present, source_kind `live`, and diagnostic extra fields for top score, retrieval latency, answer latency, sub-questions, and answerer diagnostics. Empty retrieval still records an event with empty candidates. Instrumentation failures are swallowed so diagnostic writes cannot invalidate a benchmark answer pass.
+
+CLI change in `benchmarks/external/locomo/run.py`: `build_adapter` forwards `record_retrieval_events` and `retrieval_event_run_id` to the SEAM adapter. The runner accepts `--record-retrieval-events` and `--retrieval-event-run-id`, and forwards both through the single-worker and worker-factory paths. Default behavior is unchanged unless the flag or environment variable enables recording.
+
+Tests in `tests/audit/test_locomo_adapter_retrieval_event_writer.py` cover default-off behavior, constructor-enabled writes, environment-enabled writes, auto-generated run ids, empty-candidate events, diagnostic write failure isolation, env truth parsing, build_adapter forwarding, and CLI parser/runner forwarding. Verification: the two new CLI-plumbing tests failed before the `run.py` change with the expected unexpected-kwarg and unrecognized-argument errors, then `.venv/bin/python -m pytest tests/audit/test_locomo_adapter_retrieval_event_writer.py -q` passed 9 tests. Focused adjacent suites passed: `.venv/bin/python -m pytest tests/audit/test_locomo_adapter_retrieval_event_writer.py tests/audit/test_retrieval_event_store.py tests/audit/test_locomo_adapter_evidence_text.py -q` passed 29 tests; `.venv/bin/python -m pytest tests/audit/test_cross_encoder_rerank.py tests/audit/test_locomo_decomposer.py tests/audit/test_abstain_threshold.py -q` passed 16 tests. `git diff --check` passed. No paid API calls were made.
+
+Next step: H2 slice 3 remains the BIL-2 backfill tool that reads LoCoMo result bundles into retrieval_event rows with stale_source set according to the HISTORY#240/#242 freshness boundary. Scoring-weight tuning and policy promotion remain blocked on dev/holdout split and `seam improvement review` per HISTORY#243.
+---END-ENTRY-#251---
+
+---BEGIN-ENTRY-#252---
+id: 252
+date: 2026-05-25T17:39:47Z
+agent: codex
+status: done
+topics: protocol, verify, history, status
+commits: none
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/cross_index.md,.seam/snapshots
+supersedes: 251
+tokens: 317
+---
+Closed the H2 writer branch-tracking loop after HISTORY#251 by pushing `codex/h2-slice-2-retrieval-event-writer` and opening draft PR #34 (`[codex] Add H2 retrieval event writer hook`) against `main`.
+
+This entry exists because HISTORY#251 recorded the code and branch hygiene before the GitHub draft PR was created. The PR now keeps the branch from becoming an orphan remote and aligns with the AGENTS.md GitHub PR workflow added in HISTORY#249. Updated PROJECT_STATUS.md to name HISTORY#252 as the latest handoff and to state that the HISTORY#251 work is tracked by draft PR #34. The stale closed-PR branch `origin/claude/remote-control-AD6Di` remains deleted, and `python3 -m tools.git.scan_stale_branches` after the push classified the local and remote H2 branch as unique-and-fresh rather than stale.
+
+Verification before this closeout entry: `git status --short --branch` was clean except for being on the pushed H2 branch; `python3 -m tools.git.scan_stale_branches` showed `codex/h2-slice-2-retrieval-event-writer` and `origin/codex/h2-slice-2-retrieval-event-writer` as `UNIQUE-AND-FRESH`, with only protected allowlist branches remaining. Draft PR creation returned PR #34 with head SHA `63ac11380e5b06f385b4130351bdc5b6e8d933ec`. No paid API calls were made.
+---END-ENTRY-#252---
+
+---BEGIN-ENTRY-#253---
+id: 253
+date: 2026-05-25T19:28:36Z
+agent: codex
+status: done
+topics: security, protocol, verify, history, status
+commits: none
+refs: tools/ci/github_maintenance_report.py,tests/audit/test_github_maintenance_report.py,PROJECT_STATUS.md
+supersedes: 252
+tokens: 465
+---
+Fixed the local GitHub maintenance report token-routing mismatch discovered after HISTORY#252.
+
+Root cause: `tools.ci.github_maintenance_report` only read `GITHUB_TOKEN`, while local operator sessions authenticate GitHub CLI through the OS keyring. `gh` commands worked, but `.venv/bin/python -m tools.ci.github_maintenance_report ...` failed with `GITHUB_TOKEN is required to fetch pull requests` because no CI-style token variable was exported. The token was not missing; it was available to `gh auth status` through keyring auth and was deliberately not printed.
+
+Change in `tools/ci/github_maintenance_report.py`: added `resolve_github_token()`, which prefers `GITHUB_TOKEN`, then `GH_TOKEN`, then falls back to `gh auth token` with captured output and process-local use only. If none are available, the script exits with a clearer message: `GITHUB_TOKEN, GH_TOKEN, or a logged-in GitHub CLI is required to fetch pull requests`. The token is never logged, written, or rendered in reports.
+
+Tests in `tests/audit/test_github_maintenance_report.py`: added coverage that `GITHUB_TOKEN` wins without invoking `gh`, `GH_TOKEN` is accepted, `gh auth token` is used when env vars are unset, and an unavailable GitHub CLI returns an empty token. The test first failed with an ImportError for missing `resolve_github_token`, then passed after the implementation.
+
+Verification: `.venv/bin/python -m pytest tests/audit/test_github_maintenance_report.py -q` passed 8 tests. `.venv/bin/python -m tools.ci.github_maintenance_report --output /tmp/seam-github-maintenance.md --json-output /tmp/seam-github-maintenance.json` now succeeded without exported `GITHUB_TOKEN`/`GH_TOKEN` and rendered status `PASS`: 1 open PR (#34 draft), 0 stale PRs, 0 stale branches without PR. `git diff --check` passed. No token value was printed or recorded; no paid API calls were made.
+---END-ENTRY-#253---
+
+---BEGIN-ENTRY-#254---
+id: 254
+date: 2026-05-25T20:20:47Z
+agent: codex
+status: done
+topics: verify, benchmark, protocol, history, status
+commits: none
+refs: .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,tests/audit/test_bench_stub_seal_gate.py,tests/audit/test_benchmark_endpoint_safety.py,tests/audit/test_locomo_adapter_real_embedding.py,tests/audit/test_mcp_artifact_containment.py,tests/audit/test_streams_fsync.py,tests/audit/test_sys_metrics_honesty.py,tools/streams/streams_lib.py,PROJECT_STATUS.md
+supersedes: 253
+tokens: 996
+---
+Remediated the broad PR #34 `test-and-benchmark` CI failures after the operator clarified that no failing checks are acceptable.
+
+Root cause from GitHub Actions logs: the broad Ubuntu/Windows matrix installed only `.[server]` but ran LoCoMo and rerank tests that require the `sbert`/`rerank` extras, producing many `sentence-transformers is not installed` failures and downstream LoCoMo quickstart failures. The same run also exposed stale or platform-fragile audit tests: an unjudged fixture named non-stub in the BIL seal test, a holdout endpoint test coupled to missing private holdout fixtures, a cached LoCoMo sentence-transformer instance hiding the missing-sbert branch, a Windows root override that used `/`, a POSIX-only directory fsync expectation on Windows, Linux-only sys-metrics assertions on Windows, and a Windows stream-lock race.
+
+Changes: `.github/workflows/ci.yml` broad `test-and-benchmark` install now uses `python -m pip install -e ".[server,sbert,rerank]"`, with `tests/audit/test_github_pr_gates.py` pinning that dependency contract. Updated `tests/audit/test_bench_stub_seal_gate.py` so the non-stub BIL-2 success fixture actually has a non-stub judge. Updated `tests/audit/test_benchmark_endpoint_safety.py` to monkeypatch `run_benchmark_suite` in the holdout-allowed test, preserving the endpoint policy check without requiring private holdout fixtures. Reset the LoCoMo adapter's module-level sentence-transformer cache in `test_open_runtime_surfaces_missing_sbert`. Made the MCP artifact containment override use the actual outside file parent instead of `/`, made the fsync test account for Windows' best-effort directory fsync behavior, and skipped Linux-only sys-metrics permission assertions on non-Linux while allowing unsupported disk metrics on Windows. Hardened `tools/streams/streams_lib.py` Windows lock acquisition by ensuring the lock file has at least one byte before `msvcrt.locking` locks byte 0.
+
+Verification: focused repro command passed 10 targeted failures: `.venv/bin/python -m pytest tests/audit/test_bench_stub_seal_gate.py::test_non_stub_bil2_succeeds tests/audit/test_benchmark_endpoint_safety.py::test_benchmark_holdout_allowed_with_env tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving tests/audit/test_mcp_artifact_containment.py::test_env_override_restores_permissive_behavior tests/audit/test_streams_fsync.py::test_write_log_fsyncs_file_and_directory tests/audit/test_sys_metrics_honesty.py::test_sys_metrics_cpu_unavailable_on_permission_error tests/audit/test_sys_metrics_honesty.py::test_sys_metrics_disk_targets_data_dir tests/audit/test_locomo_adapter_real_embedding.py::test_open_runtime_surfaces_missing_sbert tests/audit/test_github_pr_gates.py -q`. LoCoMo focused suite passed 33 tests: `.venv/bin/python -m pytest test_seam_all/test_locomo_seam_adapter.py tests/audit/test_abstain_threshold.py tests/audit/test_locomo_adapter_evidence_text.py tests/audit/test_locomo_decomposer.py tests/audit/test_cross_encoder_rerank.py tests/audit/test_locomo_adapter_real_embedding.py -q`. Full local equivalent of the broad CI pytest command passed with exit 0: `.venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q`. Post-test CI commands passed locally: `python3 -m tools.history.verify_integrity && python3 -m tools.history.verify_continuity && python3 -m tools.history.verify_routing && python3 -m tools.streams.verify_streams`; `.venv/bin/python -m seam benchmark run all --output /tmp/seam-ci-benchmark-bundle.json --format json && .venv/bin/python -m seam benchmark gate /tmp/seam-ci-benchmark-bundle.json` (gate PASS, 45/45 checks, bundle hash `6bf9907c69224dedb97e7f50711a75e8658996bcefacc31d0d59f50490673b65`); `.venv/bin/python -m tools.run_external_memory_benchmarks --plan --scope all --format json --output /tmp/seam-external-memory-benchmark-plan.json`. `git diff --check` passed. No paid API calls were made.
+---END-ENTRY-#254---
+
+---BEGIN-ENTRY-#255---
+id: 255
+date: 2026-05-25T20:36:15Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: test_seam_all/test_git_hooks.py,tools/streams/streams_lib.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 254
+tokens: 328
+---
+PR #34 Windows CI follow-up after commit 7fc3ce0. GitHub Actions run 26418345669 showed all non-broad gates passing and ubuntu-latest broad test-and-benchmark passing, with windows-latest broad test-and-benchmark failing two Windows-specific cases: test_seam_all/test_git_hooks.py::test_pre_commit_refuses_when_python_missing hard-coded /bin/bash, and tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving still allowed same-process Windows threads to overwrite the stream log.
+
+Fixes: test_git_hooks now resolves bash with shutil.which and skips only when bash is unavailable, while still removing python from PATH for the hook contract under test. tools/streams/streams_lib.py now wraps the existing OS advisory file lock in a per-lock-path threading.Lock, so same-process Windows threads serialize the read/next-id/write section before the inter-process lock is released.
+
+Verification before this entry: targeted local pytest passed for test_seam_all/test_git_hooks.py::test_pre_commit_refuses_when_python_missing and tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving. Full local broad CI pytest command passed: .venv/bin/python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -q.
+---END-ENTRY-#255---
+
+---BEGIN-ENTRY-#256---
+id: 256
+date: 2026-05-25T20:45:46Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tools/streams/test_streams.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 255
+tokens: 314
+---
+PR #34 Windows CI follow-up after commit cc7828a. GitHub Actions run 26418841412 passed repo-hygiene, registry-plan, chroma-real-smoke, pgvector-integration, locomo-quickstart-bil2, and ubuntu-latest test-and-benchmark, but windows-latest test-and-benchmark still failed tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving.
+
+Root cause: the Windows log showed both append threads returned distinct sequential ids, but the final temp log read saw only one event. The test used join(timeout=5) and then exited the patched STREAMS_ROOT context even if a slower Windows writer was still alive. That could let the second writer finish after the patch reverted, making the test inspect the temp root while the late writer completed elsewhere.
+
+Fix: the stream append concurrency test now joins each writer with a 30 second timeout and asserts both threads are no longer alive before leaving the patched root context. This keeps the test's root override active for the entire append critical section while still failing boundedly on a real deadlock.
+
+Verification before this entry: targeted local pytest passed for tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving.
+---END-ENTRY-#256---
+
+---BEGIN-ENTRY-#257---
+id: 257
+date: 2026-05-25T20:54:52Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tools/streams/streams_lib.py,tools/streams/test_streams.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 256
+tokens: 229
+---
+PR #34 Windows CI follow-up after commit a865992. GitHub Actions run 26419146231 passed every check except windows-latest test-and-benchmark; the remaining failure was still tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving, with returned ids sequential but the final test log containing only one event.
+
+Fixes: tools/streams/streams_lib.py now uses one process-wide stream append mutex around the OS advisory lock instead of a per-path lock, removing same-process Windows overwrite races for all stream writes. tools/streams/test_streams.py now uses an isolated tempfile root for the concurrency test and keeps the patched stream root active until both writer threads are complete.
+
+Verification before this entry: targeted stream append concurrency test passed locally, and the full tools/streams test module passed locally with the new mutex and isolated test root.
+---END-ENTRY-#257---
+
+---BEGIN-ENTRY-#258---
+id: 258
+date: 2026-05-25T21:05:09Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tools/streams/streams_lib.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 257
+tokens: 225
+---
+PR #34 Windows CI follow-up after commit 5db92a3. GitHub Actions run 26419447360 passed every check except windows-latest test-and-benchmark; the remaining failure was still tools/streams/test_streams.py::AppendEventLockTests::test_concurrent_append_event_no_interleaving with the final log containing one event.
+
+Fix: tools/streams/streams_lib.py now appends only the newly rendered event block under the stream lock instead of rewriting the whole log from a read-modify-write buffer. This removes the overwrite class directly; even if Windows scheduling delays a writer, a later append does not truncate another writer's already-written event. The existing process-wide in-process mutex and OS advisory lock remain in place.
+
+Verification before this entry: targeted stream append concurrency test passed locally, and the full tools/streams test module passed locally with append-only event writes.
+---END-ENTRY-#258---
+
+---BEGIN-ENTRY-#259---
+id: 259
+date: 2026-05-25T21:14:05Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: .gitattributes,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 258
+tokens: 236
+---
+PR #34 Windows CI follow-up after commit 36c1169. GitHub Actions run 26419777390 passed pytest and every check except the post-test history integrity gate on windows-latest. The failure reported HISTORY_INDEX.md entry hashes not matching computed HISTORY.md hashes from entry #001 onward, which indicates Windows checkout newline conversion changed HISTORY.md bytes before hashing.
+
+Fix: .gitattributes now forces LF checkout for canonical append-only history and derived stream/index artifacts: HISTORY.md, HISTORY_INDEX.md, .seam/streams/**, .seam/cross_index.md, and .seam/cross_index_archive/**. This preserves the byte-level hash contract on Windows runners without changing the history hash algorithm.
+
+Verification before this entry: local verify_integrity/verify_continuity/verify_routing/verify_streams were clean before the attribute change; the CI failure scope was isolated to Windows checkout line endings in the integrity gate.
+---END-ENTRY-#259---
+
+---BEGIN-ENTRY-#260---
+id: 260
+date: 2026-05-25T21:24:33Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 259
+tokens: 237
+---
+PR #34 Windows CI follow-up after commit b38ba69. GitHub Actions run 26420060280 passed pytest, history integrity, and all non-broad gates, but windows-latest test-and-benchmark failed the post-test continuity gate because a clean GitHub checkout has no local .seam/snapshots/ snapshot for the newly appended latest history entry.
+
+Fix: .github/workflows/ci.yml now runs python -m tools.history.verify_continuity --no-snapshot in the clean-checkout CI matrix. This skips only the local snapshot-presence check that cannot be satisfied from ignored local snapshot artifacts, while retaining integrity, supersedes, secret scan, routing, and recorded-fact continuity checks. Local session-end protocol still runs full verify_continuity with snapshots present. tests/audit/test_github_pr_gates.py now asserts the CI workflow keeps this clean-checkout form explicit.
+
+Verification before this entry: tests/audit/test_github_pr_gates.py passed locally.
+---END-ENTRY-#260---
+
+---BEGIN-ENTRY-#261---
+id: 261
+date: 2026-05-25T21:35:57Z
+agent: codex
+status: done
+topics: verify, windows, protocol, history, status
+commits: pending
+refs: tests/audit/test_ci_verify_gates.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 260
+tokens: 197
+---
+PR #34 CI verify-step audit follow-up after commit cc3f377. GitHub Actions run 26420377244 had both ubuntu-latest and windows-latest broad test-and-benchmark jobs failing only the CI audit tests that still expected the exact old continuity command, even though the workflow was intentionally changed to python -m tools.history.verify_continuity --no-snapshot for clean GitHub checkouts.
+
+Fix: tests/audit/test_ci_verify_gates.py now expects python -m tools.history.verify_continuity --no-snapshot in the ordered CI verify-step contract. This keeps local session-end verification stricter while making the CI audit match the clean-checkout workflow that cannot contain ignored local snapshot artifacts.
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/test_ci_verify_gates.py tests/audit/test_github_pr_gates.py -q passed locally.
+---END-ENTRY-#261---

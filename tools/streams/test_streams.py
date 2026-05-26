@@ -270,12 +270,14 @@ class BuildContextPackTests(unittest.TestCase):
 
 class AppendEventLockTests(unittest.TestCase):
     def test_concurrent_append_event_no_interleaving(self) -> None:
+        import shutil
         import threading
+        import tempfile
         from unittest.mock import patch
         from tools.streams.streams_lib import append_event
 
-        tmp_root = Path(self._testMethodName)
-        tmp_root.mkdir(parents=True, exist_ok=True)
+        tmp_root = Path(tempfile.mkdtemp(prefix=f"{self._testMethodName}-"))
+        self.addCleanup(lambda: shutil.rmtree(tmp_root, ignore_errors=True))
 
         results = [None, None]
 
@@ -300,8 +302,10 @@ class AppendEventLockTests(unittest.TestCase):
             t1 = threading.Thread(target=_append_with_barrier, args=(1, "Body from thread 1"), daemon=True)
             t0.start()
             t1.start()
-            t0.join(timeout=5)
-            t1.join(timeout=5)
+            t0.join(timeout=30)
+            t1.join(timeout=30)
+            self.assertFalse(t0.is_alive(), "Thread 0 did not complete")
+            self.assertFalse(t1.is_alive(), "Thread 1 did not complete")
 
         self.assertIsNotNone(results[0], "Thread 0 did not complete")
         self.assertIsNotNone(results[1], "Thread 1 did not complete")

@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
@@ -26,6 +27,7 @@ from typing import Iterable
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STREAMS_ROOT = REPO_ROOT / ".seam" / "streams"
 CROSS_INDEX_PATH = REPO_ROOT / ".seam" / "cross_index.md"
+_STREAM_APPEND_THREAD_LOCK = threading.Lock()
 
 
 def delim_for(kind: str) -> str:
@@ -235,6 +237,25 @@ def write_log(kind: str, data: bytes) -> None:
         pass
 
 
+def append_log(kind: str, data: bytes) -> None:
+    p = log_path(kind)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(p), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    try:
+        os.write(fd, data)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    try:
+        dir_fd = os.open(str(p.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        pass
+
+
 def list_stream_kinds() -> list[str]:
     if not STREAMS_ROOT.exists():
         return []
@@ -250,11 +271,15 @@ def _acquire_stream_lock(kind: str):
     stream_dir = STREAMS_ROOT / kind
     stream_dir.mkdir(parents=True, exist_ok=True)
     lock_path = stream_dir / "log.lock"
+    _STREAM_APPEND_THREAD_LOCK.acquire()
     fd = -1
     try:
         fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT)
         if os.name == "nt":
             import msvcrt
+            if os.path.getsize(lock_path) == 0:
+                os.write(fd, b"\0")
+            os.lseek(fd, 0, os.SEEK_SET)
             msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
 
             def _release():
@@ -262,7 +287,10 @@ def _acquire_stream_lock(kind: str):
                     os.lseek(fd, 0, os.SEEK_SET)
                     msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
                 finally:
-                    os.close(fd)
+                    try:
+                        os.close(fd)
+                    finally:
+                        _STREAM_APPEND_THREAD_LOCK.release()
 
         else:
             import fcntl
@@ -272,12 +300,16 @@ def _acquire_stream_lock(kind: str):
                 try:
                     fcntl.flock(fd, fcntl.LOCK_UN)
                 finally:
-                    os.close(fd)
+                    try:
+                        os.close(fd)
+                    finally:
+                        _STREAM_APPEND_THREAD_LOCK.release()
 
         return fd, _release
     except Exception:
         if fd >= 0:
             os.close(fd)
+        _STREAM_APPEND_THREAD_LOCK.release()
         raise
 
 
@@ -296,12 +328,13 @@ def append_event(kind: str, header_fields: dict[str, str], body: str, *, agent: 
             fields=header_fields,
             body=body,
         )
+        append_bytes = b""
         if data and not data.endswith(b"\n"):
-            data += b"\n"
+            append_bytes += b"\n"
         if data:
-            data += b"\n"
-        data += block.encode("utf-8")
-        write_log(kind, data)
+            append_bytes += b"\n"
+        append_bytes += block.encode("utf-8")
+        append_log(kind, append_bytes)
         events = parse_events(read_log(kind), kind)
         return events[-1]
     finally:

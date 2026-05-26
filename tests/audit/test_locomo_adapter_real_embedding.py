@@ -16,7 +16,9 @@ def test_open_runtime_uses_real_embedding(tmp_path):
 
 def test_open_runtime_surfaces_missing_sbert(monkeypatch, tmp_path):
     """When SentenceTransformerModel fails, RuntimeError surfaces clear install hint."""
-    from benchmarks.external.locomo.adapters.seam import _open_runtime
+    from benchmarks.external.locomo.adapters import seam as seam_adapter
+
+    seam_adapter._DEFAULT_SENTENCE_TRANSFORMER_MODEL = None
 
     def _raise(*args, **kwargs):
         raise ImportError("no sentence_transformers")
@@ -27,4 +29,4 @@ def test_open_runtime_surfaces_missing_sbert(monkeypatch, tmp_path):
     )
     db_path = tmp_path / "test_missing_sbert.db"
     with pytest.raises(RuntimeError, match="sentence-transformers"):
-        _open_runtime(db_path)
+        seam_adapter._open_runtime(db_path)

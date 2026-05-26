@@ -4,9 +4,17 @@ import hashlib
 import json
 import os
 import time as _time
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from benchmarks.external.common.types import AdapterAnswer, ConversationTurn
+
+
+def _env_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 _DEFAULT_SENTENCE_TRANSFORMER_MODEL = None
@@ -41,6 +49,8 @@ class SeamLocomoAdapter:
         rerank_top_k: int = 20,
         rerank_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2",
         keep_db: bool = False,
+        record_retrieval_events: bool | None = None,
+        run_id: str | None = None,
     ) -> None:
         # TODO: default db_path should be tmp_path, not a gitignored project dir
         self._db_root = Path(db_path) if db_path is not None else Path("test_seam/locomo")
@@ -60,6 +70,12 @@ class SeamLocomoAdapter:
         self._scope_anchor_by_id = {}
         self._runtime_by_scope = {}
         self._cached_scopes: set[str] = set()
+        # H2 slice 2: opt-in retrieval_event writer hook.
+        # Explicit ctor arg wins; env var is the operator/CI knob; default off.
+        if record_retrieval_events is None:
+            record_retrieval_events = _env_truthy(os.environ.get("SEAM_RECORD_RETRIEVAL_EVENTS"))
+        self._record_events = bool(record_retrieval_events)
+        self._run_id = run_id or os.environ.get("SEAM_RUN_ID") or None
 
     # ------------------------------------------------------------------
     # Protocol methods
@@ -144,6 +160,10 @@ class SeamLocomoAdapter:
         closures: list[list[str]] = []
         retrieval_latency_ms = 0.0
         top_score = 0.0
+        # Track the result for the original question (always last in `questions`)
+        # so the retrieval_event row reflects the question actually asked, not a
+        # decomposed sub-query. Stays None if no candidates ever came back.
+        primary_result = None
         for q in questions:
             t0 = _time.monotonic()
             result = rt.search_ir(
@@ -155,9 +175,13 @@ class SeamLocomoAdapter:
                 temporal_reference=temporal_reference,
             )
             retrieval_latency_ms += (_time.monotonic() - t0) * 1000.0
+            if q == question:
+                primary_result = result
             if result.candidates:
                 if self._rerank == "cross-encoder" and len(result.candidates) > 1:
                     result = self._rerank_candidates(q, result)
+                if q == question:
+                    primary_result = result
                 closures.append(self._collect_closure_ids(result))
                 top_score = max(top_score, result.candidates[0].score)
 
@@ -170,6 +194,20 @@ class SeamLocomoAdapter:
                     merged.append(record_id)
 
         if not merged:
+            if self._record_events:
+                self._record_retrieval_event(
+                    rt=rt,
+                    scope_id=scope_id,
+                    question=question,
+                    sub_questions=[q for q in questions if q != question],
+                    primary_result=primary_result,
+                    retrieved_context="",
+                    retrieval_latency_ms=retrieval_latency_ms,
+                    answer_latency_ms=None,
+                    top_score=top_score,
+                    generated=None,
+                    answerer_diag=None,
+                )
             return AdapterAnswer(
                 retrieved_context="",
                 retrieval_latency_ms=retrieval_latency_ms,
@@ -196,6 +234,21 @@ class SeamLocomoAdapter:
                 generated = self._generate_answer(question, retrieved_context, diag_out=answerer_diag)
                 answer_latency_ms = (_time.monotonic() - t1) * 1000.0
 
+        if self._record_events:
+            self._record_retrieval_event(
+                rt=rt,
+                scope_id=scope_id,
+                question=question,
+                sub_questions=[q for q in questions if q != question],
+                primary_result=primary_result,
+                retrieved_context=retrieved_context,
+                retrieval_latency_ms=retrieval_latency_ms,
+                answer_latency_ms=answer_latency_ms,
+                top_score=top_score,
+                generated=generated,
+                answerer_diag=answerer_diag,
+            )
+
         return AdapterAnswer(
             retrieved_context=retrieved_context,
             generated_answer=generated,
@@ -203,6 +256,75 @@ class SeamLocomoAdapter:
             answer_latency_ms=answer_latency_ms,
             answerer_diagnostics=answerer_diag,
         )
+
+    def _resolve_run_id(self) -> str:
+        """Lazy-resolve and cache the run_id. Called only when recording is on."""
+        if self._run_id:
+            return self._run_id
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        self._run_id = f"seam-locomo-{ts}-{uuid.uuid4().hex[:8]}"
+        return self._run_id
+
+    def _record_retrieval_event(
+        self,
+        *,
+        rt,
+        scope_id: str,
+        question: str,
+        sub_questions: list[str],
+        primary_result,
+        retrieved_context: str,
+        retrieval_latency_ms: float,
+        answer_latency_ms: float | None,
+        top_score: float,
+        generated: str | None,
+        answerer_diag: dict | None,
+    ) -> None:
+        """Append a retrieval_event row to the per-scope SQLite store.
+
+        Diagnostic write: failures must never break the benchmark. The H2
+        substrate is the canonical training-data source for the improvement
+        loop; missing rows are acceptable, corrupting an answer pass is not.
+        """
+        try:
+            candidates = list(primary_result.candidates) if primary_result is not None else []
+            candidate_ids = [c.record.id for c in candidates]
+            scores = [float(c.score) for c in candidates]
+            ranks = list(range(1, len(candidates) + 1))
+            reasons = [", ".join(c.reasons or []) for c in candidates]
+            context_hash = (
+                hashlib.sha256(retrieved_context.encode("utf-8")).hexdigest()
+                if retrieved_context
+                else None
+            )
+            extra: dict = {
+                "top_score": float(top_score),
+                "retrieval_latency_ms": float(retrieval_latency_ms),
+            }
+            if answer_latency_ms is not None:
+                extra["answer_latency_ms"] = float(answer_latency_ms)
+            if sub_questions:
+                extra["sub_questions"] = sub_questions
+            if answerer_diag:
+                extra["answerer_diagnostics"] = answerer_diag
+            rt.store.write_retrieval_event(
+                run_id=self._resolve_run_id(),
+                scope=f"locomo:{scope_id}",
+                query=question,
+                candidate_ids=candidate_ids,
+                ranks=ranks if candidate_ids else None,
+                scores=scores if candidate_ids else None,
+                reasons=reasons if candidate_ids else None,
+                context_hash=context_hash,
+                answer=generated,
+                source_kind="live",
+                extra=extra,
+            )
+        except Exception:
+            # Diagnostic write; swallow so the benchmark answer pass is never
+            # invalidated by an instrumentation failure. The integrity hash of
+            # the result bundle does not depend on retrieval_event rows.
+            pass
 
     def _generate_answer(self, question: str, context: str, diag_out: dict | None = None) -> str:
         prompt = (

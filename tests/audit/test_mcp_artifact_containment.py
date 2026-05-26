@@ -50,7 +50,7 @@ def test_env_override_restores_permissive_behavior(tmp_path: Path) -> None:
     resolved_outside.touch()
 
     mock_row = {"artifact_path": str(resolved_outside)}
-    with mock.patch.dict(os.environ, {"SEAM_SURFACE_ROOT": "/"}):
+    with mock.patch.dict(os.environ, {"SEAM_SURFACE_ROOT": str(resolved_outside.parent)}):
         with mock.patch.object(runtime.store, "read_surface_artifact", return_value=mock_row):
             result = _resolve_registered_surface_path(runtime, "hs:abcd1234")
             assert result == resolved_outside

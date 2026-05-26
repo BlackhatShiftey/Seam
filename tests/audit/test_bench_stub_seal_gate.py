@@ -50,6 +50,13 @@ def _non_stub_result():
                 "scores": {"context_recall": 1.0, "answer_em": 1.0, "answer_f1": 1.0},
                 "retrieval_latency_ms": 5.0,
                 "answer_latency_ms": 10.0,
+                "judge": {
+                    "verdict": "correct",
+                    "score": 1.0,
+                    "rationale": "provider judge accepted the answer",
+                    "judge_name": "openai",
+                    "judge_model": "gpt-5-mini",
+                },
             }
         ],
     }

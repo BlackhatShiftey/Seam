@@ -130,6 +130,9 @@ def test_sys_metrics_all_unsupported_on_non_linux(metrics_client):
 
 def test_sys_metrics_cpu_unavailable_on_permission_error(metrics_client):
     """When /proc/stat is unreadable, cpu reports unavailable."""
+    import sys as _sys
+    if not _sys.platform.startswith("linux"):
+        pytest.skip("permission-error contract only applies to Linux /proc/stat")
     import builtins as _builtins
 
     _real_open = _builtins.open
@@ -167,7 +170,9 @@ def test_sys_metrics_disk_targets_data_dir(metrics_client, tmp_path):
         assert resp.status_code == 200
         disk = resp.json()["disk"]
         # Disk should be live since tmp_path exists
-        assert disk["source"] in ("live", "unavailable"), f"unexpected disk source: {disk['source']}"
+        assert disk["source"] in ("live", "unavailable", "unsupported"), (
+            f"unexpected disk source: {disk['source']}"
+        )
         if disk["source"] == "live":
             assert isinstance(disk["value"], (int, float))
     finally:

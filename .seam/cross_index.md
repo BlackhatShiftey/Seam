@@ -2,24 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 305
+total_events: 316
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-26T23:29:00Z | history:090:b354c9c9 | session-event | done | benchmark, mirl, compress, verify, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/lossless.py,test_seam.py,docs/MIRL_V1... |
-| 2026-04-27T00:00:00Z | roadmap:017:9d994ead | status-change | bootstrap | benchmark, holdout, fixture | ROADMAP.md:570 |
-| 2026-04-27T00:00:00Z | roadmap:018:4f81bdd3 | status-change | bootstrap | benchmark, diff, verify | ROADMAP.md:595 |
-| 2026-04-27T00:00:00Z | roadmap:019:f43cb95d | status-change | bootstrap | command, persist, retrieval | ROADMAP.md:826 |
-| 2026-04-27T04:14:02Z | history:091:003eb8d5 | session-event | done | dashboard, tui, command, compress, windows, verify, histo... | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md |
-| 2026-04-27T06:01:51Z | history:092:33be794f | session-event | done | benchmark, diff, holdout, fixture, verify, roadmap, readm... | seam_runtime/benchmarks.py,seam_runtime/cli.py,seam_runtime/runtime.py,seam.p... |
-| 2026-04-27T06:03:41Z | history:093:30b7b2a1 | session-event | done | benchmark, diff, holdout, verify, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/cli.py,test_seam.py,HISTORY.md,HISTOR... |
-| 2026-04-27T09:26:17Z | history:094:0f4cfea4 | session-event | done | command, verify, readme, roadmap, status, history, snapsh... | seam_runtime/server.py,seam_runtime/cli.py,seam_runtime/storage.py,test_seam.... |
-| 2026-04-28T00:00:00Z | roadmap:020:b96511a9 | status-change | bootstrap | readme, docs, installer | ROADMAP.md:1007 |
-| 2026-04-28T00:00:00Z | roadmap:021:2c04a920 | status-change | bootstrap | docs, readme, doctor | ROADMAP.md:1034 |
-| 2026-04-28T08:16:31Z | history:095:0c54f0e9 | session-event | done | benchmark, verify, command, history, snapshot | seam_runtime/benchmarks.py,seam_runtime/runtime.py,seam_runtime/cli.py,seam.p... |
 | 2026-04-28T09:07:41Z | history:096:efb0e297 | session-event | done | benchmark, verify, command, history, snapshot | .github/workflows/ci.yml,HISTORY.md,HISTORY_INDEX.md |
 | 2026-04-28T09:28:36Z | history:097:0ed9bdd4 | session-event | done | dashboard, tui, command, verify, status, history, snapshot | seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_I... |
 | 2026-04-28T12:24:27Z | history:098:39c54d3f | session-event | done | dashboard, tui, command, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_I... |
@@ -209,10 +198,21 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-25T12:45:28Z | history:248:19849f93 | session-event | done | security, protocol, verify, history, status | PROJECT_STATUS.md,.github/workflows/repository-maintenance.yml,tools/ci/githu... |
 | 2026-05-25T12:59:52Z | history:249:edf07639 | session-event | done | protocol, security, verify, history, status | AGENTS.md,REPO_LEDGER.md,PROJECT_STATUS.md,GitHub-PR:32 |
 | 2026-05-25T13:51:15Z | history:250:d76f57b7 | session-event | done | protocol, verify, history, status, security | PROJECT_STATUS.md,GitHub-PR:31,GitHub-PR:32,GitHub-branch:main |
+| 2026-05-25T17:37:36Z | history:251:2938605e | session-event | done | persist, retrieval, benchmark, command, verify, history, ... | benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py... |
+| 2026-05-25T17:39:47Z | history:252:f6bcabd9 | session-event | done | protocol, verify, history, status | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.s... |
+| 2026-05-25T19:28:36Z | history:253:2e18e819 | session-event | done | security, protocol, verify, history, status | tools/ci/github_maintenance_report.py,tests/audit/test_github_maintenance_rep... |
+| 2026-05-25T20:20:47Z | history:254:d1a59a90 | session-event | done | verify, benchmark, protocol, history, status | .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,tests/audit/test... |
+| 2026-05-25T20:36:15Z | history:255:dba3e5e7 | session-event | done | verify, windows, protocol, history, status | test_seam_all/test_git_hooks.py,tools/streams/streams_lib.py,PROJECT_STATUS.m... |
+| 2026-05-25T20:45:46Z | history:256:d310e523 | session-event | done | verify, windows, protocol, history, status | tools/streams/test_streams.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.... |
+| 2026-05-25T20:54:52Z | history:257:b4959999 | session-event | done | verify, windows, protocol, history, status | tools/streams/streams_lib.py,tools/streams/test_streams.py,PROJECT_STATUS.md,... |
+| 2026-05-25T21:05:09Z | history:258:73267294 | session-event | done | verify, windows, protocol, history, status | tools/streams/streams_lib.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.s... |
+| 2026-05-25T21:14:05Z | history:259:e2b36892 | session-event | done | verify, windows, protocol, history, status | .gitattributes,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/hi... |
+| 2026-05-25T21:24:33Z | history:260:3af70289 | session-event | done | verify, windows, protocol, history, status | .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,PROJECT_STATUS.m... |
+| 2026-05-25T21:35:57Z | history:261:9d37437e | session-event | done | verify, windows, protocol, history, status | tests/audit/test_ci_verify_gates.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDE... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0105.cross.md | 2026-04-15T00:00:00Z..2026-04-26T23:25:45Z | 105 | (multi) | (multi) |
+| 0001-0116.cross.md | 2026-04-15T00:00:00Z..2026-04-28T08:16:31Z | 116 | (multi) | (multi) |

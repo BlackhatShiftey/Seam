@@ -28,7 +28,20 @@ from benchmarks.external.common.runner import (
 )
 
 
-def build_adapter(name: str, answerer: str | None = None, answerer_model: str | None = None, decomposer: str | None = None, decomposer_model: str | None = None, decomposer_max_subq: int = 3, abstain_threshold: float = 0.0, rerank: str | None = None, keep_db: bool = False, db_path: str | None = None):
+def build_adapter(
+    name: str,
+    answerer: str | None = None,
+    answerer_model: str | None = None,
+    decomposer: str | None = None,
+    decomposer_model: str | None = None,
+    decomposer_max_subq: int = 3,
+    abstain_threshold: float = 0.0,
+    rerank: str | None = None,
+    keep_db: bool = False,
+    db_path: str | None = None,
+    record_retrieval_events: bool | None = None,
+    retrieval_event_run_id: str | None = None,
+):
     """Lazy-import factory so SEAM-only runs don't require Mem0/Zep installed."""
     if name == "seam":
         from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
@@ -41,6 +54,8 @@ def build_adapter(name: str, answerer: str | None = None, answerer_model: str | 
             abstain_threshold=abstain_threshold,
             rerank=rerank,
             keep_db=keep_db,
+            record_retrieval_events=record_retrieval_events,
+            run_id=retrieval_event_run_id,
         )
     if name == "mem0":
         from benchmarks.external.locomo.adapters.mem0 import Mem0LocomoAdapter
@@ -248,6 +263,17 @@ def main() -> None:
         default=None,
         help="(seam adapter) Directory for per-scope SQLite databases. Default: test_seam/locomo. Use with --keep-db to isolate a benchmark slice from other DBs.",
     )
+    parser.add_argument(
+        "--record-retrieval-events",
+        action="store_true",
+        help="(seam adapter) Append retrieval_event rows while answering cases. Default off unless SEAM_RECORD_RETRIEVAL_EVENTS is truthy.",
+    )
+    parser.add_argument(
+        "--retrieval-event-run-id",
+        type=str,
+        default=None,
+        help="(seam adapter) Run id for retrieval_event rows. Default: SEAM_RUN_ID or an auto-generated id.",
+    )
     args = parser.parse_args()
 
     dataset_path = args.dataset_path or args.dataset
@@ -297,6 +323,8 @@ def main() -> None:
                 rerank=rerank,
                 keep_db=args.keep_db,
                 db_path=args.db_path,
+                record_retrieval_events=args.record_retrieval_events,
+                retrieval_event_run_id=args.retrieval_event_run_id,
             ),
             adapter_name=args.adapter,
             cases=cases,
@@ -320,6 +348,8 @@ def main() -> None:
             rerank=rerank,
             keep_db=args.keep_db,
             db_path=args.db_path,
+            record_retrieval_events=args.record_retrieval_events,
+            retrieval_event_run_id=args.retrieval_event_run_id,
         )
         judge = build_judge(args.judge, model=args.judge_model)
         report = run_benchmark_grouped(

@@ -41,13 +41,22 @@ def test_benchmark_holdout_rejected_without_env(bench_client):
     assert "holdout" in detail or "seam_api_allow_benchmark_holdout" in detail
 
 
-def test_benchmark_holdout_allowed_with_env(bench_client):
+def test_benchmark_holdout_allowed_with_env(bench_client, monkeypatch):
     """POST /benchmark with holdout=true + env vars returns 200."""
+    calls = []
+
+    def _fake_run_benchmark_suite(runtime, *, suite, persist, holdout):
+        calls.append({"suite": suite, "persist": persist, "holdout": holdout})
+        return {"ok": True, "suite": suite, "holdout": holdout}
+
+    monkeypatch.setattr("seam_runtime.benchmarks.run_benchmark_suite", _fake_run_benchmark_suite)
     os.environ["SEAM_API_ALLOW_BENCHMARK_HOLDOUT"] = "1"
     os.environ["SEAM_API_CONFIRM_HOLDOUT"] = "1"
     try:
         resp = bench_client.post("/benchmark", json={"suite": "all", "holdout": True})
         assert resp.status_code == 200
+        assert resp.json()["holdout"] is True
+        assert calls == [{"suite": "all", "persist": False, "holdout": True}]
     finally:
         os.environ.pop("SEAM_API_ALLOW_BENCHMARK_HOLDOUT", None)
         os.environ.pop("SEAM_API_CONFIRM_HOLDOUT", None)
