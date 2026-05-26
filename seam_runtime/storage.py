@@ -229,6 +229,28 @@ class SQLiteStore:
                     schema_version integer not null default 1,
                     extra_json text
                 );
+                create table if not exists improvement_proposal (
+                    proposal_id integer primary key autoincrement,
+                    created_at text not null,
+                    kind text not null,
+                    summary text not null,
+                    rationale text,
+                    evidence_event_ids_json text,
+                    evidence_case_ids_json text,
+                    proposed_change_json text,
+                    holdout_violation integer not null default 0,
+                    schema_version integer not null default 1,
+                    extra_json text
+                );
+                create table if not exists proposal_decision (
+                    decision_id integer primary key autoincrement,
+                    proposal_id integer not null,
+                    ts text not null,
+                    status text not null,
+                    reason text,
+                    actor text,
+                    foreign key (proposal_id) references improvement_proposal(proposal_id)
+                );
                 create index if not exists idx_ir_records_kind on ir_records (kind);
                 create index if not exists idx_ir_records_ns_scope on ir_records (ns, scope);
                 create index if not exists idx_document_status_source on document_status (source_ref);
@@ -245,6 +267,11 @@ class SQLiteStore:
                 create index if not exists idx_retrieval_event_run on retrieval_event (run_id);
                 create index if not exists idx_retrieval_event_ts on retrieval_event (ts);
                 create index if not exists idx_retrieval_event_stale on retrieval_event (stale_source);
+                create index if not exists idx_improvement_proposal_kind on improvement_proposal (kind);
+                create index if not exists idx_improvement_proposal_violation on improvement_proposal (holdout_violation);
+                create index if not exists idx_improvement_proposal_created on improvement_proposal (created_at);
+                create index if not exists idx_proposal_decision_proposal on proposal_decision (proposal_id);
+                create index if not exists idx_proposal_decision_ts on proposal_decision (ts);
                 """
             )
             connection.execute("pragma foreign_keys = on")
@@ -1148,6 +1175,197 @@ class SQLiteStore:
             ).fetchone()
         return int(row[0])
 
+    # ------------------------------------------------------------------
+    # H2 slice 5: improvement_proposal + proposal_decision
+    # ------------------------------------------------------------------
+    # Append-only pair: improvement_proposal rows are written once and never
+    # mutated; status transitions append rows to proposal_decision. Current
+    # status = latest decision by ts/decision_id. SEAM never writes to
+    # AGENTS.md / REPO_LEDGER.md / PROJECT_STATUS.md from this surface; the
+    # gate is operator approval recorded here.
+
+    def write_improvement_proposal(
+        self,
+        *,
+        kind: str,
+        summary: str,
+        rationale: str | None = None,
+        evidence_event_ids: list[int] | None = None,
+        evidence_case_ids: list[str] | None = None,
+        proposed_change: dict[str, object] | None = None,
+        holdout_violation: bool = False,
+        created_at: str | None = None,
+        extra: dict[str, object] | None = None,
+    ) -> int:
+        """Append a new improvement proposal. Also writes an initial
+        ``proposal_decision`` row with status=pending so listing pending
+        proposals is one query.
+
+        Append-only: there is no update method. Status transitions go through
+        ``record_proposal_decision``; the proposal body itself never changes.
+        """
+        if not kind:
+            raise ValueError("kind is required")
+        if not summary:
+            raise ValueError("summary is required")
+        with closing(self._connect()) as connection:
+            cursor = connection.execute(
+                """
+                insert into improvement_proposal (
+                    created_at, kind, summary, rationale,
+                    evidence_event_ids_json, evidence_case_ids_json,
+                    proposed_change_json, holdout_violation, schema_version, extra_json
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    created_at or utc_now(),
+                    kind,
+                    summary,
+                    rationale,
+                    json.dumps(list(evidence_event_ids), separators=(",", ":")) if evidence_event_ids is not None else None,
+                    json.dumps(list(evidence_case_ids), separators=(",", ":")) if evidence_case_ids is not None else None,
+                    json.dumps(proposed_change, sort_keys=True, separators=(",", ":")) if proposed_change is not None else None,
+                    1 if holdout_violation else 0,
+                    1,
+                    json.dumps(extra, sort_keys=True, separators=(",", ":")) if extra is not None else None,
+                ),
+            )
+            proposal_id = int(cursor.lastrowid)
+            connection.execute(
+                """
+                insert into proposal_decision (proposal_id, ts, status, reason, actor)
+                values (?, ?, 'pending', NULL, NULL)
+                """,
+                (proposal_id, utc_now()),
+            )
+            connection.commit()
+        return proposal_id
+
+    def record_proposal_decision(
+        self,
+        *,
+        proposal_id: int,
+        status: str,
+        reason: str | None = None,
+        actor: str | None = None,
+        ts: str | None = None,
+    ) -> int:
+        """Append a status transition for an existing proposal. Returns the
+        new decision_id.
+
+        Append-only: prior decisions are preserved. A reverse decision
+        (approve -> reject) leaves both rows in place so the audit trail
+        captures the change of mind.
+        """
+        if status not in ("pending", "approved", "rejected", "superseded"):
+            raise ValueError(f"unknown status {status!r}")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "select 1 from improvement_proposal where proposal_id = ?",
+                (proposal_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"proposal_id {proposal_id} does not exist")
+            cursor = connection.execute(
+                """
+                insert into proposal_decision (proposal_id, ts, status, reason, actor)
+                values (?, ?, ?, ?, ?)
+                """,
+                (proposal_id, ts or utc_now(), status, reason, actor),
+            )
+            decision_id = int(cursor.lastrowid)
+            connection.commit()
+        return decision_id
+
+    def latest_proposal_status(self, proposal_id: int) -> dict[str, object] | None:
+        """Return the most recent decision row for one proposal, or None if
+        the proposal does not exist."""
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                select decision_id, proposal_id, ts, status, reason, actor
+                from proposal_decision
+                where proposal_id = ?
+                order by decision_id desc
+                limit 1
+                """,
+                (proposal_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _proposal_decision_row(row)
+
+    def iter_improvement_proposals(
+        self,
+        *,
+        kind: str | None = None,
+        status: str | None = None,
+        holdout_violation: bool | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, object]]:
+        """List proposals newest-first with their latest decision joined."""
+        clauses: list[str] = []
+        params: list[object] = []
+        if kind is not None:
+            clauses.append("p.kind = ?")
+            params.append(kind)
+        if holdout_violation is not None:
+            clauses.append("p.holdout_violation = ?")
+            params.append(1 if holdout_violation else 0)
+        where = (" where " + " and ".join(clauses)) if clauses else ""
+        sql = f"""
+            select p.*,
+                   (select status from proposal_decision d
+                    where d.proposal_id = p.proposal_id
+                    order by decision_id desc limit 1) as latest_status,
+                   (select reason from proposal_decision d
+                    where d.proposal_id = p.proposal_id
+                    order by decision_id desc limit 1) as latest_reason,
+                   (select ts from proposal_decision d
+                    where d.proposal_id = p.proposal_id
+                    order by decision_id desc limit 1) as latest_status_ts
+            from improvement_proposal p{where}
+            order by p.proposal_id desc
+        """
+        if limit is not None:
+            sql += " limit ?"
+            params.append(int(limit))
+        with closing(self._connect()) as connection:
+            rows = connection.execute(sql, tuple(params)).fetchall()
+        proposals = [_improvement_proposal_row(row) for row in rows]
+        if status is not None:
+            proposals = [p for p in proposals if p.get("latest_status") == status]
+        return proposals
+
+    def count_improvement_proposals(
+        self,
+        *,
+        kind: str | None = None,
+        status: str | None = None,
+        holdout_violation: bool | None = None,
+    ) -> int:
+        return len(
+            self.iter_improvement_proposals(
+                kind=kind, status=status, holdout_violation=holdout_violation
+            )
+        )
+
+    def iter_proposal_decisions(
+        self, proposal_id: int
+    ) -> list[dict[str, object]]:
+        """All decision rows for one proposal, oldest first."""
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                select decision_id, proposal_id, ts, status, reason, actor
+                from proposal_decision
+                where proposal_id = ?
+                order by decision_id asc
+                """,
+                (proposal_id,),
+            ).fetchall()
+        return [_proposal_decision_row(row) for row in rows]
+
 
 def _retrieval_event_row(row: sqlite3.Row) -> dict[str, object]:
     def _maybe_json(value):
@@ -1176,6 +1394,41 @@ def _retrieval_event_row(row: sqlite3.Row) -> dict[str, object]:
         "stale_source": bool(row["stale_source"]),
         "schema_version": int(row["schema_version"]),
         "extra": _maybe_json(row["extra_json"]),
+    }
+
+
+def _improvement_proposal_row(row: sqlite3.Row) -> dict[str, object]:
+    def _maybe_json(value):
+        if value is None:
+            return None
+        return json.loads(value)
+
+    return {
+        "proposal_id": int(row["proposal_id"]),
+        "created_at": row["created_at"],
+        "kind": row["kind"],
+        "summary": row["summary"],
+        "rationale": row["rationale"],
+        "evidence_event_ids": _maybe_json(row["evidence_event_ids_json"]),
+        "evidence_case_ids": _maybe_json(row["evidence_case_ids_json"]),
+        "proposed_change": _maybe_json(row["proposed_change_json"]),
+        "holdout_violation": bool(row["holdout_violation"]),
+        "schema_version": int(row["schema_version"]),
+        "extra": _maybe_json(row["extra_json"]),
+        "latest_status": row["latest_status"] if "latest_status" in row.keys() else None,
+        "latest_reason": row["latest_reason"] if "latest_reason" in row.keys() else None,
+        "latest_status_ts": row["latest_status_ts"] if "latest_status_ts" in row.keys() else None,
+    }
+
+
+def _proposal_decision_row(row: sqlite3.Row) -> dict[str, object]:
+    return {
+        "decision_id": int(row["decision_id"]),
+        "proposal_id": int(row["proposal_id"]),
+        "ts": row["ts"],
+        "status": row["status"],
+        "reason": row["reason"],
+        "actor": row["actor"],
     }
 
 
