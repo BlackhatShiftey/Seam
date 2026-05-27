@@ -135,7 +135,7 @@ source: streams/*/log.md (derived; do not hand-edit)
 hot_zone_max: 200
 archive_pattern: archive/<lo>-<hi>.cross.md
 
-## Hot Zone (latest 200 events, newest first)
+## Hot Zone (latest 200 events, oldest first)
 
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|

@@ -5654,3 +5654,47 @@ Verification before this entry: .venv/bin/python -m pytest tests/audit/test_h2_i
 
 Next step: rebuild HISTORY_INDEX, refresh streams + cross-index, write snapshot, run verify_integrity + verify_routing + verify_continuity + verify_streams. Slice 5 closes H2 phase 2 substrate work; the substrate is now writable both live (slice 2) and from history (slice 3), partitioned (slice 4), and gated (slice 5). Materialising the real benchmarks/external/locomo/holdout_assignment.json against the full LoCoMo dataset and producing the first actual improvement proposals from substrate evidence both remain operator-gated. Track H3 (retrieval integration with stream filters) and broader Track K (Trust/Security/Auditability) become the natural next workstreams; operator direction required to start either.
 ---END-ENTRY-#266---
+
+---BEGIN-ENTRY-#267---
+id: 267
+date: 2026-05-27T13:27:37Z
+agent: claude
+status: done
+topics: bugfix, storage, retrieval, docs, pyproject, ci, webui, history, protocol, verify
+commits: 25661e4,acf26c4,b0b2103,7fbb12b,10d2b51
+refs: seam_runtime/storage.py,seam_runtime/temporal.py,seam_runtime/mirl.py,seam_runtime/models.py,experimental/retrieval_orchestrator/adapters.py,tests/audit/test_orphan_edge_cleanup.py,tools/history/retention.py,tests/audit/test_retention.py,pyproject.toml,.github/workflows/external-memory-benchmarks.yml,experimental/webui/.gitignore,experimental/webui/src/api/apiClient.ts,experimental/webui/src/api/apiClient.test.ts,AGENTS.md,ROADMAP.md,docs/roadmap/CONTEXT_STREAMS.md
+supersedes: 266
+tokens: 1197
+---
+Polish + bugfix pass committed on branch polish/cleanup-pass-267 (five commits) and prepared for PR against main.
+
+Runtime bug fixes (25661e4):
+- seam_runtime.storage._cleanup_orphan_edges previously only cleaned edges whose src_id matched 'clm:%' or dst_id matched 'clm:%'. Edges with rel:/sym:/raw:/sta:/evt: endpoints could survive cleanup even after the underlying record was deleted. Sweep now iterates every record prefix on both endpoints. Five new audit tests in tests/audit/test_orphan_edge_cleanup.py cover non-clm prefixes (rel:), prov edges, evidence edges, both-endpoints-missing, and the positive case that valid edges with two extant endpoints survive cleanup.
+- seam_runtime.storage.batch_ir applied SQL LIMIT/OFFSET only when no ids filter was active, then re-sliced the resulting records in Python; both paths now apply LIMIT/OFFSET in SQL and the redundant Python slice is removed.
+- seam_runtime.temporal.parse_iso truncated the timestamp via ts[: len(fmt) + 4], which fed shorter format strings partial input and silently failed to parse otherwise-valid timestamps. Pass the full string to strptime so all three formats get a fair shot.
+- experimental.retrieval_orchestrator.adapters._build_structured_sql escaped backslash, percent, and underscore in plan.filters.object_text before interpolating into the LIKE clause and added ESCAPE '\\\\' to the SQL. Without this, an object_text containing % or _ would silently widen the match.
+- seam_runtime.mirl.iter_textual_fields now iterates dict values in sorted-key order so the lexical retrieval token stream is deterministic across runs (previously dependent on dict insertion order).
+- Docstrings added to seam_runtime.mirl.cosine_similarity (sparse / bag-of-words dicts, used by the lexical retrieval path) and seam_runtime.models.cosine (dense embedding lists, used by EmbeddingModel.embed consumers) so callers pick the right one for the right vector shape.
+
+New tool (acf26c4):
+- tools/history/retention.py is a snapshot pruning CLI for .seam/snapshots/. Retention policy: keep latest N (default 10), keep one per calendar date (so every history-recording day retains a representative snapshot), keep anything newer than --max-age days (default 30). Dry-run by default; --prune actually deletes. Reports per-file deletions and freed bytes. Handles both snapshot filename formats (with and without the 6-digit random suffix).
+- tests/audit/test_retention.py covers filename parsing for both formats, latest-N retention, per-day retention across multiple days, max-age window, dry-run vs --prune deletion semantics, the human-size formatter, and the same-day collapse case (5 snapshots on one old day with keep=1 keeps only the newest).
+
+Dependency hardening (b0b2103):
+- pyproject.toml now pins explicit upper bounds (<MAJOR+1) on every optional extra (dash, pgvector, sbert, server, rerank, bench-judge, bench-mem0, bench-zep), the all-extras superset, and the tiktoken core dep. Stops a future major-version release of textual / fastapi / anthropic / etc. from silently breaking installs.
+- .github/workflows/external-memory-benchmarks.yml bumps actions/setup-python from 3.11 to 3.12 to match the version the runtime is being developed against.
+
+WebUI cleanup (7fbb12b):
+- The static dashboard at public/dashboard.html replaced the TypeScript pane shell some time ago. The unused panes (CompilePane, ContextPane, SearchPane, SettingsPane, StatusPane) and components (ActivityBar, Spinner, StatusBar, icons) are removed instead of being carried as dead code.
+- experimental/webui/src/api/apiClient.HealthResponse drops store_path because the REST /health endpoint does not actually return it; the test fixture is updated to match the real response shape.
+- experimental/webui/.gitignore adds uploads/ so any runtime-staged file uploads stop showing as untracked.
+
+Docs (10d2b51):
+- AGENTS.md topic vocabulary moves from one packed line to a one-per-line list and expands the controlled set with previously informal-but-used tags. All previously listed tags are preserved.
+- ROADMAP.md drops A1 (NL->MIRL animation) and A5 (chat tab in dashboard) from the Next section because both already landed via the dashboard work tracked in PROJECT_STATUS.
+- docs/roadmap/CONTEXT_STREAMS.md hot-zone header now says 'oldest first', which is what the cross-index rebuilder actually emits.
+
+Verification before this entry: .venv/bin/python -m pytest tests/audit/ -q passed 341 tests with 6 skips and no failures (includes the new orphan-edge and retention tests); .venv/bin/python -m pytest test_seam_all/test_seam.py passed 181 tests with 3 subtests passing; .venv/bin/python -m tools.history.verify_integrity printed 'Integrity OK'; .venv/bin/python -m tools.history.verify_routing printed 'Routing OK'. The stale grok worktree at /home/terrabyte/.grok/worktrees/projects-all-seam/grok (detached HEAD c2dd45d, three commits behind main, untracked tools/h2/ files already merged into main via PR #35) was removed via git worktree remove --force before branching. No secrets, no provider session URLs, no API keys, no local .env content was committed.
+
+Next step: rebuild HISTORY_INDEX, write snapshot, run verify_continuity + verify_streams, push branch, open PR, watch required checks (repo-hygiene, chroma-real-smoke, locomo-quickstart-bil2), and merge once green.
+---END-ENTRY-#267---

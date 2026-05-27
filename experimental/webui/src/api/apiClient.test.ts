@@ -81,9 +81,9 @@ describe('apiClient', () => {
 
   it('uses the default local API base URL without a saved setting', async () => {
     installStorage();
-    const fetchMock = installFetch(Response.json({ status: 'ok', store_path: 'seam.db' }));
+    const fetchMock = installFetch(Response.json({ status: 'ok' }));
 
-    await expect(fetchHealth()).resolves.toEqual({ status: 'ok', store_path: 'seam.db' });
+    await expect(fetchHealth()).resolves.toEqual({ status: 'ok' });
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:8765/health',
       expect.objectContaining({ headers: { 'Content-Type': 'application/json' } }),

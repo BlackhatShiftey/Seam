@@ -345,6 +345,13 @@ def token_count(text: str) -> int:
 
 
 def cosine_similarity(left: dict[str, float], right: dict[str, float]) -> float:
+    """Cosine similarity for sparse / bag-of-words vectors stored as dicts.
+
+    Keys are token strings, values are weights.  Use this when working with
+    the lexical retrieval path (see ``seam_runtime.retrieval``).
+
+    For dense embedding vectors (``list[float]``), use ``seam_runtime.models.cosine`` instead.
+    """
     if not left or not right:
         return 0.0
     numerator = sum(left[token] * right.get(token, 0.0) for token in left)
@@ -364,6 +371,6 @@ def iter_textual_fields(record: MIRLRecord) -> Iterable[str]:
                 if isinstance(item, str):
                     yield item
         elif isinstance(value, dict):
-            for subvalue in value.values():
+            for subvalue in (value[k] for k in sorted(value.keys())):
                 if isinstance(subvalue, str):
                     yield subvalue
