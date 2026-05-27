@@ -294,8 +294,9 @@ def _build_structured_sql(plan: RetrievalPlan, query_tokens: list[str], limit: i
         where_clauses.append("lower(coalesce(json_extract(r.payload_json, '$.attrs.subject'), '')) = ?")
         where_params.append(plan.filters.subject.lower())
     if plan.filters.object_text:
-        where_clauses.append("lower(coalesce(json_extract(r.payload_json, '$.attrs.object'), '')) like ?")
-        where_params.append(f"%{plan.filters.object_text.lower()}%")
+        escaped = plan.filters.object_text.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        where_clauses.append("lower(coalesce(json_extract(r.payload_json, '$.attrs.object'), '')) like ? escape '\\'")
+        where_params.append(f"%{escaped}%")
 
     structured_parts: list[str] = []
     structured_params: list[object] = []
@@ -320,8 +321,9 @@ def _build_structured_sql(plan: RetrievalPlan, query_tokens: list[str], limit: i
         structured_parts.append("case when subject_text = ? then 0.70 else 0 end")
         structured_params.append(plan.filters.subject.lower())
     if plan.filters.object_text:
-        structured_parts.append("case when object_text like ? then 0.65 else 0 end")
-        structured_params.append(f"%{plan.filters.object_text.lower()}%")
+        escaped = plan.filters.object_text.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        structured_parts.append("case when object_text like ? escape '\\' then 0.65 else 0 end")
+        structured_params.append(f"%{escaped}%")
     structured_expr = " + ".join(structured_parts) if structured_parts else "0.0"
 
     lexical_count_parts: list[str] = []

@@ -281,20 +281,26 @@ class SQLiteStore:
     def _cleanup_orphan_edges(self, connection: sqlite3.Connection) -> None:
         """Remove edges whose src or dst references a record that no longer exists.
 
-        ir_edges uses virtual entity IDs (e.g. ``ent:turn:xxx``) for CLM
-        subject-based edges, so FK constraints are not feasible.  Instead we
-        run a best-effort orphan sweep at open time: edges where *both* src_id
-        and dst_id look like record IDs but are missing from ir_records are
-        removed.  Edges with at least one virtual-entity-style endpoint are
-        left alone.
+        ir_edges has no FK constraints because it uses virtual entity IDs
+        (e.g. ``ent:turn:xxx``, ``ent:user:xxx``, ``prov``, ``evidence`` edges).
+        We run a best-effort orphan sweep at open time: any edge where EITHER
+        endpoint looks like a record ID (starts with a known prefix) but is
+        missing from ir_records is removed. Virtual entity IDs are preserved.
         """
-        connection.execute(
-            "delete from ir_edges "
-            "where src_id like 'clm:%' and src_id not in (select id from ir_records)"
+        record_prefixes = ("clm:", "rel:", "sym:", "raw:", "sta:", "evt:")
+        prefix_clause = " or ".join(
+            f"src_id like '{p}%'" for p in record_prefixes
         )
         connection.execute(
-            "delete from ir_edges "
-            "where dst_id like 'clm:%' and dst_id not in (select id from ir_records)"
+            f"delete from ir_edges "
+            f"where ({prefix_clause}) and src_id not in (select id from ir_records)"
+        )
+        prefix_clause_dst = " or ".join(
+            f"dst_id like '{p}%'" for p in record_prefixes
+        )
+        connection.execute(
+            f"delete from ir_edges "
+            f"where ({prefix_clause_dst}) and dst_id not in (select id from ir_records)"
         )
 
     def get_stats(self) -> dict[str, object]:
@@ -642,10 +648,10 @@ class SQLiteStore:
         if scope:
             query += " and scope = ?"
             params.append(scope)
-        if limit is not None and not ids:
+        if limit is not None:
             query += " order by id limit ? offset ?"
             params.extend([limit, offset])
-        elif offset and not ids:
+        elif offset:
             query += " order by id limit -1 offset ?"
             params.append(offset)
         with closing(self._connect()) as connection:
@@ -654,10 +660,6 @@ class SQLiteStore:
         if ids:
             by_id = {record.id: record for record in records}
             records = [by_id[record_id] for record_id in ids if record_id in by_id]
-            if offset:
-                records = records[offset:]
-            if limit is not None:
-                records = records[:limit]
         return IRBatch(records)
 
     def delete_ir(self, ids: list[str], include_vectors: bool = True) -> None:

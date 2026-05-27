@@ -60,7 +60,7 @@ def parse_iso(ts: str | None) -> datetime | None:
         return None
     for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.strptime(ts[: len(fmt) + 4], fmt)
+            return datetime.strptime(ts, fmt)
         except ValueError:
             continue
     return None

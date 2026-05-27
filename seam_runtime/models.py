@@ -174,6 +174,15 @@ def default_embedding_model() -> EmbeddingModel:
 
 
 def cosine(left: list[float], right: list[float]) -> float:
+    """Cosine similarity for dense embedding vectors stored as lists.
+
+    Both vectors must have the same length.  Use this when working with
+    dense embeddings from ``EmbeddingModel.embed()`` (hash, sentence-transformers,
+    OpenAI-compatible, etc.).
+
+    For sparse / bag-of-words vectors (``dict[str, float]``), use
+    ``seam_runtime.mirl.cosine_similarity`` instead.
+    """
     if not left or not right or len(left) != len(right):
         return 0.0
     numerator = sum(a * b for a, b in zip(left, right, strict=False))
