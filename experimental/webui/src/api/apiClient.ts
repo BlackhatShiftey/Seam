@@ -4,7 +4,6 @@ const DEFAULT_BASE_URL = 'http://127.0.0.1:8765';
 
 export interface HealthResponse {
   status: string;
-  store_path: string;
 }
 
 export interface StatsResponse {
