@@ -1551,10 +1551,8 @@ Now - retrieval feedback loop + browser dashboard / REST API GUI + context strea
 Next - dashboard and agent ergonomics
 - A2: Benchmark progress bar
 - A3: ASCII sparkline graphs
-- A1: NL->MIRL compilation animation
 - A6: Presentation mode
 - D1: SEAM as Claude/Gemini/Codex tool set
-- A5: Chat tab in dashboard
 
 Next plug-and-play target - external memory benchmark credibility
 - I1: External memory benchmark registry + runner (landed via PR #22)
