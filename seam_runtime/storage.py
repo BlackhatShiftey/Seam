@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 from uuid import uuid4
 
 from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, SYMBOL_FOR_KIND, TraceGraph, utc_now
+from .pool import ConnectionPool
 
 
 class SQLiteStore:
-    def __init__(self, path: str | Path = "seam.db") -> None:
+    def __init__(self, path: str | Path = "seam.db", pool_size: int | None = None) -> None:
         self.path = str(path)
         self._mem_anchor: sqlite3.Connection | None = None
         if self.path != ":memory:":
@@ -20,17 +22,33 @@ class SQLiteStore:
             # Keep one anchor connection alive so that the shared in-memory
             # database persists across per-operation connections.
             self._mem_anchor = sqlite3.connect(
-                f"file:mem_{id(self)}?mode=memory&cache=shared", uri=True, timeout=5.0
+                f"file:mem_{id(self)}?mode=memory&cache=shared",
+                uri=True,
+                timeout=5.0,
+                check_same_thread=False,
             )
         self._init_schema()
+        resolved_pool_size = pool_size if pool_size is not None else int(os.environ.get("SEAM_DB_POOL_SIZE", "5"))
+        self._pool = ConnectionPool(
+            connect_factory=self._connect,
+            pool_size=resolved_pool_size,
+            idle_timeout=int(os.environ.get("SEAM_DB_POOL_TIMEOUT", "300")),
+        )
 
     def _connect(self) -> sqlite3.Connection:
         if self.path == ":memory:":
             connection = sqlite3.connect(
-                f"file:mem_{id(self)}?mode=memory&cache=shared", uri=True, timeout=5.0
+                f"file:mem_{id(self)}?mode=memory&cache=shared",
+                uri=True,
+                timeout=5.0,
+                check_same_thread=False,
             )
         else:
-            connection = sqlite3.connect(self.path, timeout=5.0)
+            connection = sqlite3.connect(
+                self.path,
+                timeout=5.0,
+                check_same_thread=False,
+            )
         connection.row_factory = sqlite3.Row
         if self.path != ":memory:":
             connection.execute("pragma journal_mode=WAL")
@@ -39,6 +57,9 @@ class SQLiteStore:
         return connection
 
     def close(self) -> None:
+        pool = getattr(self, "_pool", None)
+        if pool is not None:
+            pool.close()
         if self._mem_anchor is not None:
             self._mem_anchor.close()
             self._mem_anchor = None
@@ -304,7 +325,7 @@ class SQLiteStore:
         )
 
     def get_stats(self) -> dict[str, object]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             total_records = connection.execute("select count(*) from ir_records").fetchone()[0]
             vector_entries = connection.execute("select count(*) from vector_index").fetchone()[0]
             pack_entries = connection.execute("select count(*) from pack_store").fetchone()[0]
@@ -433,7 +454,7 @@ class SQLiteStore:
         }
 
     def list_namespaces(self, limit: int = 100) -> list[str]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 "select distinct ns from ir_records order by ns limit ?",
                 (limit,),
@@ -441,7 +462,7 @@ class SQLiteStore:
         return [row["ns"] for row in rows]
 
     def list_scopes(self, ns: str, limit: int = 100) -> list[str]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 "select distinct scope from ir_records where ns = ? order by scope limit ?",
                 (ns, limit),
@@ -449,7 +470,7 @@ class SQLiteStore:
         return [row["scope"] for row in rows]
 
     def list_record_summaries(self, ns: str, scope: str, limit: int = 100) -> list[dict[str, object]]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 """
                 select id, kind, status, updated_at
@@ -463,7 +484,7 @@ class SQLiteStore:
         return [dict(row) for row in rows]
 
     def persist_ir(self, batch: IRBatch) -> PersistReport:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             for record in batch.records:
                 # Capture old CLM subject before overwriting.
                 old_clm_subject: str | None = None
@@ -505,7 +526,7 @@ class SQLiteStore:
         deleted_at: str | None = None,
     ) -> dict[str, object]:
         now = utc_now()
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             existing = connection.execute("select created_at from document_status where document_id = ?", (document_id,)).fetchone()
             created_at = existing["created_at"] if existing else now
             connection.execute(
@@ -535,7 +556,7 @@ class SQLiteStore:
         return self.read_document_status(document_id)
 
     def read_document_status(self, document_id: str) -> dict[str, object]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute("select * from document_status where document_id = ?", (document_id,)).fetchone()
         if row is None:
             raise KeyError(document_id)
@@ -544,7 +565,7 @@ class SQLiteStore:
     def mark_document_superseded_by_source_ref(self, source_ref: str, except_document_id: str) -> int:
         """Mark all other documents with the same source_ref as deleted (superseded)."""
         now = utc_now()
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             cursor = connection.execute(
                 "update document_status set deleted_at = ?, updated_at = ? "
                 "where source_ref = ? and document_id != ? and deleted_at is null",
@@ -554,7 +575,7 @@ class SQLiteStore:
             return cursor.rowcount
 
     def list_document_status(self, limit: int = 20) -> list[dict[str, object]]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 "select * from document_status order by updated_at desc limit ?",
                 (limit,),
@@ -654,7 +675,7 @@ class SQLiteStore:
         elif offset:
             query += " order by id limit -1 offset ?"
             params.append(offset)
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(query, params).fetchall()
         records = [MIRLRecord.from_dict(json.loads(row["payload_json"])) for row in rows]
         if ids:
@@ -666,7 +687,7 @@ class SQLiteStore:
         if not ids:
             return
         placeholders = ",".join("?" for _ in ids)
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             connection.execute(f"delete from raw_docs where id in ({placeholders})", ids)
             connection.execute(f"delete from raw_spans where id in ({placeholders})", ids)
             connection.execute(f"delete from symbol_table where id in ({placeholders})", ids)
@@ -689,7 +710,7 @@ class SQLiteStore:
         return Pack.from_record(record)
 
     def trace(self, root_id: str) -> TraceGraph:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             root = _load_record_by_id(connection, root_id)
             if root is None:
                 raise KeyError(root_id)
@@ -730,7 +751,7 @@ class SQLiteStore:
         artifact_id = f"mx:{uuid4().hex[:12]}"
         machine_text = str(artifact.get("machine_text", "") or "")
         machine_bytes = machine_text.encode("utf-8") if machine_text else b""
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             connection.execute(
                 """
                 insert or replace into machine_artifacts
@@ -764,7 +785,7 @@ class SQLiteStore:
         return artifact_id
 
     def read_machine_artifact(self, artifact_id: str) -> dict[str, object]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute("select * from machine_artifacts where artifact_id = ?", (artifact_id,)).fetchone()
         if row is None:
             raise KeyError(artifact_id)
@@ -808,7 +829,7 @@ class SQLiteStore:
         query_status = "direct_queryable" if payload_format in {"MIRL", "SEAM-RC/1"} else "verify_only"
         merged_metadata = dict(metadata or {})
         merged_metadata["artifact"] = dict(artifact)
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             existing = connection.execute("select created_at from surface_artifacts where surface_id = ?", (surface_id,)).fetchone()
             created_at = existing["created_at"] if existing else now
             connection.execute(
@@ -846,7 +867,7 @@ class SQLiteStore:
         return self.read_surface_artifact(surface_id)
 
     def read_surface_artifact(self, surface_ref: str) -> dict[str, object]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute(
                 """
                 select * from surface_artifacts
@@ -859,7 +880,7 @@ class SQLiteStore:
         return _surface_artifact_row(row)
 
     def list_surface_artifacts(self, limit: int = 20) -> list[dict[str, object]]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 "select * from surface_artifacts order by updated_at desc limit ?",
                 (limit,),
@@ -868,7 +889,7 @@ class SQLiteStore:
 
     def update_surface_import_status(self, surface_ref: str, import_status: str) -> dict[str, object]:
         current = self.read_surface_artifact(surface_ref)
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             connection.execute(
                 "update surface_artifacts set import_status = ?, updated_at = ? where surface_id = ?",
                 (import_status, utc_now(), current["surface_id"]),
@@ -891,7 +912,7 @@ class SQLiteStore:
         if metadata:
             merged_metadata.update(metadata)
         next_artifact_path = artifact_path or str(current["artifact_path"])
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             connection.execute(
                 """
                 update surface_artifacts
@@ -926,7 +947,7 @@ class SQLiteStore:
         metadata: dict[str, object] | None = None,
     ) -> str:
         projection_id = f"px:{uuid4().hex[:12]}"
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             connection.execute("delete from projection_index where record_id = ? and projection_kind = ?", (record_id, projection_kind))
             connection.execute(
                 """
@@ -958,7 +979,7 @@ class SQLiteStore:
             query += " and projection_kind = ?"
             params.append(projection_kind)
         query += " order by updated_at desc"
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(query, params).fetchall()
         return [
             {
@@ -979,7 +1000,7 @@ class SQLiteStore:
         summary = dict(report.get("summary", {}))
         run_id = str(manifest.get("run_id") or f"bench:{uuid4().hex[:12]}")
         executed_suites = list(manifest.get("executed_suites", []))
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             connection.execute(
                 """
                 insert or replace into benchmark_runs
@@ -1022,14 +1043,14 @@ class SQLiteStore:
         return run_id
 
     def read_benchmark_run(self, run_id: str) -> dict[str, object]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute("select report_json from benchmark_runs where run_id = ?", (run_id,)).fetchone()
         if row is None:
             raise KeyError(f"Benchmark run not found: {run_id}")
         return json.loads(row["report_json"])
 
     def list_benchmark_runs(self, limit: int = 10) -> list[dict[str, object]]:
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 "select run_id, requested_suite, executed_suites, status, bundle_hash, created_at from benchmark_runs order by created_at desc limit ?",
                 (limit,),
@@ -1084,7 +1105,7 @@ class SQLiteStore:
             raise ValueError("ranks must align with candidate_ids")
         if scores is not None and len(scores) != len(candidate_ids):
             raise ValueError("scores must align with candidate_ids")
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             cursor = connection.execute(
                 """
                 insert into retrieval_event (
@@ -1149,7 +1170,7 @@ class SQLiteStore:
         if limit is not None:
             sql += " limit ?"
             params.append(int(limit))
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(sql, tuple(params)).fetchall()
         return [_retrieval_event_row(row) for row in rows]
 
@@ -1171,7 +1192,7 @@ class SQLiteStore:
         if not include_stale:
             clauses.append("stale_source = 0")
         where = (" where " + " and ".join(clauses)) if clauses else ""
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute(
                 f"select count(*) from retrieval_event{where}", tuple(params)
             ).fetchone()
@@ -1210,7 +1231,7 @@ class SQLiteStore:
             raise ValueError("kind is required")
         if not summary:
             raise ValueError("summary is required")
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             cursor = connection.execute(
                 """
                 insert into improvement_proposal (
@@ -1261,7 +1282,7 @@ class SQLiteStore:
         """
         if status not in ("pending", "approved", "rejected", "superseded"):
             raise ValueError(f"unknown status {status!r}")
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute(
                 "select 1 from improvement_proposal where proposal_id = ?",
                 (proposal_id,),
@@ -1282,7 +1303,7 @@ class SQLiteStore:
     def latest_proposal_status(self, proposal_id: int) -> dict[str, object] | None:
         """Return the most recent decision row for one proposal, or None if
         the proposal does not exist."""
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             row = connection.execute(
                 """
                 select decision_id, proposal_id, ts, status, reason, actor
@@ -1332,7 +1353,7 @@ class SQLiteStore:
         if limit is not None:
             sql += " limit ?"
             params.append(int(limit))
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(sql, tuple(params)).fetchall()
         proposals = [_improvement_proposal_row(row) for row in rows]
         if status is not None:
@@ -1356,7 +1377,7 @@ class SQLiteStore:
         self, proposal_id: int
     ) -> list[dict[str, object]]:
         """All decision rows for one proposal, oldest first."""
-        with closing(self._connect()) as connection:
+        with self._pool.checkout() as connection:
             rows = connection.execute(
                 """
                 select decision_id, proposal_id, ts, status, reason, actor

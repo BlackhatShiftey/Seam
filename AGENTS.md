@@ -35,6 +35,18 @@ If you created a working branch: push it if the work is real, delete it locally 
 
 Use `tools/history/*` scripts for the canonical history protocol and `tools/streams/*` scripts for the multi-stream substrate (history mirror, roadmap, experience, cross-index). Run `python -m tools.git.scan_stale_branches` on-demand to audit branch health; the repo has `delete_branch_on_merge` enabled on GitHub so merged PR branches auto-delete.
 
+## Cut-off Recovery
+
+This rule applies to every agent (Claude, Codex, Gemini, DeepSeek, Qwen, Aider, OpenCode, others). A session that stops mid-implementation without leaving a recovery breadcrumb is the failure mode this rule prevents.
+
+Before stopping a session that has touched runtime code:
+
+1. Run `pytest --collect-only` against the modules you touched. Any `ImportError`, `NameError` at module scope, or undefined symbol means the implementation does not match its tests; do not stop until that gap is closed or recorded.
+2. Run the relevant test slice (`tests/audit/` plus any directly affected suite). New tests that import symbols must compile alongside the implementation they target.
+3. If extraction or refactor was in progress, search for every reference to the renamed/extracted symbol and confirm it still resolves. Do not commit or hand off code that references undefined constants or helpers.
+4. If the session ends with the working tree dirty, append a HISTORY entry marked `status: in-progress` that names: (a) the files touched, (b) any missing constants/helpers/methods the next agent must add, (c) any test-vs-implementation mismatches, and (d) what the next agent should run first to reproduce state. This is the cut-off breadcrumb; without it the next session cannot tell intentional in-flight work from abandoned code.
+5. Never leave large binary artifacts (image tarballs, model weights, backups, datasets) inside the repo working tree. Move them to an external path before stopping.
+
 ## GitHub PR Workflow
 
 - `main` is the source-of-truth branch and is protected by the GitHub ruleset
