@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import shlex
 import sqlite3
@@ -13,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+LOGGER = logging.getLogger(__name__)
 
 try:
     from rich import box
@@ -121,6 +124,76 @@ DEFAULT_CHAT_MODELS = [
     "google/gemma-4-26b-a4b-it",
     "google/gemma-4-26b-a4b-it:free",
 ]
+
+
+ALLOWED_SHELL_PATHS: frozenset[str] = frozenset({
+    "/bin/bash",
+    "/bin/sh",
+    "/bin/zsh",
+    "/usr/bin/bash",
+    "/usr/bin/sh",
+    "/usr/bin/zsh",
+})
+
+ALLOWED_SHELL_COMMANDS: frozenset[str] = frozenset({
+    "ls", "cat", "grep", "find", "pwd", "date", "whoami", "echo",
+    "head", "tail", "wc", "sort", "uniq", "cut", "awk", "sed",
+    "git", "diff", "tree", "stat", "file", "which", "env", "printenv",
+    "tr", "tee", "less", "more", "basename", "dirname", "realpath",
+    "true", "false", "test", "sleep",
+})
+
+BLOCKED_SHELL_COMMANDS: frozenset[str] = frozenset({
+    "rm", "sudo", "su", "chmod", "chown", "kill", "pkill",
+    "dd", "mkfs", "mount", "umount", "shutdown", "reboot", "init",
+    "fdisk", "parted", "wipefs", "passwd", "useradd", "userdel",
+    "iptables", "nft", "ifconfig", "ip",
+})
+
+
+def _validate_shell_executable(path: str) -> str:
+    if path not in ALLOWED_SHELL_PATHS:
+        raise PermissionError(f"Shell executable {path!r} is not in allowed set")
+    return path
+
+
+def _validate_shell_command(command: str) -> str:
+    if not command or not command.strip():
+        raise PermissionError("Empty shell command")
+    try:
+        parts = shlex.split(command)
+    except ValueError as exc:
+        raise PermissionError(f"Cannot parse shell command: {exc}") from exc
+    if not parts:
+        raise PermissionError("Empty shell command")
+    cmd_name = parts[0].rsplit("/", 1)[-1]
+    family_root = cmd_name.split(".", 1)[0]
+    if cmd_name in BLOCKED_SHELL_COMMANDS or family_root in BLOCKED_SHELL_COMMANDS:
+        raise PermissionError(f"Command {cmd_name!r} is in blocked set")
+    if cmd_name not in ALLOWED_SHELL_COMMANDS:
+        raise PermissionError(f"Command {cmd_name!r} is not in the allowed set")
+    return cmd_name
+
+
+def _validate_shell_cwd(cwd: Path, project_root: Path | None = None) -> Path:
+    resolved = Path(cwd).resolve()
+    allowed_roots: list[Path] = [Path("/tmp").resolve()]
+    if project_root is not None:
+        allowed_roots.append(Path(project_root).resolve())
+    for root in allowed_roots:
+        if resolved == root or root in resolved.parents:
+            return resolved
+    raise PermissionError(f"Working directory {resolved} is outside allowed roots")
+
+
+def _get_shell_timeout() -> float:
+    raw = os.environ.get("SEAM_SHELL_TIMEOUT_SECONDS")
+    if raw is None:
+        return 10.0
+    try:
+        return float(raw)
+    except ValueError:
+        return 10.0
 
 
 @dataclass
@@ -1343,22 +1416,32 @@ if (
                 raise PermissionError(
                     "Shell execution is disabled by default; set SEAM_DASHBOARD_ALLOW_SHELL=1 to enable subprocess commands."
                 )
-            timeout_seconds = float(os.environ.get("SEAM_SHELL_TIMEOUT_SECONDS", "45"))
+
+            _validate_shell_command(command)
+
+            project_root = Path(__file__).parent.parent.resolve()
+            cwd = _validate_shell_cwd(Path(self.shell_cwd), project_root=project_root)
+
+            timeout_seconds = _get_shell_timeout()
+
             if os.name == "nt":
+                LOGGER.info("Executing shell command: %s", command)
                 return subprocess.run(
                     ["powershell", "-NoLogo", "-NoProfile", "-Command", command],
                     capture_output=True,
                     text=True,
-                    cwd=self.shell_cwd,
+                    cwd=str(cwd),
                     timeout=timeout_seconds,
                     check=False,
                 )
-            shell_executable = os.environ.get("SHELL", "/bin/bash")
+
+            shell_executable = _validate_shell_executable(os.environ.get("SHELL", "/bin/bash"))
+            LOGGER.info("Executing shell command: %s", command)
             return subprocess.run(
                 [shell_executable, "-lc", command],
                 capture_output=True,
                 text=True,
-                cwd=self.shell_cwd,
+                cwd=str(cwd),
                 timeout=timeout_seconds,
                 check=False,
             )

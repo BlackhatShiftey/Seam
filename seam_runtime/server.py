@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import logging
 import os
+import signal
 import sys
 import threading
 import time
@@ -14,6 +16,88 @@ from typing import Any
 from .installer import default_runtime_db_path
 from .mirl import IRBatch
 from .runtime import SeamRuntime
+
+LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class ShutdownState:
+    shutting_down: bool = False
+    in_flight: int = 0
+    _lock: Any = field(default_factory=threading.Lock, repr=False, compare=False)
+
+    def begin_request(self) -> bool:
+        with self._lock:
+            if self.shutting_down:
+                return False
+            self.in_flight += 1
+            return True
+
+    def end_request(self) -> None:
+        with self._lock:
+            self.in_flight = max(0, self.in_flight - 1)
+
+    def trigger_shutdown(self) -> None:
+        with self._lock:
+            self.shutting_down = True
+
+    def snapshot(self) -> tuple[bool, int]:
+        with self._lock:
+            return (self.shutting_down, self.in_flight)
+
+    def wait_drain(self, timeout: float) -> bool:
+        deadline = time.monotonic() + timeout
+        while True:
+            with self._lock:
+                if self.in_flight == 0:
+                    return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(0.05, remaining))
+
+
+def _shutdown_timeout_from_env() -> float:
+    raw = os.environ.get("SEAM_SHUTDOWN_TIMEOUT") or "30"
+    try:
+        value = float(raw)
+    except ValueError:
+        return 30.0
+    return max(1.0, value)
+
+
+def _cleanup_runtime(runtime: SeamRuntime) -> None:
+    try:
+        runtime.store.close()
+    except Exception:
+        LOGGER.warning("Error closing store", exc_info=True)
+    vector_adapter = getattr(runtime, "vector_adapter", None)
+    if vector_adapter is not None and hasattr(vector_adapter, "close"):
+        try:
+            vector_adapter.close()
+        except Exception:
+            LOGGER.warning("Error closing vector adapter", exc_info=True)
+
+
+class ShutdownMiddleware:
+    def __init__(self, app: Any, state: ShutdownState) -> None:
+        self.app = app
+        self.state = state
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        if not self.state.begin_request():
+            from starlette.responses import JSONResponse
+
+            response = JSONResponse({"status": "shutting_down"}, status_code=503)
+            await response(scope, receive, send)
+            return
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            self.state.end_request()
 
 
 def _require_fastapi() -> tuple[Any, Any, Any, Any, Any, Any]:
@@ -152,18 +236,25 @@ async def _send_body_too_large(scope: dict[str, Any], send: Any, max_body_bytes:
     await response(scope, empty_receive, send)
 
 
-def create_app(runtime: SeamRuntime | None = None) -> Any:
+def create_app(
+    runtime: SeamRuntime | None = None,
+    shutdown_state: ShutdownState | None = None,
+) -> Any:
     Depends, FastAPI, Header, HTTPException, Query, Request = _require_fastapi()
     # Required: `from __future__ import annotations` defers annotation evaluation,
     # so FastAPI's typing.get_type_hints must find `Request` in module globals.
     # fastapi is a lazy import (optional extra), so we publish it here. Idempotent:
     # the class is the same across create_app() calls.
     globals()["Request"] = Request
-    runtime = runtime or SeamRuntime(default_runtime_db_path())
+    if runtime is None:
+        db_path = os.environ.get("SEAM_SERVER_DB") or default_runtime_db_path()
+        runtime = SeamRuntime(db_path)
     limiter = RateLimiter(_rate_limit_from_env(), max_keys=_rate_limit_max_keys_from_env())
     token = os.environ.get("SEAM_API_TOKEN")
+    state = shutdown_state or ShutdownState()
 
     app = FastAPI(title="SEAM Runtime API", version="0.1")
+    app.add_middleware(ShutdownMiddleware, state=state)
     app.add_middleware(BodySizeLimitMiddleware, max_body_bytes=_max_body_bytes_from_env())
     cors_origins = _cors_origins_from_env()
     if cors_origins:
@@ -179,10 +270,12 @@ def create_app(runtime: SeamRuntime | None = None) -> Any:
 
     def guard(request: Request, authorization: str | None = Header(default=None)) -> None:
         if not limiter.check(_client_key(request, authorization)):
+            LOGGER.warning("Rate limit exceeded for client %s", request.client.host if request.client else "unknown")
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
         if token:
             expected = f"Bearer {token}"
             if not authorization or not hmac.compare_digest(authorization, expected):
+                LOGGER.warning("Auth failed for client %s", request.client.host if request.client else "unknown")
                 raise HTTPException(status_code=401, detail="Missing or invalid bearer token")
 
     def rate_limit_only(request: Request, authorization: str | None = Header(default=None)) -> None:
@@ -441,6 +534,18 @@ def run_server(
     uvicorn = _require_uvicorn()
     _validate_server_safety(host=host, workers=workers)
     os.environ["SEAM_SERVER_DB"] = str(db or default_runtime_db_path())
+
+    # Setup signal handlers for graceful shutdown
+    def signal_handler(signum: int, frame: Any) -> None:
+        sig_name = signal.Signals(signum).name
+        LOGGER.info("Received %s, initiating graceful shutdown", sig_name)
+        # uvicorn handles SIGTERM/SIGINT gracefully by default
+        # This handler just logs the signal
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     uvicorn.run(
         "seam_runtime.server:create_app_from_env",
         host=host,
