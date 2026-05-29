@@ -1,0 +1,66 @@
+{
+  "dataset": "LoCoMo",
+  "file": "locomo10.json",
+  "source_url": "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json",
+  "upstream_repo": "https://github.com/snap-research/locomo",
+  "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4",
+  "size_bytes": 2805274,
+  "sample_count": 10,
+  "qa_pair_count": 1986,
+  "category_counts": {
+    "1": 282,
+    "2": 321,
+    "3": 96,
+    "4": 841,
+    "5": 446
+  },
+  "samples": [
+    {
+      "sample_id": "conv-26",
+      "qa_count": 199
+    },
+    {
+      "sample_id": "conv-30",
+      "qa_count": 105
+    },
+    {
+      "sample_id": "conv-41",
+      "qa_count": 193
+    },
+    {
+      "sample_id": "conv-42",
+      "qa_count": 260
+    },
+    {
+      "sample_id": "conv-43",
+      "qa_count": 242
+    },
+    {
+      "sample_id": "conv-44",
+      "qa_count": 158
+    },
+    {
+      "sample_id": "conv-47",
+      "qa_count": 190
+    },
+    {
+      "sample_id": "conv-48",
+      "qa_count": 239
+    },
+    {
+      "sample_id": "conv-49",
+      "qa_count": 196
+    },
+    {
+      "sample_id": "conv-50",
+      "qa_count": 204
+    }
+  ],
+  "note": "sample_id labels differ across LoCoMo releases; this release's conv-30 == an earlier release's conv-26 (Jon/Gina). Content/QA verified identical to the dataset that produced the HISTORY#242 baseline (103/104 fragment-question match).",
+  "restore_order": [
+    "benchmarks/external/locomo/data/locomo10.json (in-repo, committed)",
+    "/media/terrabyte/T7/Proprietary/Projects-All/Seam/.dataset_store/locomo/locomo10.json (T7 durable)",
+    "source_url (network)"
+  ],
+  "retrieved_utc": "2026-05-29T15:40:54Z"
+}

@@ -5784,3 +5784,29 @@ Verification: .venv/bin/python -m pytest passed 912 with 0 failures (plus the pg
 
 Next step: ship the remaining audit-remediation items as focused follow-ups (S1 shell argv execution is the highest-value security one), port the durable-archive treatment to beam/longmemeval runners, and resume audit #3 retrieval scoring once the operator restores the LoCoMo dataset and picks the flag-gated-vs-wait path.
 ---END-ENTRY-#270---
+
+---BEGIN-ENTRY-#271---
+id: 271
+date: 2026-05-29T15:52:57Z
+agent: claude
+status: done
+topics: benchmark, locomo, recovery, infra, verify, audit
+commits: pending
+refs: benchmarks/external/locomo/data/locomo10.json,benchmarks/external/locomo/data/locomo10.manifest.json,tools/benchmarks/restore_locomo.py
+supersedes: 270
+tokens: 1049
+---
+LoCoMo dataset recovery + no-paid baseline reproduction + permanent anti-loss safeguards (operator-critical: the benchmark dataset had been lost). Prior state: locomo10.json and ~/seam_benchmarks/ were absent from disk and recorded in HISTORY#269/#270 as the blocker gating audit #3. Root cause: the dataset lived only on the near-full root volume (/, ext4, 90% used / 23G free), never on T7; an operator mount operation removed it. T7 itself was mounted and healthy throughout (exfat, 872G free, repo accessible).
+
+Recovery: re-acquired the canonical dataset from snap-research/locomo (data/locomo10.json) — sha256 79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4, 2805274 bytes, 10 conversations, 1986 QA pairs. Verified authenticity against the two surviving fragments (benchmarks/external/locomo/fixtures/quickstart.json and a conv-26 fragment in a sibling tree): this release relabels sample_ids (this release's conv-30 == the prior release's conv-26, speakers Jon/Gina) but the underlying content is identical — 103/104 fragment questions matched, the one miss being a quote-escaping artifact, not a content difference.
+
+Permanent safeguards (defense-in-depth so this cannot silently recur): (1) committed the dataset in-repo at benchmarks/external/locomo/data/locomo10.json so it lives on T7 and offsite via the private GitHub repo; (2) benchmarks/external/locomo/data/locomo10.manifest.json pins source URL, sha256, byte size, and sample/QA/category counts; (3) tools/benchmarks/restore_locomo.py restores and SHA-verifies from in-repo copy -> T7 durable copy (.dataset_store/locomo/) -> canonical network, with --verify / --ensure / --to; (4) sha-verified durable copies placed on T7 (.dataset_store/locomo/) and the /home working path. Per operator decision, the canonical dataset is relocated off the cramped root volume onto T7 (the repo drive).
+
+Verification (no-paid): ran the 100-case no-paid slice (--answerer none --judge none, local BAAI/bge-small-en-v1.5 embeddings from HF cache, SQLite vector backend) -> context_recall_mean = 0.528308, an exact match to the HISTORY#242 baseline 0.5283084138. This proves byte-identity of the restored data, an intact harness, AND SQLite-vector == pgvector equivalence for this workload (the no-paid path no longer requires the Docker pgvector service; the docker daemon was down this session and the run still reproduced the baseline). Run archived durably to benchmarks/runs/locomo/20260529_104615_seam_100cases_judge-none.json. Accuracy note: only the AGGREGATE is claimed reproduced. The per-category breakdown in docs/audits/2026-05-28-locomo-retrieval-memory.md line 5 (cat1=.374/cat2=.634/cat3=.242/cat4=.605) weight-sums to ~0.4946 == the older 0.4947 run, not 0.528, so that breakdown is stale/mislabeled; the correct k=20 breakdown from this run is cat1=.359 (n=32) / cat2=.650 (n=37) / cat3=.250 (n=13) / cat4=.778 (n=18). Flagged for later doc correction, not edited here. Also cleared 23 stale mislabeled per-scope DBs from test_seam/locomo/ (untracked, regenerable) that held prior-release sample_id labels and would silently mis-retrieve under --keep-db on the default --db-path (run.py:267) — the exact silent-wrong-data failure class to avoid.
+
+Not in this slice: the full ~1542-case judged LoCoMo run remains paid and operator-gated, and per the audit should follow the retrieval-scoring fixes (audit #3 / P0-1 + P0-2) rather than re-measure the 0.528 plateau. audit #3 is now UNBLOCKED (dataset restored) but deliberately not started here.
+
+No paid API calls. No provider session URLs, API keys, or local .env / pgvector DSN values written into commits, snapshots, or this entry.
+
+Next step: operator to decide whether to land the audit #3 retrieval-scoring fixes (now unblocked) before authorizing the paid full judged run; optionally correct the stale per-category breakdown in docs/audits/2026-05-28-locomo-retrieval-memory.md. Track K (Trust/Security + BIL) remains gated on benchmarks being fully functional — the no-paid LoCoMo baseline is now restored, reproducible, and self-contained.
+---END-ENTRY-#271---

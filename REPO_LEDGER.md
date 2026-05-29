@@ -211,3 +211,13 @@ Published benchmark statements must include:
 - holdout result bundle when the statement is an external or publication claim
 
 Holdout benchmark fixtures live under `benchmarks/fixtures/holdout/` and are ignored by git by default. They must be run only with `seam benchmark run --holdout --confirm-holdout`, and default holdout result bundles are written separately under `benchmarks/runs/holdout/`.
+
+## Benchmark Dataset Integrity Policy
+
+The LoCoMo dataset was once lost because it lived only on the near-full root volume (`/`). To prevent silent recurrence, benchmark source datasets follow defense-in-depth:
+
+- The canonical LoCoMo dataset is committed in-repo at `benchmarks/external/locomo/data/locomo10.json` (so it lives on T7 and offsite via the private GitHub repo), never only on the root volume.
+- `benchmarks/external/locomo/data/locomo10.manifest.json` pins the source URL, SHA256, byte size, and sample/QA/category counts. Treat the SHA256 as the integrity authority — LoCoMo releases reuse `sample_id` labels across different content, so verify by hash, not by label.
+- `python -m tools.benchmarks.restore_locomo` restores and SHA-verifies the dataset from, in priority order: the in-repo copy → the T7 durable copy (`.dataset_store/locomo/`) → the canonical network source. Use `--verify` before any run, `--ensure` to repair all standard locations, `--to <path>` for a specific target.
+- The no-paid LoCoMo path (`--answerer none --judge none`) runs self-contained on the local `SQLiteVectorAdapter` with local `BAAI/bge-small-en-v1.5` embeddings; it does NOT require the Docker pgvector service. SQLite-vector and pgvector are score-equivalent for this workload (verified: both reproduce `context_recall_mean=0.528308`).
+- `--keep-db` reuses per-scope SQLite DBs by `sample_id`; never reuse DBs ingested from a different dataset release on the same `--db-path`, or retrieval silently reads the wrong conversation. Use a fresh `--db-path` when the dataset version changes.

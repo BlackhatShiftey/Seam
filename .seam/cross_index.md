@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 325
+total_events: 326
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-29T15:40:45Z | history:105:c92f861c | session-event | done | dashboard, tui, status, verify, history, snapshot | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/da... |
 | 2026-04-29T23:38:09Z | history:106:2890c852 | session-event | done | dashboard, tui, textual, verify, status, history, snapshot | seam_runtime/dashboard.py,seam_runtime/storage.py,seam_runtime/lossless.py,te... |
 | 2026-04-29T23:44:01Z | history:107:5c4f3f1f | session-event | done | dashboard, tui, verify, status, history, snapshot | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,PROJECT_STATUS.md,seam_runtime/da... |
 | 2026-04-29T23:46:56Z | history:108:a4b035eb | session-event | done | dashboard, tui, textual, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snap... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-28T05:22:24Z | history:268:d817ea8f | session-event | done | bugfix, hardening, security, storage, multi-agent, protoc... | seam_runtime/storage.py,seam_runtime/server.py,seam_runtime/dashboard.py,seam... |
 | 2026-05-29T00:42:30Z | history:269:4b1818d8 | session-event | done | bugfix, storage, benchmark, security, retrieval, audit, v... | seam_runtime/pool.py,seam_runtime/benchmark_integrity.py,seam_runtime/cli.py,... |
 | 2026-05-29T07:28:25Z | history:270:9ef6f8de | session-event | done | bugfix, storage, security, audit, verify | seam_runtime/pool.py,seam_runtime/storage.py,tests/audit/test_pool_concurrenc... |
+| 2026-05-29T15:52:57Z | history:271:c925b3b4 | session-event | done | benchmark, locomo, recovery, infra, verify, audit | benchmarks/external/locomo/data/locomo10.json,benchmarks/external/locomo/data... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0125.cross.md | 2026-04-15T00:00:00Z..2026-04-29T15:35:06Z | 125 | (multi) | (multi) |
+| 0001-0126.cross.md | 2026-04-15T00:00:00Z..2026-04-29T15:40:45Z | 126 | (multi) | (multi) |
