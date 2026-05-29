@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from .mirl import IRBatch, MIRLRecord, Pack, PersistReport, RecordKind, SYMBOL_FOR_KIND, TraceGraph, utc_now
 from .pool import ConnectionPool
+from .retry import retry_db_operation
 
 
 class SQLiteStore:
@@ -483,6 +484,7 @@ class SQLiteStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    @retry_db_operation()
     def persist_ir(self, batch: IRBatch) -> PersistReport:
         with self._pool.checkout() as connection:
             for record in batch.records:
@@ -510,6 +512,7 @@ class SQLiteStore:
             connection.commit()
         return PersistReport(stored_ids=[record.id for record in batch.records], store_path=self.path)
 
+    @retry_db_operation()
     def upsert_document_status(
         self,
         *,
@@ -683,6 +686,7 @@ class SQLiteStore:
             records = [by_id[record_id] for record_id in ids if record_id in by_id]
         return IRBatch(records)
 
+    @retry_db_operation()
     def delete_ir(self, ids: list[str], include_vectors: bool = True) -> None:
         if not ids:
             return
@@ -1067,6 +1071,7 @@ class SQLiteStore:
             for row in rows
         ]
 
+    @retry_db_operation()
     def write_retrieval_event(
         self,
         *,
@@ -1207,6 +1212,7 @@ class SQLiteStore:
     # AGENTS.md / REPO_LEDGER.md / PROJECT_STATUS.md from this surface; the
     # gate is operator approval recorded here.
 
+    @retry_db_operation()
     def write_improvement_proposal(
         self,
         *,
@@ -1264,6 +1270,7 @@ class SQLiteStore:
             connection.commit()
         return proposal_id
 
+    @retry_db_operation()
     def record_proposal_decision(
         self,
         *,

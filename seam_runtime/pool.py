@@ -48,76 +48,105 @@ class ConnectionPool:
         except Exception:
             LOGGER.warning("Error closing connection", exc_info=True)
 
-    @contextmanager
-    def checkout(self):
-        if self._closed:
-            raise RuntimeError("ConnectionPool is closed")
-
-        connection = None
-
+    def _drop(self, connection: sqlite3.Connection) -> None:
+        """Close a connection and account for it leaving the pool."""
+        self._close_connection(connection)
         with self._lock:
-            while not self._pool.empty():
-                try:
-                    conn, last_used = self._pool.get_nowait()
-                    idle_time = time.time() - last_used
+            self._active_count -= 1
 
-                    if idle_time > self.idle_timeout:
-                        LOGGER.debug("Closing idle connection (idle %.1fs)", idle_time)
+    def _acquire(self) -> sqlite3.Connection:
+        # Validation (a SQL round-trip) is done OUTSIDE the lock so one slow or
+        # hung connection check cannot serialize every other checkout.
+        deadline = time.time() + self.checkout_timeout
+        while True:
+            candidate: sqlite3.Connection | None = None
+            created = False
+            with self._lock:
+                while not self._pool.empty():
+                    try:
+                        conn, last_used = self._pool.get_nowait()
+                    except queue.Empty:
+                        break
+                    if time.time() - last_used > self.idle_timeout:
+                        LOGGER.debug("Closing idle connection")
                         self._close_connection(conn)
                         self._active_count -= 1
                         continue
-
-                    if not self._validate_connection(conn):
-                        self._close_connection(conn)
-                        self._active_count -= 1
-                        continue
-
-                    connection = conn
+                    candidate = conn
                     break
-                except queue.Empty:
-                    break
+                if candidate is None and self._active_count < self.pool_size:
+                    candidate = self._connect_factory()
+                    self._active_count += 1
+                    created = True
 
-            if connection is None and self._active_count < self.pool_size:
-                connection = self._connect_factory()
-                self._active_count += 1
+            if candidate is not None:
+                # Freshly created connections are valid by construction; pooled
+                # ones are validated off-lock and discarded+retried if stale.
+                if created or self._validate_connection(candidate):
+                    return candidate
+                self._drop(candidate)
+                continue
 
-        if connection is None:
+            # Pool exhausted: block for a returned connection, then validate it
+            # too (the fast path is not the only way to get a dead connection).
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"Could not acquire connection within {self.checkout_timeout}s "
+                    f"(pool_size={self.pool_size}, active={self._active_count})"
+                )
             try:
-                conn, _ = self._pool.get(timeout=self.checkout_timeout)
-                connection = conn
+                conn, _ = self._pool.get(timeout=remaining)
             except queue.Empty:
                 raise TimeoutError(
                     f"Could not acquire connection within {self.checkout_timeout}s "
                     f"(pool_size={self.pool_size}, active={self._active_count})"
                 )
+            if self._validate_connection(conn):
+                return conn
+            self._drop(conn)
+            # loop: a slot is now free, so the next pass can create a fresh one
 
+    def _release(self, connection: sqlite3.Connection) -> None:
+        if self._closed:
+            self._drop(connection)
+            return
+        # Reset on return: discard any uncommitted transaction before the
+        # connection re-enters the pool. SQLite uses implicit transactions
+        # (isolation_level=""), so a write that raised after the first statement
+        # but before commit() would leave an open transaction; without this
+        # rollback the next caller to reuse this connection would commit those
+        # orphaned rows. Done OUTSIDE the lock (it is a SQL round-trip).
+        try:
+            connection.rollback()
+        except sqlite3.Error:
+            LOGGER.warning("Connection unusable on return, discarding", exc_info=True)
+            self._drop(connection)
+            return
+        with self._lock:
+            if self._closed:
+                self._active_count -= 1
+                should_close = True
+            else:
+                try:
+                    self._pool.put_nowait((connection, time.time()))
+                    should_close = False
+                except queue.Full:
+                    LOGGER.warning("Pool is full, closing excess connection")
+                    self._active_count -= 1
+                    should_close = True
+        if should_close:
+            self._close_connection(connection)
+
+    @contextmanager
+    def checkout(self):
+        if self._closed:
+            raise RuntimeError("ConnectionPool is closed")
+        connection = self._acquire()
         try:
             yield connection
         finally:
-            with self._lock:
-                if self._closed:
-                    self._close_connection(connection)
-                    self._active_count -= 1
-                else:
-                    # Reset on return: discard any uncommitted transaction before
-                    # the connection re-enters the pool. SQLite uses implicit
-                    # transactions (isolation_level=""), so a write that raised
-                    # after the first statement but before commit() would leave an
-                    # open transaction; without this rollback the next caller to
-                    # check out this connection would commit those orphaned rows.
-                    try:
-                        connection.rollback()
-                        self._pool.put_nowait((connection, time.time()))
-                    except queue.Full:
-                        LOGGER.warning("Pool is full, closing excess connection")
-                        self._close_connection(connection)
-                        self._active_count -= 1
-                    except sqlite3.Error:
-                        LOGGER.warning(
-                            "Connection unusable on return, discarding", exc_info=True
-                        )
-                        self._close_connection(connection)
-                        self._active_count -= 1
+            self._release(connection)
 
     def close(self) -> None:
         with self._lock:
