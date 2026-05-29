@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 269
-total_tokens: ~81028
-latest_id: 269
+total_entries: 270
+total_tokens: ~81891
+latest_id: 270
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 270 | 2026-05-29 | done | 9ef6f8decc6b4aa9 | bugfix,storage,security,audit,+ | 269 |
 | 269 | 2026-05-29 | done | 4b1818d82ebfc2b6 | bugfix,storage,benchmark,security,+ | 268 |
 | 268 | 2026-05-28 | done | d817ea8f3ea398da | bugfix,hardening,security,storage,+ | 267 |
 | 267 | 2026-05-27 | done | 853c550371931ce4 | bugfix,storage,retrieval,docs,+ | 266 |
@@ -286,10 +287,10 @@ compact: true
 - alias: count=2 latest=#033, #002
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
-- audit: count=62 latest=#269, #268, #244, #229, #227
+- audit: count=63 latest=#270, #269, #268, #244, #229
 - beam: count=1 latest=#223
 - benchmark: count=84 latest=#269, #266, #265, #262, #254
-- bugfix: count=4 latest=#269, #268, #267, #234
+- bugfix: count=5 latest=#270, #269, #268, #267, #234
 - bundle: count=5 latest=#262, #245, #238, #015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
@@ -349,11 +350,11 @@ compact: true
 - salvage: count=1 latest=#179
 - sbert: count=3 latest=#023, #022, #011
 - search: count=15 latest=#242, #240, #181, #154, #088
-- security: count=33 latest=#269, #268, #264, #263, #253
+- security: count=34 latest=#270, #269, #268, #264, #263
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - status: count=115 latest=#264, #263, #261, #260, #259
-- storage: count=4 latest=#269, #268, #267, #182
+- storage: count=5 latest=#270, #269, #268, #267, #182
 - streams: count=7 latest=#216, #210, #209, #202, #201
 - surface: count=4 latest=#225, #218, #208, #145
 - test: count=4 latest=#223, #222, #219, #202
@@ -362,7 +363,7 @@ compact: true
 - tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=200 latest=#269, #268, #267, #266, #265
+- verify: count=201 latest=#270, #269, #268, #267, #266
 - webui: count=1 latest=#267
 - windows: count=19 latest=#261, #260, #259, #258, #257
 - wsl2: count=1 latest=#021
@@ -370,6 +371,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 247
+- done: 248
 - in-progress: 2
 - planned: 20

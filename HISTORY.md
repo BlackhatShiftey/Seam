@@ -5760,3 +5760,27 @@ Verification: .venv/bin/python -m pytest passed 905 with 0 failures; the 3 pgvec
 
 Next step: operator to choose the #3 path (flag-gated-now-then-measure vs wait-for-dataset-then-measure) and restore locomo10.json to ~/seam_benchmarks/track_m/locomo/ to unblock both #3 and validating durable saves on a real full run; apply the same durable-archive treatment to beam/longmemeval runners; commit this slice through the canonical pre-commit hook.
 ---END-ENTRY-#269---
+
+---BEGIN-ENTRY-#270---
+id: 270
+date: 2026-05-29T07:28:25Z
+agent: claude
+status: done
+topics: bugfix, storage, security, audit, verify
+commits: pending
+refs: seam_runtime/pool.py,seam_runtime/storage.py,tests/audit/test_pool_concurrency.py
+supersedes: 269
+tokens: 863
+---
+SQLite concurrency-layer hardening: the deferred pool/retry follow-ups from the 2026-05-28 deep health audit (docs/audits/2026-05-28-deep-health-audit.md findings F2/F3/F4), continuing the connection-pool work from HISTORY#269. Prior state: HISTORY#269 landed the reset-on-return rollback (P1) but explicitly deferred the pool validation/retry items; pool validation ran under the global lock and the blocking-get path returned unvalidated connections; retry.py existed but was wired to nothing.
+
+seam_runtime/pool.py (F3 + F4): split checkout() into _acquire() / _release() so connection validation (a SQL round-trip) happens OUTSIDE the global lock. _acquire pops or creates a candidate under the lock, then validates off-lock; a stale pooled connection is closed and the loop retries; freshly created connections skip validation (valid by construction). The blocking-exhaustion path now also validates the connection it gets from the queue and discards+retries a dead one instead of handing it back (F4). _release rolls back off-lock (reset-on-return preserved from #269), then re-pools or closes under the lock; the closed-pool and queue-full paths both decrement active_count. Net effect: one slow/hung validation no longer serializes all checkouts, and the blocking path can no longer return a dead connection under load.
+
+seam_runtime/storage.py (F2): wired the previously-dead retry_db_operation decorator onto the six SQLite write methods (persist_ir, upsert_document_status, delete_ir, write_retrieval_event, write_improvement_proposal, record_proposal_decision). retry_db_operation only retries sqlite3.OperationalError whose message contains "database is locked" or "cannot commit" (exponential backoff, 5 attempts); non-transient errors such as IntegrityError propagate immediately and unchanged. This is safe alongside the #269 reset-on-return: a transient failure rolls the connection back clean before the next attempt re-checks-out, so retries never compound partial writes.
+
+Scope held deliberately to the concurrency layer. NOT in this slice (tracked for follow-up): audit S1 (dashboard shell runs bash -lc <raw string>, allowlist bypassable via shell operators — execute argv directly instead), F5 (orphan-edge sweep misses span:/pack: prefixes), B5 (run.py vs audit.py fixture_hash divergence), B6 (benchmark determinism: seeds + rounded floats + stable bundle_hash), beam/longmemeval durable-archive port, and audit #3 (retrieval scoring) which remains gated on restoring locomo10.json to ~/seam_benchmarks/track_m/locomo/ and a measured dev-slice run.
+
+Verification: .venv/bin/python -m pytest passed 912 with 0 failures (plus the pgvector real-adapter tests in tests/audit/test_pgvector_pk_composite.py, run separately against the live container, all three passing, so 915 with pgvector up and 0 skipped); the pgvector real-adapter tests ran against an ephemeral docker compose seam-pgvector container (PGVECTOR_TEST_DSN set, healthcheck reached healthy) and the container/volume/network were stopped and removed afterward with port 55432 confirmed released. New tests: tests/audit/test_pool_concurrency.py (9 tests covering concurrent writers commit correctly under a 3-connection pool, exhaustion TimeoutError, stale pooled connection replaced via off-lock validation, blocking-path validation, idle eviction, write methods are retry-wrapped, transient lock retries then succeeds, non-transient error not retried). Existing test_pool_rollback / test_retry / test_storage_lifecycle / test_h2_improvement_review remain green. No paid API calls. No provider session URLs, API keys, or local .env values written into commits, snapshots, or this entry.
+
+Next step: ship the remaining audit-remediation items as focused follow-ups (S1 shell argv execution is the highest-value security one), port the durable-archive treatment to beam/longmemeval runners, and resume audit #3 retrieval scoring once the operator restores the LoCoMo dataset and picks the flag-gated-vs-wait path.
+---END-ENTRY-#270---
