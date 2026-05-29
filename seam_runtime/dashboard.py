@@ -126,13 +126,15 @@ DEFAULT_CHAT_MODELS = [
 ]
 
 
-ALLOWED_SHELL_PATHS: frozenset[str] = frozenset({
-    "/bin/bash",
-    "/bin/sh",
-    "/bin/zsh",
-    "/usr/bin/bash",
-    "/usr/bin/sh",
-    "/usr/bin/zsh",
+# Tokens that look like shell control operators. The dashboard shell executes
+# commands with shell=False (see _run_shell_subprocess), so these can never
+# chain, redirect, or substitute regardless — but we reject the spaced forms up
+# front to give the operator a clear error instead of a confusing literal-arg
+# run. The security boundary is shell=False, not this list.
+_SHELL_OPERATOR_TOKENS: frozenset[str] = frozenset({
+    "&&", "||", ";", "|", "&", "|&",
+    ">", ">>", "<", "<<", "<<<", "2>", "2>>", "&>",
+    "`", "$(",
 })
 
 ALLOWED_SHELL_COMMANDS: frozenset[str] = frozenset({
@@ -151,28 +153,31 @@ BLOCKED_SHELL_COMMANDS: frozenset[str] = frozenset({
 })
 
 
-def _validate_shell_executable(path: str) -> str:
-    if path not in ALLOWED_SHELL_PATHS:
-        raise PermissionError(f"Shell executable {path!r} is not in allowed set")
-    return path
+def _validate_shell_command(command: str) -> list[str]:
+    """Parse, validate, and return the argv to run shell-free.
 
-
-def _validate_shell_command(command: str) -> str:
+    The returned list is executed directly with ``shell=False`` so no operator
+    chaining, redirection, or command substitution is ever interpreted. We also
+    reject spaced shell-operator tokens here for a clear up-front error.
+    """
     if not command or not command.strip():
         raise PermissionError("Empty shell command")
     try:
-        parts = shlex.split(command)
+        argv = shlex.split(command)
     except ValueError as exc:
         raise PermissionError(f"Cannot parse shell command: {exc}") from exc
-    if not parts:
+    if not argv:
         raise PermissionError("Empty shell command")
-    cmd_name = parts[0].rsplit("/", 1)[-1]
+    for token in argv:
+        if token in _SHELL_OPERATOR_TOKENS:
+            raise PermissionError(f"Shell operator {token!r} is not allowed")
+    cmd_name = argv[0].rsplit("/", 1)[-1]
     family_root = cmd_name.split(".", 1)[0]
     if cmd_name in BLOCKED_SHELL_COMMANDS or family_root in BLOCKED_SHELL_COMMANDS:
         raise PermissionError(f"Command {cmd_name!r} is in blocked set")
     if cmd_name not in ALLOWED_SHELL_COMMANDS:
         raise PermissionError(f"Command {cmd_name!r} is not in the allowed set")
-    return cmd_name
+    return argv
 
 
 def _validate_shell_cwd(cwd: Path, project_root: Path | None = None) -> Path:
@@ -1417,33 +1422,26 @@ if (
                     "Shell execution is disabled by default; set SEAM_DASHBOARD_ALLOW_SHELL=1 to enable subprocess commands."
                 )
 
-            _validate_shell_command(command)
+            argv = _validate_shell_command(command)
 
             project_root = Path(__file__).parent.parent.resolve()
             cwd = _validate_shell_cwd(Path(self.shell_cwd), project_root=project_root)
 
             timeout_seconds = _get_shell_timeout()
 
-            if os.name == "nt":
-                LOGGER.info("Executing shell command: %s", command)
-                return subprocess.run(
-                    ["powershell", "-NoLogo", "-NoProfile", "-Command", command],
-                    capture_output=True,
-                    text=True,
-                    cwd=str(cwd),
-                    timeout=timeout_seconds,
-                    check=False,
-                )
-
-            shell_executable = _validate_shell_executable(os.environ.get("SHELL", "/bin/bash"))
-            LOGGER.info("Executing shell command: %s", command)
+            # Execute shell-free: no shell is spawned, so the validated argv is
+            # passed verbatim and operator chaining / redirection / command
+            # substitution is structurally impossible. This is the security
+            # boundary for the off-by-default dashboard shell.
+            LOGGER.info("Executing shell command (shell-free): %s", command)
             return subprocess.run(
-                [shell_executable, "-lc", command],
+                argv,
                 capture_output=True,
                 text=True,
                 cwd=str(cwd),
                 timeout=timeout_seconds,
                 check=False,
+                shell=False,
             )
 
         def _route_command_output(self, command: str, title: str, body: str) -> None:

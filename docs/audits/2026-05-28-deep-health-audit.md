@@ -138,6 +138,16 @@ uncovered area given the "rival the best memory frameworks" goal.
   baseline can't be reproduced. Changing fusion blind is the exact regression
   trap the audit warns about (HISTORY#240: 0.495→0.461). Land behind a default-off
   flag and flip only after a measured dev-slice run once the dataset is restored.
+- **S1 (High; Critical when `SEAM_DASHBOARD_ALLOW_SHELL=1`) — FIXED (HISTORY#272).**
+  `dashboard.py` now executes the validated `argv` directly with `shell=False`
+  instead of `[shell, "-lc", <raw string>]`, so operator chaining / redirection /
+  command substitution is structurally impossible — not a denylist. `_validate_shell_command`
+  parses once, rejects spaced shell-operator tokens up front, and returns the exact
+  argv that runs. The dead `$SHELL` allowlist (`_validate_shell_executable` /
+  `ALLOWED_SHELL_PATHS`) is removed since no shell is invoked. Regression: the audit
+  PoC payloads in `tests/audit/test_shell_security.py::TestShellInjectionRejected`
+  plus `test_command_substitution_not_expanded` (writes a real secret, proves
+  `echo $(cat secret)` returns literal text and never leaks it).
 
 ## 5. Things to watch
 - **CI `--timeout` trap:** `pytest --timeout=600` errors out ("unrecognized argument";
