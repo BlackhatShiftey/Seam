@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import hmac
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 BUNDLE_VERSION = "SEAM-BENCHMARK-BUNDLE/1"
+SIGNATURE_ALGO = "HMAC-SHA256"
+SIGNING_KEY_ENV = "SEAM_BENCHMARK_SIGNING_KEY"
 INPUT_MANIFEST_VERSION = "SEAM-BENCHMARK-INPUT-MANIFEST/1"
 SUPPORTED_BIL_LEVELS = {"BIL-0", "BIL-1", "BIL-2"}
 VOLATILE_RESULT_HASH_KEYS = {
@@ -113,8 +117,41 @@ def build_input_manifest(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _signing_key_from_env() -> bytes | None:
+    raw = os.environ.get(SIGNING_KEY_ENV)
+    if raw is None or raw == "":
+        return None
+    return raw.encode("utf-8")
+
+
+def _bundle_signature(bil_block: dict[str, Any], key: bytes) -> str:
+    """HMAC-SHA256 over the canonical BIL block (level + result/manifest hashes).
+
+    Signing the BIL block makes the bundle tamper-evident: editing ``result``
+    forces a new ``result_hash`` in the BIL block, which an attacker cannot
+    re-sign without the secret key. The signature itself lives outside the
+    signed region so it never signs itself.
+    """
+    payload = canonical_json(bil_block).encode("utf-8")
+    return hmac.new(key, payload, hashlib.sha256).hexdigest()
+
+
+def sign_benchmark_bundle(bundle: dict[str, Any], key: bytes) -> dict[str, Any]:
+    bundle = copy.deepcopy(bundle)
+    bil_block = bundle.get("bil") or {}
+    bundle["signature"] = {
+        "algo": SIGNATURE_ALGO,
+        "value": _bundle_signature(bil_block, key),
+    }
+    return bundle
+
+
 def seal_benchmark_bundle(
-    result: dict[str, Any], *, level: str = "BIL-2", allow_stub_seal: bool = False
+    result: dict[str, Any],
+    *,
+    level: str = "BIL-2",
+    allow_stub_seal: bool = False,
+    signing_key: bytes | None = None,
 ) -> dict[str, Any]:
     if level not in SUPPORTED_BIL_LEVELS or level == "BIL-0":
         raise ValueError(f"unsupported BIL level for sealing: {level}")
@@ -136,7 +173,7 @@ def seal_benchmark_bundle(
                 )
     result_copy = copy.deepcopy(result)
     manifest = build_input_manifest(result_copy) if level == "BIL-2" else None
-    return {
+    bundle = {
         "version": BUNDLE_VERSION,
         "bil": {
             "level": level,
@@ -146,9 +183,15 @@ def seal_benchmark_bundle(
         "result": result_copy,
         "input_manifest": manifest,
     }
+    key = signing_key if signing_key is not None else _signing_key_from_env()
+    if key is not None:
+        bundle = sign_benchmark_bundle(bundle, key)
+    return bundle
 
 
-def verify_benchmark_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
+def verify_benchmark_bundle(
+    bundle: dict[str, Any], *, signing_key: bytes | None = None
+) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     status = "PASS"
     if bundle.get("version") != BUNDLE_VERSION:
@@ -200,8 +243,46 @@ def verify_benchmark_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
                     "actual": actual,
                     "message": "" if manifest == derived_manifest else "input manifest does not match result",
                 })
+    # Tamper-evidence: an HMAC signature over the BIL block. Only engage the
+    # signature path when a signature is present or a key is available, so
+    # unsigned bundles verify exactly as before (integrity-only).
+    signature = bundle.get("signature")
+    key = signing_key if signing_key is not None else _signing_key_from_env()
+    signed = isinstance(signature, dict)
+    if signed or key is not None:
+        if not signed:
+            checks.append({
+                "id": "signature",
+                "status": "FAIL",
+                "message": "signing key configured but bundle is unsigned",
+            })
+        elif signature.get("algo") != SIGNATURE_ALGO:
+            checks.append({
+                "id": "signature",
+                "status": "FAIL",
+                "message": f"unsupported signature algo {signature.get('algo')!r}",
+            })
+        elif key is None:
+            checks.append({
+                "id": "signature",
+                "status": "WARN",
+                "message": (
+                    f"bundle is signed but no key available to verify it; set "
+                    f"{SIGNING_KEY_ENV} to check tamper-evidence"
+                ),
+            })
+        else:
+            expected = _bundle_signature(bil, key)
+            actual = str(signature.get("value", ""))
+            ok = hmac.compare_digest(expected, actual)
+            checks.append({
+                "id": "signature",
+                "status": "PASS" if ok else "FAIL",
+                "message": "" if ok else "signature mismatch (bundle altered or wrong key)",
+            })
+
     for check in checks:
-        if check.get("status") != "PASS":
+        if check.get("status") not in ("PASS", "WARN"):
             status = "FAIL"
     return {
         "version": "SEAM-BENCHMARK-BUNDLE-VERIFY/1",
@@ -209,6 +290,7 @@ def verify_benchmark_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
         "bil": {
             "level": level or "BIL-0",
             "sealed": True,
+            "signed": signed,
             "result_hash": bil.get("result_hash"),
             "input_manifest_hash": bil.get("input_manifest_hash"),
         },

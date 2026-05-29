@@ -14,6 +14,7 @@ from .benchmark_integrity import (
     inspect_benchmark_integrity,
     load_json_payload,
     seal_benchmark_bundle,
+    validate_publication_readiness,
     verify_benchmark_bundle as verify_integrity_bundle,
     write_json_payload,
 )
@@ -437,6 +438,17 @@ def build_parser() -> argparse.ArgumentParser:
     bench_inspect_parser.add_argument("payload", help="Benchmark result or bundle JSON path")
     bench_inspect_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
 
+    bench_publish_parser = bench_subparsers.add_parser(
+        "publish",
+        help="Gate a benchmark result for competitive publication (non-stub judge + BIL-2 verify)",
+    )
+    bench_publish_parser.add_argument("result", help="Benchmark result JSON path")
+    bench_publish_parser.add_argument("--bundle", help="Pre-sealed BIL-2 bundle JSON path; default seals BIL-2 in memory")
+    bench_publish_parser.add_argument("--dataset", default="", help="Dataset name (else read from result.dataset)")
+    bench_publish_parser.add_argument("--fixture-hash", default="", help="Fixture hash (else read from result)")
+    bench_publish_parser.add_argument("--git-sha", default="", help="Git SHA (else auto-detected from the repo)")
+    bench_publish_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
     subparsers.add_parser("stats", help="Run retrieval benchmark summary")
     return parser
 
@@ -818,6 +830,36 @@ def run_cli(argv: list[str] | None = None) -> None:
         else:
             print(_render_bil_integrity_pretty(report))
         raise SystemExit(0 if report.get("status") == "PASS" else 1)
+
+    if args.command == "bench" and args.bench_command == "publish":
+        result_payload = load_json_payload(args.result)
+        if args.bundle:
+            bundle = load_json_payload(args.bundle)
+        else:
+            # Seal in memory only to produce a verifiable BIL-2 bundle for the
+            # readiness check. allow_stub_seal here does NOT weaken the gate:
+            # validate_publication_readiness still refuses stub judges below.
+            bundle = seal_benchmark_bundle(result_payload, level="BIL-2", allow_stub_seal=True)
+        bil_verification = verify_integrity_bundle(bundle)
+        dataset = args.dataset or str((result_payload.get("dataset") or {}).get("name") or "")
+        fixture_hash = (
+            args.fixture_hash
+            or str(result_payload.get("fixture_hash") or "")
+            or str((result_payload.get("dataset") or {}).get("fixture_hash") or "")
+        )
+        git_sha = args.git_sha or _current_git_sha()
+        readiness = validate_publication_readiness(
+            result_payload,
+            git_sha=git_sha,
+            fixture_hash=fixture_hash,
+            dataset_name=dataset,
+            bil_verification=bil_verification,
+        )
+        if args.format == "json":
+            print(json.dumps({"readiness": readiness, "bil_verification": bil_verification}, indent=2, sort_keys=True))
+        else:
+            print(_render_publication_readiness_pretty(readiness))
+        raise SystemExit(0 if readiness.get("ready") else 1)
 
     runtime = SeamRuntime(args.db)
 
@@ -1824,6 +1866,35 @@ def _render_bil_integrity_pretty(report: dict[str, object]) -> str:
         lines.append(f"Verification checks: {len(verification.get('checks', [])) - len(failed)}/{len(verification.get('checks', []))} passed")
         for check in failed[:10]:
             lines.append(f"- {check.get('id')}: {check.get('message')}")
+    return "\n".join(lines)
+
+
+def _current_git_sha() -> str:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+def _render_publication_readiness_pretty(report: dict[str, object]) -> str:
+    summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    lines = [
+        f"Publication readiness: {'READY' if report.get('ready') else 'BLOCKED'}",
+        f"Checks: {summary.get('passed', 0)} passed, {summary.get('warned', 0)} warned, {summary.get('failed', 0)} failed",
+    ]
+    for check in report.get("checks", []) if isinstance(report.get("checks"), list) else []:
+        if check.get("status") != "PASS":
+            lines.append(f"- [{check.get('status')}] {check.get('id')}: {check.get('message')}")
+    blocked_by = report.get("publication_blocked_by") or []
+    if blocked_by:
+        lines.append(f"Blocked by: {', '.join(blocked_by)}")
     return "\n".join(lines)
 
 

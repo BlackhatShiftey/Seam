@@ -153,8 +153,15 @@ def run_benchmark_grouped(
     judge_batch: bool = False,
     save_context: bool = False,
     progress: Callable[[int, int], None] | None = None,
+    checkpoint: Callable[[list[dict], int, int], None] | None = None,
 ) -> dict:
-    """Run cases grouped by shared conversation scope, ingesting each scope once."""
+    """Run cases grouped by shared conversation scope, ingesting each scope once.
+
+    ``checkpoint`` (if given) is called after every scope completes with the
+    accumulated ``case_results`` so far, plus ``(completed, total)``. This lets
+    callers flush partial results to durable storage during long runs, so an
+    interrupted multi-hour run is not a total loss.
+    """
     started_ts = time.time()
     run_started_at = datetime.now(timezone.utc).isoformat()
     total = len(cases)
@@ -174,6 +181,8 @@ def run_benchmark_grouped(
             completed += 1
             if progress:
                 progress(completed, total)
+        if checkpoint:
+            checkpoint(case_results, completed, total)
 
     if batch_judge is not None:
         _finalize_judge_batch(case_results, batch_judge, key="judge")
@@ -203,8 +212,14 @@ def run_benchmark_grouped_parallel(
     workers: int = 4,
     save_context: bool = False,
     progress: Callable[[int, int], None] | None = None,
+    checkpoint: Callable[[list[dict], int, int], None] | None = None,
 ) -> dict:
-    """Run grouped scopes concurrently while preserving original case order."""
+    """Run grouped scopes concurrently while preserving original case order.
+
+    ``checkpoint`` (if given) is called as each scope-future completes with the
+    results accumulated so far, plus ``(completed, total)`` — so a long parallel
+    run flushes partial results to durable storage and survives interruption.
+    """
     if workers <= 1:
         return run_benchmark_grouped(
             adapter=adapter_factory(),
@@ -216,6 +231,7 @@ def run_benchmark_grouped_parallel(
             judge_batch=judge_batch,
             save_context=save_context,
             progress=progress,
+            checkpoint=checkpoint,
         )
 
     started_ts = time.time()
@@ -260,6 +276,8 @@ def run_benchmark_grouped_parallel(
             completed += len(entries)
             if progress:
                 progress(completed, total)
+            if checkpoint:
+                checkpoint([case for case in case_results if case is not None], completed, total)
 
     final_results = [case for case in case_results if case is not None]
     if batch_judge is not None:

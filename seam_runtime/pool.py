@@ -95,16 +95,29 @@ class ConnectionPool:
             yield connection
         finally:
             with self._lock:
-                if not self._closed:
+                if self._closed:
+                    self._close_connection(connection)
+                    self._active_count -= 1
+                else:
+                    # Reset on return: discard any uncommitted transaction before
+                    # the connection re-enters the pool. SQLite uses implicit
+                    # transactions (isolation_level=""), so a write that raised
+                    # after the first statement but before commit() would leave an
+                    # open transaction; without this rollback the next caller to
+                    # check out this connection would commit those orphaned rows.
                     try:
+                        connection.rollback()
                         self._pool.put_nowait((connection, time.time()))
                     except queue.Full:
                         LOGGER.warning("Pool is full, closing excess connection")
                         self._close_connection(connection)
                         self._active_count -= 1
-                else:
-                    self._close_connection(connection)
-                    self._active_count -= 1
+                    except sqlite3.Error:
+                        LOGGER.warning(
+                            "Connection unusable on return, discarding", exc_info=True
+                        )
+                        self._close_connection(connection)
+                        self._active_count -= 1
 
     def close(self) -> None:
         with self._lock:

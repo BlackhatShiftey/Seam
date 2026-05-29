@@ -16,8 +16,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 from benchmarks.external.common.dataset import load_locomo_cases, load_quickstart_cases
@@ -312,6 +315,26 @@ def main() -> None:
     rerank = None if args.rerank == "none" else args.rerank
     judge_cross = build_judge(args.judge_cross, model=args.judge_cross_model) if args.judge_cross != "none" else None
 
+    # Durable result destination resolved BEFORE the run so partial checkpoints
+    # and the final bundle share one stable name. A long run that crashes leaves
+    # a recoverable <stem>.partial.json on persistent disk (never /tmp).
+    archive_dir = _resolve_archive_dir()
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    run_stem = _run_stem(args, len(cases))
+    partial_path = archive_dir / f"{run_stem}.partial.json"
+
+    def _checkpoint(case_results: list[dict], completed: int, total: int) -> None:
+        # A flush failure must never crash the run it is protecting.
+        try:
+            payload = json.dumps(
+                {"status": "PARTIAL", "completed": completed, "total": total, "case_results": case_results},
+                indent=2, default=str,
+            )
+            _atomic_write(partial_path, payload)
+            print(f"[checkpoint] {completed}/{total} cases flushed to {partial_path}", file=sys.stderr)
+        except Exception as exc:
+            print(f"WARNING: checkpoint flush failed at {completed}/{total}: {exc!r}", file=sys.stderr)
+
     # Run benchmark
     if args.workers > 1:
         report = run_benchmark_grouped_parallel(
@@ -338,6 +361,7 @@ def main() -> None:
             judge_batch=args.judge_batch,
             workers=args.workers,
             save_context=args.save_context,
+            checkpoint=_checkpoint,
         )
     else:
         adapter = build_adapter(
@@ -361,6 +385,7 @@ def main() -> None:
             judge_cross=judge_cross,
             judge_batch=args.judge_batch,
             save_context=args.save_context,
+            checkpoint=_checkpoint,
         )
 
     # Output
@@ -370,8 +395,87 @@ def main() -> None:
             f.write(report_json)
             f.write("\n")
         print(f"Report written to {args.output}")
+        if _is_ephemeral_path(args.output):
+            print(
+                f"WARNING: {args.output} is under a temp directory and will not survive a reboot.",
+                file=sys.stderr,
+            )
     else:
         print(report_json)
+
+    # Always archive a durable copy so result bundles are never lost to /tmp.
+    # Atomic write + fsync + verified read-back, then drop the partial.
+    # Emit on stderr so stdout stays pure JSON when --output is not given.
+    try:
+        archive_path = archive_dir / f"{run_stem}.json"
+        _atomic_write(archive_path, report_json + "\n")
+        _verify_saved(archive_path, report_json + "\n")
+        if partial_path.exists():
+            partial_path.unlink()
+        print(f"Durable copy archived (verified) to {archive_path}", file=sys.stderr)
+    except Exception as exc:  # archiving must never fail a completed run
+        kept = partial_path if partial_path.exists() else "(no partial)"
+        print(
+            f"WARNING: could not archive durable result copy: {exc!r}. "
+            f"Last checkpoint retained at {kept}.",
+            file=sys.stderr,
+        )
+
+
+def _is_ephemeral_path(path: str) -> bool:
+    resolved = str(Path(path).resolve())
+    tmp_roots = [str(Path(tempfile.gettempdir()).resolve()), "/tmp", "/var/tmp", "/dev/shm"]
+    return any(resolved == root or resolved.startswith(root + "/") for root in tmp_roots)
+
+
+def _resolve_archive_dir() -> Path:
+    """Durable result directory. Defaults to ``<repo>/benchmarks/runs/locomo/``
+    (persistent storage, never /tmp). Override with ``SEAM_BENCH_RESULTS_DIR``."""
+    env_dir = os.environ.get("SEAM_BENCH_RESULTS_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+    return Path(__file__).resolve().parents[2] / "runs" / "locomo"
+
+
+def _run_stem(args: argparse.Namespace, n_cases: int) -> str:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    adapter = getattr(args, "adapter", "seam") or "seam"
+    judge = getattr(args, "judge", None)
+    parts = [timestamp, str(adapter), f"{n_cases}cases"]
+    if judge:
+        parts.append(f"judge-{judge}")
+    if getattr(args, "quickstart", False):
+        parts.append("quickstart")
+    return "_".join(parts)
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write durably: temp file in the same dir, fsync, then atomic os.replace."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+    # fsync the directory entry so the rename itself is durable across crashes.
+    try:
+        dir_fd = os.open(str(path.parent), os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        pass
+
+
+def _verify_saved(path: Path, expected: str) -> None:
+    """Read the file back and confirm it is intact, so a 'saved' claim is real."""
+    if not path.exists():
+        raise RuntimeError(f"archive file missing after write: {path}")
+    actual = path.read_text(encoding="utf-8")
+    if actual != expected:
+        raise RuntimeError(f"archive read-back mismatch at {path} ({len(actual)} vs {len(expected)} bytes)")
 
 
 if __name__ == "__main__":

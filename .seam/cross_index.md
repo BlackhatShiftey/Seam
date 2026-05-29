@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 323
+total_events: 324
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-28T14:58:49Z | history:103:3198f391 | session-event | done | history, integrity, verify, snapshot | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,_imports |
 | 2026-04-29T15:35:06Z | history:104:82d13be8 | session-event | done | dashboard, tui, command, verify, history, snapshot | seam_runtime/dashboard.py,test_seam.py,HISTORY.md,HISTORY_INDEX.md,.seam/snap... |
 | 2026-04-29T15:40:45Z | history:105:c92f861c | session-event | done | dashboard, tui, status, verify, history, snapshot | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/da... |
 | 2026-04-29T23:38:09Z | history:106:2890c852 | session-event | done | dashboard, tui, textual, verify, status, history, snapshot | seam_runtime/dashboard.py,seam_runtime/storage.py,seam_runtime/lossless.py,te... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-26T22:06:52Z | history:266:55f1f930 | session-event | done | protocol, history, verify, benchmark, retrieval | seam_runtime/storage.py,seam_runtime/improvement.py,tools/h2/improvement_revi... |
 | 2026-05-27T13:27:37Z | history:267:853c5503 | session-event | done | bugfix, storage, retrieval, docs, pyproject, ci, webui, h... | seam_runtime/storage.py,seam_runtime/temporal.py,seam_runtime/mirl.py,seam_ru... |
 | 2026-05-28T05:22:24Z | history:268:d817ea8f | session-event | done | bugfix, hardening, security, storage, multi-agent, protoc... | seam_runtime/storage.py,seam_runtime/server.py,seam_runtime/dashboard.py,seam... |
+| 2026-05-29T00:42:30Z | history:269:4b1818d8 | session-event | done | bugfix, storage, benchmark, security, retrieval, audit, v... | seam_runtime/pool.py,seam_runtime/benchmark_integrity.py,seam_runtime/cli.py,... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0123.cross.md | 2026-04-15T00:00:00Z..2026-04-28T13:17:22Z | 123 | (multi) | (multi) |
+| 0001-0124.cross.md | 2026-04-15T00:00:00Z..2026-04-28T14:58:49Z | 124 | (multi) | (multi) |
