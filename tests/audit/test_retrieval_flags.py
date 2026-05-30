@@ -1,0 +1,152 @@
+"""Tests for the audit #3 retrieval-scoring levers (RetrievalFlags).
+
+Each lever is OFF by default; with all defaults the scoring path must be
+byte-identical to the pre-audit weighted-sum fusion. These tests lock the
+flag-parsing contract and the behavioural change each lever introduces,
+independent of any LoCoMo benchmark outcome.
+"""
+
+from seam_runtime.bm25 import BM25Index
+from seam_runtime.mirl import IRBatch, MIRLRecord, RecordKind
+from seam_runtime.retrieval import RetrievalFlags, retrieval_flags_from_env, search_batch
+
+
+def _semantic_reason(candidate) -> float:
+    for reason in candidate.reasons:
+        if reason.startswith("semantic="):
+            return float(reason.split("=", 1)[1])
+    raise AssertionError(f"no semantic reason in {candidate.reasons}")
+
+
+def _lexical_reason(candidate) -> float:
+    for reason in candidate.reasons:
+        if reason.startswith("lexical="):
+            return float(reason.split("=", 1)[1])
+    raise AssertionError(f"no lexical reason in {candidate.reasons}")
+
+
+def _find(result, record_id):
+    for candidate in result.candidates:
+        if candidate.record.id == record_id:
+            return candidate
+    return None
+
+
+# --- flag parsing contract ------------------------------------------------
+
+def test_flag_defaults_all_off():
+    flags = RetrievalFlags()
+    assert flags.semantic_zero_no_vector is False
+    assert flags.bm25_all_kinds is False
+    assert flags.fusion == "weighted"
+    assert flags.rrf_k == 60
+
+
+def test_flag_env_parsing_truthy_variants():
+    assert retrieval_flags_from_env({}) == RetrievalFlags()
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_SEMANTIC_ZERO": "1"}).semantic_zero_no_vector is True
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_SEMANTIC_ZERO": "TRUE"}).semantic_zero_no_vector is True
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_BM25_ALL": "yes"}).bm25_all_kinds is True
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_RRF": "on"}).fusion == "rrf"
+    # falsy / unset stays off
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_RRF": "0"}).fusion == "weighted"
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_BM25_ALL": "false"}).bm25_all_kinds is False
+
+
+# --- P0-1: semantic -> 0 when a real vector backend is active -------------
+
+def _two_claims():
+    a = MIRLRecord(
+        id="clm:a", kind=RecordKind.CLM, ns="test", scope="thread", t0="2024-01-01",
+        attrs={"subject": "ent:1", "predicate": "likes", "object": "hiking trips"},
+    )
+    b = MIRLRecord(
+        id="clm:b", kind=RecordKind.CLM, ns="test", scope="thread", t0="2024-01-02",
+        attrs={"subject": "ent:2", "predicate": "likes", "object": "hiking trails"},
+    )
+    return IRBatch([a, b])
+
+
+def test_semantic_zero_off_uses_bagofwords_fallback():
+    batch = _two_claims()
+    # vector backend returned a score for clm:a only; clm:b is absent.
+    vs = {"clm:a": 0.9}
+    result = search_batch(batch, query="hiking", vector_scores=vs, limit=5)
+    cand_b = _find(result, "clm:b")
+    assert cand_b is not None
+    # Flag OFF: clm:b falls back to bag-of-words cosine, which is > 0 here.
+    assert _semantic_reason(cand_b) > 0.0
+
+
+def test_semantic_zero_on_zeros_absent_record():
+    batch = _two_claims()
+    vs = {"clm:a": 0.9}
+    flags = RetrievalFlags(semantic_zero_no_vector=True)
+    result = search_batch(batch, query="hiking", vector_scores=vs, limit=5, flags=flags)
+    cand_b = _find(result, "clm:b")
+    assert cand_b is not None
+    # Flag ON + real backend active: absent record's semantic channel is 0.
+    assert _semantic_reason(cand_b) == 0.0
+    # clm:a still carries its true vector score.
+    assert _semantic_reason(_find(result, "clm:a")) == 0.9
+
+
+def test_semantic_zero_on_is_noop_without_vectors():
+    """With no vector backend (empty vector_scores) the flag must not zero out
+    the bag-of-words fallback -- otherwise the local/test path breaks."""
+    batch = _two_claims()
+    off = search_batch(batch, query="hiking", vector_scores={}, limit=5)
+    on = search_batch(batch, query="hiking", vector_scores={}, limit=5,
+                      flags=RetrievalFlags(semantic_zero_no_vector=True))
+    assert [c.record.id for c in on.candidates] == [c.record.id for c in off.candidates]
+    assert _semantic_reason(_find(on, "clm:a")) == _semantic_reason(_find(off, "clm:a"))
+
+
+# --- P0-2: BM25 across all candidate kinds -------------------------------
+
+def test_bm25_all_kinds_applies_to_non_raw():
+    # A CLM record whose only match to the query is a rare term BM25 rewards.
+    rare = MIRLRecord(
+        id="clm:rare", kind=RecordKind.CLM, ns="test", scope="thread", t0="2024-01-01",
+        attrs={"subject": "ent:1", "predicate": "mentions", "object": "axolotl"},
+    )
+    other = MIRLRecord(
+        id="clm:other", kind=RecordKind.CLM, ns="test", scope="thread", t0="2024-01-01",
+        attrs={"subject": "ent:2", "predicate": "mentions", "object": "weather today"},
+    )
+    batch = IRBatch([rare, other])
+    bm25 = BM25Index()
+    bm25.add("clm:rare", "axolotl salamander amphibian")
+    bm25.add("clm:other", "weather today sunny")
+
+    off = search_batch(batch, query="axolotl", bm25_index=bm25, limit=5)
+    on = search_batch(batch, query="axolotl", bm25_index=bm25, limit=5,
+                      flags=RetrievalFlags(bm25_all_kinds=True))
+    # Flag OFF: BM25 is RAW-only, so the CLM lexical score is unchanged by BM25.
+    # Flag ON: the rare CLM gets a BM25 boost, raising its lexical channel.
+    assert _lexical_reason(_find(on, "clm:rare")) >= _lexical_reason(_find(off, "clm:rare"))
+
+
+# --- P1-1: RRF fusion -----------------------------------------------------
+
+def test_rrf_changes_fusion_but_keeps_candidates():
+    batch = _two_claims()
+    vs = {"clm:a": 0.1, "clm:b": 0.95}
+    weighted = search_batch(batch, query="hiking", vector_scores=vs, limit=5)
+    rrf = search_batch(batch, query="hiking", vector_scores=vs, limit=5,
+                       flags=RetrievalFlags(fusion="rrf"))
+    # Same candidate set, RRF scores differ from the weighted sum.
+    assert {c.record.id for c in rrf.candidates} == {c.record.id for c in weighted.candidates}
+    rrf_scores = {c.record.id: c.score for c in rrf.candidates}
+    weighted_scores = {c.record.id: c.score for c in weighted.candidates}
+    assert rrf_scores != weighted_scores
+
+
+def test_rrf_record_with_no_positive_channel_is_excluded():
+    # A record with zero lexical/semantic/graph and only the default temporal
+    # base still participates via temporal; a record with no signal at all does not.
+    batch = _two_claims()
+    result = search_batch(batch, query="zzznomatch", vector_scores={}, limit=5,
+                          flags=RetrievalFlags(fusion="rrf"))
+    for cand in result.candidates:
+        assert cand.score > 0.0

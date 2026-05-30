@@ -121,19 +121,27 @@ class SeamRuntime:
 
     def search_ir(self, query: str, lens: str = "general", scope: str | None = None, budget: int = 5, include_raw: bool = False, temporal_window = None, temporal_reference = None) -> SearchResult:
         from .bm25 import BM25Index
+        from .mirl import iter_textual_fields
+        from .retrieval import retrieval_flags_from_env
 
+        flags = retrieval_flags_from_env()
         batch = self.store.load_ir(scope=scope)
         vector_scores = self.vector_adapter.search(query, limit=max(budget * 3, 10))
         namespace = batch.records[0].ns if batch.records else None
         bm25 = None
-        if include_raw:
+        if include_raw or flags.bm25_all_kinds:
             bm25 = BM25Index()
             for record in batch.records:
                 if record.kind == RecordKind.RAW:
                     content = record.attrs.get("content")
-                    if isinstance(content, str) and content:
-                        bm25.add(record.id, content)
-        return search_batch(batch, query=query, scope=scope, limit=max(1, budget), vector_scores=vector_scores, namespace=namespace, include_raw=include_raw, bm25_index=bm25, temporal_window=temporal_window, temporal_reference=temporal_reference)
+                    text = content if isinstance(content, str) and content else ""
+                elif flags.bm25_all_kinds:
+                    text = " ".join(iter_textual_fields(record))
+                else:
+                    text = ""
+                if text:
+                    bm25.add(record.id, text)
+        return search_batch(batch, query=query, scope=scope, limit=max(1, budget), vector_scores=vector_scores, namespace=namespace, include_raw=include_raw, bm25_index=bm25, temporal_window=temporal_window, temporal_reference=temporal_reference, flags=flags)
 
     def ingest_conversation_turn(
         self,
