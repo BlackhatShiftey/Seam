@@ -15,7 +15,7 @@ Regenerate: `python -m tools.streams.roadmap_parser --emit-state`.
 - `roadmap:track:A-Web` — since 2026-05-10 via history:163 — topics: dashboard, webui, command
 - `roadmap:track:E1` — since 2026-04-30 via history:121 — topics: pgvector, vector, docker
 
-## planned (31)
+## planned (32)
 
 - `roadmap:track:A2` — since 2026-04-18 via none — topics: benchmark, dashboard, animation
 - `roadmap:track:A3` — since 2026-04-18 via none — topics: benchmark, dashboard, graph
@@ -40,6 +40,7 @@ Regenerate: `python -m tools.streams.roadmap_parser --emit-state`.
 - `roadmap:track:F:backlog:superseded-phase-tree` — since 2026-05-18 via history:PENDING — topics: roadmap, docs
 - `roadmap:track:F:backlog:test-claude-judge-flaky` — since 2026-05-18 via history:PENDING — topics: tests, judge
 - `roadmap:track:F:backlog:verify-continuity-ref-existence` — since 2026-05-18 via history:PENDING — topics: verify, continuity, history
+- `roadmap:track:G5` — since 2026-05-31 via none — topics: surface, search, verify, integrity
 - `roadmap:track:J` — since 2026-05-15 via history:180 — topics: codec, compress, prompt, benchmark
 - `roadmap:track:K` — since 2026-05-15 via history:180 — topics: security, audit, trust, benchmark
 - `roadmap:track:K14` — since 2026-05-18 via history:196 — topics: verify, audit, retrieval

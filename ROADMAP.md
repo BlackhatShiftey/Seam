@@ -1199,6 +1199,54 @@ rate, stored-surface query rate after original-output deletion, repair success
 rate, repaired-copy query rate, and direct query exactness all stay at 100% for
 release-blocking fixtures.
 
+### G5: Zero-Ops Multi-Surface Library Index with Drift Verification
+
+<!-- seam:item
+id: roadmap:track:G5
+status: planned
+status-since: 2026-05-31
+status-by: none
+supersedes: none
+topics: surface, search, verify, integrity
+priority: 2
+phase: 1
+-->
+
+**What:** Add a portable, zero-ops index over a folder of `.seam.png` HS/1
+surfaces plus a drift verifier that catches index/surface disagreements.
+Bundled because shipping the index without the verifier is shipping a silent
+skip lane: a stale index lies without warning. This closes the gap between
+"we can store an HS/1 surface" (G2) and "you can ship a folder of `.seam.png`
+files and it behaves like a queryable, verifiable store" -- the missing piece
+for portable memory to be production-grade.
+
+**Zero-ops contract:** the index must be derivable from any folder of valid
+`.seam.png` files via one command, with no external service, no schema-managed
+DB, and no out-of-band state. Preferred form is an HS/1 surface itself
+(`INDEX.seam.png` or a manifest surface) so the library stays a single artifact
+type; a sidecar SQLite is acceptable only if it is fully rebuildable from the
+surfaces and never the source of truth.
+
+**Coverage:** surface id, payload hash, format, plus claim / entity /
+quote-span tokens needed for fast surface discovery without decoding every PNG.
+Index only verified-hash surfaces; failed-hash surfaces are evicted, not
+silently shadowed.
+
+**Verifier (`seam surfaces verify-index`, module `verify_index`):** reports
+`missing_on_disk`, `missing_in_index`, `hash_mismatch`, and
+`format_unreadable` by default (cheap, no full decode); `payload_drift`
+(decoded payload disagrees with what the index claims) is opt-in via `--deep`.
+Exits non-zero on any conflict so pre-commit and CI can gate. Names align with
+the existing `verify_integrity` / `verify_continuity` / `verify_routing` /
+`verify_streams` pattern.
+
+**Gate:** A folder of N surfaces can be (1) indexed in one command with no
+external services, (2) queried for "which surfaces contain X" without decoding
+every PNG, (3) verified for index/surface consistency with non-zero exit on any
+drift, and (4) repaired by rebuilding the index from scratch. Deep verification
+of payload claims is available but opt-in. Default verifier run must complete on
+a 10k-surface library in seconds, not minutes.
+
 ---
 
 ## Track H — Context Streams Protocol

@@ -5926,3 +5926,23 @@ CI regression fix for HISTORY#274 (substream isolation): the mocked PgVectorAdap
 
 Root-cause lesson for future agents: the test suite has TWO roots -- tests/ AND test_seam_all/test_seam.py -- and CI runs both. The #274 SQLite-path validation ran only tests/ and missed the mocked pgvector adapter tests in test_seam_all/test_seam.py. Always run BOTH (env -u SEAM_PGVECTOR_DSN .venv/bin/python -m pytest tests/ test_seam_all/test_seam.py) before pushing a change to vector_adapters.py / vector.py / runtime.py schema or SQL. Verified: test_seam_all/test_seam.py PgVectorAdapter tests 10/10 pass and the full file passes on the SQLite path. No paid calls; no secrets written.
 ---END-ENTRY-#275---
+
+---BEGIN-ENTRY-#276---
+id: 276
+date: 2026-05-31T23:56:01Z
+agent: codex
+status: done
+topics: roadmap, surface, verify, integrity, search, streams, history, status
+commits: pending
+refs: ROADMAP.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/roadmap/log.md,.seam/streams/roadmap/index.md,.seam/streams/roadmap/state.md,.seam/cross_index.md
+supersedes: 275
+tokens: 528
+---
+Local branch/PR closeout and completed roadmap merge. Session start state: `git status --short --branch` showed clean `main...origin/main`; after `git fetch --all --prune`, `gh pr list --state open --limit 100` returned `[]`, so there were no open GitHub PRs to merge or close. The working tree had no uncommitted done work to commit at start.
+
+Local branch classification: `recovery/locomo-dataset-271` still existed locally with a gone upstream, but `git log --left-right --cherry-pick --oneline main...recovery/locomo-dataset-271` showed no branch-side unique commits, matching the already-merged PR #43 state. `roadmap/g5-multi-surface-index` had one branch-side unique commit (`633627f Add ROADMAP G5: zero-ops multi-surface library index with drift verification`), but it was based before later audit/history work; a direct branch merge would have replayed stale derived HISTORY/stream/cross-index files and effectively rolled back later entries. I therefore replayed the intended source change only: added Track G5 to ROADMAP.md on current `main`, preserving current HISTORY#269-#275 instead of merging the old branch artifact set.
+
+G5 adds a planned Track G card for a portable, zero-ops multi-surface `.seam.png` library index plus drift verifier. The card requires an index derivable from a folder of valid HS/1 surfaces with no external service or out-of-band source of truth; preferred carrier is an HS/1 manifest surface, with sidecar SQLite allowed only as rebuildable derived state. The verifier shape is `seam surfaces verify-index` / `verify_index`, reporting `missing_on_disk`, `missing_in_index`, `hash_mismatch`, and `format_unreadable` by default, with opt-in `--deep` `payload_drift`, and non-zero exit on conflicts. PROJECT_STATUS.md now records this as the latest handoff and notes that no runtime code changed.
+
+Derived state before this history entry: `python3 -m tools.streams.roadmap_parser` reported `items: 56, events: 56`, reflecting the new G5 roadmap item. Remaining closeout after this entry: rebuild the history stream mirror, rebuild the cross-index, write a snapshot for #276, run verify_integrity, verify_routing, verify_continuity, verify_streams, run a docs/metadata-appropriate test slice, commit the changed repo state, then re-check open PRs and branch deltas.
+---END-ENTRY-#276---
