@@ -5946,3 +5946,23 @@ G5 adds a planned Track G card for a portable, zero-ops multi-surface `.seam.png
 
 Derived state before this history entry: `python3 -m tools.streams.roadmap_parser` reported `items: 56, events: 56`, reflecting the new G5 roadmap item. Remaining closeout after this entry: rebuild the history stream mirror, rebuild the cross-index, write a snapshot for #276, run verify_integrity, verify_routing, verify_continuity, verify_streams, run a docs/metadata-appropriate test slice, commit the changed repo state, then re-check open PRs and branch deltas.
 ---END-ENTRY-#276---
+
+---BEGIN-ENTRY-#277---
+id: 277
+date: 2026-06-01T19:23:53Z
+agent: codex
+status: done
+topics: audit, benchmark, retrieval, locomo, docs, verify, history, status
+commits: pending
+refs: docs/audits/2026-05-31-cat4-single-hop-attribution.md,.gitignore,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 276
+tokens: 433
+---
+Cat4 single-hop attribution audit preservation and artifact hygiene. Starting state on 2026-06-01: local `main` had the committed HISTORY#276 G5 roadmap card and was ahead of `origin/main` by one commit, GitHub reported no open PRs, and the working tree had untracked `docs/audits/2026-05-31-cat4-single-hop-attribution.md` plus generated `diag_out/` diagnostics (13 files, 8.8M). Per AGENTS.md, generated diagnostic dumps should not remain as loose repo artifacts or be blindly committed.
+
+Preserved the durable source-worthy finding as `docs/audits/2026-05-31-cat4-single-hop-attribution.md` and moved raw generated diagnostics out of the worktree to `../Seam-artifacts/20260601-192239-cat4-diag_out/` (13 files, 8.8M). Updated the audit doc's artifact section to describe that local external bundle instead of implying `diag_out/` is tracked. Added `diag_out/` to `.gitignore` under local artifact dumps so future generated diagnostics do not appear as untracked source work.
+
+Audit conclusion recorded for future work: the HISTORY#274 cat4 open question is resolved against the capture-adapter hypothesis. RAW-vs-abstract crowding did not explain the measured single-hop gap; the pack already filters to RAW text and the rank-depth cases are mostly competing RAW turns, not abstract records. The measured dominant retrieval-context-recall lever is pack char budget (with a strong interaction with deeper candidate pools), but the audit explicitly warns that this is a context-recall metric lift at larger context size, not a proven judged answer-quality gain. Next technical work should be an operator-approved, default-off/configurable pack-budget experiment plus judged validation before claiming a LoCoMo answer-quality win.
+
+No runtime code changed in this entry. This branch (`codex/g5-cat4-audit-publish`) is intended to publish the existing local HISTORY#276 commit plus this audit/hygiene closeout through a draft PR instead of direct-pushing protected `main`.
+---END-ENTRY-#277---

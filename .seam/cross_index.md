@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 332
+total_events: 333
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-30T09:06:05Z | history:111:dd8d9f04 | session-event | done | command, compress, verify, history, snapshot | seam_runtime/cli.py,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
 | 2026-04-30T09:21:44Z | history:112:d4e921ce | session-event | done | compress, mirl, codec, benchmark, command, roadmap, ledge... | seam_runtime/holographic.py,seam_runtime/cli.py,seam_runtime/benchmarks.py,se... |
 | 2026-04-30T09:34:38Z | history:113:cec1ae05 | session-event | done | compress, mirl, codec, benchmark, command, roadmap, ledge... | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/holographic.py,seam_... |
 | 2026-04-30T10:27:14Z | history:114:6e5b5ae1 | session-event | done | dashboard, tui, command, compress, verify, history, snaps... | seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-31T00:00:00Z | roadmap:056:e5e1b575 | status-change | bootstrap | surface, search, verify, integrity | ROADMAP.md:1204 |
 | 2026-05-31T13:12:09Z | history:275:1ab79a91 | session-event | done | retrieval, memory, isolation, bugfix, verify, benchmark | test_seam_all/test_seam.py |
 | 2026-05-31T23:56:01Z | history:276:aa84a2f6 | session-event | done | roadmap, surface, verify, integrity, search, streams, his... | ROADMAP.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/roadma... |
+| 2026-06-01T19:23:53Z | history:277:cb90f2da | session-event | done | audit, benchmark, retrieval, locomo, docs, verify, histor... | docs/audits/2026-05-31-cat4-single-hop-attribution.md,.gitignore,PROJECT_STAT... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0132.cross.md | 2026-04-15T00:00:00Z..2026-04-30T09:03:51Z | 132 | (multi) | (multi) |
+| 0001-0133.cross.md | 2026-04-15T00:00:00Z..2026-04-30T09:06:05Z | 133 | (multi) | (multi) |

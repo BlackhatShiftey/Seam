@@ -68,6 +68,7 @@ seam_runtime/_handoff_20260419/
 
 # Local artifact dumps
 Webui-final-dash/
+diag_out/
 
 # Publish-only benchmark material stays local unless intentionally released
 benchmarks/fixtures/holdout/*.json
