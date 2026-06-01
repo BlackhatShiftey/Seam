@@ -69,6 +69,43 @@ def test_locomo_adapter_uses_separate_search_top_k(monkeypatch, tmp_path):
     assert observed["budget"] == 20
 
 
+def test_locomo_adapter_reports_retrieval_policy_diagnostics(monkeypatch, tmp_path):
+    class FakeRuntime:
+        def search_ir(self, query, **kwargs):
+            class Result:
+                candidates = []
+
+            return Result()
+
+    monkeypatch.setattr(
+        "benchmarks.external.locomo.adapters.seam._open_runtime",
+        lambda _db_path: FakeRuntime(),
+    )
+    adapter = SeamLocomoAdapter(
+        db_path=str(tmp_path),
+        budget=8000,
+        search_top_k=100,
+        rerank_top_k=40,
+        semantic_recovery_mode="pack-budget-deep",
+    )
+
+    answer = adapter.answer("scope", "What happened?")
+
+    assert answer.answerer_diagnostics == {
+        "retrieval_policy": {
+            "mode": "pack-budget-deep",
+            "context_char_budget": 8000,
+            "search_top_k": 100,
+            "rerank_top_k": 40,
+        },
+        "retrieval": {
+            "candidate_count": 0,
+            "closure_id_count": 0,
+            "sub_question_count": 0,
+        },
+    }
+
+
 def test_locomo_adapter_reuses_runtime_per_scope(monkeypatch, tmp_path):
     """Repeated turns/questions in a scope should not reload the runtime."""
     opens = []

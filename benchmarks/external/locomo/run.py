@@ -42,6 +42,10 @@ def build_adapter(
     rerank: str | None = None,
     keep_db: bool = False,
     db_path: str | None = None,
+    context_budget: int = 2000,
+    search_top_k: int = 20,
+    rerank_top_k: int = 20,
+    semantic_recovery_mode: str = "baseline",
     record_retrieval_events: bool | None = None,
     retrieval_event_run_id: str | None = None,
 ):
@@ -56,6 +60,10 @@ def build_adapter(
             decomposer_max_subq=decomposer_max_subq,
             abstain_threshold=abstain_threshold,
             rerank=rerank,
+            budget=context_budget,
+            search_top_k=search_top_k,
+            rerank_top_k=rerank_top_k,
+            semantic_recovery_mode=semantic_recovery_mode,
             keep_db=keep_db,
             record_retrieval_events=record_retrieval_events,
             run_id=retrieval_event_run_id,
@@ -267,6 +275,30 @@ def main() -> None:
         help="(seam adapter) Directory for per-scope SQLite databases. Default: test_seam/locomo. Use with --keep-db to isolate a benchmark slice from other DBs.",
     )
     parser.add_argument(
+        "--semantic-recovery-mode",
+        choices=["baseline", "pack-budget", "deep-candidates", "pack-budget-deep"],
+        default="baseline",
+        help="(seam adapter) Label for default-off semantic recovery experiments. Baseline preserves existing defaults; other modes are explicit measurement labels.",
+    )
+    parser.add_argument(
+        "--context-budget",
+        type=int,
+        default=2000,
+        help="(seam adapter) Character budget for retrieved evidence context (default: 2000).",
+    )
+    parser.add_argument(
+        "--search-top-k",
+        type=int,
+        default=20,
+        help="(seam adapter) Candidate count requested from search_ir before evidence closure (default: 20).",
+    )
+    parser.add_argument(
+        "--rerank-top-k",
+        type=int,
+        default=20,
+        help="(seam adapter) Candidate count re-ranked when --rerank cross-encoder is enabled (default: 20).",
+    )
+    parser.add_argument(
         "--record-retrieval-events",
         action="store_true",
         help="(seam adapter) Append retrieval_event rows while answering cases. Default off unless SEAM_RECORD_RETRIEVAL_EVENTS is truthy.",
@@ -346,6 +378,10 @@ def main() -> None:
                 rerank=rerank,
                 keep_db=args.keep_db,
                 db_path=args.db_path,
+                context_budget=args.context_budget,
+                search_top_k=args.search_top_k,
+                rerank_top_k=args.rerank_top_k,
+                semantic_recovery_mode=args.semantic_recovery_mode,
                 record_retrieval_events=args.record_retrieval_events,
                 retrieval_event_run_id=args.retrieval_event_run_id,
             ),
@@ -372,6 +408,10 @@ def main() -> None:
             rerank=rerank,
             keep_db=args.keep_db,
             db_path=args.db_path,
+            context_budget=args.context_budget,
+            search_top_k=args.search_top_k,
+            rerank_top_k=args.rerank_top_k,
+            semantic_recovery_mode=args.semantic_recovery_mode,
             record_retrieval_events=args.record_retrieval_events,
             retrieval_event_run_id=args.retrieval_event_run_id,
         )

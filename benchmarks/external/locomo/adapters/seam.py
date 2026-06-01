@@ -5,6 +5,7 @@ import json
 import os
 import time as _time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,6 +19,22 @@ def _env_truthy(value: str | None) -> bool:
 
 
 _DEFAULT_SENTENCE_TRANSFORMER_MODEL = None
+
+
+@dataclass(frozen=True)
+class SemanticRecoveryPolicy:
+    mode: str = "baseline"
+    context_char_budget: int = 2000
+    search_top_k: int = 20
+    rerank_top_k: int = 20
+
+    def to_dict(self) -> dict[str, int | str]:
+        return {
+            "mode": self.mode,
+            "context_char_budget": self.context_char_budget,
+            "search_top_k": self.search_top_k,
+            "rerank_top_k": self.rerank_top_k,
+        }
 
 
 class SeamLocomoAdapter:
@@ -47,6 +64,7 @@ class SeamLocomoAdapter:
         rerank: str | None = None,
         search_top_k: int = 20,
         rerank_top_k: int = 20,
+        semantic_recovery_mode: str = "baseline",
         rerank_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2",
         keep_db: bool = False,
         record_retrieval_events: bool | None = None,
@@ -54,7 +72,13 @@ class SeamLocomoAdapter:
     ) -> None:
         # TODO: default db_path should be tmp_path, not a gitignored project dir
         self._db_root = Path(db_path) if db_path is not None else Path("test_seam/locomo")
-        self.budget = budget
+        self.semantic_recovery_policy = SemanticRecoveryPolicy(
+            mode=semantic_recovery_mode,
+            context_char_budget=budget,
+            search_top_k=search_top_k,
+            rerank_top_k=rerank_top_k,
+        )
+        self.budget = self.semantic_recovery_policy.context_char_budget
         self.include_evidence_closure = include_evidence_closure
         self._answerer = answerer
         self._answerer_model = answerer_model
@@ -63,8 +87,8 @@ class SeamLocomoAdapter:
         self._decomposer_max_subq = decomposer_max_subq
         self._abstain_threshold = abstain_threshold
         self._rerank = rerank if rerank != "none" else None
-        self._search_top_k = search_top_k
-        self._rerank_top_k = rerank_top_k
+        self._search_top_k = self.semantic_recovery_policy.search_top_k
+        self._rerank_top_k = self.semantic_recovery_policy.rerank_top_k
         self._rerank_model = rerank_model
         self._keep_db = keep_db
         self._scope_anchor_by_id = {}
@@ -167,6 +191,7 @@ class SeamLocomoAdapter:
         closures: list[list[str]] = []
         retrieval_latency_ms = 0.0
         top_score = 0.0
+        candidate_count = 0
         # Track the result for the original question (always last in `questions`)
         # so the retrieval_event row reflects the question actually asked, not a
         # decomposed sub-query. Stays None if no candidates ever came back.
@@ -186,6 +211,7 @@ class SeamLocomoAdapter:
             if q == question:
                 primary_result = result
             if result.candidates:
+                candidate_count += len(result.candidates)
                 if self._rerank == "cross-encoder" and len(result.candidates) > 1:
                     result = self._rerank_candidates(q, result)
                 if q == question:
@@ -202,6 +228,11 @@ class SeamLocomoAdapter:
                     merged.append(record_id)
 
         if not merged:
+            diag = self._retrieval_diagnostics(
+                candidate_count=candidate_count,
+                closure_id_count=0,
+                sub_question_count=len(questions) - 1,
+            )
             if self._record_events:
                 self._record_retrieval_event(
                     rt=rt,
@@ -214,11 +245,12 @@ class SeamLocomoAdapter:
                     answer_latency_ms=None,
                     top_score=top_score,
                     generated=None,
-                    answerer_diag=None,
+                    answerer_diag=diag,
                 )
             return AdapterAnswer(
                 retrieved_context="",
                 retrieval_latency_ms=retrieval_latency_ms,
+                answerer_diagnostics=diag,
             )
 
         if self.include_evidence_closure:
@@ -242,6 +274,14 @@ class SeamLocomoAdapter:
                 generated = self._generate_answer(question, retrieved_context, diag_out=answerer_diag)
                 answer_latency_ms = (_time.monotonic() - t1) * 1000.0
 
+        diag = self._retrieval_diagnostics(
+            candidate_count=candidate_count,
+            closure_id_count=len(merged),
+            sub_question_count=len(questions) - 1,
+        )
+        if answerer_diag:
+            diag.update(answerer_diag)
+
         if self._record_events:
             self._record_retrieval_event(
                 rt=rt,
@@ -254,7 +294,7 @@ class SeamLocomoAdapter:
                 answer_latency_ms=answer_latency_ms,
                 top_score=top_score,
                 generated=generated,
-                answerer_diag=answerer_diag,
+                answerer_diag=diag,
             )
 
         return AdapterAnswer(
@@ -262,8 +302,24 @@ class SeamLocomoAdapter:
             generated_answer=generated,
             retrieval_latency_ms=retrieval_latency_ms,
             answer_latency_ms=answer_latency_ms,
-            answerer_diagnostics=answerer_diag,
+            answerer_diagnostics=diag,
         )
+
+    def _retrieval_diagnostics(
+        self,
+        *,
+        candidate_count: int,
+        closure_id_count: int,
+        sub_question_count: int,
+    ) -> dict:
+        return {
+            "retrieval_policy": self.semantic_recovery_policy.to_dict(),
+            "retrieval": {
+                "candidate_count": candidate_count,
+                "closure_id_count": closure_id_count,
+                "sub_question_count": sub_question_count,
+            },
+        }
 
     def _resolve_run_id(self) -> str:
         """Lazy-resolve and cache the run_id. Called only when recording is on."""

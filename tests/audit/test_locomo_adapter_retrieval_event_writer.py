@@ -188,6 +188,14 @@ def test_empty_candidates_still_writes_event(monkeypatch, tmp_path):
     assert event["candidate_ids"] == []
     assert event["ranks"] is None
     assert event["scores"] is None
+    extra = event["extra"] or {}
+    assert extra["answerer_diagnostics"] == answer.answerer_diagnostics
+    assert extra["answerer_diagnostics"]["retrieval_policy"] == {
+        "mode": "baseline",
+        "context_char_budget": 2000,
+        "search_top_k": 20,
+        "rerank_top_k": 20,
+    }
 
 
 def test_writer_failure_does_not_break_answer(monkeypatch, tmp_path):
@@ -235,6 +243,27 @@ def test_build_adapter_forwards_retrieval_event_writer_flags(tmp_path):
     assert adapter._run_id == "run-build-adapter"
 
 
+def test_build_adapter_forwards_semantic_recovery_policy(tmp_path):
+    adapter = locomo_run.build_adapter(
+        "seam",
+        db_path=str(tmp_path),
+        context_budget=8000,
+        search_top_k=100,
+        rerank_top_k=40,
+        semantic_recovery_mode="pack-budget-deep",
+    )
+
+    assert adapter.budget == 8000
+    assert adapter._search_top_k == 100
+    assert adapter._rerank_top_k == 40
+    assert adapter.semantic_recovery_policy.to_dict() == {
+        "mode": "pack-budget-deep",
+        "context_char_budget": 8000,
+        "search_top_k": 100,
+        "rerank_top_k": 40,
+    }
+
+
 def test_cli_forwards_retrieval_event_writer_flags(monkeypatch, tmp_path):
     captured = {}
 
@@ -263,3 +292,42 @@ def test_cli_forwards_retrieval_event_writer_flags(monkeypatch, tmp_path):
     adapter = captured["adapter"]
     assert adapter._record_events is True
     assert adapter._run_id == "run-cli"
+
+
+def test_cli_forwards_semantic_recovery_policy(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_run_benchmark_grouped(**kwargs):
+        captured["adapter"] = kwargs["adapter"]
+        return {"ok": True}
+
+    monkeypatch.setattr(locomo_run, "run_benchmark_grouped", fake_run_benchmark_grouped)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "locomo-run",
+            "--quickstart",
+            "--limit",
+            "0",
+            "--db-path",
+            str(tmp_path),
+            "--semantic-recovery-mode",
+            "pack-budget-deep",
+            "--context-budget",
+            "8000",
+            "--search-top-k",
+            "100",
+            "--rerank-top-k",
+            "40",
+        ],
+    )
+
+    locomo_run.main()
+
+    adapter = captured["adapter"]
+    assert adapter.semantic_recovery_policy.to_dict() == {
+        "mode": "pack-budget-deep",
+        "context_char_budget": 8000,
+        "search_top_k": 100,
+        "rerank_top_k": 40,
+    }

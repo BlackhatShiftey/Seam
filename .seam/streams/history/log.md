@@ -5966,3 +5966,25 @@ Audit conclusion recorded for future work: the HISTORY#274 cat4 open question is
 
 No runtime code changed in this entry. This branch (`codex/g5-cat4-audit-publish`) is intended to publish the existing local HISTORY#276 commit plus this audit/hygiene closeout through a draft PR instead of direct-pushing protected `main`.
 ---END-ENTRY-#277---
+
+---BEGIN-ENTRY-#278---
+id: 278
+date: 2026-06-01T22:59:38Z
+agent: codex
+status: done
+topics: retrieval, benchmark, locomo, audit, docs, verify, history, status
+commits: pending
+refs: benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py,tests/audit/test_locomo_adapter_evidence_text.py,tests/audit/test_locomo_adapter_retrieval_event_writer.py,docs/audits/2026-06-01-semantic-recovery-policy-experiment.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 277
+tokens: 520
+---
+Semantic recovery policy surface, diagnostics, and no-paid pack-budget experiment. This implements the operator-approved next slice after HISTORY#277: make the pack-budget/deep-candidate experiments explicit and default-off, record enough diagnostics to audit what policy produced a report, and run the full LoCoMo no-paid grid before making claims.
+
+Code changes: `benchmarks/external/locomo/run.py` now accepts SEAM-adapter policy flags `--semantic-recovery-mode` (`baseline`, `pack-budget`, `deep-candidates`, `pack-budget-deep`), `--context-budget`, `--search-top-k`, and `--rerank-top-k`, with defaults preserving old behavior (`baseline`, 2000 chars, k=20, rerank k=20). `build_adapter()` forwards those settings. `benchmarks/external/locomo/adapters/seam.py` records them in `SemanticRecoveryPolicy` and adds retrieval diagnostics to saved `AdapterAnswer.answerer_diagnostics` and retrieval-event `extra.answerer_diagnostics`, including empty-retrieval cases. Tests cover build_adapter forwarding, CLI forwarding, returned diagnostics, and event diagnostics.
+
+No-paid experiment: ran full LoCoMo 10-conversation suite (`n=1542`, `--answerer none`, `--judge none`, `--workers 1`, SQLite path with `env -u SEAM_PGVECTOR_DSN`, artifacts outside git under `../Seam-artifacts/20260601-semantic-recovery-policy/`). Results: baseline k20/b2000 context_recall_mean `0.623668`; pack-budget k20/b8000 `0.682864` (`+0.059195`); deep-candidates k100/b2000 `0.624195` (`+0.000526`); pack-budget-deep k100/b8000 `0.758217` (`+0.134549`). Diagnostics in the saved reports show the expected policy/candidate counts (e.g. k100 runs record `candidate_count=100` for the sample case).
+
+Interpretation: the pack budget is the dominant measured retrieval-context-recall throttle. Deeper candidates alone do almost nothing under the 2000-character pack and slightly regress some categories; deeper candidates become useful only when the pack budget expands enough to retain more evidence. This remains a context-recall result, not an answer-quality result: no answerer or judge ran, and larger packs can mechanically improve token-overlap recall by adding more text. The next gated validation is a paid judged baseline-vs-`pack-budget-deep` comparison before product or benchmark-quality claims.
+
+Verification: focused policy tests passed (`4 passed` for `tests/audit/test_locomo_adapter_evidence_text.py::test_locomo_adapter_reports_retrieval_policy_diagnostics`, `tests/audit/test_locomo_adapter_retrieval_event_writer.py::test_empty_candidates_still_writes_event`, `tests/audit/test_locomo_adapter_retrieval_event_writer.py::test_build_adapter_forwards_semantic_recovery_policy`, and `tests/audit/test_locomo_adapter_retrieval_event_writer.py::test_cli_forwards_semantic_recovery_policy`); `env -u SEAM_PGVECTOR_DSN .venv/bin/python -m pytest tests/audit/test_locomo_adapter_evidence_text.py tests/audit/test_locomo_adapter_retrieval_event_writer.py -q` passed (`23 passed`). The first post-baseline experiment attempt failed immediately because the inherited `SEAM_PGVECTOR_DSN` pointed at a non-running local pgvector service on `127.0.0.1:55432`; rerunning with the variable explicitly unset resolved it and all four reports completed. No paid API calls. Raw reports and benchmark archives are intentionally outside git; only the summarized audit doc is tracked.
+---END-ENTRY-#278---
