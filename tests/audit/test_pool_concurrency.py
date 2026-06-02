@@ -15,15 +15,28 @@ from seam_runtime.pool import ConnectionPool
 
 def _bootstrap(db_path: str) -> None:
     c = sqlite3.connect(db_path)
+    # Establish WAL mode on the file so concurrent writers serialize on a write
+    # lock with a busy wait instead of failing; mirrors SQLiteStore's production
+    # connection config. Without this, Windows rollback-journal locking makes
+    # concurrent writes flaky ("database is locked").
+    c.execute("pragma journal_mode=WAL")
     c.execute("create table t (id integer primary key autoincrement, v text not null)")
     c.commit()
     c.close()
 
 
+def _wal_connect(db_path: str) -> sqlite3.Connection:
+    """Connection factory mirroring SQLiteStore: WAL + a real busy timeout."""
+    conn = sqlite3.connect(db_path, timeout=5)
+    conn.execute("pragma journal_mode=WAL")
+    conn.execute("pragma busy_timeout=5000")
+    return conn
+
+
 def test_concurrent_writes_all_commit(tmp_path):
     db = str(tmp_path / "c.db")
     _bootstrap(db)
-    pool = ConnectionPool(lambda: sqlite3.connect(db, timeout=5), pool_size=3)
+    pool = ConnectionPool(lambda: _wal_connect(db), pool_size=3)
 
     n_threads, per_thread = 8, 25
     errors: list[Exception] = []

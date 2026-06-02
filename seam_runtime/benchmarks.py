@@ -812,6 +812,9 @@ def _run_surface_family(
             if artifact_id is not None:
                 case["artifact_id"] = artifact_id
             cases.append(_stamp_case_hash(case))
+        # Close the store before the TemporaryDirectory is cleaned up; on Windows
+        # an open SQLite handle locks surface-library.db and cleanup raises WinError 32.
+        surface_store.close()
 
     summary = {
         "case_count": len(cases),
@@ -1025,6 +1028,9 @@ def _run_long_context_family(
                 case["projection_id"] = projection_id
             cases.append(_stamp_case_hash(case))
         finally:
+            # Close the runtime before deleting temp_db; an open SQLite handle
+            # blocks deletion on Windows (WinError 32) and leaks the temp file.
+            temp_runtime.close()
             _cleanup_temp_db(temp_db)
 
     summary = {
@@ -1146,6 +1152,10 @@ claim c2:
             else [],
         }
         cases.append(_stamp_case_hash(case))
+        # Close both transient runtimes before the TemporaryDirectory is cleaned
+        # up; otherwise Windows keeps persistence.db locked and cleanup fails.
+        reopened_runtime.close()
+        temp_runtime.close()
 
     summary = {
         "case_count": len(cases),
@@ -1257,6 +1267,9 @@ def _run_agent_task_family(
                 case["artifact_id"] = artifact_id
             cases.append(_stamp_case_hash(case))
         finally:
+            # Close the runtime before deleting temp_db; an open SQLite handle
+            # blocks deletion on Windows (WinError 32) and leaks the temp file.
+            temp_runtime.close()
             _cleanup_temp_db(temp_db)
 
     summary = {

@@ -52,12 +52,17 @@ def test_bil2_result_hash_deterministic():
         dataset_source="quickstart",
         judge=judge_a,
     )
+    # Close adapter_a before adapter_b reuses the same default db path; otherwise
+    # adapter_b.reset() cannot delete the per-case DBs adapter_a still holds open
+    # (Windows WinError 32).
+    adapter_a.close()
     result_b = run_benchmark(
         adapter=adapter_b,
         cases=copy.deepcopy(cases),
         dataset_source="quickstart",
         judge=judge_b,
     )
+    adapter_b.close()
 
     bundle_a = seal_benchmark_bundle(result_a, level="BIL-2", allow_stub_seal=True)
     bundle_b = seal_benchmark_bundle(result_b, level="BIL-2", allow_stub_seal=True)
