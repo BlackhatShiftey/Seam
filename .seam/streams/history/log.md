@@ -6085,3 +6085,23 @@ Verification: Linux cannot reproduce WinError 32 (it unlinks open files), so the
 
 Known follow-up (not covered by any CI test, so deferred): `run_benchmark_grouped_parallel` in `benchmarks/external/common/runner.py` creates adapters via `adapter_factory()` per worker/scope and does not close them; real Windows parallel LoCoMo runs could still leak adapter handles. Owed a runner-side close (close factory-created adapters when their scope completes).
 ---END-ENTRY-#282---
+
+---BEGIN-ENTRY-#283---
+id: 283
+date: 2026-06-02T16:12:06Z
+agent: claude
+status: done
+topics: bugfix, windows, storage, locking, ci, verify, history, status
+commits: pending
+refs: tests/audit/test_pool_concurrency.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 282
+tokens: 404
+---
+Windows pool-concurrency test hardening (WAL) — the last red on `test-and-benchmark (windows-latest)` after HISTORY#282. The #282 handle-close fix dropped the Windows job from `10 failed, 6 errors` (all WinError 32 file-locks) to `1 failed, 881 passed`. The single remaining failure was `tests/audit/test_pool_concurrency.py::test_concurrent_writes_all_commit` with `AssertionError: concurrent writers raised: [OperationalError('database is locked')]`.
+
+This is independent of #282: the test is fully self-contained (its own tmp_path db, its own `ConnectionPool`, its own connection factory) and touches none of the code #282 changed. Root cause: the test built its pool with `lambda: sqlite3.connect(db, timeout=5)` — a bare connection without WAL, i.e. a LESS robust config than production `SQLiteStore`, which sets `pragma journal_mode=WAL` + `pragma busy_timeout=5000`. Under Windows file locking, rollback-journal mode makes 8-thread concurrent writers intermittently raise `database is locked` (it passed in the earlier Windows run, so it is flaky/timing-dependent, not deterministic).
+
+Fix: align the test's connections with production. `_bootstrap` now sets `pragma journal_mode=WAL` to establish WAL on the db file, and a new `_wal_connect` factory sets `journal_mode=WAL` + `busy_timeout=5000` per connection; the test's pool uses it. WAL lets concurrent writers serialize on a write lock with a busy wait instead of failing. Only this test's factory changed; the other pool tests in the file (exhaustion, idle eviction, validation) keep their own inline factories.
+
+Verification: full `tests/audit/test_pool_concurrency.py` = 7 passed on Linux. Windows-only behavior re-verified by CI on PR #51 (same branch as #282).
+---END-ENTRY-#283---
