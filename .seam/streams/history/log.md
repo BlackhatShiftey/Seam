@@ -5988,3 +5988,25 @@ Interpretation: the pack budget is the dominant measured retrieval-context-recal
 
 Verification: focused policy tests passed (`4 passed` for `tests/audit/test_locomo_adapter_evidence_text.py::test_locomo_adapter_reports_retrieval_policy_diagnostics`, `tests/audit/test_locomo_adapter_retrieval_event_writer.py::test_empty_candidates_still_writes_event`, `tests/audit/test_locomo_adapter_retrieval_event_writer.py::test_build_adapter_forwards_semantic_recovery_policy`, and `tests/audit/test_locomo_adapter_retrieval_event_writer.py::test_cli_forwards_semantic_recovery_policy`); `env -u SEAM_PGVECTOR_DSN .venv/bin/python -m pytest tests/audit/test_locomo_adapter_evidence_text.py tests/audit/test_locomo_adapter_retrieval_event_writer.py -q` passed (`23 passed`). The first post-baseline experiment attempt failed immediately because the inherited `SEAM_PGVECTOR_DSN` pointed at a non-running local pgvector service on `127.0.0.1:55432`; rerunning with the variable explicitly unset resolved it and all four reports completed. No paid API calls. Raw reports and benchmark archives are intentionally outside git; only the summarized audit doc is tracked.
 ---END-ENTRY-#278---
+
+---BEGIN-ENTRY-#279---
+id: 279
+date: 2026-06-02T03:23:37Z
+agent: codex
+status: done
+topics: retrieval, benchmark, locomo, audit, docs, verify, history, status
+commits: pending
+refs: docs/audits/2026-06-01-paid-locomo-slice-validation.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 278
+tokens: 454
+---
+Paid LoCoMo slice validation for the semantic recovery pack-budget lever. The existing usable `OPENAI_API_KEY` was reused without printing or recording it. A safe credential check found `OPENAI_API_KEY` present in the shell and persisted in ignored `.env.local`; `ANTHROPIC_API_KEY` was shell-present but not persisted, so OpenAI was the least brittle paid path. No key values, env file contents, provider session URLs, or private links were read or written.
+
+Built a deterministic external 100-case slice from `benchmarks/external/locomo/data/locomo10.json` at `../Seam-artifacts/20260601-paid-locomo-slice/locomo_paid_slice_100.json`, with all 10 conversations represented and categories cat1=24, cat2=24, cat3=24, cat4=26, cat5=2. The runner dry-run validated 100 cases with fixture hash `27137212827893399d590d7172a254fb784f057e9bd71969c8ced87aa9d3e00d`.
+
+Paid smoke: 2-case baseline using `--answerer openai --judge openai` completed with zero judge errors, answerer model `gpt-4o-mini`, and judge model `gpt-4o-mini`. Paid A/B slice then compared baseline (`semantic-recovery-mode baseline`, context budget 2000, search top-k 20) against candidate (`pack-budget-deep`, context budget 8000, search top-k 100), both with workers=1, SQLite path (`SEAM_PGVECTOR_DSN` unset), saved context, OpenAI answerer, and OpenAI judge. Raw reports and durable archives live outside git under `../Seam-artifacts/20260601-paid-locomo-slice/`.
+
+Results: baseline context_recall_mean `0.433482`, answer_f1_mean `0.349337`, judge_score_mean `0.44`, correct_count `32`, partial_count `24`, incorrect_count `44`, judge_errors `0`. Pack-budget-deep context_recall_mean `0.604897`, answer_f1_mean `0.402854`, judge_score_mean `0.57`, correct_count `40`, partial_count `34`, incorrect_count `26`, judge_errors `0`. Deltas: context recall `+0.171415`, answer F1 `+0.053517`, judge score `+0.13`, correct `+8`, partial `+10`, incorrect `-18`. All major categories improved on judged score: cat1 `0.333333 -> 0.520833`, cat2 `0.437500 -> 0.541667`, cat3 `0.291667 -> 0.416667`, cat4 `0.634615 -> 0.750000`; cat5 stayed `1.0 -> 1.0` on two cases.
+
+Interpretation: the 100-case paid slice supports the no-paid pack-budget diagnosis. The larger pack plus deeper candidate pool improved judged answer quality, not just token-overlap context recall. There are still case-level regressions (5 correct->partial, 1 partial->incorrect, 1 correct->incorrect), so this is positive slice evidence, not full LoCoMo proof. Next gated step: full 1542-case paid judged A/B baseline vs pack-budget-deep only if the operator accepts the spend.
+---END-ENTRY-#279---

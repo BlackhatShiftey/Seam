@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 334
+total_events: 335
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-30T09:34:38Z | history:113:cec1ae05 | session-event | done | compress, mirl, codec, benchmark, command, roadmap, ledge... | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,seam_runtime/holographic.py,seam_... |
 | 2026-04-30T10:27:14Z | history:114:6e5b5ae1 | session-event | done | dashboard, tui, command, compress, verify, history, snaps... | seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX... |
 | 2026-04-30T10:29:39Z | history:115:38b13455 | session-event | done | dashboard, tui, verify, history, snapshot | seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX... |
 | 2026-04-30T11:40:02Z | history:116:1c22cb7e | session-event | done | ledger, readme, benchmark, verify, history, snapshot | LICENSE,NOTICE,README.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/sna... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-05-31T23:56:01Z | history:276:aa84a2f6 | session-event | done | roadmap, surface, verify, integrity, search, streams, his... | ROADMAP.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/roadma... |
 | 2026-06-01T19:23:53Z | history:277:cb90f2da | session-event | done | audit, benchmark, retrieval, locomo, docs, verify, histor... | docs/audits/2026-05-31-cat4-single-hop-attribution.md,.gitignore,PROJECT_STAT... |
 | 2026-06-01T22:59:38Z | history:278:8ddb1b38 | session-event | done | retrieval, benchmark, locomo, audit, docs, verify, histor... | benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py... |
+| 2026-06-02T03:23:37Z | history:279:d613fd79 | session-event | done | retrieval, benchmark, locomo, audit, docs, verify, histor... | docs/audits/2026-06-01-paid-locomo-slice-validation.md,PROJECT_STATUS.md,HIST... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0134.cross.md | 2026-04-15T00:00:00Z..2026-04-30T09:21:44Z | 134 | (multi) | (multi) |
+| 0001-0135.cross.md | 2026-04-15T00:00:00Z..2026-04-30T09:34:38Z | 135 | (multi) | (multi) |
