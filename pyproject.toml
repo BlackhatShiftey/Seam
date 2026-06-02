@@ -42,7 +42,7 @@ seam-mcp = "seam_runtime.mcp_protocol:main"
 py-modules = ["seam"]
 
 [tool.setuptools.packages.find]
-include = ["experimental*", "seam_runtime*"]
+include = ["seam_runtime*"]
 
 [tool.setuptools.exclude-package-data]
 # Operator-local Codex profile; never ship in the wheel.

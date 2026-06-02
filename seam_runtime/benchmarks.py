@@ -962,7 +962,7 @@ def _run_long_context_family(
     fixture_path: Path = LONG_CONTEXT_FIXTURE_PATH,
     require_fixture: bool = False,
 ) -> dict[str, Any]:
-    from experimental.retrieval_orchestrator import RetrievalOrchestrator
+    from seam_runtime.retrieval_orchestrator import RetrievalOrchestrator
 
     cases: list[dict[str, Any]] = []
     for config in _load_json_fixture(fixture_path, _default_long_context_cases(), require_exists=require_fixture):
@@ -1177,7 +1177,7 @@ def _run_agent_task_family(
     fixture_path: Path = AGENT_TASK_FIXTURE_PATH,
     require_fixture: bool = False,
 ) -> dict[str, Any]:
-    from experimental.retrieval_orchestrator import RetrievalOrchestrator
+    from seam_runtime.retrieval_orchestrator import RetrievalOrchestrator
 
     cases: list[dict[str, Any]] = []
     for config in _load_json_fixture(fixture_path, _default_agent_task_cases(), require_exists=require_fixture):

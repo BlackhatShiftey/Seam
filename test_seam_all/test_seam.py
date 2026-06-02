@@ -13,9 +13,9 @@ from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 
-from experimental.retrieval_orchestrator import ChromaSemanticAdapter, QueryIntent, RetrievalOrchestrator
-from experimental.retrieval_orchestrator.adapters import SQLiteIRAdapter
-from experimental.retrieval_orchestrator.planner import build_plan
+from seam_runtime.retrieval_orchestrator import ChromaSemanticAdapter, QueryIntent, RetrievalOrchestrator
+from seam_runtime.retrieval_orchestrator.adapters import SQLiteIRAdapter
+from seam_runtime.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime, compile_dsl, compile_nl, decompile_ir, load_ir_lines, pack_ir, render_ir, unpack_pack
 from seam_runtime import benchmarks as benchmark_module
 from seam_runtime.mirl import IRBatch, MIRLRecord, RecordKind, Status
@@ -528,7 +528,7 @@ import sys
 orig = builtins.__import__
 
 def blocked(name, globals=None, locals=None, fromlist=(), level=0):
-    if name.startswith("experimental.retrieval_orchestrator") or name == "experimental":
+    if name.startswith("seam_runtime.retrieval_orchestrator") or name == "experimental":
         raise ImportError("simulated experimental import failure")
     return orig(name, globals, locals, fromlist, level)
 

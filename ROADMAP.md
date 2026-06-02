@@ -1567,6 +1567,34 @@ high recall; that may be an answerer failure, not a retrieval failure.
 
 ---
 
+## Track N — Packaging, Release, and Distribution
+
+<!-- seam:item
+id: roadmap:track:N
+status: planned
+status-since: 2026-06-02
+status-by: history:284
+supersedes: none
+topics: packaging, release, distribution
+priority: 3
+phase: 1
+-->
+
+**Status:** Planned, deferred (operator decision 2026-06-02 — not a current priority). Build the release/distribution plumbing for `seam-runtime`.
+
+**Distribution target:** PRIVATE for now (GitHub Releases wheels / private index), NOT public PyPI. Keep the `Private :: Do Not Upload` classifier until the operator explicitly flips it. Package name `seam-runtime` (free on PyPI; `seam` is taken). Build plumbing should be target-agnostic so switching to public PyPI later is a one-line change.
+
+**License gate:** the license is expected to change from the current proprietary/source-available to Apache-2.0 or MIT (to enable selling SaaS/commercial later) — operator decides. Do NOT change the license as part of packaging. Advisory: Apache-2.0 > MIT for a company (patent grant + defensive clauses); neither prevents competitor SaaS — AGPL-3.0 + dual-licensing or a source-available license (BSL) is the SaaS-protective option if that matters.
+
+Phase work:
+
+1. Complete project metadata (authors, `project.urls`, keywords, long-description content type); confirm `seam_runtime*` packaging only (experimental promoted out — see HISTORY#284).
+2. `python -m build` + `twine check` validation in CI on every tag.
+3. Private-distribution release workflow: build sdist+wheel on a `v*` tag, `twine check`, attach artifacts to a GitHub Release (private repo). Keep `Do Not Upload`.
+4. When/if the license flips and the operator approves public release: remove `Do Not Upload`, wire Trusted Publishing (OIDC) to PyPI, publish `seam-runtime`.
+
+---
+
 ## Recommended Course — Priority Order
 
 Use this section for current priority. Older planned entries `HISTORY#028`-

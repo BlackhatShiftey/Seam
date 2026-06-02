@@ -6105,3 +6105,25 @@ Fix: align the test's connections with production. `_bootstrap` now sets `pragma
 
 Verification: full `tests/audit/test_pool_concurrency.py` = 7 passed on Linux. Windows-only behavior re-verified by CI on PR #51 (same branch as #282).
 ---END-ENTRY-#283---
+
+---BEGIN-ENTRY-#284---
+id: 284
+date: 2026-06-02T16:46:11Z
+agent: claude
+status: done
+topics: refactor, structure, retrieval, roadmap, packaging, verify, history, status
+commits: pending
+refs: seam_runtime/retrieval_orchestrator/,seam_runtime/cli.py,seam_runtime/mcp.py,seam_runtime/dashboard.py,seam_runtime/benchmarks.py,test_seam_all/test_seam.py,test_seam_all/test_cli_import_isolation.py,tools/ci/chroma_real_smoke.py,tests/audit/test_hybrid_orchestrator_removed.py,tests/audit/test_chroma_sync_default.py,pyproject.toml,docs/CODE_LAYOUT.md,ROADMAP.md,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/roadmap/log.md,.seam/streams/history/log.md,.seam/cross_index.md
+supersedes: 283
+tokens: 767
+---
+Promote retrieval_orchestrator out of experimental/ and defer packaging to a new roadmap track. Operator decided (2026-06-02) that packaging is not a current priority (roadmap it for later) and that the experimental code must be moved somewhere it is not misrepresented.
+
+Finding: `experimental/retrieval_orchestrator/` was never really experimental — it is load-bearing runtime code imported by shipped modules at 6 sites: `seam_runtime/cli.py` (x2, the `seam retrieve` command), `seam_runtime/mcp.py` (MCP retrieval tool), `seam_runtime/dashboard.py` (dashboard retrieval), and `seam_runtime/benchmarks.py` (x2, agent-task + benchmark families). It could not be deleted (breaks `retrieve`/MCP/dashboard/benchmarks) nor excluded from packaging (the installed package would crash on import). The separate `experimental/webui/` (TypeScript browser-dashboard prototype, ~non-Python) is a different, untouched question.
+
+Change: `git mv experimental/retrieval_orchestrator seam_runtime/retrieval_orchestrator` (history preserved; the package's internal imports are relative `.types`/`.adapters`/`.merger`/`.planner` plus absolute `seam_runtime.*`, so they survived the move unchanged). Rewrote 15 `experimental.retrieval_orchestrator` references to `seam_runtime.retrieval_orchestrator` across 9 files: the 6 runtime import sites plus `test_seam_all/test_seam.py`, `test_seam_all/test_cli_import_isolation.py` (including the `BlockRetrievalOrchestrator` MetaPathFinder `startswith(...)` guard), `tools/ci/chroma_real_smoke.py` (used by the required `chroma-real-smoke` CI check), `tests/audit/test_hybrid_orchestrator_removed.py` (the hybrid-alias import), and `tests/audit/test_chroma_sync_default.py`. Removed the now-vestigial `experimental/__init__.py` (experimental/ is no longer a Python package; only the webui prototype remains). Set pyproject `tool.setuptools.packages.find` include to `seam_runtime*` only (dropped `experimental*`). Updated `docs/CODE_LAYOUT.md` to list `seam_runtime/retrieval_orchestrator/` under Active Runtime and to note experimental/ now holds only the webui prototype.
+
+Packaging deferral: added ROADMAP Track N — Packaging, Release, and Distribution (`roadmap:track:N`, status planned, priority 3), recording the operator's decisions: private distribution for now (GitHub Releases/private index, keep `Private :: Do Not Upload`), package name `seam-runtime` (free on PyPI; `seam` taken), and that the license is expected to change to Apache-2.0/MIT (operator decides; do not change it as part of packaging). Roadmap stream rebuilt (56 -> 57 items).
+
+Verification: import smoke (all 6 runtime importers + the package load, `HybridOrchestrator is RetrievalOrchestrator` alias intact); targeted tests `test_cli_import_isolation.py + test_hybrid_orchestrator_removed.py + test_chroma_sync_default.py` = 6 passed; full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` exits 0 on Linux (DSN unset). No runtime behavior changed — only the import path of an internal subsystem. Windows re-verified by CI on the PR. No functional change to the webui prototype.
+---END-ENTRY-#284---
