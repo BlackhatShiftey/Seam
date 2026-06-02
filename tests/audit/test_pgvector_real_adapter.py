@@ -10,10 +10,13 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("SEAM_PGVECTOR_DSN"),
-    reason="SEAM_PGVECTOR_DSN not set; skipping real-postgres pgvector integration",
-)
+pytestmark = [
+    pytest.mark.external,
+    pytest.mark.skipif(
+        not os.environ.get("SEAM_PGVECTOR_DSN"),
+        reason="SEAM_PGVECTOR_DSN not set; skipping real-postgres pgvector integration",
+    ),
+]
 
 
 def _make_adapter():
