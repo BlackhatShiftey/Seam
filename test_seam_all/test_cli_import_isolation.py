@@ -19,7 +19,7 @@ def test_seam_doctor_runs_without_retrieval_orchestrator_imported():
 
 
 def test_dashboard_module_imports_without_retrieval_orchestrator_available():
-    """Dashboard module import should not depend on experimental retrieval startup."""
+    """Dashboard module import should not depend on retrieval_orchestrator startup."""
     code = r'''
 import importlib.abc
 import sys

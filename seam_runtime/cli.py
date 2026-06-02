@@ -348,6 +348,20 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument("--reload", action="store_true")
     serve_parser.add_argument("--workers", type=int, default=1)
 
+    webui_parser = subparsers.add_parser(
+        "webui",
+        aliases=["dashboard-web"],
+        help="Serve the SEAM browser dashboard (UI + REST API on one server) and open it",
+    )
+    webui_parser.add_argument("--host", default="127.0.0.1")
+    webui_parser.add_argument("--port", type=int, default=8765)
+    webui_parser.add_argument("--reload", action="store_true")
+    webui_parser.add_argument("--workers", type=int, default=1)
+    webui_parser.add_argument(
+        "--no-open", dest="open_browser", action="store_false", default=True,
+        help="Do not open a browser window automatically",
+    )
+
     pack_parser = subparsers.add_parser("pack", help="Build a pack from persisted record ids")
     pack_parser.add_argument("record_ids")
     pack_parser.add_argument("--lens", default="general")
@@ -714,6 +728,26 @@ def run_cli(argv: list[str] | None = None) -> None:
     if args.command == "serve":
         from .server import run_server
 
+        run_server(host=args.host, port=args.port, db=args.db, reload=args.reload, workers=args.workers)
+        return
+
+    if args.command in ("webui", "dashboard-web"):
+        from .server import run_server, webui_dir
+
+        if webui_dir() is None:
+            print(
+                "SEAM dashboard assets not found (expected seam_runtime/webui/dashboard.html).",
+                file=sys.stderr,
+            )
+            return
+        url = f"http://{args.host}:{args.port}/"
+        if getattr(args, "open_browser", True):
+            import threading
+            import webbrowser
+
+            # Open the browser shortly after uvicorn starts accepting connections.
+            threading.Timer(1.5, lambda: webbrowser.open(url)).start()
+        print(f"SEAM dashboard: {url}  (Ctrl-C to stop)")
         run_server(host=args.host, port=args.port, db=args.db, reload=args.reload, workers=args.workers)
         return
 

@@ -1830,12 +1830,12 @@ const MODEL_OPTIONS = [
 
 
 // ── Ingest Panel ─────────────────────────────────────────────────────────
-<!-- DEMO NOTE: Files added without drag-and-drop (e.g. via addDemoFile button
+/* DEMO NOTE: Files added without drag-and-drop (e.g. via addDemoFile button
      or empty drops) are simulated — they lack a _file reference and use
      a setInterval-driven pipeline that fakes stage progress.  Only files
      added via real drag-and-drop or the file-picker (<input type=file>)
      carry a _file reference and call the real SEAM REST API via
-     ingestFileViaAPI() → SeamAPI.compile(). -->
+     ingestFileViaAPI() → SeamAPI.compile(). */
 const ingestStages = ['Select files', 'Parse & chunk', 'Compile MIRL', 'Embed vectors', 'Persist to DB'];
 
 function IngestPanel({ width, onOpenSettings }) {

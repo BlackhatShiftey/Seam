@@ -6127,3 +6127,27 @@ Packaging deferral: added ROADMAP Track N — Packaging, Release, and Distributi
 
 Verification: import smoke (all 6 runtime importers + the package load, `HybridOrchestrator is RetrievalOrchestrator` alias intact); targeted tests `test_cli_import_isolation.py + test_hybrid_orchestrator_removed.py + test_chroma_sync_default.py` = 6 passed; full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` exits 0 on Linux (DSN unset). No runtime behavior changed — only the import path of an internal subsystem. Windows re-verified by CI on the PR. No functional change to the webui prototype.
 ---END-ENTRY-#284---
+
+---BEGIN-ENTRY-#285---
+id: 285
+date: 2026-06-02T18:22:53Z
+agent: claude
+status: done
+topics: dashboard, webui, server, cli, structure, verify, history, status
+commits: pending
+refs: seam_runtime/webui/,webui/,seam_runtime/server.py,seam_runtime/cli.py,seam_runtime/mcp.py,seam_runtime/webui/dashboard.html,webui/vite.config.ts,pyproject.toml,docs/CODE_LAYOUT.md,docs/setup.md,installers/README.md,test_seam_all/test_cli_import_isolation.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/cross_index.md
+supersedes: 284
+tokens: 891
+---
+Wire the browser dashboard in as the functional SEAM GUI and delete experimental/ entirely. Operator decision (2026-06-02): SEAM is used either via this dashboard or the CLI; nothing in the repo is experimental. The webui is THE project dashboard, not a prototype. Chosen serving model: the SEAM REST server serves the static dashboard itself (one server, same origin), because dashboard.html already calls the API with relative paths and DEFAULT_BASE_URL=''; Vite was only a dev shim.
+
+Structure / experimental removal: `git mv experimental/webui webui` (the Vite+React+TS dev project, kept intact at repo root) and `git mv webui/public seam_runtime/webui` (the served static assets: dashboard.html, seam-api.js, tweaks-panel.jsx, branding/, favicon.svg, icons.svg). Removed the now-empty `experimental/` directory entirely — combined with HISTORY#284 (retrieval_orchestrator promotion), nothing remains under experimental/. Pointed `webui/vite.config.ts` publicDir at `../seam_runtime/webui` so `npm run dev` and the runtime serve one canonical asset copy. Added `webui/*`,`webui/**/*` to pyproject `tool.setuptools.package-data[seam_runtime]` so the wheel ships the dashboard.
+
+FastAPI wiring (seam_runtime/server.py): added `webui_dir()` (resolves `seam_runtime/webui/`, override via `SEAM_WEBUI_DIR`, returns None if absent so the API still runs headless) and `_mount_webui(app)` which adds `GET /` -> FileResponse(dashboard.html) and mounts StaticFiles at `/`. `_mount_webui(app)` is called at the END of `create_app` so the explicit API routes (/health, /stats, /search, ...) are matched before the static mount; the mount only serves the dashboard's same-origin assets. CLI (seam_runtime/cli.py): added `seam webui` (alias `dashboard-web`) which starts the server and opens the browser (`--no-open` to skip), mirroring `seam serve`.
+
+Browser verification (Playwright against a live `seam serve` on 127.0.0.1:8799): TestClient first confirmed GET / -> 200 dashboard HTML, GET /seam-api.js -> 200, GET /branding/* -> 200, GET /health -> 200 (API not shadowed), GET /missing -> 404. Rendering then exposed a REAL pre-existing bug: dashboard.html had an HTML comment (`<!-- DEMO NOTE ... -->`) at top level inside the inline `text/babel` script (line 1833). HTML comments are invalid JS/JSX, so Babel-standalone threw `SyntaxError: Unexpected token` and the entire React app failed to mount — the page was blank. Converted it to a `/* ... */` JS block comment. After the fix the full IDE dashboard renders (title bar, explorer, editor, agent chat, terminal, status bar) with 0 console errors. The dashboard works served from one `seam serve`, no Node/Vite/CORS.
+
+Cleanup of stale `experimental` references: `seam_runtime/mcp.py` error text ("experimental module missing" -> "seam_runtime.retrieval_orchestrator import failed"), `test_cli_import_isolation.py` docstring, `installers/README.md`, `docs/setup.md`, and `docs/CODE_LAYOUT.md` (removed the Active Prototypes/experimental section; added `seam_runtime/webui/` under Active Runtime and a WebUI Dev Project section for `webui/`). Remaining literal "experimental" mentions are historical (a types.py comment about prior stage naming, a hybrid_orchestrator-removed path assertion that still holds, and history test-fixture strings) — harmless, no broken refs.
+
+Verification: full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` exits 0 on Linux; server/API subset 65 passed; import smoke + `webui_dir()` resolution OK. Known follow-up: the `webui/src/` React rewrite is still incomplete rework material (the shipped UI is the static dashboard.html); finishing or replacing it is future work.
+---END-ENTRY-#285---

@@ -54,7 +54,8 @@ sh ./installers/install_seam_linux.sh --dev
 ```
 
 The Linux development bootstrap installs Python dependencies only. It does not
-install or modify `experimental/webui/`.
+install Node dependencies or build the `webui/` dev project; the runtime serves
+the dashboard (`seam serve` / `seam webui`) directly with no build step.
 
 If Debian/Ubuntu says `venv` is missing:
 

@@ -7,6 +7,7 @@ not have to infer what works from directory names alone.
 
 - `seam_runtime/` - packaged runtime, dashboard, storage, retrieval, model, and benchmark code.
 - `seam_runtime/retrieval_orchestrator/` - multi-leg retrieval orchestrator (planner, adapters, merger) powering `seam retrieve`, the MCP tool, dashboard retrieval, and the benchmark suite. Promoted from `experimental/` in HISTORY#284.
+- `seam_runtime/webui/` - the SEAM browser dashboard served by the REST API: `dashboard.html` (the IDE-style operator UI), `seam-api.js`, `tweaks-panel.jsx`, branding, and icons. `seam serve` and `seam webui` serve these at `/` on the same origin as the API; packaged with the wheel. This is the functional dashboard (HISTORY#285).
 - `seam.py` - console entrypoint module for `seam` and `seam-benchmark`.
 - `test_seam_all/test_seam.py` - primary regression suite. Local `test_seam_*.db`
   artifacts live in ignored `test_seam/` so root stays clean.
@@ -18,16 +19,16 @@ not have to infer what works from directory names alone.
 - `scripts/` - active operator scripts and guarded runners.
 - `installers/` - active installation entrypoints and installer docs.
 
-## Active Prototypes
+## WebUI Dev Project
 
-- `experimental/` - now holds only the browser dashboard prototype below. The
-  former `experimental/retrieval_orchestrator/` was load-bearing runtime code
-  (imported by `cli`, `mcp`, `dashboard`, and `benchmarks`) and has been
-  promoted to `seam_runtime/retrieval_orchestrator/` (see HISTORY#284); it is
-  no longer "experimental".
-- `experimental/webui/` - active IDE-like browser dashboard prototype and
-  visual target for the future REST API GUI. It is a non-Python (TypeScript)
-  prototype, is not imported by the runtime, and is not packaged.
+- `webui/` - the Vite + React + TypeScript dev project for the browser dashboard.
+  Its `vite.config.ts` `publicDir` points at `../seam_runtime/webui`, so `npm run
+  dev` serves the same canonical assets the runtime serves. The runtime does NOT
+  depend on Node or a build step: `seam serve` serves the static `dashboard.html`
+  directly. The React panes under `webui/src/` are in-progress rework material;
+  the shipped, working dashboard is the static `seam_runtime/webui/dashboard.html`.
+  (`experimental/` was removed in HISTORY#285 — nothing in this repo is
+  experimental.)
 
 ## Inactive Code
 

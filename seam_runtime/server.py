@@ -236,6 +236,42 @@ async def _send_body_too_large(scope: dict[str, Any], send: Any, max_body_bytes:
     await response(scope, empty_receive, send)
 
 
+def webui_dir() -> Path | None:
+    """Directory of the served SEAM dashboard, or None if it is not present.
+
+    The canonical copy ships inside the package at ``seam_runtime/webui/``.
+    ``SEAM_WEBUI_DIR`` overrides it (e.g. to serve a local build). Returns None
+    only if no ``dashboard.html`` is found, so the API still runs headless.
+    """
+    override = os.environ.get("SEAM_WEBUI_DIR")
+    candidate = Path(override).expanduser() if override else Path(__file__).resolve().parent / "webui"
+    return candidate if (candidate / "dashboard.html").is_file() else None
+
+
+def _mount_webui(app: Any) -> None:
+    """Serve the static dashboard from the SEAM API itself (same origin).
+
+    `dashboard.html` calls the API with relative paths (`/health`, `/search`, ...),
+    so serving it here means `seam serve` delivers both the UI and the API from one
+    process — no Node/Vite/CORS. Mounted LAST so the explicit API routes win; the
+    mount only handles the dashboard's own assets (`seam-api.js`, `tweaks-panel.jsx`,
+    `branding/`, icons) at the web root.
+    """
+    directory = webui_dir()
+    if directory is None:
+        return
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    index = directory / "dashboard.html"
+
+    @app.get("/", include_in_schema=False)
+    def _webui_index() -> Any:
+        return FileResponse(index)
+
+    app.mount("/", StaticFiles(directory=str(directory)), name="webui")
+
+
 def create_app(
     runtime: SeamRuntime | None = None,
     shutdown_state: ShutdownState | None = None,
@@ -520,6 +556,9 @@ def create_app(
             raise HTTPException(status_code=400, detail="records list is required")
         return runtime.persist_ir(IRBatch.from_json(records)).to_dict()
 
+    # Serve the static dashboard from this same server (added last so the API
+    # routes above take precedence over the static mount).
+    _mount_webui(app)
     return app
 
 

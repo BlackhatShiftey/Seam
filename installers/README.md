@@ -80,7 +80,8 @@ Linux `--dev` mode:
 - installs `requirements.txt`, `.[all-extras]`, and `pytest`
 - runs `seam.py doctor`, history integrity, routing, snapshot, continuity, and
   stream verification checks
-- does not install or modify `experimental/webui/`
+- does not install Node dependencies or build the `webui/` dev project (the
+  runtime serves the dashboard directly; no build step is required)
 
 Default persistent database paths:
 

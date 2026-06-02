@@ -4,7 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  publicDir: 'public',
+  // The served dashboard assets (dashboard.html, seam-api.js, tweaks-panel.jsx,
+  // branding, icons) are the canonical runtime copy under seam_runtime/webui/,
+  // which `seam serve` ships and serves. The Vite dev server points at the same
+  // directory so `npm run dev` and the runtime serve byte-identical assets.
+  publicDir: '../seam_runtime/webui',
   server: {
     port: 5173,
     proxy: {

@@ -44,6 +44,11 @@ py-modules = ["seam"]
 [tool.setuptools.packages.find]
 include = ["seam_runtime*"]
 
+[tool.setuptools.package-data]
+# Ship the browser dashboard assets so `seam serve`/`seam webui` can serve the
+# UI from the installed package, not just from a source checkout.
+seam_runtime = ["webui/*", "webui/**/*"]
+
 [tool.setuptools.exclude-package-data]
 # Operator-local Codex profile; never ship in the wheel.
 seam_runtime = ["config.toml"]
