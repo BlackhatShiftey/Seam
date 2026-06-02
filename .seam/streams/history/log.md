@@ -6010,3 +6010,49 @@ Results: baseline context_recall_mean `0.433482`, answer_f1_mean `0.349337`, jud
 
 Interpretation: the 100-case paid slice supports the no-paid pack-budget diagnosis. The larger pack plus deeper candidate pool improved judged answer quality, not just token-overlap context recall. There are still case-level regressions (5 correct->partial, 1 partial->incorrect, 1 correct->incorrect), so this is positive slice evidence, not full LoCoMo proof. Next gated step: full 1542-case paid judged A/B baseline vs pack-budget-deep only if the operator accepts the spend.
 ---END-ENTRY-#279---
+
+---BEGIN-ENTRY-#280---
+id: 280
+date: 2026-06-02T13:32:10Z
+agent: claude
+status: done
+topics: test, pgvector, bugfix, protocol, branch, audit, verify, history, status
+commits: pending
+refs: tests/conftest.py,tests/audit/test_pgvector_real_adapter.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 279
+tokens: 1116
+---
+Full-audit closeout: local test-harness pgvector-DSN isolation fix plus stale-branch cleanup. Starting state on 2026-06-02: `main` clean and equal to `origin/main` at `2d7b113` (HISTORY#279); all four protocol gates (verify_integrity, verify_continuity, verify_routing, verify_streams) passed. A full run of `tests/ test_seam_all/test_seam.py` with the Docker pgvector service up returned exit 0 (green, 4 skipped), confirming suite health.
+
+Audit-found issue and fix: the operator shell exports `SEAM_PGVECTOR_DSN` (documented local dev setup), which leaked into every persist-path test. With the optional Docker pgvector container down, ~21 tests that do NOT intend to exercise pgvector (e.g. tests/audit/test_reingest_source_dedup.py, test_server_budget_bounds.py, test_storage_stats_max_degree.py, test_locomo_decomposer.py, test_mem0_harness_adapter_contract.py) failed with raw `connection refused (127.0.0.1:55432)` instead of running on the SQLite default, which is confusing and diverges from CI (CI sets no DSN). Added `tests/conftest.py` with an autouse fixture that hides the ambient `SEAM_PGVECTOR_DSN` (monkeypatch.delenv, auto-restored) for any test NOT marked `external`, routing them to the SQLite vector backend so local runs are deterministic and match CI. Marked `tests/audit/test_pgvector_real_adapter.py` `external` (changed `pytestmark` to a list of `pytest.mark.external` plus the existing skipif) so it keeps the ambient DSN and continues to self-gate via skipif. Deliberately did NOT add a reachability auto-skip to the real-adapter tests: per operator policy, a set-but-unreachable DSN should require the operator to start the service, not silently skip.
+
+Verification of the fix: (a) with `SEAM_PGVECTOR_DSN` unset, real-adapter tests SKIP cleanly and the formerly-failing persist tests pass on SQLite; (b) with the operator DSN exported and Docker UP, a full `tests/ test_seam_all/test_seam.py` run returned exit 0 (no regression); (c) the ~21 confusing failures are gone — only the 3 genuine real-adapter tests require the live service, which is correct and documented. No runtime code changed; the change is test-harness only.
+
+Stale-branch cleanup (per AGENTS.md/REPO_LEDGER resolve-don't-accumulate). All three non-main remote branches were content-superseded by `main`. Deleted from origin: `claude/remote-control-AD6Di` (tip aef3a0da07dfe70f0d4907996edf8a5c82b800fc; only unique content was a stale PROJECT_STATUS snapshot from HISTORY#220, main is at #279) and `roadmap-trust-security-manual` (tip 1d1331b4e71992ed0cc9119a20ac6c7e6c9e89d1; its trust/security addendum was already harvested into main's evolved docs/roadmap/TRUST_SECURITY_AUDITABILITY.md as Track K, which explicitly records the harvest). Kept `backup/local-pgvector-bootstrap` (tip 4911bd55846ffa5c990c57d5fb4d38b765f8b6ea): it is a deliberate backup branch and is the only one holding files absent from main (old compose.yaml, docker/initdb/01-vector.sql, scripts/pgvector-up.ps1, scripts/setup-seam.ps1, several early docs, and a PDF brief). `handoff/archive` is left intact per the ledger reservation. Branch tip SHAs are recorded here so the two deletions are recoverable.
+
+History-status note: index entries #225 and #247 remain `in-progress`. They are append-only committed entries already superseded by #226 and #248 respectively, so the in-progress status is the correct honest temporal record and was intentionally NOT edited (editing committed history to flip status would violate the no-collapse rule). verify_continuity tolerates them.
+
+Operator gate clarification (durable): the operator defined the Track K precondition "benchmarks 100% functional" as "we can use the results of the benchmarks to improve the system, systematically, almost in a way we can automate it" — i.e. the closed observe->propose->apply->re-measure self-improvement loop. Per HISTORY#274 that loop is still OPEN: observe (retrieval_event), validate, gate, and re-measure exist, but there is no auto-proposer and no apply step (retrieval reads hardcoded weights + env flags, not a stored policy; RetrievalFlags are the apply seed). A green test suite is necessary but is not this bar. This change does not start that work; it records the gate definition for the next session.
+
+This change is on branch `fix/test-pgvector-dsn-isolation` for a draft PR; `main` is protected and not direct-pushed. The two branch deletions were already applied to origin (branch deletion of non-main refs is not gated by the protect-main ruleset).
+---END-ENTRY-#280---
+
+---BEGIN-ENTRY-#281---
+id: 281
+date: 2026-06-02T15:11:26Z
+agent: claude
+status: done
+topics: benchmark, bugfix, integrity, locomo, retrieval, ci, verify, history, status
+commits: pending
+refs: benchmarks/external/common/runner.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 280
+tokens: 554
+---
+Benchmark integrity-hash regression fix: exclude answerer_diagnostics from the external-memory result integrity hash. While making CI green for the HISTORY#280 PR (fix/test-pgvector-dsn-isolation, PR #50), the advisory `test-and-benchmark` matrix job was found already RED on `main` itself (every recent main push run since 2026-05-31 failed), independent of the #280 test-harness change. Local reproduction of the exact CI command (`pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/`, no DSN) gave `1 failed, 919 passed, 7 skipped`: the single failure was `test_seam_all/test_locomo_runner_cli.py::test_save_context_cli_includes_retrieved_context_without_changing_integrity_hash`.
+
+Root cause: in `benchmarks/external/common/runner.py` the `_score_case` save-context path (lines ~404-407) attaches BOTH `retrieved_context` and `answerer_diagnostics` to the case entry when `--save-context` is set, but `integrity_exclude_keys` (used to build `stable_cases` before `_integrity_hash`) excluded only `retrieved_context`, not `answerer_diagnostics`. The `answerer_diagnostics` attachment was introduced by HISTORY#278 (commit 869a7f4, semantic recovery policy experiment). Result: a `--save-context` run produced a different integrity_hash than the otherwise-identical default run, breaking the documented invariant that save-context is supplementary diagnostic output and must not change the reproducible benchmark hash.
+
+Fix: added `"answerer_diagnostics"` to `integrity_exclude_keys`. This is a one-line correctness fix that restores the invariant. Scope of effect: ONLY `--save-context` runs change (their hash now matches the equivalent non-save-context run); normal runs never attach `answerer_diagnostics` to the case entry, so their integrity_hash is byte-identical to before and previously sealed/published bundles (which are non-save-context) are unaffected.
+
+Verification: the previously-failing test now passes (`1 passed`); the full `test_seam_all/test_locomo_runner_cli.py` plus integrity/benchmark/seal/context-selected `tests/audit/` slice passed (`46 passed, 472 deselected`). This fix lands on the same branch as HISTORY#280 so PR #50's `test-and-benchmark` job can go green; the three required ruleset checks (`repo-hygiene`, `chroma-real-smoke`, `locomo-quickstart-bil2`) were already passing. No runtime/CLI/dashboard/API behavior changed beyond the save-context hash invariant restoration.
+---END-ENTRY-#281---

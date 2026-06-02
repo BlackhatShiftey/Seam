@@ -520,6 +520,7 @@ def _build_report(
         "_judge_gold",
         "judge_cross",
         "retrieved_context",
+        "answerer_diagnostics",
     }
     stable_cases = [
         {k: v for k, v in c.items() if k not in integrity_exclude_keys}
