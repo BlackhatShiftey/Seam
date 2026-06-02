@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 336
+total_events: 337
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-30T10:29:39Z | history:115:38b13455 | session-event | done | dashboard, tui, verify, history, snapshot | seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX... |
 | 2026-04-30T11:40:02Z | history:116:1c22cb7e | session-event | done | ledger, readme, benchmark, verify, history, snapshot | LICENSE,NOTICE,README.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/sna... |
 | 2026-04-30T12:13:06Z | history:117:c65be303 | session-event | done | ledger, readme, verify, history, snapshot | LICENSE,NOTICE,README.md,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,.seam/sna... |
 | 2026-04-30T12:32:18Z | history:118:f0f3a858 | session-event | done | dashboard, tui, verify, history, snapshot | seam_runtime/dashboard.py,Test-Seam-All/test_seam.py,HISTORY.md,HISTORY_INDEX... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-01T22:59:38Z | history:278:8ddb1b38 | session-event | done | retrieval, benchmark, locomo, audit, docs, verify, histor... | benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py... |
 | 2026-06-02T03:23:37Z | history:279:d613fd79 | session-event | done | retrieval, benchmark, locomo, audit, docs, verify, histor... | docs/audits/2026-06-01-paid-locomo-slice-validation.md,PROJECT_STATUS.md,HIST... |
 | 2026-06-02T13:32:10Z | history:280:a329f272 | session-event | done | test, pgvector, bugfix, protocol, branch, audit, verify, ... | tests/conftest.py,tests/audit/test_pgvector_real_adapter.py,PROJECT_STATUS.md... |
+| 2026-06-02T15:11:26Z | history:281:cecfeea7 | session-event | done | benchmark, bugfix, integrity, locomo, retrieval, ci, veri... | benchmarks/external/common/runner.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_IND... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0136.cross.md | 2026-04-15T00:00:00Z..2026-04-30T10:27:14Z | 136 | (multi) | (multi) |
+| 0001-0137.cross.md | 2026-04-15T00:00:00Z..2026-04-30T10:29:39Z | 137 | (multi) | (multi) |
