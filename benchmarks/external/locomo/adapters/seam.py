@@ -126,6 +126,25 @@ class SeamLocomoAdapter:
         _remove_db_files(db)
         self._scope_anchor_by_id.pop(scope_id, None)
 
+    def close(self) -> None:
+        """Close every cached per-scope runtime so its SQLite file is unlocked.
+
+        The adapter caches a runtime per scope for the duration of a run; callers
+        must close the adapter when finished (or use it as a context manager) or
+        Windows cannot delete the per-scope databases (WinError 32). Idempotent.
+        """
+        for runtime in self._runtime_by_scope.values():
+            close = getattr(runtime, "close", None)
+            if callable(close):
+                close()
+        self._runtime_by_scope.clear()
+
+    def __enter__(self) -> "SeamLocomoAdapter":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     def ingest_turn(self, scope_id: str, turn: ConversationTurn) -> None:
         """Compile a conversation turn to MIRL and persist it in the
         scope's database. Skipped when the scope is already cached on disk."""

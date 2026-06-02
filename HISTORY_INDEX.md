@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 281
-total_tokens: ~92208
-latest_id: 281
+total_entries: 282
+total_tokens: ~93110
+latest_id: 282
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 282 | 2026-06-02 | done | 72dedfd2971bb5d8 | bugfix,windows,storage,benchmark,+ | 281 |
 | 281 | 2026-06-02 | done | cecfeea7297c210b | benchmark,bugfix,integrity,locomo,+ | 280 |
 | 280 | 2026-06-02 | done | a329f272874023f2 | test,pgvector,bugfix,protocol,+ | 279 |
 | 279 | 2026-06-02 | done | d613fd7997e0073b | retrieval,benchmark,locomo,audit,+ | 278 |
@@ -300,13 +301,13 @@ compact: true
 - atomicity: count=1 latest=#182
 - audit: count=71 latest=#280, #279, #278, #277, #274
 - beam: count=1 latest=#223
-- benchmark: count=92 latest=#281, #279, #278, #277, #275
+- benchmark: count=93 latest=#282, #281, #279, #278, #277
 - branch: count=1 latest=#280
-- bugfix: count=9 latest=#281, #280, #275, #272, #270
+- bugfix: count=10 latest=#282, #281, #280, #275, #272
 - bundle: count=5 latest=#262, #245, #238, #015, #008
 - chat: count=14 latest=#137, #074, #073, #072, #071
 - chroma: count=2 latest=#017, #001
-- ci: count=4 latest=#281, #267, #211, #191
+- ci: count=5 latest=#282, #281, #267, #211, #191
 - classification: count=11 latest=#177, #176, #171, #170, #169
 - codec: count=13 latest=#132, #131, #130, #129, #128
 - command: count=67 latest=#251, #241, #232, #221, #220
@@ -327,7 +328,7 @@ compact: true
 - handoff: count=10 latest=#229, #228, #224, #190, #186
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
-- history: count=204 latest=#281, #280, #279, #278, #277
+- history: count=205 latest=#282, #281, #280, #279, #278
 - holdout: count=4 latest=#152, #093, #092, #036
 - infra: count=1 latest=#271
 - installer: count=13 latest=#204, #177, #173, #169, #100
@@ -337,7 +338,7 @@ compact: true
 - lexical: count=1 latest=#004
 - linux: count=6 latest=#177, #173, #136, #135, #021
 - locking: count=1 latest=#182
-- locomo: count=10 latest=#281, #279, #278, #277, #274
+- locomo: count=11 latest=#282, #281, #279, #278, #277
 - longmemeval: count=1 latest=#223
 - lx1: count=6 latest=#206, #197, #088, #018, #011
 - mcp: count=15 latest=#222, #218, #213, #212, #211
@@ -369,8 +370,8 @@ compact: true
 - security: count=36 latest=#274, #272, #270, #269, #268
 - session: count=3 latest=#027, #025, #019
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
-- status: count=121 latest=#281, #280, #279, #278, #277
-- storage: count=5 latest=#270, #269, #268, #267, #182
+- status: count=122 latest=#282, #281, #280, #279, #278
+- storage: count=6 latest=#282, #270, #269, #268, #267
 - streams: count=8 latest=#276, #216, #210, #209, #202
 - surface: count=5 latest=#276, #225, #218, #208, #145
 - test: count=5 latest=#280, #223, #222, #219, #202
@@ -379,14 +380,14 @@ compact: true
 - tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=212 latest=#281, #280, #279, #278, #277
+- verify: count=213 latest=#282, #281, #280, #279, #278
 - webui: count=1 latest=#267
-- windows: count=19 latest=#261, #260, #259, #258, #257
+- windows: count=20 latest=#282, #261, #260, #259, #258
 - wsl2: count=1 latest=#021
 
 ## status rollup
 
 - roots: 66
-- done: 259
+- done: 260
 - in-progress: 2
 - planned: 20

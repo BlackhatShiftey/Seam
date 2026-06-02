@@ -168,6 +168,9 @@ def test_adapter_rerank_off_does_not_reorder() -> None:
 
         answer = adapter.answer(sid, "what color does Alice like?")
         assert len(answer.retrieved_context) > 0
+        # Release the cached per-scope runtime so the TemporaryDirectory can be
+        # removed on Windows (an open SQLite handle locks scope-1.db: WinError 32).
+        adapter.close()
 
 
 # ---------------------------------------------------------------------------

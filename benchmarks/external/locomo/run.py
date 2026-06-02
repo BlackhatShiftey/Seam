@@ -463,9 +463,17 @@ def main() -> None:
 
 
 def _is_ephemeral_path(path: str) -> bool:
+    # Check both the resolved path (catches this OS's real temp dir) and the raw
+    # path with normalized separators (catches POSIX /tmp literals on any OS;
+    # on Windows Path("/tmp").resolve() becomes "C:\\tmp" and never matches).
     resolved = str(Path(path).resolve())
+    raw = path.replace("\\", "/")
     tmp_roots = [str(Path(tempfile.gettempdir()).resolve()), "/tmp", "/var/tmp", "/dev/shm"]
-    return any(resolved == root or resolved.startswith(root + "/") for root in tmp_roots)
+
+    def _under(value: str, root: str) -> bool:
+        return value == root or value.startswith(root + "/") or value.startswith(root + os.sep)
+
+    return any(_under(resolved, root) or _under(raw, root) for root in tmp_roots)
 
 
 def _resolve_archive_dir() -> Path:

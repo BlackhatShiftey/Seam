@@ -6056,3 +6056,32 @@ Fix: added `"answerer_diagnostics"` to `integrity_exclude_keys`. This is a one-l
 
 Verification: the previously-failing test now passes (`1 passed`); the full `test_seam_all/test_locomo_runner_cli.py` plus integrity/benchmark/seal/context-selected `tests/audit/` slice passed (`46 passed, 472 deselected`). This fix lands on the same branch as HISTORY#280 so PR #50's `test-and-benchmark` job can go green; the three required ruleset checks (`repo-hygiene`, `chroma-real-smoke`, `locomo-quickstart-bil2`) were already passing. No runtime/CLI/dashboard/API behavior changed beyond the save-context hash invariant restoration.
 ---END-ENTRY-#281---
+
+---BEGIN-ENTRY-#282---
+id: 282
+date: 2026-06-02T15:59:58Z
+agent: claude
+status: done
+topics: bugfix, windows, storage, benchmark, locomo, ci, verify, history, status
+commits: pending
+refs: seam_runtime/runtime.py,seam_runtime/benchmarks.py,benchmarks/external/mem0_harness/adapter.py,benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py,tests/audit/test_benchmark_reproducibility.py,tests/audit/test_cross_encoder_rerank.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/streams/history/index.md,.seam/cross_index.md
+supersedes: 281
+tokens: 902
+---
+Windows SQLite-handle cleanup so the advisory `test-and-benchmark (windows-latest)` CI job can go green. After HISTORY#281 fixed the ubuntu integrity-hash failure, windows-latest still failed `10 failed, 6 errors` all with `PermissionError [WinError 32] The process cannot access the file because it is being used by another process` on benchmark/surface/mem0 temp `.db` files (and one `AssertionError` in the ephemeral-path test). This was pre-existing and platform-specific: Linux allows unlinking an open file, so the leak never surfaced there; Windows locks open files, so deleting a temp DB whose SQLite connection is still open raises WinError 32.
+
+Root cause: transient runtimes/stores were created against temp databases and never closed before those databases (or their TemporaryDirectory) were cleaned up. `SeamRuntime` held `self.store` (an `SQLiteStore` with a connection pool) but exposed no close; `SeamLocomoAdapter` caches one runtime per scope in `_runtime_by_scope` and only closed them in `reset()`, so after a run every scope DB stayed locked; the internal benchmark suite opened `surface_store`, persist `temp_runtime`/`reopened_runtime`, and two agent-family `temp_runtime`s without closing; the mem0 harness adapter opened a runtime per `add`/`search` and discarded it open.
+
+Changes:
+- `seam_runtime/runtime.py`: added `SeamRuntime.close()` (closes `self.store`; vector adapters open per-op via `with closing(...)` so they hold no handle at rest) plus `__enter__`/`__exit__`. Idempotent.
+- `seam_runtime/benchmarks.py`: close `surface_store` after the surface loop (inside the `seam-bench-surface-` TemporaryDirectory); close `reopened_runtime` and `temp_runtime` at the end of the persistence family; added `temp_runtime.close()` to both agent-family `finally` blocks before `_cleanup_temp_db`.
+- `benchmarks/external/locomo/adapters/seam.py`: added `SeamLocomoAdapter.close()` (closes every cached per-scope runtime and clears the cache) plus `__enter__`/`__exit__`.
+- `benchmarks/external/mem0_harness/adapter.py`: wrapped `add`/`search` runtime use in try/finally with a new `_close_runtime` helper.
+- `benchmarks/external/locomo/run.py`: `_is_ephemeral_path` now matches both the resolved path and the raw POSIX path, fixing the windows `AssertionError` where `Path('/tmp/run.json').resolve()` becomes `C:\\tmp\\run.json` and never matched the `/tmp` literal.
+- `tests/audit/test_benchmark_reproducibility.py`: close `adapter_a` before `adapter_b` reuses the same default db path (the two adapters shared the default path, so adapter_b.reset() could not delete adapter_a's still-open per-case DBs).
+- `tests/audit/test_cross_encoder_rerank.py`: close the adapter before the TemporaryDirectory is removed.
+
+Verification: Linux cannot reproduce WinError 32 (it unlinks open files), so the Windows fix is verified via CI on the PR. On Linux, the previously-failing slices all pass with the new close() calls in place: `tests/audit/test_mem0_harness_adapter_contract.py + test_cross_encoder_rerank.py + test_benchmark_reproducibility.py + test_benchmark_endpoint_safety.py + test_locomo_result_durability.py` = 34 passed; the four `test_seam_all/test_seam.py` surface/benchmark cases = 4 passed; full-suite `--collect-only` exits 0 (no import breakage). No functional/behavioral change beyond lifecycle: data is persisted/read before any close, and each mem0 `add`/`search` reopens from disk.
+
+Known follow-up (not covered by any CI test, so deferred): `run_benchmark_grouped_parallel` in `benchmarks/external/common/runner.py` creates adapters via `adapter_factory()` per worker/scope and does not close them; real Windows parallel LoCoMo runs could still leak adapter handles. Owed a runner-side close (close factory-created adapters when their scope completes).
+---END-ENTRY-#282---

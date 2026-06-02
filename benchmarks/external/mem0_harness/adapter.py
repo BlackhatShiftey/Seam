@@ -57,38 +57,44 @@ class SeamMem0HarnessAdapter:
         from seam_runtime.runtime import SeamRuntime
 
         rt = _open_runtime(self._db_path(user_id))
-        rt.ingest_text(
-            text=text,
-            source_ref=f"mem0-harness:{user_id}",
-            ns=f"mem0-harness:{user_id}",
-            scope="thread",
-            persist=True,
-        )
+        try:
+            rt.ingest_text(
+                text=text,
+                source_ref=f"mem0-harness:{user_id}",
+                ns=f"mem0-harness:{user_id}",
+                scope="thread",
+                persist=True,
+            )
+        finally:
+            _close_runtime(rt)
 
     def search(self, query: str, *, user_id: str, limit: int = 10) -> list[MemoryResult]:
         """Search memory for records relevant to *query* and return ranked results."""
         from seam_runtime.runtime import SeamRuntime
 
         rt = _open_runtime(self._db_path(user_id))
-        result = rt.search_ir(query, scope="thread", budget=self.budget)
-        output: list[MemoryResult] = []
-        for candidate in result.candidates[:limit]:
-            rid = candidate.record.id
-            record_ids = [rid]
-            record_ids.extend(candidate.record.evidence or [])
-            record_ids.extend(candidate.record.prov or [])
-            pack = rt.pack_ir(record_ids, lens="general", budget=self.budget // max(1, limit), mode="exact")
-            pack_dict = pack.to_dict() if hasattr(pack, "to_dict") else {}
-            memory_text = json.dumps(pack_dict, sort_keys=True)
-            output.append(
-                MemoryResult(
-                    id=rid,
-                    memory=memory_text,
-                    score=candidate.score,
-                    metadata={"source": "seam", "kind": candidate.record.kind.value},
+        try:
+            result = rt.search_ir(query, scope="thread", budget=self.budget)
+            output: list[MemoryResult] = []
+            for candidate in result.candidates[:limit]:
+                rid = candidate.record.id
+                record_ids = [rid]
+                record_ids.extend(candidate.record.evidence or [])
+                record_ids.extend(candidate.record.prov or [])
+                pack = rt.pack_ir(record_ids, lens="general", budget=self.budget // max(1, limit), mode="exact")
+                pack_dict = pack.to_dict() if hasattr(pack, "to_dict") else {}
+                memory_text = json.dumps(pack_dict, sort_keys=True)
+                output.append(
+                    MemoryResult(
+                        id=rid,
+                        memory=memory_text,
+                        score=candidate.score,
+                        metadata={"source": "seam", "kind": candidate.record.kind.value},
+                    )
                 )
-            )
-        return output
+            return output
+        finally:
+            _close_runtime(rt)
 
     def delete(self, *, user_id: str) -> None:
         """Remove all memory for a user/scoped session."""
@@ -107,6 +113,17 @@ def _open_runtime(db_path: Path):
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     return SeamRuntime(str(db_path))
+
+
+def _close_runtime(runtime) -> None:
+    """Close a runtime's store so the SQLite file is unlocked for delete/cleanup.
+
+    Without this, Windows holds the per-user ``.db`` open and both ``delete()``
+    and pytest tempdir teardown fail with WinError 32.
+    """
+    close = getattr(runtime, "close", None)
+    if callable(close):
+        close()
 
 
 def _format_messages(messages: list[dict[str, str]]) -> str:

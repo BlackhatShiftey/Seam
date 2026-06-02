@@ -43,6 +43,26 @@ class SeamRuntime:
         else:
             self.vector_adapter = SQLiteVectorAdapter(str(store_path), self.embedding_model)
 
+    def close(self) -> None:
+        """Close the underlying SQLite store connection pool.
+
+        Transient runtimes opened against a temp database must be closed before
+        that database is deleted; on Windows an open SQLite handle locks the file
+        and tempdir cleanup fails with ``PermissionError``/WinError 32. Idempotent.
+        The vector adapters open connections per-operation (``with closing(...)``)
+        so they hold no handle at rest; only the store pool needs closing.
+        """
+        store = getattr(self, "store", None)
+        close = getattr(store, "close", None)
+        if callable(close):
+            close()
+
+    def __enter__(self) -> "SeamRuntime":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     def compile_nl(self, raw_text: str, source_ref: str = "local://input", ns: str = "local.default", scope: str = "thread") -> IRBatch:
         return compile_nl(raw_text, source_ref=source_ref, ns=ns, scope=scope)
 
