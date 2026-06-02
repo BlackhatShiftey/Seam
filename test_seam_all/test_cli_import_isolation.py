@@ -26,7 +26,7 @@ import sys
 
 class BlockRetrievalOrchestrator(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.startswith("experimental.retrieval_orchestrator"):
+        if fullname.startswith("seam_runtime.retrieval_orchestrator"):
             raise ImportError("blocked for dashboard import isolation test")
         return None
 

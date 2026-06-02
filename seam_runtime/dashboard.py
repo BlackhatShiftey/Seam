@@ -73,7 +73,7 @@ def _build_retrieval_orchestrator(
     vector_path: str,
     vector_collection: str,
 ) -> Any:
-    from experimental.retrieval_orchestrator import RetrievalOrchestrator
+    from seam_runtime.retrieval_orchestrator import RetrievalOrchestrator
 
     return RetrievalOrchestrator(
         runtime,

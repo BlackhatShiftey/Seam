@@ -8,7 +8,7 @@ def test_legacy_hybrid_orchestrator_package_removed():
 
 
 def test_retrieval_orchestrator_keeps_hybrid_aliases():
-    from experimental.retrieval_orchestrator import (
+    from seam_runtime.retrieval_orchestrator import (
         HybridCandidate,
         HybridOrchestrator,
         HybridSearchResult,

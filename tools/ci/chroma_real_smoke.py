@@ -4,8 +4,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from experimental.retrieval_orchestrator import ChromaSemanticAdapter
-from experimental.retrieval_orchestrator.planner import build_plan
+from seam_runtime.retrieval_orchestrator import ChromaSemanticAdapter
+from seam_runtime.retrieval_orchestrator.planner import build_plan
 from seam import SeamRuntime
 from seam_runtime.models import HashEmbeddingModel
 

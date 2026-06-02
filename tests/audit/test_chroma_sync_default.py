@@ -1,7 +1,7 @@
 """P3 Fix 6 — Chroma sync_on_search default is False."""
 from __future__ import annotations
 
-from experimental.retrieval_orchestrator.adapters import ChromaSemanticAdapter
+from seam_runtime.retrieval_orchestrator.adapters import ChromaSemanticAdapter
 
 
 def test_default_sync_on_search_is_false() -> None:

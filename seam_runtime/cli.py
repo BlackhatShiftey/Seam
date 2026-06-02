@@ -1262,7 +1262,7 @@ def _handle_shell_command(
         query = argument.strip() if command == "/context" else text
         if not query:
             return "Usage: /context <query>"
-        from experimental.retrieval_orchestrator import RetrievalOrchestrator
+        from seam_runtime.retrieval_orchestrator import RetrievalOrchestrator
         orchestrator = RetrievalOrchestrator(runtime)
         rag_payload = orchestrator.rag(
             query,
@@ -1731,7 +1731,7 @@ def _add_rag_sync_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_retrieval_orchestrator(runtime: SeamRuntime, args: argparse.Namespace):
-    from experimental.retrieval_orchestrator import RetrievalOrchestrator
+    from seam_runtime.retrieval_orchestrator import RetrievalOrchestrator
     return RetrievalOrchestrator(
         runtime,
         semantic_backend=getattr(args, "vector_backend", "seam"),
