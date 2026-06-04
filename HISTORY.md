@@ -6151,3 +6151,27 @@ Cleanup of stale `experimental` references: `seam_runtime/mcp.py` error text ("e
 
 Verification: full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` exits 0 on Linux; server/API subset 65 passed; import smoke + `webui_dir()` resolution OK. Known follow-up: the `webui/src/` React rewrite is still incomplete rework material (the shipped UI is the static dashboard.html); finishing or replacing it is future work.
 ---END-ENTRY-#285---
+
+---BEGIN-ENTRY-#286---
+id: 286
+date: 2026-06-04T04:41:57Z
+agent: claude
+status: done
+topics: dashboard, webui, server, chat, memory, bugfix, verify, history
+commits: none
+refs: seam_runtime/server.py,seam_runtime/webui/dashboard.html,seam_runtime/webui/seam-api.js,tests/audit/test_chat_endpoint.py,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/cross_index.md
+supersedes: 285
+tokens: 630
+---
+Wire SEAM-augmented dashboard chat end-to-end and fix two bugs found in audit.
+
+Feature (was uncommitted WIP on this branch): the dashboard agent panel now chats THROUGH SEAM instead of echoing search results. seam_runtime/server.py adds POST /chat plus _seam_chat_system_prompt and _call_chat_provider, which retrieve SEAM memory for the message, inject it as a system prompt, and call the selected provider via stdlib urllib (OpenAI-compatible + Anthropic schemas; key resolution order: explicit dashboard key -> server env via env_key -> 'local' for localhost/Ollama). seam-api.js adds SeamAPI.chat(); dashboard.html MODEL_OPTIONS now carry real model/baseUrl/envKey (Anthropic, OpenAI, Gemini OpenAI-compat, Ollama) and the agent send handler calls chat() instead of context().
+
+Audit BUG 1 (HIGH) memory counted but never injected: /chat built context with rec.get('text'), but MIRL records carry no 'text' field (content lives in attrs), so memory_used was >0 while the system prompt said 'No relevant SEAM memory' and the model received nothing. Fixed by iterating search_result.candidates and rendering each via the public iter_textual_fields(record) (the same strings the embedder indexes, so injected context equals retrieved content); memory_used now counts only records that produced text.
+
+Audit BUG 2 (MEDIUM) retrieval failure returned raw 500: the provider call was wrapped (502) but runtime.search_ir() was not, so a vector-backend outage 500'd the default path (use_memory=true). Fixed by wrapping retrieval; on failure the chat answers without memory (memory_used=0) and returns memory_error, and dashboard.html now shows a SEAM-memory-unavailable note instead of a false 'grounded in N memories'.
+
+Tests: tests/audit/test_chat_endpoint.py grew 5 -> 7, adding test_chat_injects_retrieved_memory_into_prompt (guards BUG 1) and test_chat_degrades_when_memory_backend_unavailable (guards BUG 2); both fail against pre-fix code. Fixture now clears SEAM_PGVECTOR_DSN so tests default to the no-Docker SQLite vector adapter.
+
+Verification: tests/audit/test_chat_endpoint.py = 7 passed; subset -k 'server or chat or api or webui' = 21 passed. Live harness (SQLite adapter, stubbed provider): seeded an Alice-preference claim, then /chat returned memory_used=2 with record content present in the system prompt; pgvector-down harness returned 200 with memory_error (no 500). Provider branches reach real endpoints (OpenAI/Anthropic 401 on bogus key -> 502; Ollama 404 model-not-found -> 502). Not verified: a real successful provider reply (no local Ollama model pulled; no cloud spend while operator away). Known follow-ups: server does not auto-load OPENAI_API_KEY from .env.local so the env-key fallback needs a manual export; injected memory text is the indexed slug form rather than original NL.
+---END-ENTRY-#286---

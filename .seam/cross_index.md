@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 342
+total_events: 343
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-04-30T13:46:54Z | history:121:9ef597bb | session-event | done | dashboard, tui, pgvector, ledger, readme, verify, history... | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots,LICENSE,NOTICE,README.md,REPO_LED... |
 | 2026-05-01T05:07:06Z | history:122:fc6af486 | session-event | done | compress, mirl, roadmap, ledger, status, verify, history,... | ROADMAP.md,PROJECT_STATUS.md,REPO_LEDGER.md,docs/ledgers/runtime/compression.... |
 | 2026-05-02T14:26:46Z | history:123:e4b57958 | session-event | done | verify, windows, history, snapshot | .gitignore,docs/CODE_LAYOUT.md,test_seam_all/test_seam.py,HISTORY.md,HISTORY_... |
 | 2026-05-04T07:47:17Z | history:124:8261bcfb | session-event | done | verify, history, snapshot, ledger, protocol, audit | .gitignore,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,REPO_LEDGER.md,ROADM... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-02T16:12:06Z | history:283:d46e609b | session-event | done | bugfix, windows, storage, locking, ci, verify, history, s... | tests/audit/test_pool_concurrency.py,PROJECT_STATUS.md,HISTORY.md,HISTORY_IND... |
 | 2026-06-02T16:46:11Z | history:284:782b83c2 | session-event | done | refactor, structure, retrieval, roadmap, packaging, verif... | seam_runtime/retrieval_orchestrator/,seam_runtime/cli.py,seam_runtime/mcp.py,... |
 | 2026-06-02T18:22:53Z | history:285:c8699092 | session-event | done | dashboard, webui, server, cli, structure, verify, history... | seam_runtime/webui/,webui/,seam_runtime/server.py,seam_runtime/cli.py,seam_ru... |
+| 2026-06-04T04:41:57Z | history:286:d89b0879 | session-event | done | dashboard, webui, server, chat, memory, bugfix, verify, h... | seam_runtime/server.py,seam_runtime/webui/dashboard.html,seam_runtime/webui/s... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0142.cross.md | 2026-04-15T00:00:00Z..2026-04-30T13:42:07Z | 142 | (multi) | (multi) |
+| 0001-0143.cross.md | 2026-04-15T00:00:00Z..2026-04-30T13:46:54Z | 143 | (multi) | (multi) |

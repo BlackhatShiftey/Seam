@@ -272,6 +272,58 @@ def _mount_webui(app: Any) -> None:
     app.mount("/", StaticFiles(directory=str(directory)), name="webui")
 
 
+def _seam_chat_system_prompt(context_text: str) -> str:
+    base = (
+        "You are the SEAM assistant, embedded in the SEAM memory runtime. Answer the user using "
+        "their SEAM memory when it is relevant, and cite record ids in brackets like [clm:1] when "
+        "you rely on a memory. If the retrieved memory does not contain the answer, say so briefly "
+        "and then answer from general knowledge."
+    )
+    if context_text.strip():
+        return base + "\n\n# Retrieved SEAM memory\n" + context_text
+    return base + "\n\n(No relevant SEAM memory was retrieved for this message.)"
+
+
+def _call_chat_provider(
+    *, provider: str, base_url: str, api_key: str, model: str,
+    messages: list[dict], max_tokens: int = 1024, timeout: int = 60,
+) -> str:
+    """Call an OpenAI-compatible or Anthropic chat API and return the assistant text.
+
+    The API key is forwarded from the caller (the dashboard's Settings) and is never logged.
+    Uses stdlib urllib so no extra dependency is required. OpenAI-compatible is the default
+    (OpenAI, OpenRouter, Groq, Mistral, Perplexity, Together, ...); Anthropic uses its own schema.
+    """
+    import json as _json
+    import urllib.request
+
+    base = (base_url or "").rstrip("/")
+    is_anthropic = (provider or "").lower() == "anthropic" or "anthropic" in base
+    if is_anthropic:
+        url = (base or "https://api.anthropic.com/v1") + "/messages"
+        system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+        conv = [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] in ("user", "assistant")]
+        body: dict[str, Any] = {"model": model, "max_tokens": max_tokens, "messages": conv}
+        if system:
+            body["system"] = system
+        headers = {"content-type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"}
+        req = urllib.request.Request(url, data=_json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+        parts = data.get("content") or []
+        return "".join(p.get("text", "") for p in parts if p.get("type") == "text") or "(empty response)"
+    url = (base or "https://api.openai.com/v1") + "/chat/completions"
+    body = {"model": model, "messages": messages, "max_tokens": max_tokens}
+    headers = {"content-type": "application/json", "authorization": "Bearer " + api_key}
+    req = urllib.request.Request(url, data=_json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = _json.loads(resp.read().decode("utf-8"))
+    choices = data.get("choices") or []
+    if choices:
+        return choices[0].get("message", {}).get("content", "") or "(empty response)"
+    return "(empty response)"
+
+
 def create_app(
     runtime: SeamRuntime | None = None,
     shutdown_state: ShutdownState | None = None,
@@ -555,6 +607,97 @@ def create_app(
         if not isinstance(records, list):
             raise HTTPException(status_code=400, detail="records list is required")
         return runtime.persist_ir(IRBatch.from_json(records)).to_dict()
+
+    @app.post("/chat", dependencies=[Depends(guard)])
+    def chat(payload: dict[str, object]) -> dict[str, object]:
+        """SEAM-augmented chat: retrieve memory for the message, then call the chosen model.
+
+        The dashboard sends the selected model plus the provider's base_url/api_key (from its
+        Settings). We retrieve SEAM context here (same store as the rest of the API), inject it
+        as a system prompt, call the provider, and return the reply. The key is never logged.
+        """
+        import urllib.error
+
+        from .mirl import iter_textual_fields
+
+        message = str(payload.get("message", "")).strip()
+        if not message:
+            raise HTTPException(status_code=400, detail="message is required")
+        model = str(payload.get("model") or "").strip()
+        if not model:
+            raise HTTPException(status_code=400, detail="model is required")
+        provider = str(payload.get("provider") or "")
+        base_url = str(payload.get("base_url") or "")
+        env_key = str(payload.get("env_key") or "")
+        # Key resolution order: explicit key from the dashboard Settings, then the
+        # server process environment (e.g. OPENAI_API_KEY), then "local" for a
+        # localhost provider like Ollama that ignores the key.
+        api_key = str(payload.get("api_key") or "").strip()
+        if not api_key and env_key:
+            api_key = (os.environ.get(env_key) or "").strip()
+        is_local = any(h in base_url for h in ("localhost", "127.0.0.1", "0.0.0.0"))
+        if not api_key and not is_local:
+            label = env_key or f"{provider} API key" if provider else "the provider API key"
+            raise HTTPException(
+                status_code=400,
+                detail=f"No API key found. Set {label} in your environment or in Settings → API Keys.",
+            )
+        if not api_key:
+            api_key = "local"  # Ollama / local OpenAI-compatible servers ignore the key
+        use_memory = bool(payload.get("use_memory", True))
+
+        context_text = ""
+        memory_used = 0
+        memory_error = ""
+        if use_memory:
+            budget = max(1, min(20, int(payload.get("budget") or 6)))
+            try:
+                search_result = runtime.search_ir(query=message, budget=budget, lens="general")
+                lines = []
+                for cand in search_result.candidates:
+                    rec = cand.record
+                    # MIRL records (CLM/STA/EVT/REL) carry no plain "text" field; their
+                    # content lives in attrs. iter_textual_fields yields the same strings
+                    # the embedder indexes, so the injected context matches what was
+                    # retrieved. Only count a memory once we actually have text for it.
+                    fields = [f.strip() for f in iter_textual_fields(rec) if f and f.strip()]
+                    if fields:
+                        line = f"[{rec.id}] ({rec.kind.value}) " + " ".join(fields)
+                        lines.append(line[:400])
+                memory_used = len(lines)
+                context_text = "\n".join(lines)
+            except Exception as exc:  # noqa: BLE001 - a memory backend outage must not 500 the chat
+                # Degrade gracefully: answer without memory and let the UI surface why.
+                memory_error = f"memory retrieval unavailable: {exc}"
+
+        messages: list[dict] = [{"role": "system", "content": _seam_chat_system_prompt(context_text)}]
+        history = payload.get("history")
+        if isinstance(history, list):
+            for h in history[-12:]:
+                if not isinstance(h, dict):
+                    continue
+                role = h.get("role")
+                text = h.get("text") or h.get("content")
+                if role in ("user", "assistant") and text:
+                    messages.append({"role": role, "content": str(text)})
+        messages.append({"role": "user", "content": message})
+
+        try:
+            reply = _call_chat_provider(
+                provider=provider, base_url=base_url, api_key=api_key, model=model, messages=messages,
+            )
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = exc.read().decode("utf-8")[:400]
+            except Exception:
+                detail = str(exc)
+            raise HTTPException(status_code=502, detail=f"provider error {exc.code}: {detail}")
+        except Exception as exc:  # noqa: BLE001 - surface provider/network failures to the UI
+            raise HTTPException(status_code=502, detail=f"provider call failed: {exc}")
+        result: dict[str, object] = {"reply": reply, "memory_used": memory_used, "model": model}
+        if memory_error:
+            result["memory_error"] = memory_error
+        return result
 
     # Serve the static dashboard from this same server (added last so the API
     # routes above take precedence over the static mount).

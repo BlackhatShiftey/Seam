@@ -1820,13 +1820,13 @@ function FsNode({ node, depth, openFolders, toggleFolder, onOpenFile }) {
 
 // ── Model options ─────────────────────────────────────────────────────────
 const MODEL_OPTIONS = [
-{ id: 'claude-haiku', label: 'Claude Haiku 3.5', provider: 'Anthropic', color: '#d391ff' },
-{ id: 'claude-sonnet', label: 'Claude Sonnet 3.7', provider: 'Anthropic', color: '#d391ff' },
-{ id: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI', color: '#7efdb9' },
-{ id: 'gpt-4o-mini', label: 'GPT-4o mini', provider: 'OpenAI', color: '#7efdb9' },
-{ id: 'gemini-2.0', label: 'Gemini 2.0 Flash', provider: 'Google', color: '#7fe0ff' },
-{ id: 'ollama-llama', label: 'Llama 3.3 (local)', provider: 'Ollama', color: '#f4d676' },
-{ id: 'ollama-mistral', label: 'Mistral (local)', provider: 'Ollama', color: '#f4d676' }];
+{ id: 'claude-haiku', label: 'Claude Haiku 3.5', provider: 'Anthropic', color: '#d391ff', model: 'claude-3-5-haiku-latest', baseUrl: 'https://api.anthropic.com/v1', envKey: 'ANTHROPIC_API_KEY' },
+{ id: 'claude-sonnet', label: 'Claude Sonnet 3.7', provider: 'Anthropic', color: '#d391ff', model: 'claude-3-7-sonnet-latest', baseUrl: 'https://api.anthropic.com/v1', envKey: 'ANTHROPIC_API_KEY' },
+{ id: 'gpt-4o', label: 'GPT-4o', provider: 'OpenAI', color: '#7efdb9', model: 'gpt-4o', baseUrl: 'https://api.openai.com/v1', envKey: 'OPENAI_API_KEY' },
+{ id: 'gpt-4o-mini', label: 'GPT-4o mini', provider: 'OpenAI', color: '#7efdb9', model: 'gpt-4o-mini', baseUrl: 'https://api.openai.com/v1', envKey: 'OPENAI_API_KEY' },
+{ id: 'gemini-2.0', label: 'Gemini 2.0 Flash', provider: 'Google', color: '#7fe0ff', model: 'gemini-2.0-flash', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', envKey: 'GEMINI_API_KEY' },
+{ id: 'ollama-llama', label: 'Llama 3.3 (local)', provider: 'Ollama', color: '#f4d676', model: 'llama3.3', baseUrl: 'http://localhost:11434/v1', envKey: '' },
+{ id: 'ollama-mistral', label: 'Mistral (local)', provider: 'Ollama', color: '#f4d676', model: 'mistral', baseUrl: 'http://localhost:11434/v1', envKey: '' }];
 
 
 // ── Ingest Panel ─────────────────────────────────────────────────────────
@@ -5417,31 +5417,38 @@ function App() {
     setAgentAttachments([]);
     setAgentLoading(true);
     try {
-      // Retrieve SEAM context as the agent response
-      const result = await window.SeamAPI.context(queryText, 5, null, 'general', 512, 'mix');
-      const candidates = result.candidates || [];
-      const pack = result.pack || {};
-      let response = '';
-      if (candidates.length === 0) {
-        response = 'No relevant records found in MIRL memory for that query. Try:\n• A more specific search term\n• Ingest related documents first via the Ingest panel';
-      } else {
-        response = `Found ${candidates.length} relevant MIRL records:\n\n`;
-        candidates.forEach((c) => {
-          const rec = c.record || {};
-          const score = (c.score * 100).toFixed(0);
-          response += `• **${rec.id || '?'}** [${score}%] — ${(rec.text || '').slice(0, 120)}\n`;
-        });
-        if (pack.total_tokens) {
-          response += `\n_Context pack: ${candidates.length} records, ${pack.total_tokens} tokens_`;
-        }
-      }
-      setAgentMessages((prev) => [...prev, { id: prev.length, role: 'assistant', text: response }]);
+      // Talk to the selected model THROUGH SEAM: the server retrieves SEAM memory
+      // for this message, injects it as context, and calls the chosen provider.
+      const m = selectedModel || MODEL_OPTIONS[0];
+      // Per-provider key entered in Settings → API Keys is stored under this
+      // convention; if absent the server falls back to its own env (e.g. OPENAI_API_KEY).
+      let apiKey = '';
+      try { apiKey = (m.envKey && localStorage.getItem('seam-dash-key-' + m.envKey)) || ''; } catch {}
+      const history = agentMessages
+        .filter((x) => x.role === 'user' || x.role === 'assistant')
+        .slice(-12)
+        .map((x) => ({ role: x.role, text: x.text }));
+      const res = await window.SeamAPI.chat(queryText, {
+        model: m.model || m.id,
+        provider: m.provider,
+        baseUrl: m.baseUrl,
+        envKey: m.envKey,
+        apiKey: apiKey,
+        history: history,
+        useMemory: true
+      });
+      const used = res.memory_error
+        ? `\n\n_— ⚠ SEAM memory unavailable (answered without it)_`
+        : res.memory_used
+          ? `\n\n_— grounded in ${res.memory_used} SEAM memor${res.memory_used === 1 ? 'y' : 'ies'}_`
+          : '';
+      setAgentMessages((prev) => [...prev, { id: prev.length, role: 'assistant', text: (res.reply || '(empty response)') + used }]);
     } catch (err) {
       const errMsg = err.code === 'DISCONNECTED'
-        ? '[disconnected] Cannot reach the SEAM REST API. Start it with: seam serve'
+        ? '[disconnected] Cannot reach the SEAM server. Start it with: seam serve'
         : err.code === 'UNAUTHORIZED'
           ? '[unauthorized] Set your SEAM API token in Settings → API Keys → SEAM_API_TOKEN'
-          : `[error] ${err.message}`;
+          : `[error] ${err.message || err}`;
       setAgentMessages((prev) => [...prev, { id: prev.length, role: 'assistant', text: errMsg }]);
     }
     setAgentLoading(false);

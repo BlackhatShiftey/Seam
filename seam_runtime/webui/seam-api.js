@@ -229,6 +229,34 @@
       }
     },
 
+    // SEAM-augmented chat: retrieve memory + call the selected model via the server.
+    // opts: { model, provider, baseUrl, apiKey, history, useMemory, budget }
+    chat: async function (message, opts) {
+      opts = opts || {};
+      var payload = {
+        message: message,
+        model: opts.model || '',
+        provider: opts.provider || '',
+        base_url: opts.baseUrl || '',
+        env_key: opts.envKey || '',
+        api_key: opts.apiKey || '',
+        history: opts.history || [],
+        use_memory: opts.useMemory !== false
+      };
+      if (opts.budget) payload.budget = opts.budget;
+      try {
+        const data = await _fetch('/chat', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        _notifyListeners(true);
+        return data;
+      } catch (err) {
+        if (err.code === 'DISCONNECTED') _notifyListeners(false);
+        throw err;
+      }
+    },
+
     // Persist compiled records
     persist: async function (records) {
       try {
