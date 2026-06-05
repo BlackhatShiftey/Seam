@@ -24,9 +24,33 @@ def check_pgvector(dsn: str | None) -> dict[str, object]:
         return {"configured": True, "reachable": False, "error": str(exc)}
 
 
-def check_streams() -> dict[str, object]:
+def _import_streams_verify_all():
+    """Import the repo-local ``tools.streams.verify_streams.verify_all``.
+
+    The ``seam`` console-script entry point does not put the source-checkout
+    root on ``sys.path``, so ``tools/`` (a sibling of the ``seam_runtime/``
+    package that is intentionally not shipped in the wheel) is not importable by
+    default. When running from an editable/source install, add the repo root to
+    ``sys.path`` so ``seam doctor`` can reach streams tooling without the caller
+    exporting ``PYTHONPATH``. A genuine wheel install has no sibling ``tools/``,
+    so this stays a no-op and the caller reports ``unavailable``.
+    """
     try:
         from tools.streams.verify_streams import verify_all
+        return verify_all
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parent.parent
+        if (repo_root / "tools" / "streams" / "verify_streams.py").is_file():
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+            from tools.streams.verify_streams import verify_all
+            return verify_all
+        raise
+
+
+def check_streams() -> dict[str, object]:
+    try:
+        verify_all = _import_streams_verify_all()
     except Exception as exc:
         return {"status": "unavailable", "error": str(exc)}
     try:

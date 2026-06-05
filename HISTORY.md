@@ -6175,3 +6175,25 @@ Tests: tests/audit/test_chat_endpoint.py grew 5 -> 7, adding test_chat_injects_r
 
 Verification: tests/audit/test_chat_endpoint.py = 7 passed; subset -k 'server or chat or api or webui' = 21 passed. Live harness (SQLite adapter, stubbed provider): seeded an Alice-preference claim, then /chat returned memory_used=2 with record content present in the system prompt; pgvector-down harness returned 200 with memory_error (no 500). Provider branches reach real endpoints (OpenAI/Anthropic 401 on bogus key -> 502; Ollama 404 model-not-found -> 502). Not verified: a real successful provider reply (no local Ollama model pulled; no cloud spend while operator away). Known follow-ups: server does not auto-load OPENAI_API_KEY from .env.local so the env-key fallback needs a manual export; injected memory text is the indexed slug form rather than original NL.
 ---END-ENTRY-#286---
+
+---BEGIN-ENTRY-#287---
+id: 287
+date: 2026-06-05T05:13:34Z
+agent: claude
+status: done
+topics: doctor, streams, cli, bugfix, packaging, test, verify, history
+commits: none
+refs: seam_runtime/doctor.py,test_seam_all/test_cli_import_isolation.py,HISTORY.md,HISTORY_INDEX.md,.seam/streams/history/log.md,.seam/cross_index.md
+supersedes: 286
+tokens: 476
+---
+Fix `seam doctor` Streams check reporting `unavailable` from the console-script entry point.
+
+Problem: seam_runtime/doctor.py check_streams() did `from tools.streams.verify_streams import verify_all`. The `seam` console script does not put the source-checkout root on sys.path, and `tools/` is a sibling of the seam_runtime package that is intentionally not shipped in the wheel. So `seam doctor` (and the dashboard doctor surface) reported `Streams: unavailable (No module named 'tools')` unless the caller ran from the repo root via `python -m` or exported PYTHONPATH. Surfaced while relocating the working checkout off the T7 external drive to /home/terrabyte/Documents/Projects/Seam (internal ext4); doctor behaved identically on both copies, so this is pre-existing, not relocation-induced.
+
+Fix: added _import_streams_verify_all() which, on ModuleNotFoundError, derives repo_root = Path(__file__).resolve().parent.parent and — only if repo_root/tools/streams/verify_streams.py actually exists — inserts repo_root into sys.path and retries the import. A genuine wheel install (no sibling tools/) still raises, so status stays `unavailable` with no false positive. Package-relative resolution, deliberately not cwd- or `git rev-parse`-dependent (those misfire when doctor runs from outside the repo).
+
+Test: test_seam_all/test_cli_import_isolation.py adds test_doctor_streams_resolves_repo_tools_from_console_script, which runs check_streams() in a subprocess from a non-repo cwd (tmp_path) with PYTHONPATH stripped and asserts status == PASS. In-process assertions verify nothing here because pytest runs from the repo root where `tools` already imports; the subprocess reproduces the broken console-script condition and fails (`unavailable`) against pre-fix code.
+
+Verification: bare `seam doctor` from /tmp with a clean env (no PYTHONPATH, no DSN) now prints `Streams: PASS` (was `unavailable`). Full gate `pytest test_seam_all tools/history/test_history_tools.py tools/streams/test_streams.py` = 417 passed, 0 failed (prior 416 + the new test) with pgvector up on 127.0.0.1:55432. No behavior change for real wheel installs.
+---END-ENTRY-#287---
