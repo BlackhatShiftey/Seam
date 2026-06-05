@@ -42,3 +42,28 @@ print("dashboard import ok")
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
     assert "dashboard import ok" in result.stdout
+
+
+def test_doctor_streams_resolves_repo_tools_from_console_script(tmp_path):
+    """`seam doctor` streams check must reach the repo-local `tools/` package
+    even when invoked like the console script: cwd outside the repo and no
+    PYTHONPATH. The fix adds the package-relative repo root to sys.path; without
+    it this returns 'unavailable'. Run in a subprocess from a non-repo cwd so
+    the test actually reproduces the broken condition (pytest itself runs from
+    the repo root where `tools` already imports)."""
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "from seam_runtime.doctor import check_streams; print(check_streams()['status'])"],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(tmp_path),
+        timeout=30,
+    )
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert result.stdout.strip().splitlines()[-1] == "PASS", (
+        f"streams status should be PASS from a non-repo cwd; "
+        f"stdout: {result.stdout!r} stderr: {result.stderr!r}"
+    )
