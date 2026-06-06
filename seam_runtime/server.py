@@ -284,6 +284,44 @@ def _seam_chat_system_prompt(context_text: str) -> str:
     return base + "\n\n(No relevant SEAM memory was retrieved for this message.)"
 
 
+def _validate_provider_base_url(base_url: str) -> None:
+    """Reject SSRF-prone provider base URLs before any outbound request.
+
+    The ``/chat`` endpoint forwards ``base_url`` to an outbound HTTP call, so an
+    unconstrained value lets a caller probe internal services. We require an
+    http(s) scheme and reject hosts that resolve into private, link-local
+    (incl. the cloud metadata address 169.254.169.254), reserved, multicast, or
+    unspecified ranges. Loopback is deliberately allowed: local providers such
+    as Ollama bind to 127.0.0.1, so loopback-port access remains a known,
+    accepted residual (the endpoint is already auth-gated and loopback-bound by
+    default). An empty base_url falls through to the trusted provider defaults.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    from fastapi import HTTPException
+
+    if not base_url:
+        return
+    parsed = urlparse(base_url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail=f"base_url scheme must be http or https, got {parsed.scheme!r}")
+    host = parsed.hostname
+    if not host:
+        raise HTTPException(status_code=400, detail="base_url is missing a host")
+    try:
+        infos = socket.getaddrinfo(host, parsed.port)
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail=f"base_url host does not resolve: {host}")
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_loopback:
+            continue
+        if ip.is_private or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            raise HTTPException(status_code=400, detail=f"base_url resolves to a disallowed address: {ip}")
+
+
 def _call_chat_provider(
     *, provider: str, base_url: str, api_key: str, model: str,
     messages: list[dict], max_tokens: int = 1024, timeout: int = 60,
@@ -628,6 +666,7 @@ def create_app(
             raise HTTPException(status_code=400, detail="model is required")
         provider = str(payload.get("provider") or "")
         base_url = str(payload.get("base_url") or "")
+        _validate_provider_base_url(base_url)  # SSRF guard before any outbound call
         env_key = str(payload.get("env_key") or "")
         # Key resolution order: explicit key from the dashboard Settings, then the
         # server process environment (e.g. OPENAI_API_KEY), then "local" for a

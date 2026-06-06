@@ -6197,3 +6197,35 @@ Test: test_seam_all/test_cli_import_isolation.py adds test_doctor_streams_resolv
 
 Verification: bare `seam doctor` from /tmp with a clean env (no PYTHONPATH, no DSN) now prints `Streams: PASS` (was `unavailable`). Full gate `pytest test_seam_all tools/history/test_history_tools.py tools/streams/test_streams.py` = 417 passed, 0 failed (prior 416 + the new test) with pgvector up on 127.0.0.1:55432. No behavior change for real wheel installs.
 ---END-ENTRY-#287---
+
+---BEGIN-ENTRY-#288---
+id: 288
+date: 2026-06-06T14:22:16Z
+agent: claude
+status: done
+topics: security, audit, retrieval, holographic, lossless, server, dashboard, ssrf, planner, test, verify, history
+commits: none
+refs: seam_runtime/dashboard.py,seam_runtime/holographic.py,seam_runtime/lossless.py,seam_runtime/retrieval_orchestrator/adapters.py,seam_runtime/retrieval_orchestrator/planner.py,seam_runtime/server.py,tests/audit/test_audit_2026_06_05.py,tests/audit/test_shell_security.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 287
+tokens: 919
+---
+Audit-driven correctness + security hardening bundle (was uncommitted WIP on fix/audit-correctness-security), reviewed and verified before commit.
+
+Six source fixes plus their audit tests:
+
+1. SHELL ARGV0 PATH HARDENING (seam_runtime/dashboard.py) — _validate_shell_command previously allowlisted on the BASENAME of argv[0] (argv[0].rsplit('/')[-1]), so an absolute/relative path whose final component matched an allowed name (e.g. /custom/path/git, ./ls) could smuggle an arbitrary binary past the allowlist. Now a slash/backslash in argv[0] is rejected outright; the command must be a bare name resolved against PATH. Slashes in later args (e.g. `ls /tmp`) remain fine.
+
+2. PNG IMAGE-BOMB GUARD (seam_runtime/holographic.py) — _read_png now bounds an untrusted IHDR: new MAX_SURFACE_DIMENSION=8192 ceiling on width/height (a real SEAM-HS/1 surface for the 64MiB default payload is ~4096x4096), and new _bounded_inflate refuses to materialize more than the declared raster size ((stride+1)*height) so a crafted IDAT (decompression bomb) is rejected instead of driving an unbounded/multi-GB allocation.
+
+3. CORRUPT READABLE-PAYLOAD GUARD (seam_runtime/lossless.py) — decompress_text_readable now raises a clear ValueError ("order references unknown chunk id") when the order list references a chunk id absent from the chunk table, instead of an opaque KeyError on corrupt input.
+
+4. GRAPH-ADAPTER NAMESPACE SCOPING (seam_runtime/retrieval_orchestrator/adapters.py) — SQLiteGraphAdapter.search now passes ns to load_ir (matching the other adapters, which already filtered by namespace) and restricts the edge load to edges that TOUCH an in-scope/in-namespace record via a subquery, instead of scanning the entire ir_edges table on every graph search. Every edge incident to a loaded record is kept, so neighbor counts/bonuses are byte-identical to the prior full scan; only edges between two out-of-scope records (already unreachable downstream) are dropped. With no scope/ns filter it is the full scan as before.
+
+5. VECTOR-MODE LEG FIX (seam_runtime/retrieval_orchestrator/planner.py) — an explicit mode='vector' is now semantic-only: it no longer injects the sql leg even when a pure-filter query classifies as STRUCTURED. Previously a filtered query under mode='vector' set intent=STRUCTURED and silently ran the structural/lexical sql leg, contradicting the caller's chosen mode.
+
+6. /chat SSRF GUARD (seam_runtime/server.py) — new _validate_provider_base_url runs before any outbound /chat request: requires an http(s) scheme and a resolvable host, and rejects hosts resolving into private, link-local (incl. the cloud metadata address 169.254.169.254), reserved, multicast, or unspecified ranges. Loopback is deliberately allowed (local providers such as Ollama bind 127.0.0.1; the endpoint is already auth-gated and loopback-bound by default). Empty base_url falls through to trusted provider defaults.
+
+Tests: new tests/audit/test_audit_2026_06_05.py (16 tests) covers all six fixes. tests/audit/test_shell_security.py updated to lock in fix 1: test_command_with_path_validates_basename (which asserted /bin/ls was allowed under the old basename behavior) was renamed to test_command_with_path_in_argv0_rejected and now asserts /bin/ls, ./ls, ../bin/ls, sub/dir/ls all raise PermissionError; added test_path_in_later_arg_allowed (`ls /tmp`) so the hardening cannot over-correct into rejecting legitimate path arguments. The Windows backslash case was intentionally omitted (shlex posix-mode strips backslashes on Linux, so it cannot exercise that branch here).
+
+Verification: full suite `python -m pytest tests/` = 531 passed, 4 skipped, 0 failed (pgvector up on 127.0.0.1:55432). The lone pre-commit failure was the stale test_command_with_path_validates_basename assertion contradicting fix 1; resolved by updating the test to the hardened behavior, not by reverting the fix.
+---END-ENTRY-#288---

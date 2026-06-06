@@ -143,10 +143,18 @@ class TestValidateShellCommand:
         with pytest.raises(PermissionError, match="Empty shell command"):
             _validate_shell_command("   ")
 
-    def test_command_with_path_validates_basename(self):
-        # The allowlist check uses the basename, but the executed argv keeps
-        # the explicit path the operator typed.
-        assert _validate_shell_command("/bin/ls -la") == ["/bin/ls", "-la"]
+    def test_command_with_path_in_argv0_rejected(self):
+        # A path in argv[0] is rejected outright. Validating only the basename
+        # would let an absolute/relative path whose final component matches an
+        # allowed name (e.g. /custom/path/git, ./ls) smuggle an arbitrary binary
+        # past the allowlist. Require a bare command name resolved against PATH.
+        for command in ("/bin/ls -la", "./ls", "../bin/ls", "sub/dir/ls"):
+            with pytest.raises(PermissionError, match="bare command name"):
+                _validate_shell_command(command)
+
+    def test_path_in_later_arg_allowed(self):
+        # Slashes are only forbidden in argv[0]; path arguments are fine.
+        assert _validate_shell_command("ls /tmp") == ["ls", "/tmp"]
 
     def test_malformed_command_rejected(self):
         with pytest.raises(PermissionError, match="Cannot parse"):

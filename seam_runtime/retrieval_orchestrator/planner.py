@@ -21,7 +21,11 @@ def build_plan(query: str, scope: str | None = None, budget: int = 5, mode: str 
     leg_limit = max(budget * 2, 5) if mode in {"hybrid", "mix"} else max(budget, 5)
     legs: list[RetrievalLeg] = []
 
-    if mode in {"hybrid", "mix"} or intent == QueryIntent.STRUCTURED:
+    # An explicit mode="vector" means semantic-only: never inject the sql leg,
+    # even when a pure-filter query classifies as STRUCTURED. Previously a
+    # filtered query under mode="vector" set intent=STRUCTURED and silently ran
+    # the structural/lexical sql leg, contradicting the caller's chosen mode.
+    if mode in {"hybrid", "mix"} or (intent == QueryIntent.STRUCTURED and mode != "vector"):
         legs.append(RetrievalLeg(name="sql", limit=leg_limit, rationale="Apply explicit field filters and lexical matching"))
     if mode in {"vector", "hybrid", "mix"}:
         legs.append(RetrievalLeg(name="vector", limit=leg_limit, rationale="Use embedding similarity for semantic recall"))

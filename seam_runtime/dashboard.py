@@ -171,7 +171,15 @@ def _validate_shell_command(command: str) -> list[str]:
     for token in argv:
         if token in _SHELL_OPERATOR_TOKENS:
             raise PermissionError(f"Shell operator {token!r} is not allowed")
-    cmd_name = argv[0].rsplit("/", 1)[-1]
+    # Reject a path in argv[0] (e.g. /custom/path/git): validating only the
+    # basename would let an absolute/relative path whose final component matches
+    # an allowed name through, running an arbitrary binary. Require a bare command
+    # name resolved against PATH. Slashes in later args (e.g. `ls /tmp`) are fine.
+    if "/" in argv[0] or "\\" in argv[0]:
+        raise PermissionError(
+            f"Command {argv[0]!r} must be a bare command name resolved on PATH, not a path"
+        )
+    cmd_name = argv[0]
     family_root = cmd_name.split(".", 1)[0]
     if cmd_name in BLOCKED_SHELL_COMMANDS or family_root in BLOCKED_SHELL_COMMANDS:
         raise PermissionError(f"Command {cmd_name!r} is in blocked set")

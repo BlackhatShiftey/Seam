@@ -22,6 +22,11 @@ SURFACE_MODES = ("bw1", "rgb", "rgb24", "rgba32", "rgba64")
 SURFACE_PAYLOAD_FORMATS = ("auto", "MIRL", "SEAM-RC/1", "SEAM-LX/1", "bytes")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 DEFAULT_MAX_SURFACE_PAYLOAD_BYTES = 64 * 1024 * 1024
+# Hard ceiling on PNG raster dimensions read from an untrusted IHDR. A real
+# SEAM-HS/1 surface for the default 64MiB payload is ~4096x4096; 8192 per side
+# leaves generous headroom while preventing a malformed IHDR from driving a
+# multi-gigabyte allocation (decompression-bomb / image-bomb OOM).
+MAX_SURFACE_DIMENSION = 8192
 
 
 @dataclass
@@ -443,6 +448,24 @@ def _write_png(path: Path, width: int, height: int, color_type: int, bit_depth: 
     path.write_bytes(bytes(png))
 
 
+def _bounded_inflate(data: bytes, max_output: int) -> bytes:
+    """Inflate `data`, refusing to materialize more than `max_output` bytes.
+
+    A well-formed SEAM-HS/1 surface inflates to exactly ``(stride + 1) * height``
+    bytes, so callers pass that as the bound. A crafted IDAT that tries to expand
+    past it (decompression bomb) is rejected instead of driving an unbounded
+    allocation.
+    """
+    decompressor = zlib.decompressobj()
+    out = decompressor.decompress(data, max_output)
+    if decompressor.unconsumed_tail:
+        raise ValueError("PNG IDAT inflates beyond the declared raster size (possible image bomb)")
+    out += decompressor.flush()
+    if len(out) > max_output:
+        raise ValueError("PNG IDAT inflates beyond the declared raster size (possible image bomb)")
+    return out
+
+
 def _read_png(path: Path) -> tuple[int, int, int, int, bytes]:
     data = path.read_bytes()
     if not data.startswith(PNG_SIGNATURE):
@@ -467,6 +490,11 @@ def _read_png(path: Path) -> tuple[int, int, int, int, bytes]:
                 raise ValueError(f"Unsupported PNG color type for SEAM-HS/1: {color_type}")
             if bit_depth == 16 and color_type != 6:
                 raise ValueError("SEAM-HS/1 16-bit surfaces require RGBA color type")
+            if not (0 < width <= MAX_SURFACE_DIMENSION and 0 < height <= MAX_SURFACE_DIMENSION):
+                raise ValueError(
+                    f"PNG dimensions {width}x{height} exceed the SEAM-HS/1 limit of "
+                    f"{MAX_SURFACE_DIMENSION}px per side"
+                )
         elif chunk_type == b"IDAT":
             idat.extend(chunk_data)
         elif chunk_type == b"IEND":
@@ -476,7 +504,8 @@ def _read_png(path: Path) -> tuple[int, int, int, int, bytes]:
     channels = 4 if color_type == 6 else 3 if color_type == 2 else 1
     bytes_per_pixel = channels * (2 if bit_depth == 16 else 1)
     stride = width * bytes_per_pixel
-    raw = zlib.decompress(bytes(idat))
+    expected_raw = (stride + 1) * height  # PNG prepends one filter byte per row
+    raw = _bounded_inflate(bytes(idat), expected_raw)
     return width, height, color_type, bit_depth, _unfilter_png(raw, width, height, bytes_per_pixel, stride)
 
 

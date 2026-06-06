@@ -86,11 +86,36 @@ class SQLiteGraphAdapter:
         tokens = _unique_tokens(_tokens(query_text))
         if not tokens and not plan.filters.active():
             return []
-        batch = self.store.load_ir(scope=plan.filters.scope)
+        batch = self.store.load_ir(scope=plan.filters.scope, ns=plan.filters.namespace)
         by_id = batch.by_id()
         graph: dict[str, set[str]] = {}
+        # Restrict the edge load to edges that TOUCH an in-scope/in-namespace
+        # record instead of scanning the entire ir_edges table on every graph
+        # search. We keep every edge incident to a loaded record (src OR dst in
+        # the record set), so neighbor counts/bonuses are byte-identical to the
+        # prior full scan; only edges between two out-of-scope records — which
+        # were already unreachable downstream (filtered by by_id + matches) —
+        # are dropped. With no scope/ns filter this is the full scan as before.
+        record_where: list[str] = []
+        record_params: list[object] = []
+        if plan.filters.scope:
+            record_where.append("scope = ?")
+            record_params.append(plan.filters.scope)
+        if plan.filters.namespace:
+            record_where.append("ns = ?")
+            record_params.append(plan.filters.namespace)
+        if record_where:
+            subquery = f"select id from ir_records where {' and '.join(record_where)}"
+            edge_sql = (
+                "select src_id, edge_type, dst_id from ir_edges "
+                f"where src_id in ({subquery}) or dst_id in ({subquery})"
+            )
+            edge_params = record_params + record_params  # subquery is referenced twice
+        else:
+            edge_sql = "select src_id, edge_type, dst_id from ir_edges"
+            edge_params = []
         with closing(self.store._connect()) as connection:
-            rows = connection.execute("select src_id, edge_type, dst_id from ir_edges").fetchall()
+            rows = connection.execute(edge_sql, edge_params).fetchall()
         for row in rows:
             src = str(row["src_id"])
             dst = str(row["dst_id"])

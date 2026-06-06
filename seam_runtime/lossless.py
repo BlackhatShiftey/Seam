@@ -338,7 +338,15 @@ def compress_text_readable(
 def decompress_text_readable(machine_text: str) -> str:
     parsed = parse_readable_machine_text(machine_text)
     chunks = {str(chunk["id"]): str(chunk["text"]) for chunk in parsed["chunks"]}
-    rebuilt = "".join(chunks[str(item["id"])] for item in parsed["order"])
+    rebuilt_parts: list[str] = []
+    for item in parsed["order"]:
+        chunk_id = str(item["id"])
+        if chunk_id not in chunks:
+            raise ValueError(
+                f"Readable payload is corrupt: order references unknown chunk id {chunk_id!r}"
+            )
+        rebuilt_parts.append(chunks[chunk_id])
+    rebuilt = "".join(rebuilt_parts)
     actual_sha256 = hashlib.sha256(rebuilt.encode("utf-8")).hexdigest()
     expected_sha256 = str(parsed["meta"]["sha256"])
     if actual_sha256 != expected_sha256:
