@@ -78,3 +78,8 @@ benchmarks/runs/holdout/*.json
 benchmarks/runs/locomo/*.json
 # Local durable benchmark dataset copies (redundant with the in-repo committed copy; do not double-commit)
 .dataset_store/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
