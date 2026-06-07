@@ -1595,6 +1595,65 @@ Phase work:
 
 ---
 
+## Track O — Architecture Split (seam-core / seam-types / seam-runtime)
+
+<!-- seam:item
+id: roadmap:track:O
+status: planned
+status-since: 2026-06-07
+status-by: history:287
+supersedes: none
+topics: architecture, packaging, security, mirl, distribution
+priority: 2
+phase: 1
+-->
+
+**Status:** Planned — do this immediately before going public. Do NOT start before the license decision (Track N operator gate) is made.
+
+**Goal:** Move the SEAM secret sauce (MIRL schema, HS/1 encoder, LX/1 encoder, lossless compression) into a private `seam-core` package that is not published to PyPI or visible in the public repo. The public `seam-runtime` package becomes the open interface layer; `seam-core` is the commercial/private engine it depends on.
+
+**Why deferred:** The repo is currently private — nothing is exposed. The split is a 25-file structural refactor and should happen right before the public flip, not before.
+
+**Dependency map (verified 2026-06-07):**
+
+- `mirl.py` — imported by 19 files; contains both the public type system (MIRLRecord, IRBatch, RecordKind, Status) and the proprietary schema design.
+- `lossless.py` — imported by 7 files; compression engine.
+- `holographic.py` — imported by 4 files; HS/1 PNG encoder/decoder.
+- `lx1.py` — imported by 1 file (cli.py); LX/1 encoder/decoder.
+
+**Target package structure:**
+
+```
+seam-types  (public, thin — types only, no logic)
+    MIRLRecord, IRBatch, RecordKind, Status, Pack,
+    SearchResult, VerifyReport, and other dataclasses
+
+seam-core   (private, commercial — the secret sauce)
+    mirl schema version + field encoding logic
+    holographic.py  (HS/1 encoder/decoder)
+    lx1.py          (LX/1 encoder/decoder)
+    lossless.py     (compression engine)
+
+seam-runtime  (public — imports from both)
+    everything else: storage, retrieval, cli, server,
+    dashboard, benchmarks, mcp, vector, pack, etc.
+```
+
+**Ordered steps (do not start until license decision is made):**
+
+1. OPERATOR_GATE: license decision confirmed (Track N gate).
+2. OPERATOR_GATE: patent provisional filed for MIRL schema + HS/1 encoding method before any code moves to a public-visible location.
+3. Create private `seam-core` repo under the same GitHub account.
+4. Extract `seam-types`: pull pure dataclass definitions out of `mirl.py` into a thin standalone package. Publish publicly (no secrets here — just type stubs).
+5. Move `holographic.py`, `lx1.py`, `lossless.py`, and the mirl schema/encoding logic into `seam-core`. Update all 19 import sites in `seam_runtime/` to import from `seam_core` instead.
+6. Update `tests/` and `test_seam_all/` — 25 files need import paths updated. Run full suite green before proceeding.
+7. Update `pyproject.toml` in `seam-runtime` to declare `seam-core` and `seam-types` as dependencies.
+8. Update `benchmarks/external/locomo/adapters/seam.py` import (1 site).
+9. Run `pytest tests/ test_seam_all/test_seam.py` — must be 0 failures before merge.
+10. Flip `seam-runtime` repo public. Keep `seam-core` private.
+
+---
+
 ## Recommended Course — Priority Order
 
 Use this section for current priority. Older planned entries `HISTORY#028`-
