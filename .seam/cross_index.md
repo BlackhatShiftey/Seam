@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 345
+total_events: 346
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-04T07:47:17Z | history:124:8261bcfb | session-event | done | verify, history, snapshot, ledger, protocol, audit | .gitignore,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md,REPO_LEDGER.md,ROADM... |
 | 2026-05-04T07:53:59Z | history:125:66123911 | session-event | done | verify, history, snapshot, windows, audit | .github/workflows/ci.yml,docs/CODE_LAYOUT.md,docs/setup.md,HISTORY.md,HISTORY... |
 | 2026-05-06T00:00:00Z | roadmap:023:05af675c | status-change | bootstrap | surface, ledger, persist | ROADMAP.md:1137 |
 | 2026-05-06T00:00:00Z | roadmap:024:ece99693 | status-change | bootstrap | surface, retrieval, command | ROADMAP.md:1158 |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-04T04:41:57Z | history:286:d89b0879 | session-event | done | dashboard, webui, server, chat, memory, bugfix, verify, h... | seam_runtime/server.py,seam_runtime/webui/dashboard.html,seam_runtime/webui/s... |
 | 2026-06-05T05:13:34Z | history:287:2d859afb | session-event | done | doctor, streams, cli, bugfix, packaging, test, verify, hi... | seam_runtime/doctor.py,test_seam_all/test_cli_import_isolation.py,HISTORY.md,... |
 | 2026-06-06T14:22:16Z | history:288:76706d50 | session-event | done | security, audit, retrieval, holographic, lossless, server... | seam_runtime/dashboard.py,seam_runtime/holographic.py,seam_runtime/lossless.p... |
+| 2026-06-08T07:30:36Z | history:289:bbf7ccaa | session-event | done | retrieval, self-improvement, h2, loop, benchmark, test, v... | seam_runtime/retrieval.py,seam_runtime/runtime.py,seam_runtime/storage.py,too... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0145.cross.md | 2026-04-15T00:00:00Z..2026-05-02T14:26:46Z | 145 | (multi) | (multi) |
+| 0001-0146.cross.md | 2026-04-15T00:00:00Z..2026-05-04T07:47:17Z | 146 | (multi) | (multi) |

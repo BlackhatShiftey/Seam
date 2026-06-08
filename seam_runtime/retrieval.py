@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 import re
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields as dataclass_fields
 from datetime import datetime
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Protocol
 
 from .bm25 import BM25Index
 from .mirl import IRBatch, MIRLRecord, RecordKind, SearchCandidate, SearchResult, cosine_similarity, iter_textual_fields
@@ -43,6 +43,48 @@ class RetrievalFlags:
     scoped_vectors: bool = False
 
 
+def retrieval_flag_field_types() -> dict[str, type]:
+    """Map each ``RetrievalFlags`` field name to its scalar type.
+
+    The H2 apply step and the loader both validate persisted/proposed flag
+    payloads against this so an unknown key or wrong-typed value can never
+    reach the scoring path. ``bool`` is reported as-is; callers must reject the
+    ``bool``/``int`` cross (``True`` is an ``int`` subclass) themselves.
+    """
+    return {f.name: type(f.default) for f in dataclass_fields(RetrievalFlags)}
+
+
+def _retrieval_env_overrides(env: Mapping[str, str]) -> dict[str, object]:
+    """Return only the flag fields whose env var is *explicitly* set.
+
+    Unset vars are omitted (not defaulted) so this dict can be overlaid on top
+    of persisted applied-state without an unset var clobbering an applied flag
+    back to its default. An explicit value (including a falsey one like ``0``)
+    is an operator override and always wins.
+    """
+
+    def _present(name: str) -> bool:
+        return env.get(name, "").strip() != ""
+
+    def _truthy(name: str) -> bool:
+        return env.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+    out: dict[str, object] = {}
+    if _present("SEAM_RETRIEVAL_SEMANTIC_ZERO"):
+        out["semantic_zero_no_vector"] = _truthy("SEAM_RETRIEVAL_SEMANTIC_ZERO")
+    if _present("SEAM_RETRIEVAL_BM25_ALL"):
+        out["bm25_all_kinds"] = _truthy("SEAM_RETRIEVAL_BM25_ALL")
+    if _present("SEAM_RETRIEVAL_RRF"):
+        out["fusion"] = "rrf" if _truthy("SEAM_RETRIEVAL_RRF") else "weighted"
+    if _present("SEAM_RETRIEVAL_RRF_K"):
+        raw = env["SEAM_RETRIEVAL_RRF_K"].strip()
+        if raw.lstrip("-").isdigit():
+            out["rrf_k"] = int(raw)
+    if _present("SEAM_RETRIEVAL_SCOPED_VECTORS"):
+        out["scoped_vectors"] = _truthy("SEAM_RETRIEVAL_SCOPED_VECTORS")
+    return out
+
+
 def retrieval_flags_from_env(env: Mapping[str, str] | None = None) -> RetrievalFlags:
     env = os.environ if env is None else env
 
@@ -55,6 +97,45 @@ def retrieval_flags_from_env(env: Mapping[str, str] | None = None) -> RetrievalF
         fusion="rrf" if _on("SEAM_RETRIEVAL_RRF") else "weighted",
         scoped_vectors=_on("SEAM_RETRIEVAL_SCOPED_VECTORS"),
     )
+
+
+class _FlagStateStore(Protocol):
+    def iter_retrieval_flag_state(self) -> list[dict[str, object]]: ...
+
+
+def load_retrieval_flags(
+    store: _FlagStateStore | None, env: Mapping[str, str] | None = None
+) -> RetrievalFlags:
+    """Resolve effective retrieval flags from three layers, lowest first:
+
+    1. ``RetrievalFlags()`` defaults (the locked baseline).
+    2. Persisted applied state (the H2 self-improvement loop's apply output).
+    3. Environment overrides (operator kill switch), which always win.
+
+    With an empty flag-state table and no env vars set this returns
+    ``RetrievalFlags()`` byte-identical, so an un-improved store reproduces the
+    locked retrieval baseline exactly. Malformed persisted rows (unknown field
+    or wrong scalar type) are skipped, never raised, so a bad row can never take
+    down the search path.
+    """
+    env = os.environ if env is None else env
+    values = asdict(RetrievalFlags())
+    field_types = retrieval_flag_field_types()
+
+    iter_state = getattr(store, "iter_retrieval_flag_state", None)
+    if callable(iter_state):
+        for row in iter_state():
+            key = row.get("flag_key")
+            if key not in field_types:
+                continue
+            value = row.get("flag_value")
+            expected = field_types[key]
+            if not isinstance(value, expected) or isinstance(value, bool) != (expected is bool):
+                continue
+            values[key] = value
+
+    values.update(_retrieval_env_overrides(env))
+    return RetrievalFlags(**values)
 
 
 _WEIGHTS = (("lexical", 0.4), ("semantic", 0.35), ("graph", 0.15), ("temporal", 0.10))

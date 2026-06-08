@@ -6229,3 +6229,37 @@ Tests: new tests/audit/test_audit_2026_06_05.py (16 tests) covers all six fixes.
 
 Verification: full suite `python -m pytest tests/` = 531 passed, 4 skipped, 0 failed (pgvector up on 127.0.0.1:55432). The lone pre-commit failure was the stale test_command_with_path_validates_basename assertion contradicting fix 1; resolved by updating the test to the hardened behavior, not by reverting the fix.
 ---END-ENTRY-#288---
+
+---BEGIN-ENTRY-#289---
+id: 289
+date: 2026-06-08T07:30:36Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, benchmark, test, verify, history
+commits: none
+refs: seam_runtime/retrieval.py,seam_runtime/runtime.py,seam_runtime/storage.py,tools/h2/improvement_review.py,tests/audit/test_h2_apply.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 288
+tokens: 1265
+---
+Close the back half of the H2 self-improvement loop: the `apply` step. An approved improvement proposal now actually changes retrieval behavior; before this, `approved` was a dead end (no mechanism translated a proposal into an active flag).
+
+Context (verified before building): the H2 loop was built except two gaps — auto-propose (front) and apply (back). This entry is apply only. Retrieval flags (`seam_runtime/retrieval.py` RetrievalFlags) were env-only: `search_ir` read them via `retrieval_flags_from_env()` at runtime.py with no persisted layer, so an approved proposal had nowhere to take effect. The validate/decide/holdout-gate middle (improvement.py, tools/h2/improvement_review.py propose/list/show/approve/reject/summary, proposal_blocks_promotion) already existed and is reused, not reinvented.
+
+Changes:
+
+1. STORAGE (seam_runtime/storage.py) — new `retrieval_flag_state` table (flag_key PK, flag_value JSON-encoded scalar, source_proposal_id, applied_at) plus `iter_retrieval_flag_state`, `upsert_retrieval_flag_state`, and `replace_retrieval_flag_state`. `replace_*` rewrites the whole table in one transaction so the table is a pure projection of the approved proposal set: an empty table is the canonical no-override state, and `replace_retrieval_flag_state({})` clears all overrides.
+
+2. LOADER (seam_runtime/retrieval.py) — new `load_retrieval_flags(store, env)` resolves three layers lowest-first: RetrievalFlags() defaults < persisted applied-state < env overrides (operator kill switch, always wins). Added `retrieval_flag_field_types()` (field->scalar-type map for payload validation) and `_retrieval_env_overrides()` which returns only EXPLICITLY-set env vars so an unset var never clobbers an applied flag back to default. Baseline invariant: empty flag-state + empty env reproduces RetrievalFlags() byte-identical, preserving the locked retrieval baseline (HISTORY#273). Malformed persisted rows (unknown field / wrong scalar type, incl. the bool-vs-int subclass cross) are skipped, never raised, so a bad row cannot take down the search path. Also added the SEAM_RETRIEVAL_RRF_K env override, closing the prior gap where an applied rrf_k had no env kill switch. retrieval_flags_from_env() left intact for back-compat (the LoCoMo adapter still calls it for its scoped_vectors namespace choice).
+
+3. RUNTIME (seam_runtime/runtime.py) — search_ir now builds flags via `load_retrieval_flags(self.store)`, cached once per runtime instance (`_retrieval_flags_cached`). Per-run resolution (not per-query) keeps scoring stable for the life of the process, so an `improvement apply` mid-run does not change results under a live runtime — reproducible benchmark runs (the benchmark path opens a fresh runtime per run, which picks up applied state). The LoCoMo seam adapter calls rt.search_ir, so applied scoring flags reach the benchmark.
+
+4. CLI (tools/h2/improvement_review.py) — new `apply` subcommand (+ `--dry-run`). `compute_apply_plan(store)` projects the approved proposal set onto a desired flag map and reconciles via `replace_retrieval_flag_state`. Key properties: REVERSIBLE — withdrawing an approval and re-running removes the flag (reconcile, not a one-way ratchet); applicability is gated on the `proposed_change["flags"]` PAYLOAD SHAPE validated against RetrievalFlags, not on `kind` (kind is human metadata, orthogonal to the flag fields); newest approved proposal wins a per-flag conflict (ascending proposal_id fold); unknown/ill-typed flags and invalid `fusion` values are reported as skips, not applied; approved proposals with no flags payload (schema_change/other) are no-ops.
+
+Design reviewed against a stronger advisor before coding: caught (a) the env-overlay trap (can't overlay retrieval_flags_from_env() wholesale or unset vars clobber applied flags with False), (b) apply-must-reconcile-not-append (reversibility), (c) gate-on-payload-not-kind (VALID_KINDS are orthogonal to RetrievalFlags fields), (d) verified the LoCoMo path flows through search_ir so applied flags are observable in the benchmark.
+
+Tests: new tests/audit/test_h2_apply.py (17 tests) — baseline invariant, happy-path apply (bool/fusion/rrf_k), pending/rejected/holdout-violating not applied, unknown/wrong-type/invalid-fusion skipped without crashing the loader, approved-without-payload no-op, REVERSIBILITY on withdrawn approval, newest-wins conflict, idempotency, dry-run writes nothing, env-overrides-persisted, unset-env-does-not-clobber, and a CLI smoke through ir.main(["apply", ...]).
+
+Verification: full suite `python -m pytest tests/` = 548 passed, 4 skipped (= prior 531 + 17 new). The 4 skips are pre-existing PGVECTOR_TEST_DSN-gated pgvector tests (test_pgvector_pk_composite, test_substream_isolation), unrelated to this change. Existing tests/audit/test_retrieval_flags.py and tests/audit/test_h2_improvement_review.py still green (no regression to the env reader or the propose/decide gate).
+
+Unresolved next step: the FRONT half of the loop — the auto-proposer — remains open. It must read retrieval_event data and emit proposals in exactly the `{"flags": {<RetrievalFlags field>: value}}` schema this apply step consumes, and must be evidence-gated (propose a flip only when dev-split — never holdout — data shows a recall lift), because per HISTORY#273 most levers are LoCoMo no-ops so a blind proposer would generate mostly no-op proposals. Apply now reconciles correctly, which is the precondition for starting the proposer.
+---END-ENTRY-#289---

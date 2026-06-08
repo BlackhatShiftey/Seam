@@ -10,6 +10,12 @@ Subcommands:
 * ``approve``   - append an ``approved`` decision for one proposal.
 * ``reject``    - append a ``rejected`` decision for one proposal.
 * ``summary``   - counts by status and violation flag.
+* ``apply``     - reconcile the persisted retrieval-flag state to the set of
+                  currently approved, non-violating proposals that carry a
+                  recognized ``{"flags": {...}}`` payload. This is the back half
+                  of the H2 self-improvement loop: an approved proposal only
+                  changes retrieval behavior once it is applied. Reversible -
+                  re-running after an approval is withdrawn removes the flag.
 
 Hard rule (matches ROADMAP H2 spec L1281-1287): this CLI never writes to
 ``AGENTS.md``, ``REPO_LEDGER.md``, or ``PROJECT_STATUS.md``. The only
@@ -30,8 +36,11 @@ from seam_runtime.improvement import (
     proposal_blocks_promotion,
     validate_proposal,
 )
+from seam_runtime.retrieval import retrieval_flag_field_types
 from seam_runtime.storage import SQLiteStore
 from tools.h2.holdout_split import load_manifest
+
+_FUSION_VALUES = ("weighted", "rrf")
 
 
 def _split_csv(value: str | None) -> list[str]:
@@ -189,6 +198,87 @@ def cmd_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _flag_value_ok(flag_key: str, value: object, expected: type) -> bool:
+    """A proposed flag value is applicable only if its scalar type matches the
+    ``RetrievalFlags`` field (with the bool/int subclass cross rejected) and,
+    for ``fusion``, the value is one of the recognized modes."""
+    if not isinstance(value, expected) or isinstance(value, bool) != (expected is bool):
+        return False
+    if flag_key == "fusion" and value not in _FUSION_VALUES:
+        return False
+    return True
+
+
+def compute_apply_plan(store: SQLiteStore):
+    """Project the approved proposal set onto a desired retrieval-flag map.
+
+    Returns ``(desired, applied, skipped)`` where ``desired`` maps
+    ``flag_key -> (value, source_proposal_id)``. Applicability is gated on the
+    ``proposed_change["flags"]`` *payload shape* (validated against
+    ``RetrievalFlags``), not on ``kind`` - ``kind`` is human metadata and is
+    orthogonal to the flag fields. Proposals are folded in ascending
+    proposal_id order so when two approved proposals touch the same flag the
+    newest (highest id) wins. Blocked proposals (pending / rejected /
+    superseded / holdout violation) never contribute.
+    """
+    field_types = retrieval_flag_field_types()
+    proposals = sorted(
+        store.iter_improvement_proposals(), key=lambda p: p["proposal_id"]
+    )
+    desired: dict[str, tuple[object, int]] = {}
+    skipped: list[dict] = []
+    for p in proposals:
+        pid = p["proposal_id"]
+        change = p.get("proposed_change")
+        flags_payload = change.get("flags") if isinstance(change, dict) else None
+        has_payload = isinstance(flags_payload, dict) and bool(flags_payload)
+        if proposal_blocks_promotion(p):
+            if has_payload:
+                skipped.append(
+                    {
+                        "proposal_id": pid,
+                        "reason": "blocked",
+                        "status": p.get("latest_status") or "pending",
+                        "holdout_violation": bool(p.get("holdout_violation")),
+                    }
+                )
+            continue
+        if not has_payload:
+            continue  # approved but nothing to apply (schema_change / other)
+        for key, value in flags_payload.items():
+            if key not in field_types:
+                skipped.append(
+                    {"proposal_id": pid, "reason": f"unknown flag {key!r}"}
+                )
+                continue
+            if not _flag_value_ok(key, value, field_types[key]):
+                skipped.append(
+                    {"proposal_id": pid, "reason": f"flag {key!r} invalid value/type"}
+                )
+                continue
+            desired[key] = (value, pid)  # ascending fold -> newest approval wins
+    applied = [
+        {"flag": key, "value": value, "proposal_id": pid}
+        for key, (value, pid) in sorted(desired.items())
+    ]
+    return desired, applied, skipped
+
+
+def cmd_apply(args: argparse.Namespace) -> int:
+    store = SQLiteStore(Path(args.db))
+    desired, applied, skipped = compute_apply_plan(store)
+    if not args.dry_run:
+        store.replace_retrieval_flag_state(desired)
+    payload = {
+        "dry_run": bool(args.dry_run),
+        "applied": applied,
+        "skipped": skipped,
+        "effective_flags": {key: value for key, (value, _pid) in sorted(desired.items())},
+    }
+    _emit(payload, json_mode=args.json)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="tools.h2.improvement_review",
@@ -239,6 +329,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     summ = sub.add_parser("summary", parents=[common_db], help="Counts by status / kind / violation.")
     summ.set_defaults(func=cmd_summary)
+
+    app = sub.add_parser(
+        "apply",
+        parents=[common_db],
+        help="Reconcile retrieval-flag state to the approved, non-violating proposal set.",
+    )
+    app.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Compute and print the plan without writing flag state.",
+    )
+    app.set_defaults(func=cmd_apply)
 
     return p
 
