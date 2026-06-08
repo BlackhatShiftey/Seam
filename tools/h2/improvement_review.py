@@ -36,11 +36,9 @@ from seam_runtime.improvement import (
     proposal_blocks_promotion,
     validate_proposal,
 )
-from seam_runtime.retrieval import retrieval_flag_field_types
+from seam_runtime.retrieval import coerce_flag_value, retrieval_flag_field_types
 from seam_runtime.storage import SQLiteStore
 from tools.h2.holdout_split import load_manifest
-
-_FUSION_VALUES = ("weighted", "rrf")
 
 
 def _split_csv(value: str | None) -> list[str]:
@@ -198,17 +196,6 @@ def cmd_summary(args: argparse.Namespace) -> int:
     return 0
 
 
-def _flag_value_ok(flag_key: str, value: object, expected: type) -> bool:
-    """A proposed flag value is applicable only if its scalar type matches the
-    ``RetrievalFlags`` field (with the bool/int subclass cross rejected) and,
-    for ``fusion``, the value is one of the recognized modes."""
-    if not isinstance(value, expected) or isinstance(value, bool) != (expected is bool):
-        return False
-    if flag_key == "fusion" and value not in _FUSION_VALUES:
-        return False
-    return True
-
-
 def compute_apply_plan(store: SQLiteStore):
     """Project the approved proposal set onto a desired retrieval-flag map.
 
@@ -251,12 +238,13 @@ def compute_apply_plan(store: SQLiteStore):
                     {"proposal_id": pid, "reason": f"unknown flag {key!r}"}
                 )
                 continue
-            if not _flag_value_ok(key, value, field_types[key]):
+            coerced = coerce_flag_value(key, value)
+            if coerced is None:
                 skipped.append(
                     {"proposal_id": pid, "reason": f"flag {key!r} invalid value/type"}
                 )
                 continue
-            desired[key] = (value, pid)  # ascending fold -> newest approval wins
+            desired[key] = (coerced, pid)  # ascending fold -> newest approval wins
     applied = [
         {"flag": key, "value": value, "proposal_id": pid}
         for key, (value, pid) in sorted(desired.items())

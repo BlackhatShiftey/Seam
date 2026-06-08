@@ -228,6 +228,37 @@ def test_dry_run_writes_nothing(tmp_path):
     assert load_retrieval_flags(store, env={}) == RetrievalFlags()
 
 
+# ---- continuous weight levers (Slice A) --------------------------------------
+
+
+def test_weight_proposal_applies_with_int_coercion(tmp_path):
+    store = _store(tmp_path)
+    # w_lexical given as int 1 -> coerced to float 1.0; w_semantic as float.
+    pid = _propose(store, {"flags": {"w_lexical": 1, "w_semantic": 0.5}})
+    _approve(store, pid)
+
+    _, applied, skipped = _apply(store)
+
+    assert skipped == []
+    flags = load_retrieval_flags(store, env={})
+    assert flags.w_lexical == 1.0 and isinstance(flags.w_lexical, float)
+    assert flags.w_semantic == 0.5
+    # untouched weights keep their baseline defaults
+    assert flags.w_graph == RetrievalFlags().w_graph
+
+
+def test_weight_bool_value_is_rejected(tmp_path):
+    store = _store(tmp_path)
+    pid = _propose(store, {"flags": {"w_semantic": True}})  # bool is not a valid float weight
+    _approve(store, pid)
+
+    _, applied, skipped = _apply(store)
+
+    assert applied == []
+    assert any("w_semantic" in s["reason"] for s in skipped)
+    assert load_retrieval_flags(store, env={}).w_semantic == RetrievalFlags().w_semantic
+
+
 # ---- env layer wins over persisted applied-state -----------------------------
 
 

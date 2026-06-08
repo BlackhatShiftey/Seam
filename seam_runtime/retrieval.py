@@ -41,6 +41,27 @@ class RetrievalFlags:
     # cross-ns crowding). ~0 measured LoCoMo recall impact; the value is
     # multi-tenant isolation. End-state ON for any multi-namespace store.
     scoped_vectors: bool = False
+    # Weighted-fusion channel weights. These default to the locked pre-audit
+    # tuple (lexical .40 / semantic .35 / graph .15 / temporal .10), so an
+    # un-tuned store reproduces the baseline exactly. Unlike the boolean levers
+    # these are a *continuous* apply target: the self-improvement proposer
+    # searches them against the free self-probe gate. Reweighting cannot inflate
+    # the self-probe signal (it is record-in-set at a fixed eval budget), so it
+    # is safe to tune automatically. Magnitudes matter relatively, not in
+    # absolute sum, so they are not constrained to sum to 1.
+    w_lexical: float = 0.40
+    w_semantic: float = 0.35
+    w_graph: float = 0.15
+    w_temporal: float = 0.10
+
+    def weight_pairs(self) -> tuple[tuple[str, float], ...]:
+        """Channel weights in the canonical order used by weighted fusion."""
+        return (
+            ("lexical", self.w_lexical),
+            ("semantic", self.w_semantic),
+            ("graph", self.w_graph),
+            ("temporal", self.w_temporal),
+        )
 
 
 def retrieval_flag_field_types() -> dict[str, type]:
@@ -52,6 +73,37 @@ def retrieval_flag_field_types() -> dict[str, type]:
     ``bool``/``int`` cross (``True`` is an ``int`` subclass) themselves.
     """
     return {f.name: type(f.default) for f in dataclass_fields(RetrievalFlags)}
+
+
+def coerce_flag_value(key: str, value: object) -> object | None:
+    """Validate ``value`` against the ``RetrievalFlags`` field ``key`` and return
+    the coerced value, or None if it is invalid for that field.
+
+    Used by both the loader (persisted rows) and the apply step (proposal
+    payloads) so the contract is identical on both sides. Rules: bool fields
+    take only ``bool``; float fields take ``int`` or ``float`` (coerced to
+    float) but never ``bool`` (which is an ``int`` subclass); int fields take
+    only ``int`` (not ``bool``); ``fusion`` must be a known mode. An unknown key
+    returns None.
+    """
+    expected = retrieval_flag_field_types().get(key)
+    if expected is None:
+        return None
+    if expected is bool:
+        return value if isinstance(value, bool) else None
+    if expected is float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+    if expected is int:
+        return value if isinstance(value, int) and not isinstance(value, bool) else None
+    if expected is str:
+        if not isinstance(value, str):
+            return None
+        if key == "fusion" and value not in ("weighted", "rrf"):
+            return None
+        return value
+    return value if isinstance(value, expected) else None
 
 
 def _retrieval_env_overrides(env: Mapping[str, str]) -> dict[str, object]:
@@ -128,11 +180,10 @@ def load_retrieval_flags(
             key = row.get("flag_key")
             if key not in field_types:
                 continue
-            value = row.get("flag_value")
-            expected = field_types[key]
-            if not isinstance(value, expected) or isinstance(value, bool) != (expected is bool):
+            coerced = coerce_flag_value(key, row.get("flag_value"))
+            if coerced is None:
                 continue
-            values[key] = value
+            values[key] = coerced
 
     values.update(_retrieval_env_overrides(env))
     return RetrievalFlags(**values)
@@ -189,7 +240,7 @@ def search_batch(batch: IRBatch, query: str, scope: str | None = None, limit: in
     if flags.fusion == "rrf":
         candidates = _fuse_rrf(scored, batch_by_id, k=flags.rrf_k)
     else:
-        candidates = _fuse_weighted(scored, batch_by_id)
+        candidates = _fuse_weighted(scored, batch_by_id, flags.weight_pairs())
 
     return SearchResult(query=expanded_query, candidates=sorted(candidates, key=lambda item: item.score, reverse=True)[:limit])
 
@@ -198,10 +249,10 @@ def _reasons(channels: dict[str, float]) -> list[str]:
     return [f"{name}={channels[name]:.2f}" for name, _ in _WEIGHTS]
 
 
-def _fuse_weighted(scored: list[tuple[MIRLRecord, dict[str, float]]], batch_by_id: dict[str, MIRLRecord]) -> list[SearchCandidate]:
+def _fuse_weighted(scored: list[tuple[MIRLRecord, dict[str, float]]], batch_by_id: dict[str, MIRLRecord], weights: tuple[tuple[str, float], ...] = _WEIGHTS) -> list[SearchCandidate]:
     candidates: list[SearchCandidate] = []
     for record, channels in scored:
-        score = sum(weight * channels[name] for name, weight in _WEIGHTS)
+        score = sum(weight * channels[name] for name, weight in weights)
         if score <= 0:
             continue
         evidence = [batch_by_id[ev] for ev in record.evidence if ev in batch_by_id]

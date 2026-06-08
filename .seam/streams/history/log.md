@@ -6263,3 +6263,45 @@ Verification: full suite `python -m pytest tests/` = 548 passed, 4 skipped (= pr
 
 Unresolved next step: the FRONT half of the loop — the auto-proposer — remains open. It must read retrieval_event data and emit proposals in exactly the `{"flags": {<RetrievalFlags field>: value}}` schema this apply step consumes, and must be evidence-gated (propose a flip only when dev-split — never holdout — data shows a recall lift), because per HISTORY#273 most levers are LoCoMo no-ops so a blind proposer would generate mostly no-op proposals. Apply now reconciles correctly, which is the precondition for starting the proposer.
 ---END-ENTRY-#289---
+
+---BEGIN-ENTRY-#290---
+id: 290
+date: 2026-06-08T08:57:59Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, benchmark, locomo, audit, test, verify, history
+commits: none
+refs: seam_runtime/self_improve.py,seam_runtime/retrieval.py,seam_runtime/runtime.py,tools/h2/improvement_review.py,tests/audit/test_self_probe_scorer.py,tests/audit/test_h2_apply.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 289
+tokens: 1302
+---
+H2 self-improvement loop, front-half foundation + the empirical finding that reframes it. Builds on the #289 apply step. Two outcomes: (1) durable, green instrument code; (2) a measured NEGATIVE result that future agents must not re-discover.
+
+WHAT WAS BUILT (all green, 557 passed / 4 skipped pre-existing pgvector):
+
+1. SELF-PROBE SCORER (seam_runtime/self_improve.py) — free, deterministic, paid-free retrieval measurement from the runtime's OWN corpus. `Scorer` protocol + `ScoreReport` (aggregate / per_category / per_case); `Probe`; `generate_probes` (cloze: mask the salient span of a record's text, query = remainder, gold = that record); `SelfProbeScorer` (binary recall = gold record id in the candidate set). Not budget-gameable (record-in-set at a fixed eval budget). `generate_probes` is deterministic (seed) so the SAME probe set scores a config before/after apply — the basis for a no-regression ratchet.
+
+2. ABLATION HOOK (seam_runtime/runtime.py) — `search_ir(..., flags=)` lets a caller run retrieval under explicit RetrievalFlags, bypassing the per-runtime cache/env, so a counterfactual lever sweep is deterministic and side-effect-free.
+
+3. WEIGHTS AS APPLY TARGET / "Slice A" (seam_runtime/retrieval.py) — added continuous fusion-weight fields to RetrievalFlags (`w_lexical .40 / w_semantic .35 / w_graph .15 / w_temporal .10`, the locked baseline tuple) + `weight_pairs()`; `_fuse_weighted` now reads the weights from flags (default tuple = byte-identical baseline, preserves #273). This makes the weights tunable through the EXISTING #289 apply machinery for free. Added `coerce_flag_value(key, value)` — one shared validator used by both `load_retrieval_flags` and the apply step (`tools/h2/improvement_review.py`), with int->float tolerance for weight fields and bool/int-cross rejection; replaced the old `_flag_value_ok`.
+
+Tests: tests/audit/test_self_probe_scorer.py (7, pins the scorer mechanism not the query heuristic); tests/audit/test_h2_apply.py +2 (weight proposal applies with int coercion; bool rejected as a float weight).
+
+THE FINDING (load-bearing — do not re-litigate without new evidence):
+
+On a realistic corpus (LoCoMo conv-26 ingested via the seam adapter `ingest_turn`, ~2000 records, natural-text turns, NO paid calls), the self-probe signal has NO free headroom for any apply-able lever:
+- `search_ir` surfaces CLM (compiled claims), never RAW — a RAW-keyed probe gold scores a structural 0.0; the probe gold must target the kind retrieval returns (CLM here). With CLM gold: baseline self-probe recall 0.8917 at eval budget 20.
+- NO boolean lever moves it (semantic_zero / bm25_all = +0.0000; fusion=rrf and every rrf_k REGRESS, matching #273).
+- NO weight vector moves it UP at any eval budget (1,2,3,5,10,20). Weights are wired correctly (lexical-only swings recall -0.175), but baseline weighting is already at/near the top everywhere; best improvement found anywhere = +0.008 at top-1, within the ~±0.002 noise floor. Cloze-of-own-record is a lexical-twin by construction, so it is too easy and lever-insensitive, and free cloze-hardening cannot fix that without destroying lexical overlap (only LLM paraphrase does, which is PAID — violates the operator's "never need paid to improve" constraint).
+
+Therefore: the bottleneck is NOT the lever set (this experiment + #273 agree global retrieval levers have ~no free headroom); the self-probe task is simply too easy to expose retrieval weakness. A proposer over this signal would correctly idle. Building the proposer is GATED on resolving the direction fork below — a proposer over a no-headroom signal is an idling engine.
+
+DIRECTION FORK (operator decision, pending):
+- (A) Driver = FREE LoCoMo string-match (`--answerer none --judge none`, no judge/no paid) — it has realistic low-lexical-overlap questions AND measured lever headroom (#273: semantic_zero +0.026 cat1 / +0.018 cat3, -0.004 cat4, +0.0046 global). Self-probe is repurposed as a free, on-their-data REGRESSION WATCHDOG paired with #289's reversible apply = a no-regression ratchet (scores only go up or flat). Both free.
+- (B) Accept that global levers are already near-optimal on free signals; the loop's robust, fully-free value is REGRESSION-PREVENTION (the #289 reversible ratchet + self-probe watchdog), not score-climbing. Shippable and honest.
+- The real large score-movers (pack char-budget / search_top_k, +0.059..+0.135 per [[reference-locomo-audit-doc]]) are gameable on free string-match metrics and need a PAID judged run to validate honestly — which conflicts with "never need paid to improve". So large automatic improvement is fundamentally gated on paid validation; surface that tension to the operator, do not engineer around it.
+
+Verification: `python -m pytest tests/` = 557 passed, 4 skipped, 0 failed. Self-probe foundation + weights apply are durable regardless of which fork is chosen (self-probe = watchdog in both; weights extend the apply target). No regression to test_retrieval_flags / test_h2_improvement_review / #289 test_h2_apply.
+
+Unresolved next step: operator picks the fork; only then build the proposer (over free-LoCoMo for fork A) or finalize the watchdog framing (fork B). Do NOT torture probe design to manufacture a noise-level "improvement" — that is the metric-gaming the loop explicitly refuses.
+---END-ENTRY-#290---
