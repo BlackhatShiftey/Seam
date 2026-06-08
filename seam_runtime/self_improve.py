@@ -28,13 +28,13 @@ from __future__ import annotations
 import random
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Protocol, Sequence, runtime_checkable
 
 from .mirl import MIRLRecord, RecordKind, iter_textual_fields
+from .retrieval import RetrievalFlags
 
 if TYPE_CHECKING:  # avoid import cycle / heavy import at module load
-    from .retrieval import RetrievalFlags
     from .runtime import SeamRuntime
 
 
@@ -220,3 +220,141 @@ class SelfProbeScorer:
             per_category=per_category,
             per_case=dict(per_case),
         )
+
+
+# --- proposer core: generate candidate levers + evaluate against free scorers ---
+
+# Default decision thresholds. ``noise_margin`` is the measured self-probe noise
+# floor (~0.002 -> use a safer 0.005); a candidate must beat it on at least one
+# scorer to count as an improvement. ``regress_tol`` is the per-scorer and
+# per-category drop a candidate may not exceed - the no-regression half of the
+# ratchet, so a lever that helps one signal/category while hurting another is
+# rejected (the #273 R1 lesson, enforced automatically).
+DEFAULT_NOISE_MARGIN = 0.005
+DEFAULT_REGRESS_TOL = 0.005
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """A proposed lever change relative to the current baseline flags.
+
+    ``change`` is the minimal ``{field: value}`` overlay - exactly the
+    ``proposed_change["flags"]`` payload the #289 apply step consumes. ``flags``
+    is the fully-resolved RetrievalFlags used to score the counterfactual.
+    """
+
+    label: str
+    change: dict[str, object]
+    flags: RetrievalFlags
+
+
+@dataclass(frozen=True)
+class CandidateEvaluation:
+    candidate: Candidate
+    deltas: dict[str, float]                       # scorer -> aggregate delta vs baseline
+    category_deltas: dict[str, dict[str, float]]   # scorer -> {category -> delta}
+    is_improvement: bool
+    reason: str
+
+
+def candidate_levers(
+    baseline: RetrievalFlags, *, weight_step: float = 0.10
+) -> list[Candidate]:
+    """Bounded candidate set: the boolean/enum levers (when not already set on
+    the baseline) plus single-channel weight perturbations (+/- ``weight_step``).
+
+    Deliberately small and interpretable - the loop tries one lever at a time so
+    an accepted change has a clear attribution. Negative weights are skipped.
+    """
+    candidates: list[Candidate] = []
+    for field_name, value in (
+        ("semantic_zero_no_vector", True),
+        ("bm25_all_kinds", True),
+        ("fusion", "rrf"),
+    ):
+        if getattr(baseline, field_name) != value:
+            candidates.append(
+                Candidate(
+                    label=f"{field_name}={value}",
+                    change={field_name: value},
+                    flags=replace(baseline, **{field_name: value}),
+                )
+            )
+    for field_name in ("w_lexical", "w_semantic", "w_graph", "w_temporal"):
+        for delta in (weight_step, -weight_step):
+            new_value = round(getattr(baseline, field_name) + delta, 4)
+            if new_value < 0:
+                continue
+            candidates.append(
+                Candidate(
+                    label=f"{field_name}{delta:+g}",
+                    change={field_name: new_value},
+                    flags=replace(baseline, **{field_name: new_value}),
+                )
+            )
+    return candidates
+
+
+def evaluate_candidates(
+    runtime: "SeamRuntime",
+    scorers: Sequence[Scorer],
+    candidates: Sequence[Candidate],
+    baseline: RetrievalFlags,
+    *,
+    noise_margin: float = DEFAULT_NOISE_MARGIN,
+    regress_tol: float = DEFAULT_REGRESS_TOL,
+) -> list[CandidateEvaluation]:
+    """Score every candidate against every scorer relative to ``baseline``.
+
+    A candidate ``is_improvement`` iff it beats ``noise_margin`` on at least one
+    scorer's aggregate AND drops no scorer's aggregate and no per-category recall
+    by more than ``regress_tol``. Eval budget is whatever each scorer was built
+    with - hold it fixed across the sweep (the anti-gaming guard for the
+    record-in-set signal).
+    """
+    base = {s.name: s.score(runtime, flags=baseline) for s in scorers}
+    evaluations: list[CandidateEvaluation] = []
+    for candidate in candidates:
+        deltas: dict[str, float] = {}
+        category_deltas: dict[str, dict[str, float]] = {}
+        improved = False
+        regressed_reason = ""
+        for scorer in scorers:
+            report = scorer.score(runtime, flags=candidate.flags)
+            base_report = base[scorer.name]
+            delta = report.aggregate - base_report.aggregate
+            deltas[scorer.name] = delta
+            if delta > noise_margin:
+                improved = True
+            if delta < -regress_tol and not regressed_reason:
+                regressed_reason = f"{scorer.name} aggregate {delta:+.4f}"
+            cat_d: dict[str, float] = {}
+            for category, base_value in base_report.per_category.items():
+                cat_delta = report.per_category.get(category, 0.0) - base_value
+                cat_d[category] = cat_delta
+                if cat_delta < -regress_tol and not regressed_reason:
+                    regressed_reason = f"{scorer.name}/{category} {cat_delta:+.4f}"
+            category_deltas[scorer.name] = cat_d
+        is_improvement = improved and not regressed_reason
+        if is_improvement:
+            reason = "improves " + ", ".join(
+                f"{name} {d:+.4f}" for name, d in deltas.items() if d > noise_margin
+            )
+        elif regressed_reason:
+            reason = f"regresses {regressed_reason}"
+        else:
+            reason = "no change beyond noise"
+        evaluations.append(
+            CandidateEvaluation(candidate, deltas, category_deltas, is_improvement, reason)
+        )
+    return evaluations
+
+
+def select_best_improvement(
+    evaluations: Sequence[CandidateEvaluation],
+) -> CandidateEvaluation | None:
+    """The improving candidate with the largest total aggregate gain, or None."""
+    improving = [e for e in evaluations if e.is_improvement]
+    if not improving:
+        return None
+    return max(improving, key=lambda e: sum(e.deltas.values()))

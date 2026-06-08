@@ -6305,3 +6305,44 @@ Verification: `python -m pytest tests/` = 557 passed, 4 skipped, 0 failed. Self-
 
 Unresolved next step: operator picks the fork; only then build the proposer (over free-LoCoMo for fork A) or finalize the watchdog framing (fork B). Do NOT torture probe design to manufacture a noise-level "improvement" — that is the metric-gaming the loop explicitly refuses.
 ---END-ENTRY-#290---
+
+---BEGIN-ENTRY-#291---
+id: 291
+date: 2026-06-08T11:10:38Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, proposer, ratchet, test, verify, history
+commits: none
+refs: seam_runtime/self_improve.py,tools/h2/improvement_loop.py,tests/audit/test_improvement_loop.py,docs/handoffs/2026-06-08-h2-self-improvement-loop.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 290
+tokens: 1145
+---
+H2 self-improvement loop, front half COMPLETE: the proposer + no-regression ratchet. Realizes the operator's fork #1 (an always-trying, fully-free improvement loop + on-corpus regression watchdog) with the paid tier pluggable through the same interface ("we want both"). Builds on #289 (apply) and #290 (self-probe scorer + the no-free-headroom finding).
+
+WHAT WAS BUILT (all green, 565 passed / 4 skipped pre-existing pgvector):
+
+1. PROPOSER CORE (seam_runtime/self_improve.py, pure logic, no DB/apply):
+   - DEFAULT_NOISE_MARGIN=0.005, DEFAULT_REGRESS_TOL=0.005.
+   - Candidate(label, change: dict, flags) - `change` is the minimal {field: value} overlay = the proposed_change["flags"] payload the #289 apply consumes.
+   - candidate_levers(baseline, weight_step=0.10) - boolean/enum levers (when not already set) + single-channel weight +/- perturbations (skips negative weights). Small/interpretable: one lever at a time -> clear attribution.
+   - evaluate_candidates(runtime, scorers, candidates, baseline, noise_margin, regress_tol) - scores each candidate vs baseline on every scorer; is_improvement = beats noise on >=1 scorer AND drops no scorer aggregate and no per-category recall past regress_tol. The per-category no-regression gate enforces the #273 R1 lesson automatically (a lever that helps one category but hurts another is rejected).
+   - select_best_improvement(evaluations) - improving candidate with the largest total aggregate gain, else None.
+
+2. ORCHESTRATION CYCLE (tools/h2/improvement_loop.py):
+   - run_improvement_cycle(runtime, store, scorers, *, auto_approve=False, actor, noise_margin, regress_tol, weight_step) -> structured report. Resolve baseline = load_retrieval_flags(store) -> candidate_levers -> evaluate_candidates -> select_best_improvement -> write ONE proposal (kind="ranking_weight", proposed_change={"flags": change}). If auto_approve: approve -> apply via compute_apply_plan + replace_retrieval_flag_state -> RE-MEASURE the reconciled state and AUTO-REVERT (reject + re-apply) if any scorer regressed past tolerance vs the pre-cycle baseline.
+   - The reversible #289 apply makes this a RATCHET: applied state can only move scores up or flat, because anything that regresses post-apply is backed out in the same cycle.
+   - Scorer-agnostic: FREE scorers (SelfProbeScorer now; a free-LoCoMo scorer next) drive the always-on loop; PAID scorers (judged) implement the same Scorer protocol and join the list only for operator-triggered validation. Free never requires paid. Lives in tools/ (orchestrates runtime + scorers + proposal store + the apply CLI) to keep seam_runtime independent of tools/.
+
+Tests: tests/audit/test_improvement_loop.py (8) - candidate_levers coverage + skip-already-set; per-category regression blocks an aggregate-improving candidate; select-best-by-total-gain; cycle proposes + auto-applies an improvement; no-headroom proposes nothing; propose-only (auto_approve=False) writes a pending proposal but applies nothing; AUTO-REVERT on post-apply regression (a state-keyed synthetic scorer that looks like an improvement during eval but regresses once apply has written flag state - deterministic, no call-count reliance).
+
+HONEST STATUS of "make it improve": the machinery is complete and correct, but per #290 the FREE signals + current apply-able levers have ~no headroom, so wired to SelfProbeScorer the loop correctly proposes nothing and functions as a regression WATCHDOG (always trying, never regressing). To get actual score MOVEMENT the loop needs the free-LoCoMo scorer (the signal #273 showed has lever headroom) and/or the operator-gated PAID validation tier for the big levers (char-budget/top_k). Those plug into the same run_improvement_cycle via the scorer list.
+
+REMAINING (next slices, none blocking this commit):
+- Wire a FREE-LoCoMo Scorer (real questions + gold-evidence ids, string-match recall via search_ir, --answerer none/--judge none semantics) - the headroom signal; self-probe alone idles. Dataset at /home/terrabyte/seam_benchmarks/track_m/locomo/locomo10.json; ingest via SeamLocomoAdapter.ingest_turn (ns=locomo:<scope>); load_locomo_cases for questions/gold.
+- A thin `improvement cycle` CLI (propose-only default, --auto-approve opt-in).
+- An operator-triggered PAID judged Scorer for the validation tier (never auto-run; confirm with operator first).
+
+Verification: python -m pytest tests/ = 565 passed, 4 skipped, 0 failed. No regression to #289/#290 tests or retrieval_flags/h2_improvement_review. Handoff doc at docs/handoffs/2026-06-08-h2-self-improvement-loop.md describes the full state for the next agent.
+
+Unresolved next step: wire the free-LoCoMo scorer so the always-on loop has a signal with real headroom; until then the loop ships as a correct, free, no-regression watchdog over the self-probe signal.
+---END-ENTRY-#291---
