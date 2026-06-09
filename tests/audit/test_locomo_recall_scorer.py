@@ -8,10 +8,18 @@ manually against the real corpus; here we pin the scorer contract.
 
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from benchmarks.external.common.types import BenchmarkCase, ConversationTurn
 from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
-from benchmarks.external.locomo.recall_scorer import LocomoRecallScorer, scope_for
+from benchmarks.external.locomo.recall_scorer import (
+    LocomoRecallScorer,
+    PooledLocomoRecallScorer,
+    _select_split,
+    scope_for,
+)
 from seam_runtime.retrieval import RetrievalFlags
+from tools.h2.holdout_split import DEFAULT_RATIO, DEFAULT_SALT, assign_one
 
 
 def test_scope_for_strips_question_suffix():
@@ -79,3 +87,49 @@ def test_locomo_recall_scorer_runs_under_candidate_flags(tmp_path):
 
     assert base.n == cand.n == 1
     assert 0.0 <= base.aggregate <= 1.0 and 0.0 <= cand.aggregate <= 1.0
+
+
+def _case(cid, category="1"):
+    return BenchmarkCase(case_id=cid, conversation=(), question="q?", gold_answer="a", category=category)
+
+
+def test_select_split_partitions_deterministically():
+    cases = [_case(f"conv-{i}::q{j}") for i in range(4) for j in range(6)]
+    dev = _select_split(cases, "dev", salt=DEFAULT_SALT, ratio=DEFAULT_RATIO)
+    hold = _select_split(cases, "holdout", salt=DEFAULT_SALT, ratio=DEFAULT_RATIO)
+    dev_ids = {c.case_id for c in dev}
+    hold_ids = {c.case_id for c in hold}
+    # dev and holdout are disjoint and cover everything; matches assign_one
+    assert dev_ids.isdisjoint(hold_ids)
+    assert dev_ids | hold_ids == {c.case_id for c in cases}
+    for c in cases:
+        want = assign_one(c.case_id, salt=DEFAULT_SALT, ratio=DEFAULT_RATIO)
+        assert (c in dev) == (want == "dev")
+    # split=None keeps everything
+    assert len(_select_split(cases, None, salt=DEFAULT_SALT, ratio=DEFAULT_RATIO)) == len(cases)
+
+
+def test_pooled_scorer_spans_multiple_conversations(tmp_path):
+    adapter = SeamLocomoAdapter(db_path=str(tmp_path / "pool"), keep_db=True, answerer=None)
+    convs = {
+        "conv-a": (ConversationTurn(speaker="Ana", text="The deadline is Friday March 7."),),
+        "conv-b": (ConversationTurn(speaker="Ben", text="We store data in Postgres 16."),),
+    }
+    cases_by_scope = OrderedDict()
+    for scope, turns in convs.items():
+        _ingest(adapter, scope, turns)
+        cases_by_scope[scope] = [
+            BenchmarkCase(case_id=f"{scope}::q0", conversation=turns,
+                          question="when/what?", gold_answer="Friday" if scope == "conv-a" else "Postgres",
+                          category="1" if scope == "conv-a" else "2")
+        ]
+    scorer = PooledLocomoRecallScorer(adapter=adapter, cases_by_scope=cases_by_scope)
+    rt_a, rt_b = adapter._runtime("conv-a"), adapter._runtime("conv-b")
+
+    report = scorer.score(None, flags=RetrievalFlags())
+
+    assert report.n == 2                                   # pooled across both conversations
+    assert set(report.per_case) == {"conv-a::q0", "conv-b::q0"}
+    assert set(report.per_category) == {"1", "2"}
+    # flag override restored on every touched runtime
+    assert rt_a._retrieval_flags is None and rt_b._retrieval_flags is None

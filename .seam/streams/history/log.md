@@ -6506,3 +6506,35 @@ Verification: tests/audit/test_chroma_optional.py + test_chroma_sync_default.py 
 
 Unresolved next step: when chromadb publishes a patched release (>1.5.9 fixing GHSA-f4j7-r4q5-qw2c), widen the `chroma` extra pin to require it. Also still open from #292: the multi-conversation dev gate (--locomo-scopes>1) and an operator-gated paid judged Scorer (this entry interrupted that work to handle the security alert).
 ---END-ENTRY-#296---
+
+---BEGIN-ENTRY-#297---
+id: 297
+date: 2026-06-09T21:06:59Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, locomo, dev-gate, generalization, test, verify, history
+commits: none
+refs: benchmarks/external/locomo/recall_scorer.py,seam_runtime/cli.py,tests/audit/test_locomo_recall_scorer.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 296
+tokens: 684
+---
+Multi-conversation dev gate for the self-improvement loop - the piece that makes a proposed lever GENERALIZE (not overfit one conversation) and keeps the loop off the holdout split. Closes the #292 caveat (its semantic_zero win was measured on a single conversation; #273 showed it is category-mixed at scale).
+
+What was built:
+- benchmarks/external/locomo/recall_scorer.py:
+  * PooledLocomoRecallScorer - mean context_recall pooled over the dev questions of MULTIPLE conversations (one aggregate + per-category over a diverse dev set). Each question is answered via its own conversation's runtime; the candidate flags are applied to EVERY touched runtime for the scoring pass and restored after.
+  * build_locomo_dev_scorer(dataset, max_scopes=5, split="dev", salt, ratio, question_limit) - ingests up to max_scopes conversations and returns ONE pooled scorer over their dev questions. FREE (answerer=None).
+  * _select_split filters cases via the deterministic holdout_split.assign_one (same salt+ratio => same partition forever); the loop tunes on `dev` ONLY, holdout reserved for publish-time.
+- seam_runtime/cli.py: `seam improve cycle --locomo-dataset` now builds the pooled dev scorer; `--locomo-scopes` default raised 1->5 (multi-conversation by default); new `--locomo-split {dev,holdout,all}` (default dev).
+
+VALIDATION (no-paid; pooled over conv-26/30/41/42, 48 dev cases) - the gate CHANGES the verdict and proves its worth:
+- baseline pooled-dev locomo_recall = 0.4922 (cat1 .342 / cat2 .649 / cat3 .162 / cat4 .550).
+- semantic_zero_no_vector: was +0.040 IMPROVE on conv-26 ALONE (#292); pooled it is -0.0002 global AND regresses cat1 (-0.021) -> correctly REJECTED. The single-conversation false-positive is caught.
+- fusion=rrf: +0.055 but regresses cat3 -> rejected (consistent with #273).
+- w_lexical+0.1: +0.0104, NO category regression -> the one genuine, generalizable improvement; select_best_improvement = {w_lexical: 0.5}.
+So the gate rejects the overfit lever and still surfaces a real, generalizable gain - exactly the intended behavior.
+
+Tests: tests/audit/test_locomo_recall_scorer.py +2 (deterministic dev/holdout partition via _select_split; pooled scorer spans conversations and restores flags on every touched runtime). Full `python -m pytest tests/` with pgvector DSN + strict no-skip = 581 passed, 0 skipped, 0 failed.
+
+Unresolved next step: the only remaining item from #292 is an operator-gated PAID judged Scorer (same Scorer protocol; never auto-run) for the validation tier - confirms a dev-validated lever as a real answer-accuracy gain on holdout before a publishable claim. The free always-on loop (self-probe + multi-conversation LoCoMo dev gate + reversible #289 ratchet) is now complete and generalization-safe.
+---END-ENTRY-#297---
