@@ -42,6 +42,12 @@ class SeamRuntime:
             self.vector_adapter = PgVectorAdapter(resolved_dsn, self.embedding_model)
         else:
             self.vector_adapter = SQLiteVectorAdapter(str(store_path), self.embedding_model)
+        # Retrieval flags are resolved once per runtime (defaults < persisted
+        # applied-state < env) and cached so scoring stays stable for the life
+        # of the process; an `improvement apply` mid-run does not change results
+        # under a live runtime, which keeps a benchmark run reproducible. A new
+        # runtime (the benchmark path opens one per run) picks up applied state.
+        self._retrieval_flags = None
 
     def close(self) -> None:
         """Close the underlying SQLite store connection pool.
@@ -139,12 +145,29 @@ class SeamRuntime:
             raise RuntimeError("Vector indexing failed; rolled back SQLite record write") from exc
         return persist_report
 
-    def search_ir(self, query: str, lens: str = "general", scope: str | None = None, budget: int = 5, include_raw: bool = False, temporal_window = None, temporal_reference = None, ns: str | None = None) -> SearchResult:
+    def _retrieval_flags_cached(self):
+        """Resolve effective retrieval flags once and cache for this runtime.
+
+        Layers defaults < persisted applied-state < env (see
+        ``load_retrieval_flags``); caching keeps scoring stable across queries
+        for the process lifetime.
+        """
+        flags = getattr(self, "_retrieval_flags", None)
+        if flags is None:
+            from .retrieval import load_retrieval_flags
+
+            flags = load_retrieval_flags(self.store)
+            self._retrieval_flags = flags
+        return flags
+
+    def search_ir(self, query: str, lens: str = "general", scope: str | None = None, budget: int = 5, include_raw: bool = False, temporal_window = None, temporal_reference = None, ns: str | None = None, flags = None) -> SearchResult:
         from .bm25 import BM25Index
         from .mirl import iter_textual_fields
-        from .retrieval import retrieval_flags_from_env
 
-        flags = retrieval_flags_from_env()
+        # An explicit ``flags`` overrides the per-runtime cache: the self-improvement
+        # proposer passes a candidate RetrievalFlags to ablate one lever deterministically
+        # without mutating env or the cached runtime state.
+        flags = flags if flags is not None else self._retrieval_flags_cached()
         # Substream isolation: when ``ns`` is given, confine BOTH the candidate
         # load and the vector top-K to that namespace so a shared store/vector
         # pool cannot leak another namespace's records. ns=None reproduces the

@@ -273,6 +273,12 @@ class SQLiteStore:
                     actor text,
                     foreign key (proposal_id) references improvement_proposal(proposal_id)
                 );
+                create table if not exists retrieval_flag_state (
+                    flag_key text primary key,
+                    flag_value text not null,
+                    source_proposal_id integer,
+                    applied_at text not null
+                );
                 create index if not exists idx_ir_records_kind on ir_records (kind);
                 create index if not exists idx_ir_records_ns_scope on ir_records (ns, scope);
                 create index if not exists idx_document_status_source on document_status (source_ref);
@@ -1395,6 +1401,90 @@ class SQLiteStore:
                 (proposal_id,),
             ).fetchall()
         return [_proposal_decision_row(row) for row in rows]
+
+    def iter_retrieval_flag_state(self) -> list[dict[str, object]]:
+        """Return the persisted applied-flag rows (one per lever).
+
+        ``flag_value`` is JSON-decoded back to its scalar. An empty table is the
+        canonical "no overrides" state: ``load_retrieval_flags`` then reproduces
+        ``RetrievalFlags()`` exactly, preserving the locked retrieval baseline.
+        """
+        with self._pool.checkout() as connection:
+            rows = connection.execute(
+                """
+                select flag_key, flag_value, source_proposal_id, applied_at
+                from retrieval_flag_state
+                order by flag_key asc
+                """
+            ).fetchall()
+        return [
+            {
+                "flag_key": row["flag_key"],
+                "flag_value": json.loads(row["flag_value"]),
+                "source_proposal_id": row["source_proposal_id"],
+                "applied_at": row["applied_at"],
+            }
+            for row in rows
+        ]
+
+    def upsert_retrieval_flag_state(
+        self,
+        *,
+        flag_key: str,
+        flag_value: object,
+        source_proposal_id: int | None = None,
+        applied_at: str | None = None,
+    ) -> None:
+        """Write/replace a single applied-flag row. ``flag_value`` is stored
+        JSON-encoded so the scalar type round-trips through ``iter_*``."""
+        if not flag_key:
+            raise ValueError("flag_key is required")
+        with self._pool.checkout() as connection:
+            connection.execute(
+                """
+                insert or replace into retrieval_flag_state
+                    (flag_key, flag_value, source_proposal_id, applied_at)
+                values (?, ?, ?, ?)
+                """,
+                (
+                    flag_key,
+                    json.dumps(flag_value, separators=(",", ":")),
+                    source_proposal_id,
+                    applied_at or utc_now(),
+                ),
+            )
+            connection.commit()
+
+    def replace_retrieval_flag_state(
+        self, desired: dict[str, tuple[object, int | None]]
+    ) -> None:
+        """Atomically reconcile applied-flag state to ``desired``.
+
+        ``desired`` maps ``flag_key -> (flag_value, source_proposal_id)``. The
+        whole table is rewritten in one transaction: rows absent from
+        ``desired`` are removed, so ``replace_retrieval_flag_state({})`` clears
+        all overrides. This makes the table a pure projection of the currently
+        approved proposal set, so backing out an approval (re-running apply)
+        removes the flag rather than ratcheting it on permanently.
+        """
+        with self._pool.checkout() as connection:
+            connection.execute("delete from retrieval_flag_state")
+            now = utc_now()
+            for flag_key, (flag_value, source_proposal_id) in desired.items():
+                connection.execute(
+                    """
+                    insert into retrieval_flag_state
+                        (flag_key, flag_value, source_proposal_id, applied_at)
+                    values (?, ?, ?, ?)
+                    """,
+                    (
+                        flag_key,
+                        json.dumps(flag_value, separators=(",", ":")),
+                        source_proposal_id,
+                        now,
+                    ),
+                )
+            connection.commit()
 
 
 def _retrieval_event_row(row: sqlite3.Row) -> dict[str, object]:

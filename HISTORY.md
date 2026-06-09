@@ -6229,3 +6229,120 @@ Tests: new tests/audit/test_audit_2026_06_05.py (16 tests) covers all six fixes.
 
 Verification: full suite `python -m pytest tests/` = 531 passed, 4 skipped, 0 failed (pgvector up on 127.0.0.1:55432). The lone pre-commit failure was the stale test_command_with_path_validates_basename assertion contradicting fix 1; resolved by updating the test to the hardened behavior, not by reverting the fix.
 ---END-ENTRY-#288---
+
+---BEGIN-ENTRY-#289---
+id: 289
+date: 2026-06-08T07:30:36Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, benchmark, test, verify, history
+commits: none
+refs: seam_runtime/retrieval.py,seam_runtime/runtime.py,seam_runtime/storage.py,tools/h2/improvement_review.py,tests/audit/test_h2_apply.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 288
+tokens: 1265
+---
+Close the back half of the H2 self-improvement loop: the `apply` step. An approved improvement proposal now actually changes retrieval behavior; before this, `approved` was a dead end (no mechanism translated a proposal into an active flag).
+
+Context (verified before building): the H2 loop was built except two gaps — auto-propose (front) and apply (back). This entry is apply only. Retrieval flags (`seam_runtime/retrieval.py` RetrievalFlags) were env-only: `search_ir` read them via `retrieval_flags_from_env()` at runtime.py with no persisted layer, so an approved proposal had nowhere to take effect. The validate/decide/holdout-gate middle (improvement.py, tools/h2/improvement_review.py propose/list/show/approve/reject/summary, proposal_blocks_promotion) already existed and is reused, not reinvented.
+
+Changes:
+
+1. STORAGE (seam_runtime/storage.py) — new `retrieval_flag_state` table (flag_key PK, flag_value JSON-encoded scalar, source_proposal_id, applied_at) plus `iter_retrieval_flag_state`, `upsert_retrieval_flag_state`, and `replace_retrieval_flag_state`. `replace_*` rewrites the whole table in one transaction so the table is a pure projection of the approved proposal set: an empty table is the canonical no-override state, and `replace_retrieval_flag_state({})` clears all overrides.
+
+2. LOADER (seam_runtime/retrieval.py) — new `load_retrieval_flags(store, env)` resolves three layers lowest-first: RetrievalFlags() defaults < persisted applied-state < env overrides (operator kill switch, always wins). Added `retrieval_flag_field_types()` (field->scalar-type map for payload validation) and `_retrieval_env_overrides()` which returns only EXPLICITLY-set env vars so an unset var never clobbers an applied flag back to default. Baseline invariant: empty flag-state + empty env reproduces RetrievalFlags() byte-identical, preserving the locked retrieval baseline (HISTORY#273). Malformed persisted rows (unknown field / wrong scalar type, incl. the bool-vs-int subclass cross) are skipped, never raised, so a bad row cannot take down the search path. Also added the SEAM_RETRIEVAL_RRF_K env override, closing the prior gap where an applied rrf_k had no env kill switch. retrieval_flags_from_env() left intact for back-compat (the LoCoMo adapter still calls it for its scoped_vectors namespace choice).
+
+3. RUNTIME (seam_runtime/runtime.py) — search_ir now builds flags via `load_retrieval_flags(self.store)`, cached once per runtime instance (`_retrieval_flags_cached`). Per-run resolution (not per-query) keeps scoring stable for the life of the process, so an `improvement apply` mid-run does not change results under a live runtime — reproducible benchmark runs (the benchmark path opens a fresh runtime per run, which picks up applied state). The LoCoMo seam adapter calls rt.search_ir, so applied scoring flags reach the benchmark.
+
+4. CLI (tools/h2/improvement_review.py) — new `apply` subcommand (+ `--dry-run`). `compute_apply_plan(store)` projects the approved proposal set onto a desired flag map and reconciles via `replace_retrieval_flag_state`. Key properties: REVERSIBLE — withdrawing an approval and re-running removes the flag (reconcile, not a one-way ratchet); applicability is gated on the `proposed_change["flags"]` PAYLOAD SHAPE validated against RetrievalFlags, not on `kind` (kind is human metadata, orthogonal to the flag fields); newest approved proposal wins a per-flag conflict (ascending proposal_id fold); unknown/ill-typed flags and invalid `fusion` values are reported as skips, not applied; approved proposals with no flags payload (schema_change/other) are no-ops.
+
+Design reviewed against a stronger advisor before coding: caught (a) the env-overlay trap (can't overlay retrieval_flags_from_env() wholesale or unset vars clobber applied flags with False), (b) apply-must-reconcile-not-append (reversibility), (c) gate-on-payload-not-kind (VALID_KINDS are orthogonal to RetrievalFlags fields), (d) verified the LoCoMo path flows through search_ir so applied flags are observable in the benchmark.
+
+Tests: new tests/audit/test_h2_apply.py (17 tests) — baseline invariant, happy-path apply (bool/fusion/rrf_k), pending/rejected/holdout-violating not applied, unknown/wrong-type/invalid-fusion skipped without crashing the loader, approved-without-payload no-op, REVERSIBILITY on withdrawn approval, newest-wins conflict, idempotency, dry-run writes nothing, env-overrides-persisted, unset-env-does-not-clobber, and a CLI smoke through ir.main(["apply", ...]).
+
+Verification: full suite `python -m pytest tests/` = 548 passed, 4 skipped (= prior 531 + 17 new). The 4 skips are pre-existing PGVECTOR_TEST_DSN-gated pgvector tests (test_pgvector_pk_composite, test_substream_isolation), unrelated to this change. Existing tests/audit/test_retrieval_flags.py and tests/audit/test_h2_improvement_review.py still green (no regression to the env reader or the propose/decide gate).
+
+Unresolved next step: the FRONT half of the loop — the auto-proposer — remains open. It must read retrieval_event data and emit proposals in exactly the `{"flags": {<RetrievalFlags field>: value}}` schema this apply step consumes, and must be evidence-gated (propose a flip only when dev-split — never holdout — data shows a recall lift), because per HISTORY#273 most levers are LoCoMo no-ops so a blind proposer would generate mostly no-op proposals. Apply now reconciles correctly, which is the precondition for starting the proposer.
+---END-ENTRY-#289---
+
+---BEGIN-ENTRY-#290---
+id: 290
+date: 2026-06-08T08:57:59Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, benchmark, locomo, audit, test, verify, history
+commits: none
+refs: seam_runtime/self_improve.py,seam_runtime/retrieval.py,seam_runtime/runtime.py,tools/h2/improvement_review.py,tests/audit/test_self_probe_scorer.py,tests/audit/test_h2_apply.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 289
+tokens: 1302
+---
+H2 self-improvement loop, front-half foundation + the empirical finding that reframes it. Builds on the #289 apply step. Two outcomes: (1) durable, green instrument code; (2) a measured NEGATIVE result that future agents must not re-discover.
+
+WHAT WAS BUILT (all green, 557 passed / 4 skipped pre-existing pgvector):
+
+1. SELF-PROBE SCORER (seam_runtime/self_improve.py) — free, deterministic, paid-free retrieval measurement from the runtime's OWN corpus. `Scorer` protocol + `ScoreReport` (aggregate / per_category / per_case); `Probe`; `generate_probes` (cloze: mask the salient span of a record's text, query = remainder, gold = that record); `SelfProbeScorer` (binary recall = gold record id in the candidate set). Not budget-gameable (record-in-set at a fixed eval budget). `generate_probes` is deterministic (seed) so the SAME probe set scores a config before/after apply — the basis for a no-regression ratchet.
+
+2. ABLATION HOOK (seam_runtime/runtime.py) — `search_ir(..., flags=)` lets a caller run retrieval under explicit RetrievalFlags, bypassing the per-runtime cache/env, so a counterfactual lever sweep is deterministic and side-effect-free.
+
+3. WEIGHTS AS APPLY TARGET / "Slice A" (seam_runtime/retrieval.py) — added continuous fusion-weight fields to RetrievalFlags (`w_lexical .40 / w_semantic .35 / w_graph .15 / w_temporal .10`, the locked baseline tuple) + `weight_pairs()`; `_fuse_weighted` now reads the weights from flags (default tuple = byte-identical baseline, preserves #273). This makes the weights tunable through the EXISTING #289 apply machinery for free. Added `coerce_flag_value(key, value)` — one shared validator used by both `load_retrieval_flags` and the apply step (`tools/h2/improvement_review.py`), with int->float tolerance for weight fields and bool/int-cross rejection; replaced the old `_flag_value_ok`.
+
+Tests: tests/audit/test_self_probe_scorer.py (7, pins the scorer mechanism not the query heuristic); tests/audit/test_h2_apply.py +2 (weight proposal applies with int coercion; bool rejected as a float weight).
+
+THE FINDING (load-bearing — do not re-litigate without new evidence):
+
+On a realistic corpus (LoCoMo conv-26 ingested via the seam adapter `ingest_turn`, ~2000 records, natural-text turns, NO paid calls), the self-probe signal has NO free headroom for any apply-able lever:
+- `search_ir` surfaces CLM (compiled claims), never RAW — a RAW-keyed probe gold scores a structural 0.0; the probe gold must target the kind retrieval returns (CLM here). With CLM gold: baseline self-probe recall 0.8917 at eval budget 20.
+- NO boolean lever moves it (semantic_zero / bm25_all = +0.0000; fusion=rrf and every rrf_k REGRESS, matching #273).
+- NO weight vector moves it UP at any eval budget (1,2,3,5,10,20). Weights are wired correctly (lexical-only swings recall -0.175), but baseline weighting is already at/near the top everywhere; best improvement found anywhere = +0.008 at top-1, within the ~±0.002 noise floor. Cloze-of-own-record is a lexical-twin by construction, so it is too easy and lever-insensitive, and free cloze-hardening cannot fix that without destroying lexical overlap (only LLM paraphrase does, which is PAID — violates the operator's "never need paid to improve" constraint).
+
+Therefore: the bottleneck is NOT the lever set (this experiment + #273 agree global retrieval levers have ~no free headroom); the self-probe task is simply too easy to expose retrieval weakness. A proposer over this signal would correctly idle. Building the proposer is GATED on resolving the direction fork below — a proposer over a no-headroom signal is an idling engine.
+
+DIRECTION FORK (operator decision, pending):
+- (A) Driver = FREE LoCoMo string-match (`--answerer none --judge none`, no judge/no paid) — it has realistic low-lexical-overlap questions AND measured lever headroom (#273: semantic_zero +0.026 cat1 / +0.018 cat3, -0.004 cat4, +0.0046 global). Self-probe is repurposed as a free, on-their-data REGRESSION WATCHDOG paired with #289's reversible apply = a no-regression ratchet (scores only go up or flat). Both free.
+- (B) Accept that global levers are already near-optimal on free signals; the loop's robust, fully-free value is REGRESSION-PREVENTION (the #289 reversible ratchet + self-probe watchdog), not score-climbing. Shippable and honest.
+- The real large score-movers (pack char-budget / search_top_k, +0.059..+0.135 per [[reference-locomo-audit-doc]]) are gameable on free string-match metrics and need a PAID judged run to validate honestly — which conflicts with "never need paid to improve". So large automatic improvement is fundamentally gated on paid validation; surface that tension to the operator, do not engineer around it.
+
+Verification: `python -m pytest tests/` = 557 passed, 4 skipped, 0 failed. Self-probe foundation + weights apply are durable regardless of which fork is chosen (self-probe = watchdog in both; weights extend the apply target). No regression to test_retrieval_flags / test_h2_improvement_review / #289 test_h2_apply.
+
+Unresolved next step: operator picks the fork; only then build the proposer (over free-LoCoMo for fork A) or finalize the watchdog framing (fork B). Do NOT torture probe design to manufacture a noise-level "improvement" — that is the metric-gaming the loop explicitly refuses.
+---END-ENTRY-#290---
+
+---BEGIN-ENTRY-#291---
+id: 291
+date: 2026-06-08T11:10:38Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, proposer, ratchet, test, verify, history
+commits: none
+refs: seam_runtime/self_improve.py,tools/h2/improvement_loop.py,tests/audit/test_improvement_loop.py,docs/handoffs/2026-06-08-h2-self-improvement-loop.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 290
+tokens: 1145
+---
+H2 self-improvement loop, front half COMPLETE: the proposer + no-regression ratchet. Realizes the operator's fork #1 (an always-trying, fully-free improvement loop + on-corpus regression watchdog) with the paid tier pluggable through the same interface ("we want both"). Builds on #289 (apply) and #290 (self-probe scorer + the no-free-headroom finding).
+
+WHAT WAS BUILT (all green, 565 passed / 4 skipped pre-existing pgvector):
+
+1. PROPOSER CORE (seam_runtime/self_improve.py, pure logic, no DB/apply):
+   - DEFAULT_NOISE_MARGIN=0.005, DEFAULT_REGRESS_TOL=0.005.
+   - Candidate(label, change: dict, flags) - `change` is the minimal {field: value} overlay = the proposed_change["flags"] payload the #289 apply consumes.
+   - candidate_levers(baseline, weight_step=0.10) - boolean/enum levers (when not already set) + single-channel weight +/- perturbations (skips negative weights). Small/interpretable: one lever at a time -> clear attribution.
+   - evaluate_candidates(runtime, scorers, candidates, baseline, noise_margin, regress_tol) - scores each candidate vs baseline on every scorer; is_improvement = beats noise on >=1 scorer AND drops no scorer aggregate and no per-category recall past regress_tol. The per-category no-regression gate enforces the #273 R1 lesson automatically (a lever that helps one category but hurts another is rejected).
+   - select_best_improvement(evaluations) - improving candidate with the largest total aggregate gain, else None.
+
+2. ORCHESTRATION CYCLE (tools/h2/improvement_loop.py):
+   - run_improvement_cycle(runtime, store, scorers, *, auto_approve=False, actor, noise_margin, regress_tol, weight_step) -> structured report. Resolve baseline = load_retrieval_flags(store) -> candidate_levers -> evaluate_candidates -> select_best_improvement -> write ONE proposal (kind="ranking_weight", proposed_change={"flags": change}). If auto_approve: approve -> apply via compute_apply_plan + replace_retrieval_flag_state -> RE-MEASURE the reconciled state and AUTO-REVERT (reject + re-apply) if any scorer regressed past tolerance vs the pre-cycle baseline.
+   - The reversible #289 apply makes this a RATCHET: applied state can only move scores up or flat, because anything that regresses post-apply is backed out in the same cycle.
+   - Scorer-agnostic: FREE scorers (SelfProbeScorer now; a free-LoCoMo scorer next) drive the always-on loop; PAID scorers (judged) implement the same Scorer protocol and join the list only for operator-triggered validation. Free never requires paid. Lives in tools/ (orchestrates runtime + scorers + proposal store + the apply CLI) to keep seam_runtime independent of tools/.
+
+Tests: tests/audit/test_improvement_loop.py (8) - candidate_levers coverage + skip-already-set; per-category regression blocks an aggregate-improving candidate; select-best-by-total-gain; cycle proposes + auto-applies an improvement; no-headroom proposes nothing; propose-only (auto_approve=False) writes a pending proposal but applies nothing; AUTO-REVERT on post-apply regression (a state-keyed synthetic scorer that looks like an improvement during eval but regresses once apply has written flag state - deterministic, no call-count reliance).
+
+HONEST STATUS of "make it improve": the machinery is complete and correct, but per #290 the FREE signals + current apply-able levers have ~no headroom, so wired to SelfProbeScorer the loop correctly proposes nothing and functions as a regression WATCHDOG (always trying, never regressing). To get actual score MOVEMENT the loop needs the free-LoCoMo scorer (the signal #273 showed has lever headroom) and/or the operator-gated PAID validation tier for the big levers (char-budget/top_k). Those plug into the same run_improvement_cycle via the scorer list.
+
+REMAINING (next slices, none blocking this commit):
+- Wire a FREE-LoCoMo Scorer (real questions + gold-evidence ids, string-match recall via search_ir, --answerer none/--judge none semantics) - the headroom signal; self-probe alone idles. Dataset at /home/terrabyte/seam_benchmarks/track_m/locomo/locomo10.json; ingest via SeamLocomoAdapter.ingest_turn (ns=locomo:<scope>); load_locomo_cases for questions/gold.
+- A thin `improvement cycle` CLI (propose-only default, --auto-approve opt-in).
+- An operator-triggered PAID judged Scorer for the validation tier (never auto-run; confirm with operator first).
+
+Verification: python -m pytest tests/ = 565 passed, 4 skipped, 0 failed. No regression to #289/#290 tests or retrieval_flags/h2_improvement_review. Handoff doc at docs/handoffs/2026-06-08-h2-self-improvement-loop.md describes the full state for the next agent.
+
+Unresolved next step: wire the free-LoCoMo scorer so the always-on loop has a signal with real headroom; until then the loop ships as a correct, free, no-regression watchdog over the self-probe signal.
+---END-ENTRY-#291---
