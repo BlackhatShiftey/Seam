@@ -47,7 +47,7 @@ and `HISTORY_INDEX.md`.
   metadata, CLI commands, installer behavior, dashboard behavior, API behavior,
   benchmark behavior, or history tooling behavior.
 - SQLite is canonical source of truth.
-- Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers.
+- Vector stores (SQLite vector index, Chroma, PgVector) are derived retrieval layers. The SQLite vector adapter is the DEFAULT backend; `chromadb` and `psycopg` (pgvector) are OPTIONAL extras (`seam[chroma]`, `seam[pgvector]`), never core dependencies. All Chroma imports are lazy (`ChromaSemanticAdapter._client` raises a clear error if chromadb is absent); do not move chromadb back into core `dependencies` (guarded by `tests/audit/test_chroma_optional.py`).
 - Document ingest status is canonical SQLite metadata. Source refs, source hashes, extraction status, index status, and deletion state belong in `document_status`, not only in derived vector stores.
 - Agent-facing retrieval should use progressive disclosure where possible: compact search/index results first, then full MIRL records by selected IDs.
 - Default agent RAG should prefer `mix` retrieval only after benchmark validation; the supported retrieval modes are `vector`, `graph`, `hybrid`, and `mix`.

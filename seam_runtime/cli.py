@@ -66,6 +66,29 @@ from .runtime import SeamRuntime
 from .surface_adapters import SurfaceFileAdapter
 
 
+def _import_run_improvement_cycle():
+    """Import ``tools.h2.improvement_loop.run_improvement_cycle`` for ``seam improve``.
+
+    The self-improvement orchestration + apply step live under ``tools/`` (a
+    sibling of ``seam_runtime/`` not shipped in the wheel). The ``seam`` console
+    script does not put the source-checkout root on ``sys.path``, so add it when
+    the file exists (editable/source install). A genuine wheel install has no
+    sibling ``tools/`` and this returns None - the caller reports that the
+    command needs a source checkout. Mirrors ``doctor._import_streams_verify_all``.
+    """
+    try:
+        from tools.h2.improvement_loop import run_improvement_cycle
+        return run_improvement_cycle
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parent.parent
+        if (repo_root / "tools" / "h2" / "improvement_loop.py").is_file():
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+            from tools.h2.improvement_loop import run_improvement_cycle
+            return run_improvement_cycle
+        return None
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SEAM v1 memory compiler/runtime")
     parser.add_argument("--db", default=default_runtime_db_path(), help="SQLite database path")
@@ -285,6 +308,20 @@ def build_parser() -> argparse.ArgumentParser:
     memory_get_parser.add_argument("record_ids")
     memory_get_parser.add_argument("--timeline", action="store_true")
     memory_get_parser.add_argument("--format", choices=["pretty", "json"], default="pretty")
+
+    improve_parser = subparsers.add_parser("improve", help="Self-improvement loop over retrieval-flag levers")
+    improve_subparsers = improve_parser.add_subparsers(dest="improve_command", required=True)
+    improve_cycle_parser = improve_subparsers.add_parser(
+        "cycle",
+        help="Run one improvement cycle: evaluate levers against free scorers, propose the best non-regressing gain, optionally auto-apply with revert-on-regression",
+    )
+    improve_cycle_parser.add_argument("--db", default=argparse.SUPPRESS, help="SQLite database path (may also be given before the subcommand)")
+    improve_cycle_parser.add_argument("--auto-approve", action="store_true", help="Approve + apply the proposal and auto-revert if it regresses post-apply (default: propose only)")
+    improve_cycle_parser.add_argument("--probe-sample", type=int, default=50, help="Self-probe sample size from the local corpus (default 50; 0 disables the self-probe scorer)")
+    improve_cycle_parser.add_argument("--probe-budget", type=int, default=20, help="Fixed eval budget for the self-probe scorer (default 20)")
+    improve_cycle_parser.add_argument("--locomo-dataset", default=None, help="Optional free LoCoMo context_recall scorer from this dataset path (source checkout only)")
+    improve_cycle_parser.add_argument("--locomo-scopes", type=int, default=1, help="Number of LoCoMo conversations to score (default 1)")
+    improve_cycle_parser.add_argument("--locomo-questions", type=int, default=None, help="Cap questions per LoCoMo conversation")
 
     mcp_parser = subparsers.add_parser("mcp", help="Run SEAM agent integration bridges")
     mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", required=True)
@@ -1030,6 +1067,41 @@ def run_cli(argv: list[str] | None = None) -> None:
                 return
             print(render_memory_records(payload))
             return
+    if args.command == "improve" and args.improve_command == "cycle":
+        run_cycle = _import_run_improvement_cycle()
+        if run_cycle is None:
+            print(json.dumps({"error": "seam improve cycle requires a source checkout (tools/ is not shipped in the wheel)"}, indent=2))
+            return
+        from .self_improve import SelfProbeScorer, generate_probes
+
+        scorers = []
+        if args.probe_sample > 0:
+            probes = generate_probes(runtime, sample=args.probe_sample)
+            scorers.append(SelfProbeScorer(probes, budget=args.probe_budget))
+        adapter = None
+        if args.locomo_dataset:
+            import tempfile
+
+            from benchmarks.external.locomo.recall_scorer import build_locomo_recall_scorers
+
+            adapter, locomo_scorers = build_locomo_recall_scorers(
+                args.locomo_dataset,
+                max_scopes=args.locomo_scopes,
+                question_limit=args.locomo_questions,
+                db_path=tempfile.mkdtemp(),
+                keep_db=True,
+            )
+            scorers.extend(locomo_scorers)
+        if not scorers:
+            print(json.dumps({"error": "no scorers: set --probe-sample > 0 or pass --locomo-dataset"}, indent=2))
+            return
+        try:
+            report = run_cycle(runtime, runtime.store, scorers, auto_approve=args.auto_approve)
+        finally:
+            if adapter is not None:
+                adapter.close()
+        print(json.dumps(report, indent=2))
+        return
     if args.command == "mcp" and args.mcp_command == "stdio":
         from .mcp_protocol import run_mcp_server
 

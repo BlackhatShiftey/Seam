@@ -6382,3 +6382,33 @@ Verification: python -m pytest tests/ = 568 passed, 4 skipped, 0 failed. No regr
 
 Unresolved next step: a thin operator CLI (`improvement cycle`) wiring build_locomo_recall_scorers + run_improvement_cycle (propose-only default, --auto-approve opt-in); a multi-conversation dev-split gate (max_scopes>1) so accepted proposals generalize; an operator-gated PAID judged Scorer (same protocol, never auto-run) for the validation tier. The free always-on loop is now functional: it tries every cycle, proposes only net-positive non-regressing changes, applies+auto-reverts under the #289 ratchet.
 ---END-ENTRY-#292---
+
+---BEGIN-ENTRY-#293---
+id: 293
+date: 2026-06-09T01:01:07Z
+agent: claude
+status: done
+topics: cli, self-improvement, h2, loop, packaging, chroma, dependencies, ci, test, verify, history
+commits: none
+refs: seam_runtime/cli.py,pyproject.toml,.github/workflows/ci.yml,tests/audit/test_improve_cli.py,tests/audit/test_chroma_optional.py,tests/audit/test_chroma_sync_default.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 292
+tokens: 1032
+---
+Two operator-driven changes this session: (1) wire the self-improvement loop into the main `seam` CLI; (2) make chromadb an OPTIONAL dependency (not a forced core install). Continues the H2 loop work (#289-#292) on branch feat/free-locomo-scorer.
+
+1. `seam improve cycle` CLI (seam_runtime/cli.py) — runs one self-improvement cycle from the main CLI: evaluate the retrieval-flag levers against free scorers, propose the best non-regressing gain, and (--auto-approve) apply via #289 with revert-on-regression. Default scorer is the free SELF-PROBE over the user's own corpus (args.db; no external dataset); `--locomo-dataset PATH` adds the free LoCoMo context_recall scorer (#292) as an opt-in headroom signal. Other flags: --probe-sample/--probe-budget, --locomo-scopes/--locomo-questions, --auto-approve. The orchestration (run_improvement_cycle) + apply live under tools/ (not shipped in the wheel), so it is lazy-imported via `_import_run_improvement_cycle()` which adds the source-checkout root to sys.path when tools/ exists and returns None (clear "needs a source checkout" message) otherwise — mirrors doctor.py's #287 fallback; consistent with seam_runtime/improvement.py already coupling to tools.h2. `--db` is accepted both before AND after the subcommand (subparser --db with argparse.SUPPRESS default so it overrides the global only when given). Verified end-to-end: `seam --db <seeded> improve cycle --probe-sample 6` returns a report (self_probe baseline 0.75, proposed null on a tiny corpus = the honest watchdog). Tests: tests/audit/test_improve_cli.py (2: propose-only self-probe path + --db-after-subcommand).
+
+2. chromadb made OPTIONAL. Investigated a DeepSeek note that chroma is "a dependency": confirmed the real issue — `chromadb>=1.0,<2.0` sat in pyproject CORE `dependencies`, forcing a heavy install on everyone, even though SEAM defaults to the SQLite vector adapter (and supports pgvector) and the Chroma backend is opt-in. The naive fix (guarding tests) would have been WRONG; the correct fix is packaging + confirming graceful degradation:
+   - pyproject.toml: moved chromadb out of core `dependencies` into a new `chroma` optional extra, and added it to `all-extras` (full install still includes it).
+   - All chroma imports were ALREADY lazy: `ChromaSemanticAdapter` is a dataclass; the only `import chromadb` is inside `_client()` (seam_runtime/retrieval_orchestrator/adapters.py:170), guarded with a clear `RuntimeError("chromadb is not installed. Install it to use --semantic-backend chroma.")`. No top-level chromadb import anywhere in seam_runtime/, tools/, or benchmarks/ (verified by grep).
+   - test_chroma_sync_default needs NO skip-guard: it only reads the `sync_on_search` dataclass default and never touches `_client()`, so it runs on a core-only install. (An importorskip guard was added then reverted after verifying construction does not import chromadb — over-guarding would have skipped a runnable test and cut core-only coverage.)
+   - .github/workflows/ci.yml: the required `chroma-real-smoke` job now installs `.[server,chroma]` (it exercises the real Chroma path, so it needs the extra). The main test-and-benchmark job (`.[server,sbert,rerank]`, no chroma) stays green because no test exercises `_client()`.
+   - Regression guard: tests/audit/test_chroma_optional.py (2) asserts chromadb is NOT in core dependencies and IS in the `chroma` + `all-extras` extras.
+   Verified by simulating chromadb-absent (`sys.modules['chromadb']=None`): core `search_ir` works (SQLite backend), the chroma-sync test logic passes, and `_client()` raises the clear RuntimeError; pyproject classification asserted programmatically.
+
+Gravity: a real packaging bug (forces a large optional dependency on every install) but LOW runtime risk (all imports already lazy + guarded). Now correctly addressed.
+
+Verification: full `python -m pytest tests/` = 572 passed, 4 skipped, 0 failed (prior 568 + 4 new). No regression to the H2 loop tests (#289-#292), retrieval_flags, or h2_improvement_review.
+
+Unresolved next step: still open from #292 - a multi-conversation dev gate (`--locomo-scopes>1`) for generalizable proposals and an operator-gated PAID judged Scorer (never auto-run). The `seam improve cycle` CLI now makes the free loop runnable.
+---END-ENTRY-#293---

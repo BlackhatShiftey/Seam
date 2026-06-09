@@ -1,4 +1,10 @@
-"""P3 Fix 6 — Chroma sync_on_search default is False."""
+"""P3 Fix 6 — Chroma sync_on_search default is False.
+
+No chromadb needed here: the adapter is a dataclass and only imports chromadb
+lazily in ``_client()`` (on first real use), so constructing it to read the
+``sync_on_search`` default works on a core-only install (chromadb is the
+optional ``seam[chroma]`` extra).
+"""
 from __future__ import annotations
 
 from seam_runtime.retrieval_orchestrator.adapters import ChromaSemanticAdapter
