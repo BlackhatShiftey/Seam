@@ -1,0 +1,16 @@
+# Dependabot version updates. See:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Python deps (requirements.txt / pyproject.toml) are covered by Dependabot
+# security updates; the entries below add weekly VERSION updates for the npm
+# (webui) and docker (compose) ecosystems.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/webui"      # webui/package.json is the only first-party npm manifest
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/"           # docker-compose.yaml lives at the repo root
+    schedule:
+      interval: "weekly"
