@@ -6476,3 +6476,33 @@ Verification: pending PR #58 CI re-run (test-and-benchmark ubuntu+windows, pgvec
 
 Unresolved next step: confirm #58 CI is green, then merge; the chromadb-optional change must keep httpx explicitly provisioned for any context that collects the server tests.
 ---END-ENTRY-#295---
+
+---BEGIN-ENTRY-#296---
+id: 296
+date: 2026-06-09T20:30:51Z
+agent: claude
+status: done
+topics: security, chroma, dependencies, vulnerability, packaging, test, verify, history
+commits: none
+refs: requirements.txt,pyproject.toml,tests/audit/test_chroma_optional.py,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 295
+tokens: 785
+---
+SECURITY: resolve the CRITICAL Dependabot alert on chromadb by removing it from every forced/default install path. Alert: GHSA-f4j7-r4q5-qw2c (ChromaDB pre-authentication code injection), vulnerable range >=1.0.0,<=1.5.9, NO patched version (latest on PyPI is 1.5.9 = the top of the range), flagged on requirements.txt which pinned chromadb==1.5.7.
+
+Root cause: #293 made chromadb optional in pyproject but MISSED requirements.txt (the file the installers + scripts/bootstrap_seam.ps1 pip-install), which still pinned chromadb==1.5.7 - so chromadb was still force-installed for every default install. #293 had also ADDED chromadb to the `all-extras` convenience extra.
+
+Reachability context: SEAM uses ONLY the embedded chromadb PersistentClient (seam_runtime/retrieval_orchestrator/adapters.py ChromaSemanticAdapter._client), not the Chroma server; the advisory is a pre-auth code injection in the Chroma SERVER's auth layer, which SEAM never runs - so SEAM's embedded path is not exposed. The forced vulnerable dependency is removed regardless (defense-in-depth + clean dependency hygiene + the project's own SOPs already require "chromadb stays in optional extras only").
+
+Fix:
+- requirements.txt: removed `chromadb==1.5.7` (now `rich` + `tiktoken` only, aligned with pyproject core deps after #293).
+- pyproject.toml: removed chromadb from `all-extras`; kept it ONLY in the explicit opt-in `chroma` extra (`chromadb>=1.0,<2.0`) with a comment documenting the unpatched advisory and that the embedded client is the only usage. (bench-mem0's `chromadb>=0.4.0,<1.0` is a separate mem0-comparator pin OUTSIDE the >=1.0.0 vuln range; left as-is.)
+- tests/audit/test_chroma_optional.py: guards updated/added - chromadb NOT in core `dependencies`, NOT in `requirements.txt`, NOT in `all-extras`, and present ONLY in the `chroma` extra.
+- REPO_LEDGER.md: chroma policy line records the advisory + opt-in-only posture.
+
+Impact: a default install (`pip install -r requirements.txt` / `pip install -e .` / `seam[all-extras]`) no longer pulls chromadb at all; the SQLite vector adapter (default) needs none. The Chroma backend remains available via an explicit `seam[chroma]`. CI chroma-real-smoke still installs `.[server,chroma]` so the real-Chroma smoke is unaffected. After merge, Dependabot re-scans requirements.txt and the alert auto-resolves (the manifest no longer declares the vulnerable dependency); install `seam[chroma]` deliberately accepts the documented risk until chromadb ships a patched release (widen the pin then).
+
+Verification: tests/audit/test_chroma_optional.py + test_chroma_sync_default.py = 5 passed; full `python -m pytest tests/` with pgvector DSN + strict no-skip = 579 passed, 0 skipped, 0 failed.
+
+Unresolved next step: when chromadb publishes a patched release (>1.5.9 fixing GHSA-f4j7-r4q5-qw2c), widen the `chroma` extra pin to require it. Also still open from #292: the multi-conversation dev gate (--locomo-scopes>1) and an operator-gated paid judged Scorer (this entry interrupted that work to handle the security alert).
+---END-ENTRY-#296---
