@@ -15,6 +15,23 @@ def test_ci_workflow_requires_locomo_bil2_and_chroma_smokes() -> None:
     assert "git diff --check" in workflow
 
 
+def test_ci_enforces_no_silent_skips() -> None:
+    """The CI must never let a test silently skip: the main job deselects the
+    real-service (external) tests, and a dedicated job runs every external test
+    against the live pgvector service with PGVECTOR_TEST_DSN set."""
+    workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert '-m "not external"' in workflow            # main job deselects, not skips
+    assert "pytest tests/ -m external" in workflow      # external tests actually run
+    assert "PGVECTOR_TEST_DSN" in workflow              # ...with the DSN the gate needs
+
+
+def test_strict_no_skip_hook_present() -> None:
+    """The conftest enforces strict no-skip (default on, opt out with =0)."""
+    conftest = Path("tests/conftest.py").read_text(encoding="utf-8")
+    assert "SEAM_STRICT_NO_SKIP" in conftest
+    assert "pytest_sessionfinish" in conftest
+
+
 def test_pull_request_template_keeps_repo_management_checklist_visible() -> None:
     template = Path(".github/pull_request_template.md").read_text(encoding="utf-8")
 

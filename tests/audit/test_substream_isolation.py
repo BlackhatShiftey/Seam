@@ -99,6 +99,7 @@ def test_search_ir_ns_none_is_backward_compatible(tmp_path):
 
 # --- pgvector parity (the shared-pool backend that motivated the seal) -----
 
+@pytest.mark.external  # real pgvector service; deselect with -m "not external" without it
 @pytest.mark.skipif(not os.environ.get("PGVECTOR_TEST_DSN"), reason="PGVECTOR_TEST_DSN not set")
 def test_pgvector_adapter_namespace_filter():
     dsn = os.environ["PGVECTOR_TEST_DSN"]

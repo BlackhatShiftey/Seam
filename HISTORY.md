@@ -6412,3 +6412,42 @@ Verification: full `python -m pytest tests/` = 572 passed, 4 skipped, 0 failed (
 
 Unresolved next step: still open from #292 - a multi-conversation dev gate (`--locomo-scopes>1`) for generalizable proposals and an operator-gated PAID judged Scorer (never auto-run). The `seam improve cycle` CLI now makes the free loop runnable.
 ---END-ENTRY-#293---
+
+---BEGIN-ENTRY-#294---
+id: 294
+date: 2026-06-09T13:53:04Z
+agent: claude
+status: done
+topics: test, ci, protocol, skip, pgvector, enforcement, verify, history
+commits: none
+refs: tests/conftest.py,tests/audit/test_pgvector_pk_composite.py,tests/audit/test_substream_isolation.py,tests/audit/test_github_pr_gates.py,.github/workflows/ci.yml,AGENTS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 293
+tokens: 997
+---
+Close the "tests can silently skip" hole with enforcement, and fix a concrete instance of it. The "never skip tests" rule was behavioral only - nothing failed a run that skipped - and there was a real hole: test_pgvector_pk_composite (3 tests) and test_substream_isolation's pgvector test gate on PGVECTOR_TEST_DSN, which CI set NOWHERE (the pgvector-integration job set the DIFFERENT var SEAM_PGVECTOR_DSN and ran only test_pgvector_real_adapter.py). So those 4 tests had been silently skipping in every CI run.
+
+Fix (enforcement + the instance):
+
+1. STRICT NO-SKIP HOOK (tests/conftest.py) - default ON; opt out for ad-hoc local runs with SEAM_STRICT_NO_SKIP=0. `pytest_runtest_logreport` collects skips (excluding xfail/wasxfail); `pytest_sessionfinish` sets exitstatus=1 and prints the offenders if any skip's reason is not in a curated allowlist. Allowlist = genuinely-unavoidable reasons only: wrong OS (Linux-only / Windows-flaky / win32), a deliberately-absent optional extra ("fastapi server extra is not installed"), "bash is required", and "cannot determine merge-base" (shallow checkout). A service-gated skip (e.g. "PGVECTOR_TEST_DSN not set") is NOT allowlisted -> it fails the session.
+
+2. MARK service tests @pytest.mark.external (the existing registered marker) - test_pgvector_pk_composite (module-level, alongside its skipif) and test_substream_isolation's pgvector test. Non-service jobs DESELECT them with -m "not external" (so they are not collected, not skipped); the service job RUNS them.
+
+3. CI (.github/workflows/ci.yml): the main test-and-benchmark job now runs `... tests/ -m "not external"` (external deselected, never silently skipped); the pgvector-integration job now runs `tests/ -m external` with PGVECTOR_TEST_DSN set (host=localhost port=55432 dbname=seam_ci user=seam_ci password=seam_ci_password) alongside the existing SEAM_PGVECTOR_DSN, so EVERY external test runs against the live pgvector service. Strict no-skip is default-on, so if an external test skips in that job (service down / DSN typo - the exact bug here) the job FAILS instead of silently skipping.
+
+4. REGRESSION GUARDS (tests/audit/test_github_pr_gates.py +2): assert the CI main job uses `-m "not external"`, the pgvector job runs `pytest tests/ -m external` and sets PGVECTOR_TEST_DSN, and the conftest strict hook (SEAM_STRICT_NO_SKIP + pytest_sessionfinish) is present.
+
+5. PROTOCOL (AGENTS.md Session End rule 6): "No silent skips" - documents the strict policy, the @external convention, the canonical zero-skip local command (start pgvector via ~/.local/bin/docker-up + export PGVECTOR_TEST_DSN), and that a new skip is resolved by running the service, not ignoring it (or allowlisted WITH justification if truly unavoidable).
+
+Validation (local, Linux, pgvector container up):
+- strict hook fails correctly: `pytest tests/audit/test_pgvector_pk_composite.py` with no DSN -> REAL exit 1 + the unexplained-skip report (was a silent "3 skipped, exit 0").
+- opt-out: SEAM_STRICT_NO_SKIP=0 -> skips allowed, exit 0.
+- main-job equivalent: `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/ -m "not external"` -> 986 passed, 7 deselected, 0 SKIPPED, exit 0.
+- pgvector-job path: `pytest tests/ -m external` with PGVECTOR_TEST_DSN -> 7 passed, 0 skipped, exit 0 (the 4 previously-silent tests now run).
+- full `pytest tests/` with PGVECTOR_TEST_DSN -> 578 passed, 0 skipped, exit 0.
+
+Net: a skip can no longer pass silently - CI fails on any unexplained skip, the 4 long-silently-skipped pgvector tests now actually run in CI, and the policy is enforced by tooling, not just documented.
+
+Verification: see the validation runs above; new guard tests pass. No production code changed (test infra + CI + protocol only).
+
+Unresolved next step: still open from #292 - multi-conversation dev gate for the self-improvement proposer and an operator-gated PAID judged Scorer. This entry is test-infra hardening on the same branch (feat/free-locomo-scorer).
+---END-ENTRY-#294---

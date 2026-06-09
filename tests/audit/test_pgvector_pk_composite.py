@@ -4,10 +4,15 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("PGVECTOR_TEST_DSN"),
-    reason="PGVECTOR_TEST_DSN not set",
-)
+# external: hits the real pgvector service; deselected with -m "not external" in
+# jobs without it, RUN with PGVECTOR_TEST_DSN set in the pgvector CI job.
+pytestmark = [
+    pytest.mark.external,
+    pytest.mark.skipif(
+        not os.environ.get("PGVECTOR_TEST_DSN"),
+        reason="PGVECTOR_TEST_DSN not set",
+    ),
+]
 
 
 def _vector_literal_64(vector):
