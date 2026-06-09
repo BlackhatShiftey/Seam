@@ -1441,7 +1441,7 @@ if (
             # passed verbatim and operator chaining / redirection / command
             # substitution is structurally impossible. This is the security
             # boundary for the off-by-default dashboard shell.
-            LOGGER.info("Executing shell command (shell-free): %s", command)
+            LOGGER.debug("Executing shell command (shell-free): %s", command)
             return subprocess.run(
                 argv,
                 capture_output=True,
