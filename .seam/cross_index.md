@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 348
+total_events: 349
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-06T00:00:00Z | roadmap:024:ece99693 | status-change | bootstrap | surface, retrieval, command | ROADMAP.md:1158 |
 | 2026-05-06T00:00:00Z | roadmap:025:f622b7b9 | status-change | bootstrap | surface, benchmark, fixture | ROADMAP.md:1181 |
 | 2026-05-06T06:40:36Z | history:126:cf26f837 | session-event | done | compress, mirl, codec, command, verify, history, snapshot... | seam_runtime/holographic.py,seam_runtime/storage.py,seam_runtime/cli.py,test_... |
 | 2026-05-06T08:00:47Z | history:127:80771ff8 | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | .gitignore,seam_runtime/holographic.py,seam_runtime/surface_adapters.py,seam_... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-08T07:30:36Z | history:289:bbf7ccaa | session-event | done | retrieval, self-improvement, h2, loop, benchmark, test, v... | seam_runtime/retrieval.py,seam_runtime/runtime.py,seam_runtime/storage.py,too... |
 | 2026-06-08T08:57:59Z | history:290:3f3c4870 | session-event | done | retrieval, self-improvement, h2, loop, benchmark, locomo,... | seam_runtime/self_improve.py,seam_runtime/retrieval.py,seam_runtime/runtime.p... |
 | 2026-06-08T11:10:38Z | history:291:4d966326 | session-event | done | retrieval, self-improvement, h2, loop, proposer, ratchet,... | seam_runtime/self_improve.py,tools/h2/improvement_loop.py,tests/audit/test_im... |
+| 2026-06-09T00:30:25Z | history:292:6a03a252 | session-event | done | retrieval, self-improvement, h2, loop, benchmark, locomo,... | benchmarks/external/locomo/recall_scorer.py,seam_runtime/self_improve.py,test... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0148.cross.md | 2026-04-15T00:00:00Z..2026-05-06T00:00:00Z | 148 | (multi) | (multi) |
+| 0001-0149.cross.md | 2026-04-15T00:00:00Z..2026-05-06T00:00:00Z | 149 | (multi) | (multi) |

@@ -6346,3 +6346,39 @@ Verification: python -m pytest tests/ = 565 passed, 4 skipped, 0 failed. No regr
 
 Unresolved next step: wire the free-LoCoMo scorer so the always-on loop has a signal with real headroom; until then the loop ships as a correct, free, no-regression watchdog over the self-probe signal.
 ---END-ENTRY-#291---
+
+---BEGIN-ENTRY-#292---
+id: 292
+date: 2026-06-09T00:30:25Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, benchmark, locomo, scorer, test, verify, history
+commits: none
+refs: benchmarks/external/locomo/recall_scorer.py,seam_runtime/self_improve.py,tests/audit/test_locomo_recall_scorer.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 291
+tokens: 1050
+---
+H2 self-improvement loop: the FREE-LoCoMo scorer — the headroom signal that makes the loop actually improve (not just watch for regressions). Wired to it, the proposer + ratchet from #291 finds and keeps real, free, no-paid retrieval gains. Builds on #289 (apply), #290 (foundation + the self-probe no-headroom finding), #291 (proposer + ratchet).
+
+WHAT WAS BUILT:
+
+1. FREE-LoCoMo SCORER (benchmarks/external/locomo/recall_scorer.py) — implements the seam_runtime.self_improve.Scorer protocol on the REAL LoCoMo adapter, so the proposer optimizes the actual benchmark metric (benchmarks/external/common/scoring.py context_recall), not a proxy. FREE: answerer=None, no judge, no API. Fidelity: it drives the adapter's full answer() path (retrieval + evidence closure + char-budget trim) exactly as runner.run_benchmark_grouped does, and scores context_recall(retrieved_context, gold_answer). To evaluate a candidate lever set it overrides the adapter runtime's cached _retrieval_flags for the scoring pass (restored in finally), so search_ir retrieves under the candidate flags without env mutation or re-ingest. The conversation is ingested ONCE at construction (reset + ingest_turn per scope, scope = case_id.split("::")[0]); score() only re-runs retrieval, so a full lever sweep is cheap. `build_locomo_recall_scorers(dataset_path, max_scopes, question_limit, ...)` returns one scorer per conversation. Anti-gaming: context_recall rises with char budget / search_top_k, but those are FIXED on the adapter for the scorer's lifetime; the proposer's levers only re-rank within that fixed budget, so it cannot game the score by enlarging the context.
+
+2. ScoreReport.per_case relaxed dict[str, bool] -> dict[str, float] (binary self-probe hit OR fractional LoCoMo recall).
+
+VALIDATION (real corpus, NO PAID — conv-26, 25 questions, local SQLite vector backend): the actual proposer (evaluate_candidates + select_best_improvement) run over the LoCoMo scorer:
+- baseline locomo_recall = 0.4624 (per-cat cat2=.639 / cat3=.206 / cat1=.327 — believable; matches the known LoCoMo shape, confirms fidelity vs the 0.528 full-100 baseline).
+- semantic_zero_no_vector=True: +0.040 -> IMPROVEMENT (no regression).
+- w_semantic+0.1: +0.040 -> IMPROVEMENT (no regression).
+- fusion=rrf: +0.056 overall BUT a category regresses -> correctly REJECTED by the no-regression gate.
+- bm25_all_kinds=True: -0.019 -> rejected. Most weight perturbations: 0.000.
+- select_best_improvement -> {"semantic_zero_no_vector": True}.
+
+So the loop AUTO-DISCOVERED #273's R1 lever (semantic_zero) as a free +0.040 gain with no category regression, and the gate correctly rejected the mixed-effect levers. This is the "make it actually improve" deliverable, end-to-end, fully free. CAVEAT: single conversation / SQLite backend; #273 measured semantic_zero as category-MIXED at full-set/pgvector scale (cat1 +0.026 / cat4 -0.004, +0.0046 global), so a proposal validated on one conversation may not generalize. Production use should score across max_scopes>1 (a multi-conversation DEV gate, never holdout) for robustness, with operator-gated PAID judged validation reserved for big claims. The single-conv result proves the machinery finds and keeps free improvements; it is not itself a publishable LoCoMo gain.
+
+Tests: benchmarks/external/locomo/recall_scorer.py covered by tests/audit/test_locomo_recall_scorer.py (3, CI-safe: a tiny synthetic conversation through the real adapter, no external dataset, no paid; pins the scorer contract + flag-override restoration). The dataset-driven headroom is validated manually (above) since the LoCoMo dataset is a local path, not in the repo.
+
+Verification: python -m pytest tests/ = 568 passed, 4 skipped, 0 failed. No regression to #289/#290/#291.
+
+Unresolved next step: a thin operator CLI (`improvement cycle`) wiring build_locomo_recall_scorers + run_improvement_cycle (propose-only default, --auto-approve opt-in); a multi-conversation dev-split gate (max_scopes>1) so accepted proposals generalize; an operator-gated PAID judged Scorer (same protocol, never auto-run) for the validation tier. The free always-on loop is now functional: it tries every cycle, proposes only net-positive non-regressing changes, applies+auto-reverts under the #289 ratchet.
+---END-ENTRY-#292---

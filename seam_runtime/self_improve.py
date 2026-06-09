@@ -68,7 +68,8 @@ class ScoreReport:
     aggregate: float
     n: int
     per_category: dict[str, float] = field(default_factory=dict)
-    per_case: dict[str, bool] = field(default_factory=dict)
+    # binary hit (self-probe) or fractional recall (LoCoMo context_recall)
+    per_case: dict[str, float] = field(default_factory=dict)
 
 
 @runtime_checkable
