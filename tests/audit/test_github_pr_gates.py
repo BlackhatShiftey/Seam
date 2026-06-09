@@ -21,8 +21,10 @@ def test_ci_enforces_no_silent_skips() -> None:
     against the live pgvector service with PGVECTOR_TEST_DSN set."""
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert '-m "not external"' in workflow            # main job deselects, not skips
-    assert "pytest tests/ -m external" in workflow      # external tests actually run
-    assert "PGVECTOR_TEST_DSN" in workflow              # ...with the DSN the gate needs
+    assert "PGVECTOR_TEST_DSN" in workflow              # pgvector job sets the gate's DSN
+    # the pgvector job runs the real-service test files (so they cannot silently skip)
+    assert "test_pgvector_pk_composite.py" in workflow
+    assert "test_substream_isolation.py" in workflow
 
 
 def test_strict_no_skip_hook_present() -> None:

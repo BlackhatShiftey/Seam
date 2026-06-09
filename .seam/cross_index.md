@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 351
+total_events: 352
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-06T08:00:47Z | history:127:80771ff8 | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | .gitignore,seam_runtime/holographic.py,seam_runtime/surface_adapters.py,seam_... |
 | 2026-05-06T09:47:15Z | history:128:9eef8813 | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
 | 2026-05-06T09:52:19Z | history:129:a97566ab | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | seam_runtime/surface_adapters.py,seam_runtime/storage.py,seam_runtime/cli.py,... |
 | 2026-05-06T11:27:31Z | history:130:353aa5f7 | session-event | done | compress, mirl, codec, command, benchmark, verify, histor... | HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-09T00:30:25Z | history:292:6a03a252 | session-event | done | retrieval, self-improvement, h2, loop, benchmark, locomo,... | benchmarks/external/locomo/recall_scorer.py,seam_runtime/self_improve.py,test... |
 | 2026-06-09T01:01:07Z | history:293:ce085961 | session-event | done | cli, self-improvement, h2, loop, packaging, chroma, depen... | seam_runtime/cli.py,pyproject.toml,.github/workflows/ci.yml,tests/audit/test_... |
 | 2026-06-09T13:53:04Z | history:294:9c04649a | session-event | done | test, ci, protocol, skip, pgvector, enforcement, verify, ... | tests/conftest.py,tests/audit/test_pgvector_pk_composite.py,tests/audit/test_... |
+| 2026-06-09T14:09:49Z | history:295:cb32e58d | session-event | done | ci, test, bugfix, chroma, dependencies, pgvector, verify,... | .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,HISTORY.md,HISTO... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0151.cross.md | 2026-04-15T00:00:00Z..2026-05-06T06:40:36Z | 151 | (multi) | (multi) |
+| 0001-0152.cross.md | 2026-04-15T00:00:00Z..2026-05-06T08:00:47Z | 152 | (multi) | (multi) |

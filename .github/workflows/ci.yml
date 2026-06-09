@@ -33,7 +33,9 @@ jobs:
         run: python -m pip install -e ".[server,sbert,rerank]"
 
       - name: Install test dependencies
-        run: python -m pip install pytest
+        # httpx is required by starlette.testclient (the server tests use TestClient);
+        # it used to arrive transitively via chromadb, which is now an optional extra.
+        run: python -m pip install pytest httpx
 
       - name: Linux installer smoke test
         if: matrix.os == 'ubuntu-latest'
@@ -103,16 +105,17 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install pytest psycopg[binary]
 
-      - name: Run all external (real pgvector) tests
-        # Run EVERY @external test against the live service so none skip silently.
-        # PGVECTOR_TEST_DSN gates test_pgvector_pk_composite + test_substream_isolation;
-        # SEAM_PGVECTOR_DSN gates test_pgvector_real_adapter. Strict no-skip
-        # (tests/conftest.py, default on) fails the job if any external test skips.
+      - name: Run all real-pgvector tests
+        # Target the real-service test files explicitly (not `-m external` over all
+        # of tests/) so collection does not import server/sbert test modules whose
+        # deps this job does not install. PGVECTOR_TEST_DSN gates pk_composite +
+        # substream; SEAM_PGVECTOR_DSN gates real_adapter. Strict no-skip
+        # (tests/conftest.py, default on) fails the job if any of these skip.
         env:
           PGPASSWORD: seam_ci_password
           SEAM_PGVECTOR_DSN: postgresql://seam_ci@localhost:55432/seam_ci
           PGVECTOR_TEST_DSN: "host=localhost port=55432 dbname=seam_ci user=seam_ci password=seam_ci_password"
-        run: python -m pytest tests/ -m external -q
+        run: python -m pytest tests/audit/test_pgvector_real_adapter.py tests/audit/test_pgvector_pk_composite.py tests/audit/test_substream_isolation.py -q
 
   repo-hygiene:
     runs-on: ubuntu-latest

@@ -6451,3 +6451,28 @@ Verification: see the validation runs above; new guard tests pass. No production
 
 Unresolved next step: still open from #292 - multi-conversation dev gate for the self-improvement proposer and an operator-gated PAID judged Scorer. This entry is test-infra hardening on the same branch (feat/free-locomo-scorer).
 ---END-ENTRY-#294---
+
+---BEGIN-ENTRY-#295---
+id: 295
+date: 2026-06-09T14:09:49Z
+agent: claude
+status: done
+topics: ci, test, bugfix, chroma, dependencies, pgvector, verify, history
+commits: none
+refs: .github/workflows/ci.yml,tests/audit/test_github_pr_gates.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 294
+tokens: 533
+---
+CI regression fix caught by PR #58's own CI: making chromadb an optional extra (#293) silently removed httpx. starlette.testclient (used by the server test suite via fastapi TestClient) requires httpx, which had been arriving TRANSITIVELY through chromadb. With chromadb out of core deps, a fresh CI install of .[server,sbert,rerank] no longer had httpx, so 10 server-test modules failed at COLLECTION ("No module named 'httpx'") in both test-and-benchmark legs; the pgvector job failed the same way because its `pytest tests/ -m external` over-collected those same modules. Local runs passed only because the dev venv still has chromadb (hence httpx) physically installed - exactly the fresh-install gap CI exists to catch.
+
+Fix (.github/workflows/ci.yml):
+- main test-and-benchmark job: `Install test dependencies` now installs `pytest httpx` (httpx declared explicitly, the same way pytest is, instead of relying on a transitive chromadb dep).
+- pgvector-integration job: run the real-pgvector test FILES explicitly (test_pgvector_real_adapter.py + test_pgvector_pk_composite.py + test_substream_isolation.py) instead of `pytest tests/ -m external`. `-m external` still imports ALL of tests/ during collection, pulling server/sbert test modules whose deps that lean job does not install; targeting the files collects only what it can import while still running every real-pgvector test against the live service (with PGVECTOR_TEST_DSN + SEAM_PGVECTOR_DSN set).
+- tests/audit/test_github_pr_gates.py: updated the no-skip guard to assert the pgvector job sets PGVECTOR_TEST_DSN and runs the two newly-wired files (was asserting the now-removed `pytest tests/ -m external`).
+
+Validated locally: guard tests 4 passed; the pgvector 3-file command with the live container DSN = 11 passed. The main-job httpx absence cannot be reproduced locally (dev venv still has chromadb), so it is verified on CI re-run.
+
+Verification: pending PR #58 CI re-run (test-and-benchmark ubuntu+windows, pgvector-integration must go green; required checks repo-hygiene/chroma-real-smoke/locomo-quickstart-bil2 already passed).
+
+Unresolved next step: confirm #58 CI is green, then merge; the chromadb-optional change must keep httpx explicitly provisioned for any context that collects the server tests.
+---END-ENTRY-#295---
