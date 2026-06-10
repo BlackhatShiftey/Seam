@@ -32,11 +32,24 @@ from benchmarks.external.common.types import BenchmarkCase
 from benchmarks.external.locomo.adapters.seam import SeamLocomoAdapter
 from seam_runtime.retrieval import load_retrieval_flags
 from seam_runtime.self_improve import ScoreReport
+from tools.h2.holdout_split import DEFAULT_RATIO, DEFAULT_SALT, DEV, assign_one
 
 
 def scope_for(case_id: str) -> str:
     """LoCoMo case_id -> conversation scope (``conv-26::q0`` -> ``conv-26``)."""
     return case_id.split("::", 1)[0]
+
+
+def _select_split(
+    cases: Sequence[BenchmarkCase], split: str | None, *, salt: str, ratio: float
+) -> list[BenchmarkCase]:
+    """Filter cases to the dev/holdout ``split`` via the deterministic
+    ``assign_one`` hash (same salt+ratio => same partition forever). ``split``
+    None keeps every case. The self-improvement loop tunes on ``dev`` ONLY;
+    ``holdout`` is reserved for publish-time audits and must never feed the gate."""
+    if split is None:
+        return list(cases)
+    return [c for c in cases if assign_one(c.case_id, salt=salt, ratio=ratio) == split]
 
 
 @dataclass
@@ -73,6 +86,79 @@ class LocomoRecallScorer:
             per_category=per_category,
             per_case=per_case,
         )
+
+
+@dataclass
+class PooledLocomoRecallScorer:
+    """Mean ``context_recall`` pooled over the dev questions of MULTIPLE
+    conversations. One aggregate + per-category recall across a diverse dev set
+    is a more generalizable signal than a single conversation (the #292 caveat:
+    a one-conversation win may not hold elsewhere). Each question is answered via
+    its own conversation's runtime; the candidate flags are applied to every
+    touched runtime for the scoring pass and restored after."""
+
+    adapter: SeamLocomoAdapter
+    cases_by_scope: "OrderedDict[str, list[BenchmarkCase]]"
+    name: str = "locomo_recall"
+
+    def score(self, runtime, flags=None) -> ScoreReport:
+        runtimes = {scope: self.adapter._runtime(scope) for scope in self.cases_by_scope}
+        previous = {scope: rt._retrieval_flags for scope, rt in runtimes.items()}
+        for rt in runtimes.values():
+            rt._retrieval_flags = flags if flags is not None else load_retrieval_flags(rt.store)
+        per_case: dict[str, float] = {}
+        category_values: dict[str, list[float]] = defaultdict(list)
+        try:
+            for scope, cases in self.cases_by_scope.items():
+                for case in cases:
+                    answer = self.adapter.answer(scope, case.question)
+                    recall = context_recall(answer.retrieved_context, case.gold_answer)
+                    per_case[case.case_id] = recall
+                    category_values[case.category or "unknown"].append(recall)
+        finally:
+            for scope, rt in runtimes.items():
+                rt._retrieval_flags = previous[scope]
+        n = len(per_case)
+        aggregate = sum(per_case.values()) / n if n else 0.0
+        per_category = {cat: sum(v) / len(v) for cat, v in category_values.items()}
+        return ScoreReport(
+            scorer=self.name, aggregate=aggregate, n=n,
+            per_category=per_category, per_case=per_case,
+        )
+
+
+def build_locomo_dev_scorer(
+    dataset_path: str,
+    *,
+    max_scopes: int = 5,
+    split: str | None = DEV,
+    salt: str = DEFAULT_SALT,
+    ratio: float = DEFAULT_RATIO,
+    question_limit: int | None = None,
+    adapter: SeamLocomoAdapter | None = None,
+    **adapter_kwargs,
+) -> tuple[SeamLocomoAdapter, "PooledLocomoRecallScorer"]:
+    """Ingest up to ``max_scopes`` conversations and return ONE pooled scorer over
+    their ``split`` (default ``dev``) questions - the multi-conversation dev gate.
+
+    FREE (answerer=None). ``split`` defaults to ``dev`` so the loop never tunes on
+    holdout. A scope contributing zero dev questions is skipped (not ingested-then-empty).
+    """
+    cases = load_locomo_cases(dataset_path)
+    groups = _group_by_scope(cases)
+    adapter = adapter or SeamLocomoAdapter(answerer=None, **adapter_kwargs)
+    cases_by_scope: "OrderedDict[str, list[BenchmarkCase]]" = OrderedDict()
+    for scope, group in list(groups.items())[:max_scopes]:
+        dev_cases = _select_split(group, split, salt=salt, ratio=ratio)
+        if question_limit is not None:
+            dev_cases = dev_cases[:question_limit]
+        if not dev_cases:
+            continue
+        adapter.reset(scope)
+        for turn in group[0].conversation:
+            adapter.ingest_turn(scope, turn)
+        cases_by_scope[scope] = dev_cases
+    return adapter, PooledLocomoRecallScorer(adapter=adapter, cases_by_scope=cases_by_scope)
 
 
 def _group_by_scope(cases: Sequence[BenchmarkCase]) -> "OrderedDict[str, list[BenchmarkCase]]":

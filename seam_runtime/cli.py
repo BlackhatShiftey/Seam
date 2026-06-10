@@ -320,8 +320,9 @@ def build_parser() -> argparse.ArgumentParser:
     improve_cycle_parser.add_argument("--probe-sample", type=int, default=50, help="Self-probe sample size from the local corpus (default 50; 0 disables the self-probe scorer)")
     improve_cycle_parser.add_argument("--probe-budget", type=int, default=20, help="Fixed eval budget for the self-probe scorer (default 20)")
     improve_cycle_parser.add_argument("--locomo-dataset", default=None, help="Optional free LoCoMo context_recall scorer from this dataset path (source checkout only)")
-    improve_cycle_parser.add_argument("--locomo-scopes", type=int, default=1, help="Number of LoCoMo conversations to score (default 1)")
-    improve_cycle_parser.add_argument("--locomo-questions", type=int, default=None, help="Cap questions per LoCoMo conversation")
+    improve_cycle_parser.add_argument("--locomo-scopes", type=int, default=5, help="Number of LoCoMo conversations pooled into the dev gate (default 5; multi-conversation so proposals generalize)")
+    improve_cycle_parser.add_argument("--locomo-split", choices=["dev", "holdout", "all"], default="dev", help="Which split to score (default dev; the loop must NOT tune on holdout)")
+    improve_cycle_parser.add_argument("--locomo-questions", type=int, default=None, help="Cap dev questions per LoCoMo conversation")
 
     mcp_parser = subparsers.add_parser("mcp", help="Run SEAM agent integration bridges")
     mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", required=True)
@@ -1082,16 +1083,20 @@ def run_cli(argv: list[str] | None = None) -> None:
         if args.locomo_dataset:
             import tempfile
 
-            from benchmarks.external.locomo.recall_scorer import build_locomo_recall_scorers
+            from benchmarks.external.locomo.recall_scorer import build_locomo_dev_scorer
 
-            adapter, locomo_scorers = build_locomo_recall_scorers(
+            # One pooled scorer over the dev split of N conversations: the
+            # multi-conversation gate, so an accepted lever generalizes and the
+            # loop never tunes on holdout.
+            adapter, locomo_scorer = build_locomo_dev_scorer(
                 args.locomo_dataset,
                 max_scopes=args.locomo_scopes,
+                split=args.locomo_split,
                 question_limit=args.locomo_questions,
                 db_path=tempfile.mkdtemp(),
                 keep_db=True,
             )
-            scorers.extend(locomo_scorers)
+            scorers.append(locomo_scorer)
         if not scorers:
             print(json.dumps({"error": "no scorers: set --probe-sample > 0 or pass --locomo-dataset"}, indent=2))
             return

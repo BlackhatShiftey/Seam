@@ -6506,3 +6506,78 @@ Verification: tests/audit/test_chroma_optional.py + test_chroma_sync_default.py 
 
 Unresolved next step: when chromadb publishes a patched release (>1.5.9 fixing GHSA-f4j7-r4q5-qw2c), widen the `chroma` extra pin to require it. Also still open from #292: the multi-conversation dev gate (--locomo-scopes>1) and an operator-gated paid judged Scorer (this entry interrupted that work to handle the security alert).
 ---END-ENTRY-#296---
+
+---BEGIN-ENTRY-#297---
+id: 297
+date: 2026-06-09T21:06:59Z
+agent: claude
+status: done
+topics: retrieval, self-improvement, h2, loop, locomo, dev-gate, generalization, test, verify, history
+commits: none
+refs: benchmarks/external/locomo/recall_scorer.py,seam_runtime/cli.py,tests/audit/test_locomo_recall_scorer.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 296
+tokens: 684
+---
+Multi-conversation dev gate for the self-improvement loop - the piece that makes a proposed lever GENERALIZE (not overfit one conversation) and keeps the loop off the holdout split. Closes the #292 caveat (its semantic_zero win was measured on a single conversation; #273 showed it is category-mixed at scale).
+
+What was built:
+- benchmarks/external/locomo/recall_scorer.py:
+  * PooledLocomoRecallScorer - mean context_recall pooled over the dev questions of MULTIPLE conversations (one aggregate + per-category over a diverse dev set). Each question is answered via its own conversation's runtime; the candidate flags are applied to EVERY touched runtime for the scoring pass and restored after.
+  * build_locomo_dev_scorer(dataset, max_scopes=5, split="dev", salt, ratio, question_limit) - ingests up to max_scopes conversations and returns ONE pooled scorer over their dev questions. FREE (answerer=None).
+  * _select_split filters cases via the deterministic holdout_split.assign_one (same salt+ratio => same partition forever); the loop tunes on `dev` ONLY, holdout reserved for publish-time.
+- seam_runtime/cli.py: `seam improve cycle --locomo-dataset` now builds the pooled dev scorer; `--locomo-scopes` default raised 1->5 (multi-conversation by default); new `--locomo-split {dev,holdout,all}` (default dev).
+
+VALIDATION (no-paid; pooled over conv-26/30/41/42, 48 dev cases) - the gate CHANGES the verdict and proves its worth:
+- baseline pooled-dev locomo_recall = 0.4922 (cat1 .342 / cat2 .649 / cat3 .162 / cat4 .550).
+- semantic_zero_no_vector: was +0.040 IMPROVE on conv-26 ALONE (#292); pooled it is -0.0002 global AND regresses cat1 (-0.021) -> correctly REJECTED. The single-conversation false-positive is caught.
+- fusion=rrf: +0.055 but regresses cat3 -> rejected (consistent with #273).
+- w_lexical+0.1: +0.0104, NO category regression -> the one genuine, generalizable improvement; select_best_improvement = {w_lexical: 0.5}.
+So the gate rejects the overfit lever and still surfaces a real, generalizable gain - exactly the intended behavior.
+
+Tests: tests/audit/test_locomo_recall_scorer.py +2 (deterministic dev/holdout partition via _select_split; pooled scorer spans conversations and restores flags on every touched runtime). Full `python -m pytest tests/` with pgvector DSN + strict no-skip = 581 passed, 0 skipped, 0 failed.
+
+Unresolved next step: the only remaining item from #292 is an operator-gated PAID judged Scorer (same Scorer protocol; never auto-run) for the validation tier - confirms a dev-validated lever as a real answer-accuracy gain on holdout before a publishable claim. The free always-on loop (self-probe + multi-conversation LoCoMo dev gate + reversible #289 ratchet) is now complete and generalization-safe.
+---END-ENTRY-#297---
+
+---BEGIN-ENTRY-#298---
+id: 298
+date: 2026-06-09T22:42:26Z
+agent: claude
+status: done
+topics: security, codeql, redos, clear-text-logging, workflow-permissions, dsl, dashboard, test, verify, history
+commits: none
+refs: .github/workflows/external-memory-benchmarks.yml,seam_runtime/dsl.py,seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 297
+tokens: 603
+---
+Cleared the three honest CodeQL findings - the ones that are unambiguous code fixes with no judgment call. These alerts surfaced when CodeQL scanning was enabled (all created 2026-06-09T18:58); they are pre-existing debt, not regressions from this session's feature work. The remaining 7 alerts (SSRF x2, path-injection x4, sessionStorage token x1) are operator-decision (won't-fix / harden / false-positive) and are intentionally NOT touched here - presented to the operator separately, no unilateral dismissal.
+
+Fixes:
+- .github/workflows/external-memory-benchmarks.yml: added top-level `permissions: contents: read` (least-privilege GITHUB_TOKEN). The only workflow that lacked a permissions block; ci.yml already has `read-all`. Clears the missing-workflow-permissions alert.
+- seam_runtime/dsl.py: replaced the two scalar-literal regexes `re.fullmatch(r\"-?\\d+\")` and `re.fullmatch(r\"-?\\d+\\.\\d+\")` in _parse_scalar with linear, backtracking-free structural helpers _is_int_literal / _is_float_literal (sign strip + str.isdecimal + single-partition on '.'). Removes the ReDoS-flagged regexes entirely. Behavioral parity verified against the old patterns across 18 edge cases (signs, empties, lone '-'/'.', trailing dot, multi-dot, leading zeros, Arabic-Indic digits): ALL MATCH - isdecimal matches regex \\d identically including Unicode Nd. `re` is still used (ENTITY_RE/BLOCK_RE) so the import stays.
+- seam_runtime/dashboard.py:1444: downgraded `LOGGER.info(\"Executing shell command (shell-free): %s\", command)` to LOGGER.debug so the operator-supplied command string is not emitted at info level. Clears the clear-text-logging alert. (The shell-free subprocess boundary is unchanged.)
+
+Verification: full `python -m pytest tests/` with PGVECTOR_TEST_DSN + strict no-skip (SEAM_STRICT_NO_SKIP default-on) = 581 passed, 0 skipped, 0 failed (70.4s). Regex-parity check passed before running the suite.
+
+Unresolved next step: present the remaining 7 CodeQL alerts to the operator for per-alert disposition - #3/#4 SSRF in server.py _chat_completion (DNS-rebinding/TOCTOU residual, not a clean FP: validate resolves the host, urlopen re-resolves + follows redirects; options = won't-fix or harden by pinning the resolved IP / blocking redirects), #7-#10 path-injection (_resolve_tree_path has is_relative_to containment = genuine FP), #2 sessionStorage token (by-design). No alert dismissals performed - operator's call. Also pending: 5 Dependabot version-update PRs (#62-66, webui npm bumps).
+---END-ENTRY-#298---
+
+---BEGIN-ENTRY-#299---
+id: 299
+date: 2026-06-10T01:39:24Z
+agent: claude
+status: done
+topics: security, codeql, clear-text-logging, dashboard, correction, test, verify, history
+commits: none
+refs: seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 298
+tokens: 495
+---
+CORRECTION to #298. The #298 dashboard.py fix (LOGGER.info -> LOGGER.debug at line 1444) did NOT clear the py/clear-text-logging-sensitive-data alert, and #298's claim that it did is FALSE. PR #68's CodeQL required check failed with "1 new alert (high)": the SAME alert re-flagged on the changed line. Root cause: CodeQL's clear-text-logging sink is LEVEL-AGNOSTIC - it fires because the operator command string (which can embed a secret, e.g. an auth header/token passed as an arg) flows into a `logging` sink AT ALL, regardless of info/debug level. Lowering the level was cosmetic to the query. (Not editing #298 per the append-only protocol: the failed attempt stays on the record; this entry supersedes it.)
+
+Real fix: stop logging the command CONTENT. `seam_runtime/dashboard.py:1444` now logs only the non-sensitive argv token COUNT - `LOGGER.debug("Executing shell command (shell-free): %d-token argv", len(argv))`. `len(argv)` is an int, which breaks the string taint from `command` and is not sensitive data, so the query has no sink. The security-boundary event stays observable (something ran, with N tokens) and the FULL command remains in the operator-facing audit trail via `_record_command` / `controller._log` / the UI activity feed - none of which are clear-text-logging sinks (CodeQL only tracks the `logging` module). A comment documents why the content must not be logged.
+
+Verification: full `python -m pytest tests/` with PGVECTOR_TEST_DSN + strict no-skip = 581 passed, 0 skipped, 0 failed. `import seam_runtime.dashboard` clean. CI confirmation (CodeQL must report 0 new alerts on PR #68) follows on push; the workflow-permissions (#1) and dsl ReDoS (#5) fixes from #298 already passed all Analyze jobs and stand.
+
+Unresolved next step: confirm PR #68's CodeQL check goes green on the pushed correction, then merge. Remaining operator-decision alerts unchanged from #298 (SSRF x2 DNS-rebinding residual, path-injection x4 FP, sessionStorage token by-design - none dismissed); 5 Dependabot webui PRs (#62-66) still pending.
+---END-ENTRY-#299---
