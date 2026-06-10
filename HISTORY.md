@@ -6561,3 +6561,23 @@ Verification: full `python -m pytest tests/` with PGVECTOR_TEST_DSN + strict no-
 
 Unresolved next step: present the remaining 7 CodeQL alerts to the operator for per-alert disposition - #3/#4 SSRF in server.py _chat_completion (DNS-rebinding/TOCTOU residual, not a clean FP: validate resolves the host, urlopen re-resolves + follows redirects; options = won't-fix or harden by pinning the resolved IP / blocking redirects), #7-#10 path-injection (_resolve_tree_path has is_relative_to containment = genuine FP), #2 sessionStorage token (by-design). No alert dismissals performed - operator's call. Also pending: 5 Dependabot version-update PRs (#62-66, webui npm bumps).
 ---END-ENTRY-#298---
+
+---BEGIN-ENTRY-#299---
+id: 299
+date: 2026-06-10T01:39:24Z
+agent: claude
+status: done
+topics: security, codeql, clear-text-logging, dashboard, correction, test, verify, history
+commits: none
+refs: seam_runtime/dashboard.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 298
+tokens: 495
+---
+CORRECTION to #298. The #298 dashboard.py fix (LOGGER.info -> LOGGER.debug at line 1444) did NOT clear the py/clear-text-logging-sensitive-data alert, and #298's claim that it did is FALSE. PR #68's CodeQL required check failed with "1 new alert (high)": the SAME alert re-flagged on the changed line. Root cause: CodeQL's clear-text-logging sink is LEVEL-AGNOSTIC - it fires because the operator command string (which can embed a secret, e.g. an auth header/token passed as an arg) flows into a `logging` sink AT ALL, regardless of info/debug level. Lowering the level was cosmetic to the query. (Not editing #298 per the append-only protocol: the failed attempt stays on the record; this entry supersedes it.)
+
+Real fix: stop logging the command CONTENT. `seam_runtime/dashboard.py:1444` now logs only the non-sensitive argv token COUNT - `LOGGER.debug("Executing shell command (shell-free): %d-token argv", len(argv))`. `len(argv)` is an int, which breaks the string taint from `command` and is not sensitive data, so the query has no sink. The security-boundary event stays observable (something ran, with N tokens) and the FULL command remains in the operator-facing audit trail via `_record_command` / `controller._log` / the UI activity feed - none of which are clear-text-logging sinks (CodeQL only tracks the `logging` module). A comment documents why the content must not be logged.
+
+Verification: full `python -m pytest tests/` with PGVECTOR_TEST_DSN + strict no-skip = 581 passed, 0 skipped, 0 failed. `import seam_runtime.dashboard` clean. CI confirmation (CodeQL must report 0 new alerts on PR #68) follows on push; the workflow-permissions (#1) and dsl ReDoS (#5) fixes from #298 already passed all Analyze jobs and stand.
+
+Unresolved next step: confirm PR #68's CodeQL check goes green on the pushed correction, then merge. Remaining operator-decision alerts unchanged from #298 (SSRF x2 DNS-rebinding residual, path-injection x4 FP, sessionStorage token by-design - none dismissed); 5 Dependabot webui PRs (#62-66) still pending.
+---END-ENTRY-#299---

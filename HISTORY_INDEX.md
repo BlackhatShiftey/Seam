@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 298
-total_tokens: ~106593
-latest_id: 298
+total_entries: 299
+total_tokens: ~107088
+latest_id: 299
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 299 | 2026-06-10 | done | f461b4ea24578ea1 | security,codeql,clear-text-logging,dashboard,+ | 298 |
 | 298 | 2026-06-09 | done | 70e871a83f2fab82 | security,codeql,redos,clear-text-logging,+ | 297 |
 | 297 | 2026-06-09 | done | eda068d9de4de7b7 | retrieval,self-improvement,h2,loop,+ | 296 |
 | 296 | 2026-06-09 | done | e269f04f9535840f | security,chroma,dependencies,vulnerability,+ | 295 |
@@ -325,16 +326,17 @@ compact: true
 - chroma: count=5 latest=#296, #295, #293, #017, #001
 - ci: count=9 latest=#295, #294, #293, #283, #282
 - classification: count=11 latest=#177, #176, #171, #170, #169
-- clear-text-logging: count=1 latest=#298
+- clear-text-logging: count=2 latest=#299, #298
 - cli: count=3 latest=#293, #287, #285
 - codec: count=13 latest=#132, #131, #130, #129, #128
-- codeql: count=1 latest=#298
+- codeql: count=2 latest=#299, #298
 - command: count=67 latest=#251, #241, #232, #221, #220
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
 - continuity: count=2 latest=#193, #192
-- dashboard: count=70 latest=#298, #288, #286, #285, #272
+- correction: count=1 latest=#299
+- dashboard: count=71 latest=#299, #298, #288, #286, #285
 - dependencies: count=3 latest=#296, #295, #293
 - dev-gate: count=1 latest=#297
 - diff: count=4 latest=#153, #093, #092, #037
@@ -353,7 +355,7 @@ compact: true
 - handoff: count=10 latest=#229, #228, #224, #190, #186
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
-- history: count=221 latest=#298, #297, #296, #295, #294
+- history: count=222 latest=#299, #298, #297, #296, #295
 - holdout: count=4 latest=#152, #093, #092, #036
 - holographic: count=1 latest=#288
 - infra: count=1 latest=#271
@@ -402,7 +404,7 @@ compact: true
 - sbert: count=3 latest=#023, #022, #011
 - scorer: count=1 latest=#292
 - search: count=16 latest=#276, #242, #240, #181, #154
-- security: count=39 latest=#298, #296, #288, #274, #272
+- security: count=40 latest=#299, #298, #296, #288, #274
 - self-improvement: count=6 latest=#297, #293, #292, #291, #290
 - server: count=3 latest=#288, #286, #285
 - session: count=3 latest=#027, #025, #019
@@ -414,13 +416,13 @@ compact: true
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
 - surface: count=5 latest=#276, #225, #218, #208, #145
-- test: count=17 latest=#298, #297, #296, #295, #294
+- test: count=18 latest=#299, #298, #297, #296, #295
 - tests: count=3 latest=#192, #191, #182
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=229 latest=#298, #297, #296, #295, #294
+- verify: count=230 latest=#299, #298, #297, #296, #295
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
@@ -430,6 +432,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 276
+- done: 277
 - in-progress: 2
 - planned: 20
