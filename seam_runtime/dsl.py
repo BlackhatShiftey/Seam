@@ -93,6 +93,19 @@ def _parse_field(line: str) -> tuple[str, Any]:
     return key, value
 
 
+def _is_int_literal(value: str) -> bool:
+    """Match ``-?\\d+`` without a regex (linear, no backtracking)."""
+    body = value[1:] if value[:1] == "-" else value
+    return bool(body) and body.isdecimal()
+
+
+def _is_float_literal(value: str) -> bool:
+    """Match ``-?\\d+\\.\\d+`` without a regex (linear, no backtracking)."""
+    body = value[1:] if value[:1] == "-" else value
+    left, dot, right = body.partition(".")
+    return bool(dot) and left.isdecimal() and right.isdecimal()
+
+
 def _parse_scalar(text: str) -> Any:
     value = text.strip()
     if value.startswith('"') and value.endswith('"'):
@@ -100,9 +113,9 @@ def _parse_scalar(text: str) -> Any:
     if value.startswith("[") and value.endswith("]"):
         inner = value[1:-1].strip()
         return [] if not inner else [_parse_scalar(item.strip()) for item in inner.split(",")]
-    if re.fullmatch(r"-?\d+", value):
+    if _is_int_literal(value):
         return int(value)
-    if re.fullmatch(r"-?\d+\.\d+", value):
+    if _is_float_literal(value):
         return float(value)
     lowered = value.lower()
     if lowered in {"asserted", "observed", "inferred", "hypothetical", "contradicted", "superseded", "deprecated", "deleted_soft"}:
