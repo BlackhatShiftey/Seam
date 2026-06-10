@@ -190,6 +190,7 @@ and `HISTORY_INDEX.md`.
 - POST/PUT/PATCH bodies are bounded by `SEAM_API_MAX_BODY_BYTES` (default `5000000`; `0` disables). Oversized requests return HTTP 413 before endpoint handlers run.
 - Authenticated REST servers refuse non-loopback binds such as `0.0.0.0` unless the operator intentionally sets `SEAM_API_ALLOW_INSECURE_REMOTE=1` or places the API behind a TLS terminator. Bearer-token deployments should prefer loopback plus TLS reverse proxy for remote access.
 - The built-in rate limiter is process-local. If `SEAM_API_RATE_LIMIT_PER_MINUTE` is enabled, `seam serve --workers` greater than 1 is refused unless `SEAM_API_ALLOW_PROCESS_LOCAL_RATE_LIMIT=1` is set after an external shared limiter is in front. `SEAM_API_RATE_LIMIT_MAX_KEYS` bounds tracked client keys.
+- The `/chat` endpoint's outbound provider call is SSRF-guarded by a host allowlist: the caller-supplied `base_url` host must be a built-in provider (`_BUILTIN_CHAT_HOSTS`) or loopback (local Ollama); arbitrary hosts are rejected. Operators permit additional custom/self-hosted providers via `SEAM_CHAT_ALLOWED_HOSTS` (comma-separated) — an operator-set knob, never caller-set. The allowlist closes DNS-rebinding by construction; a resolved-IP range check (private/link-local/reserved/multicast/unspecified rejected, loopback exempt) is kept as defense-in-depth, and the outbound opener refuses 3xx redirects so a validated host cannot bounce to an internal address.
 
 ## Benchmark Publication Policy
 

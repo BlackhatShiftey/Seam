@@ -27,7 +27,11 @@ from seam_runtime.lossless import compress_text_readable, decompress_text_readab
 from seam_runtime.retrieval_orchestrator import RetrievalOrchestrator
 from seam_runtime.retrieval_orchestrator.planner import build_plan
 from seam_runtime.runtime import SeamRuntime
-from seam_runtime.server import create_app_from_env
+from seam_runtime.server import (
+    _chat_opener,
+    _validate_provider_base_url,
+    create_app_from_env,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -135,12 +139,14 @@ class TestChatBaseUrlSsrf:
         return TestClient(create_app_from_env())
 
     def test_link_local_metadata_address_rejected(self):
+        # 169.254.169.254 is an IP literal, not an allowlisted host and not
+        # loopback, so the host allowlist rejects it before any outbound call.
         resp = self._client().post("/chat", json={
             "message": "hi", "model": "x", "provider": "OpenAI",
             "base_url": "http://169.254.169.254/latest/meta-data", "api_key": "k",
         })
         assert resp.status_code == 400
-        assert "disallowed" in resp.json()["detail"].lower()
+        assert "allowlist" in resp.json()["detail"].lower()
 
     def test_private_range_rejected(self):
         resp = self._client().post("/chat", json={
@@ -166,6 +172,74 @@ class TestChatBaseUrlSsrf:
             "base_url": "http://127.0.0.1:11434/v1",
         })
         assert resp.status_code == 502
+
+    # --- host allowlist (primary SSRF / DNS-rebinding defense) --------------- #
+    @staticmethod
+    def _patch_resolve(monkeypatch, ip: str):
+        """Force getaddrinfo to return a fixed IP so allowlist logic is the only
+        variable under test (no real DNS, deterministic)."""
+        import socket as _socket
+
+        def fake(host, port, *a, **k):
+            return [(_socket.AF_INET, _socket.SOCK_STREAM, 6, "", (ip, port or 0))]
+
+        monkeypatch.setattr(_socket, "getaddrinfo", fake)
+
+    def test_unlisted_public_host_rejected(self, monkeypatch):
+        # A host that resolves to a perfectly public IP is still rejected unless
+        # it is an allowlisted provider - this is what closes rebinding: the
+        # attacker cannot name a host they control.
+        self._patch_resolve(monkeypatch, "93.184.216.34")  # example.com, public
+        with pytest.raises(Exception) as exc:
+            _validate_provider_base_url("https://evil.example.com/v1")
+        assert exc.value.status_code == 400
+        assert "allowlist" in str(exc.value.detail).lower()
+
+    def test_builtin_allowlisted_host_passes(self, monkeypatch):
+        self._patch_resolve(monkeypatch, "93.184.216.34")
+        # api.openai.com is a built-in provider -> no exception.
+        _validate_provider_base_url("https://api.openai.com/v1")
+
+    def test_env_allowlist_permits_custom_host(self, monkeypatch):
+        self._patch_resolve(monkeypatch, "93.184.216.34")
+        monkeypatch.setenv("SEAM_CHAT_ALLOWED_HOSTS", "my.custom.host, other.host")
+        _validate_provider_base_url("https://my.custom.host/v1")  # no raise
+
+    def test_allowlisted_host_resolving_internal_still_rejected(self, monkeypatch):
+        # Defense-in-depth: even an allowlisted host that resolves into the cloud
+        # metadata range is rejected by the IP-range check.
+        self._patch_resolve(monkeypatch, "169.254.169.254")
+        with pytest.raises(Exception) as exc:
+            _validate_provider_base_url("https://api.openai.com/v1")
+        assert exc.value.status_code == 400
+        assert "disallowed" in str(exc.value.detail).lower()
+
+    # --- outbound opener refuses redirects (validated-host 302 bypass) ------- #
+    def test_chat_opener_blocks_redirects(self):
+        import http.server
+        import threading
+        import urllib.error
+        import urllib.request
+
+        class _Redirect(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):  # noqa: N802 - stdlib hook name
+                self.send_response(302)
+                self.send_header("Location", "http://169.254.169.254/latest/meta-data")
+                self.end_headers()
+
+            def log_message(self, *a):  # silence
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), _Redirect)
+        threading.Thread(target=srv.handle_request, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{srv.server_address[1]}/v1/chat/completions"
+            req = urllib.request.Request(url, data=b"{}", method="POST")
+            with pytest.raises(urllib.error.HTTPError) as exc:
+                _chat_opener().open(req, timeout=5)
+            assert "redirect blocked" in str(exc.value.reason).lower()
+        finally:
+            srv.server_close()
 
 
 # --------------------------------------------------------------------------- #

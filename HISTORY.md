@@ -6581,3 +6581,30 @@ Verification: full `python -m pytest tests/` with PGVECTOR_TEST_DSN + strict no-
 
 Unresolved next step: confirm PR #68's CodeQL check goes green on the pushed correction, then merge. Remaining operator-decision alerts unchanged from #298 (SSRF x2 DNS-rebinding residual, path-injection x4 FP, sessionStorage token by-design - none dismissed); 5 Dependabot webui PRs (#62-66) still pending.
 ---END-ENTRY-#299---
+
+---BEGIN-ENTRY-#300---
+id: 300
+date: 2026-06-10T05:12:03Z
+agent: claude
+status: done
+topics: security, ssrf, dns-rebinding, chat-endpoint, server, allowlist, codeql, test, verify, history
+commits: none
+refs: seam_runtime/server.py,tests/audit/test_audit_2026_06_05.py,HISTORY.md,HISTORY_INDEX.md
+supersedes: 299
+tokens: 810
+---
+Hardened the /chat endpoint against the DNS-rebinding / TOCTOU SSRF residual (CodeQL py/full-ssrf #3/#4, server.py outbound provider call). Operator chose the allowlist approach ("what do you think" -> I picked it; advisor-concurred: lower risk than IP-pinning, no un-testable TLS plumbing, closes rebinding by construction).
+
+The residual (unchanged by #288's original guard): _validate_provider_base_url resolved+validated the host, but _call_chat_provider then used urllib.urlopen which RE-RESOLVES the host (rebinding window) and FOLLOWS REDIRECTS (a validated public host could 302 -> 169.254.169.254). Validating a resolved IP does not bind the IP the subsequent call connects to.
+
+Fix (seam_runtime/server.py), layered:
+1. HOST ALLOWLIST (primary): _BUILTIN_CHAT_HOSTS frozenset (api.openai.com, api.anthropic.com, generativelanguage.googleapis.com, api.groq.com, api.mistral.ai, api.perplexity.ai, api.deepseek.com, api.together.xyz, api.cohere.com, api-inference.huggingface.co, openrouter.ai - sourced from the dashboard's built-in provider catalog) + loopback (Ollama) + operator-set SEAM_CHAT_ALLOWED_HOSTS (comma-separated, an OPERATOR knob never a caller knob). A host not in the union and not loopback is rejected 400. This closes rebinding BY CONSTRUCTION: the host must be a name the attacker does not control, so the TOCTOU re-resolution has nothing to rebind to.
+2. RESOLVED-IP RANGE CHECK (defense-in-depth, kept from #288): even an allowlisted host must not resolve into private/link-local(incl 169.254.169.254)/reserved/multicast/unspecified; loopback exempt.
+3. NO REDIRECTS: _chat_opener() builds a urllib opener whose HTTPRedirectHandler.redirect_request raises HTTPError("redirect blocked (SSRF guard)") on any 3xx; both provider branches (anthropic + openai-compat) now use opener.open instead of urlopen. Surfaced as 502 by the handler. Closes the validated-host -> 302 -> internal-address bypass independently.
+
+Behavior preserved: every built-in dashboard provider + loopback Ollama still validate and reach the provider call; only an arbitrary attacker-chosen host is now rejected (operator adds custom providers via SEAM_CHAT_ALLOWED_HOSTS).
+
+Tests (tests/audit/test_audit_2026_06_05.py TestChatBaseUrlSsrf): updated the metadata-IP test (169.254.169.254 host literal now caught by the allowlist, not the IP-range branch) + added: unlisted-public-host rejected (the rebinding closure - public IP alone is not enough), built-in host passes, SEAM_CHAT_ALLOWED_HOSTS permits a custom host, allowlisted-host-resolving-to-metadata still rejected (defense-in-depth, getaddrinfo monkeypatched), and a live local-server test that _chat_opener blocks a 302. Full python -m pytest tests/ with PGVECTOR_TEST_DSN + strict no-skip = 586 passed, 0 skipped, 0 failed (581 + 5 new).
+
+Unresolved next step: push as a PR and MEASURE whether CodeQL clears py/full-ssrf #3/#4 (runtime validation is not always a recognized sanitizer; if it stays, the alerts are genuinely MITIGATED -> dismiss with that justification). Operator already approved dismissing the OTHER 5 alerts (path-injection x4 = sound is_relative_to containment under a resolved _tree_root = false positive; sessionStorage x1 = token must live client-side for a loopback single-user dashboard, already session-only = won't-fix) - to be executed via gh api with per-alert reasons.
+---END-ENTRY-#300---

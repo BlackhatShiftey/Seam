@@ -284,17 +284,54 @@ def _seam_chat_system_prompt(context_text: str) -> str:
     return base + "\n\n(No relevant SEAM memory was retrieved for this message.)"
 
 
+# Hostnames the /chat endpoint may reach outbound. This is the primary SSRF
+# defense: a caller can only target a *trusted* provider (whose DNS the attacker
+# does not control) or loopback, which closes DNS-rebinding by construction -
+# there is no attacker-chosen hostname left to rebind. Operators extend it for
+# custom/self-hosted providers via SEAM_CHAT_ALLOWED_HOSTS (comma-separated),
+# an operator-set knob, never a caller-set one. Sourced from the dashboard's
+# built-in provider catalog (seam_runtime/webui/dashboard.html).
+_BUILTIN_CHAT_HOSTS = frozenset({
+    "api.openai.com",
+    "api.anthropic.com",
+    "generativelanguage.googleapis.com",
+    "api.groq.com",
+    "api.mistral.ai",
+    "api.perplexity.ai",
+    "api.deepseek.com",
+    "api.together.xyz",
+    "api.cohere.com",
+    "api-inference.huggingface.co",
+    "openrouter.ai",
+})
+
+
+def _env_chat_allowed_hosts() -> frozenset[str]:
+    """Operator-supplied extra allowed chat hosts (SEAM_CHAT_ALLOWED_HOSTS)."""
+    raw = os.environ.get("SEAM_CHAT_ALLOWED_HOSTS", "")
+    return frozenset(h.strip().lower() for h in raw.split(",") if h.strip())
+
+
 def _validate_provider_base_url(base_url: str) -> None:
     """Reject SSRF-prone provider base URLs before any outbound request.
 
     The ``/chat`` endpoint forwards ``base_url`` to an outbound HTTP call, so an
-    unconstrained value lets a caller probe internal services. We require an
-    http(s) scheme and reject hosts that resolve into private, link-local
-    (incl. the cloud metadata address 169.254.169.254), reserved, multicast, or
-    unspecified ranges. Loopback is deliberately allowed: local providers such
-    as Ollama bind to 127.0.0.1, so loopback-port access remains a known,
-    accepted residual (the endpoint is already auth-gated and loopback-bound by
-    default). An empty base_url falls through to the trusted provider defaults.
+    unconstrained value lets a caller probe internal services. Defense is layered:
+
+    1. **Host allowlist (primary):** the host must be a known provider
+       (``_BUILTIN_CHAT_HOSTS``), an operator-permitted host
+       (``SEAM_CHAT_ALLOWED_HOSTS``), or loopback. Because the host must be a
+       name the attacker does not control, the DNS-rebinding / TOCTOU window
+       between this check and the actual ``urlopen`` re-resolution is closed by
+       construction (and the outbound call additionally refuses redirects, so a
+       trusted host cannot 3xx-bounce to an internal address).
+    2. **Resolved-IP range check (defense-in-depth):** even an allowlisted host
+       must not resolve into a private, link-local (incl. the cloud metadata
+       address 169.254.169.254), reserved, multicast, or unspecified range.
+
+    Loopback is deliberately allowed for local providers such as Ollama
+    (127.0.0.1); the endpoint is already auth-gated and loopback-bound by
+    default. An empty base_url falls through to the trusted provider defaults.
     """
     import ipaddress
     import socket
@@ -314,12 +351,49 @@ def _validate_provider_base_url(base_url: str) -> None:
         infos = socket.getaddrinfo(host, parsed.port)
     except socket.gaierror:
         raise HTTPException(status_code=400, detail=f"base_url host does not resolve: {host}")
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
+    ips = [ipaddress.ip_address(info[4][0]) for info in infos]
+
+    # 1. Host allowlist (primary SSRF defense / rebinding closed by construction).
+    allowed = _BUILTIN_CHAT_HOSTS | _env_chat_allowed_hosts()
+    is_loopback_host = bool(ips) and all(ip.is_loopback for ip in ips)
+    if host.lower() not in allowed and not is_loopback_host:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"base_url host is not in the chat allowlist: {host}. "
+                "Add it to SEAM_CHAT_ALLOWED_HOSTS to permit a custom provider."
+            ),
+        )
+
+    # 2. Resolved-IP range check (defense-in-depth against an allowlisted host
+    #    that resolves into an internal range).
+    for ip in ips:
         if ip.is_loopback:
             continue
         if ip.is_private or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
             raise HTTPException(status_code=400, detail=f"base_url resolves to a disallowed address: {ip}")
+
+
+def _chat_opener():
+    """Build a urllib opener that refuses to follow 3xx redirects.
+
+    A provider whose host passed ``_validate_provider_base_url`` could still try
+    to 3xx-bounce the request to an internal address (the validated-host ->
+    redirect-to-169.254.169.254 SSRF bypass). This opener blocks every redirect
+    outright; a legitimate chat provider does not redirect a POST to
+    ``/chat/completions``. A blocked redirect raises ``HTTPError`` (a 3xx code),
+    which the ``/chat`` handler surfaces as a 502.
+    """
+    import urllib.error
+    import urllib.request
+
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            raise urllib.error.HTTPError(
+                req.full_url, code, f"redirect blocked (SSRF guard): {newurl}", headers, fp
+            )
+
+    return urllib.request.build_opener(_NoRedirect)
 
 
 def _call_chat_provider(
@@ -335,6 +409,7 @@ def _call_chat_provider(
     import json as _json
     import urllib.request
 
+    opener = _chat_opener()
     base = (base_url or "").rstrip("/")
     is_anthropic = (provider or "").lower() == "anthropic" or "anthropic" in base
     if is_anthropic:
@@ -346,7 +421,7 @@ def _call_chat_provider(
             body["system"] = system
         headers = {"content-type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"}
         req = urllib.request.Request(url, data=_json.dumps(body).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with opener.open(req, timeout=timeout) as resp:
             data = _json.loads(resp.read().decode("utf-8"))
         parts = data.get("content") or []
         return "".join(p.get("text", "") for p in parts if p.get("type") == "text") or "(empty response)"
@@ -354,7 +429,7 @@ def _call_chat_provider(
     body = {"model": model, "messages": messages, "max_tokens": max_tokens}
     headers = {"content-type": "application/json", "authorization": "Bearer " + api_key}
     req = urllib.request.Request(url, data=_json.dumps(body).encode("utf-8"), headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with opener.open(req, timeout=timeout) as resp:
         data = _json.loads(resp.read().decode("utf-8"))
     choices = data.get("choices") or []
     if choices:
