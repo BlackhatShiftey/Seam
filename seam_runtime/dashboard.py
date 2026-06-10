@@ -1441,7 +1441,14 @@ if (
             # passed verbatim and operator chaining / redirection / command
             # substitution is structurally impossible. This is the security
             # boundary for the off-by-default dashboard shell.
-            LOGGER.info("Executing shell command (shell-free): %s", command)
+            #
+            # Do NOT log the command text: an operator command can embed a secret
+            # (e.g. an auth header / token passed as an arg), and the logging sink
+            # would record it in clear text. Log only the non-sensitive argv token
+            # count so the security-boundary event stays observable; the full
+            # command remains in the operator-facing audit trail (_record_command /
+            # controller._log), which is not a clear-text logging sink.
+            LOGGER.debug("Executing shell command (shell-free): %d-token argv", len(argv))
             return subprocess.run(
                 argv,
                 capture_output=True,
