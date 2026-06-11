@@ -6608,3 +6608,27 @@ Tests (tests/audit/test_audit_2026_06_05.py TestChatBaseUrlSsrf): updated the me
 
 Unresolved next step: push as a PR and MEASURE whether CodeQL clears py/full-ssrf #3/#4 (runtime validation is not always a recognized sanitizer; if it stays, the alerts are genuinely MITIGATED -> dismiss with that justification). Operator already approved dismissing the OTHER 5 alerts (path-injection x4 = sound is_relative_to containment under a resolved _tree_root = false positive; sessionStorage x1 = token must live client-side for a loopback single-user dashboard, already session-only = won't-fix) - to be executed via gh api with per-alert reasons.
 ---END-ENTRY-#300---
+
+---BEGIN-ENTRY-#301---
+id: 301
+date: 2026-06-11T09:14:32Z
+agent: claude
+status: done
+topics: maintenance, security, codeql, dependabot, dependencies, ci, pr, merge, test, verify, history, status
+commits: 6e41070,4b4b015,9245bf3,75a6815
+refs: .github/dependabot.yml,webui/package.json,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 300
+tokens: 744
+---
+Maintenance/closeout session: verified HISTORY#300's NEXT was already executed (it was never recorded), merged the pending Dependabot PRs, and fixed the permanently-failing Dependabot docker job.
+
+1. #300 NEXT verified complete: PR #70 (chat SSRF allowlist hardening) is merged to main as 6e41070. CodeQL end state: ALL 10 alerts resolved - #1 workflow-permissions, #5 dsl ReDoS, #6 clear-text-logging are FIXED (by #298/#299 code); #3/#4 py/full-ssrf DISMISSED won't-fix (genuinely mitigated by #300's allowlist + no-redirect + resolved-IP layers; CodeQL does not recognize runtime validation as a sanitizer); #7-#10 py/path-injection DISMISSED false-positive (sound is_relative_to containment under resolved _tree_root); #2 sessionStorage DISMISSED won't-fix (by design for the loopback single-user dashboard). 0 open code-scanning alerts and 0 open Dependabot security alerts on the repo. Recorded here because no HISTORY entry captured the #70 merge or the dismissals.
+
+2. Merged Dependabot version PRs #71 (@types/node 25.9.2->25.9.3, webui) and #72 (@vitejs/plugin-react 6.0.1->6.0.2, webui), squash, all required checks green (#72 required a branch update after #71 landed; auto-merge handled it).
+
+3. FIXED the weekly "Dependabot Updates" docker job that has failed on EVERY run since the config landed in PR #61: .github/dependabot.yml used package-ecosystem "docker", which only scans Dockerfiles/Kubernetes YAML and aborts with "No Dockerfiles nor Kubernetes YAML found in /" (run 27330817506). Switched the entry to "docker-compose", which scans docker-compose.yaml and will track the pgvector/pgvector:0.8.2-pg18-trixie image pin. PR #73 merged as 75a6815. Remaining verification: the next weekly docker-compose Dependabot run must succeed (no API trigger exists; it can be manually triggered from Insights > Dependency graph > Dependabot > Recent update jobs).
+
+Verification on post-merge main: full python -m pytest tests/ with PGVECTOR_TEST_DSN set (docker pgvector up) + strict no-skip = 586 passed, 0 skipped, 0 failed (exit 0; count = collect-only total, the suite summary line is suppressed under the repo pytest config when piped); secondary roots test_seam_all/test_seam.py + tools/history/test_history_tools.py + tools/streams/test_streams.py = 103 passed (exit 0).
+
+Unresolved next step: none for security/CI maintenance (CodeQL clean, Dependabot clean, zero open PRs). Open levers carried forward: (1) cat4 single-hop ranking-vs-packing --save-context diagnostic (~+0.065 recall headroom, #274); (2) the operator-gated PAID judged holdout Scorer (the only remaining piece of the self-improvement stack from #292/#297, never auto-run); (3) Track K start is an operator decision - per the operator's own gate definition ("benchmarks 100% functional" = closed automatable self-improvement loop) the free loop is complete as of #297, so the gate is plausibly satisfied pending operator confirmation.
+---END-ENTRY-#301---
