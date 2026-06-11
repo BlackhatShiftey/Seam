@@ -89,6 +89,42 @@ def _import_run_improvement_cycle():
         return None
 
 
+def _import_run_paid_validation():
+    """Import ``tools.h2.paid_validation.run_paid_validation`` for ``seam improve
+    validate``. Same source-checkout fallback as ``_import_run_improvement_cycle``."""
+    try:
+        from tools.h2.paid_validation import run_paid_validation
+        return run_paid_validation
+    except ModuleNotFoundError:
+        repo_root = Path(__file__).resolve().parent.parent
+        if (repo_root / "tools" / "h2" / "paid_validation.py").is_file():
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+            from tools.h2.paid_validation import run_paid_validation
+            return run_paid_validation
+        return None
+
+
+def _parse_candidate_flags(flags_json: str):
+    """Parse a ``--flags`` JSON object into a RetrievalFlags, rejecting unknown
+    fields and ill-typed values (same coercion as the #289 apply step)."""
+    from .retrieval import RetrievalFlags, coerce_flag_value, retrieval_flag_field_types
+
+    data = json.loads(flags_json)
+    if not isinstance(data, dict):
+        raise ValueError("--flags must be a JSON object of RetrievalFlags fields")
+    known = retrieval_flag_field_types()
+    values = {}
+    for key, raw in data.items():
+        if key not in known:
+            raise ValueError(f"unknown retrieval flag {key!r} (known: {sorted(known)})")
+        coerced = coerce_flag_value(key, raw)
+        if coerced is None:
+            raise ValueError(f"invalid value for retrieval flag {key!r}: {raw!r}")
+        values[key] = coerced
+    return RetrievalFlags(**values)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SEAM v1 memory compiler/runtime")
     parser.add_argument("--db", default=default_runtime_db_path(), help="SQLite database path")
@@ -323,6 +359,22 @@ def build_parser() -> argparse.ArgumentParser:
     improve_cycle_parser.add_argument("--locomo-scopes", type=int, default=5, help="Number of LoCoMo conversations pooled into the dev gate (default 5; multi-conversation so proposals generalize)")
     improve_cycle_parser.add_argument("--locomo-split", choices=["dev", "holdout", "all"], default="dev", help="Which split to score (default dev; the loop must NOT tune on holdout)")
     improve_cycle_parser.add_argument("--locomo-questions", type=int, default=None, help="Cap dev questions per LoCoMo conversation")
+    improve_validate_parser = improve_subparsers.add_parser(
+        "validate",
+        help="PAID holdout validation: judge the applied flag state (or --flags) against the stock baseline with a paid answerer + LLM judge. Dry-run cost estimate by default; spends ONLY with --confirm-paid",
+    )
+    improve_validate_parser.add_argument("--db", default=argparse.SUPPRESS, help="SQLite database path (may also be given before the subcommand)")
+    improve_validate_parser.add_argument("--locomo-dataset", required=True, help="LoCoMo dataset path (source checkout only)")
+    improve_validate_parser.add_argument("--locomo-scopes", type=int, default=5, help="Number of conversations pooled into the validation (default 5)")
+    improve_validate_parser.add_argument("--locomo-questions", type=int, default=None, help="Cap questions per conversation (bounds spend)")
+    improve_validate_parser.add_argument("--split", choices=["dev", "holdout", "all"], default="holdout", help="Split to validate on (default holdout - the cases the loop never tuned on)")
+    improve_validate_parser.add_argument("--answerer", choices=["openai", "claude"], default="openai", help="Paid answerer that generates from retrieved context (default openai)")
+    improve_validate_parser.add_argument("--answerer-model", default=None, help="Answerer model override")
+    improve_validate_parser.add_argument("--judge", choices=["openai", "claude"], default="openai", help="Paid LLM judge (default openai)")
+    improve_validate_parser.add_argument("--judge-model", default=None, help="Judge model override")
+    improve_validate_parser.add_argument("--flags", default=None, help="Explicit candidate flags as a JSON object (default: the loop's persisted applied state)")
+    improve_validate_parser.add_argument("--noise-margin", type=float, default=None, help="Judged-score noise margin for the verdict (default 0.02)")
+    improve_validate_parser.add_argument("--confirm-paid", action="store_true", help="REQUIRED to spend: without it the command prints the call-count estimate and makes zero API calls")
 
     mcp_parser = subparsers.add_parser("mcp", help="Run SEAM agent integration bridges")
     mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", required=True)
@@ -1105,6 +1157,66 @@ def run_cli(argv: list[str] | None = None) -> None:
         finally:
             if adapter is not None:
                 adapter.close()
+        print(json.dumps(report, indent=2))
+        return
+    if args.command == "improve" and args.improve_command == "validate":
+        run_validation = _import_run_paid_validation()
+        if run_validation is None:
+            print(json.dumps({"error": "seam improve validate requires a source checkout (tools/ is not shipped in the wheel)"}, indent=2))
+            return
+        from benchmarks.external.locomo.judged_scorer import (
+            build_locomo_holdout_scorer,
+            estimate_locomo_paid_validation,
+        )
+        from tools.h2.paid_validation import DEFAULT_JUDGED_NOISE_MARGIN
+
+        split = None if args.split == "all" else args.split
+        candidate_flags = None
+        if args.flags is not None:
+            try:
+                candidate_flags = _parse_candidate_flags(args.flags)
+            except (ValueError, json.JSONDecodeError) as exc:
+                print(json.dumps({"error": f"invalid --flags: {exc}"}, indent=2))
+                return
+        if not args.confirm_paid:
+            # Dry run: count what the validation would cost. No conversation is
+            # ingested and no API client is constructed on this path.
+            estimate = estimate_locomo_paid_validation(
+                args.locomo_dataset,
+                max_scopes=args.locomo_scopes,
+                split=split,
+                question_limit=args.locomo_questions,
+            )
+            estimate["dry_run"] = True
+            estimate["note"] = (
+                "no API calls were made; re-run with --confirm-paid to execute "
+                "(one answerer call + up to one judge call per case per pass)"
+            )
+            print(json.dumps(estimate, indent=2))
+            return
+        import tempfile
+
+        adapter, scorer = build_locomo_holdout_scorer(
+            args.locomo_dataset,
+            max_scopes=args.locomo_scopes,
+            split=split,
+            question_limit=args.locomo_questions,
+            answerer=args.answerer,
+            answerer_model=args.answerer_model,
+            judge=args.judge,
+            judge_model=args.judge_model,
+            db_path=tempfile.mkdtemp(),
+            keep_db=True,
+        )
+        try:
+            report = run_validation(
+                scorer,
+                runtime.store,
+                candidate_flags=candidate_flags,
+                noise_margin=args.noise_margin if args.noise_margin is not None else DEFAULT_JUDGED_NOISE_MARGIN,
+            )
+        finally:
+            adapter.close()
         print(json.dumps(report, indent=2))
         return
     if args.command == "mcp" and args.mcp_command == "stdio":

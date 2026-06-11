@@ -6632,3 +6632,29 @@ Verification on post-merge main: full python -m pytest tests/ with PGVECTOR_TEST
 
 Unresolved next step: none for security/CI maintenance (CodeQL clean, Dependabot clean, zero open PRs). Open levers carried forward: (1) cat4 single-hop ranking-vs-packing --save-context diagnostic (~+0.065 recall headroom, #274); (2) the operator-gated PAID judged holdout Scorer (the only remaining piece of the self-improvement stack from #292/#297, never auto-run); (3) Track K start is an operator decision - per the operator's own gate definition ("benchmarks 100% functional" = closed automatable self-improvement loop) the free loop is complete as of #297, so the gate is plausibly satisfied pending operator confirmation.
 ---END-ENTRY-#301---
+
+---BEGIN-ENTRY-#302---
+id: 302
+date: 2026-06-11T10:00:24Z
+agent: claude
+status: done
+topics: self-improvement, benchmark, locomo, judge, paid-validation, holdout, cli, improve, test, verify, history, status, ledger
+commits: none
+refs: benchmarks/external/locomo/judged_scorer.py,tools/h2/paid_validation.py,seam_runtime/cli.py,tests/audit/test_judged_scorer.py,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 301
+tokens: 977
+---
+Built the PAID judged holdout Scorer - the last open piece of the self-improvement stack from #292/#297. Operator corrected the standing assumption this session: BUILDING this tier is part of the "benchmarks 100% functional" gate, not optional; only RUNNING it stays operator-gated (every paid execution still requires fresh explicit confirmation; nothing auto-runs).
+
+1. benchmarks/external/locomo/judged_scorer.py: JudgedLocomoScorer implements the same self_improve.Scorer protocol as the free recall scorer but measures ANSWER QUALITY - the adapter's paid answerer generates from retrieved context and a paid LLM judge (common.judge build_judge: openai|claude) scores vs gold; aggregate = judge_score_mean (the #279 paid-slice metric, correct=1.0/partial=0.5/incorrect=0.0). Pooled across scopes with the same flag-override/restore discipline as PooledLocomoRecallScorer. Cost discipline: an empty generated answer is scored 0.0 WITHOUT a judge call; transient judge failures retry (default 1) then RAISE (a partially judged pass would silently skew the baseline-vs-candidate pairing); last_run exposes verdict counts/judge calls/retries. build_locomo_holdout_scorer defaults to the HOLDOUT split (loop tunes on dev only, #297) and validates answerer/judge args BEFORE reading the dataset or constructing a client. estimate_locomo_paid_validation is the zero-cost dry-run (counts cases without ingest or clients).
+
+2. tools/h2/paid_validation.py run_paid_validation: scores stock-baseline RetrievalFlags() vs candidate (default = the loop's persisted applied state via load_retrieval_flags(store); or explicit flags) on the judged scorer; verdict improved/regressed/within-noise with DEFAULT_JUDGED_NOISE_MARGIN=0.02 (judged scores move in 0/0.5/1 steps; one verdict flip on ~25 cases = 0.02-0.04); per-category deltas; when candidate == baseline the second pass is SKIPPED (half the spend, verdict "no-candidate-state"). It never proposes/applies/reverts - output is operator evidence, not ratchet input.
+
+3. seam_runtime/cli.py: new `seam improve validate` subcommand. WITHOUT --confirm-paid it is a zero-cost dry run printing the call-count estimate (no ingest, no client). WITH --confirm-paid it builds the judged scorer and runs the validation. --flags takes an explicit candidate as JSON, validated via the #289 coerce_flag_value/retrieval_flag_field_types contract (unknown/ill-typed rejected). --split holdout default; --answerer/--judge openai|claude; --locomo-questions bounds spend. _import_run_paid_validation mirrors the existing source-checkout fallback.
+
+4. REPO_LEDGER.md records the durable gate: judged scorer reachable ONLY via `seam improve validate --confirm-paid`, never in the always-on loop's scorer list, never auto-run, fresh operator confirmation per execution, holdout-by-default.
+
+Verified: 10 new CI-safe tests in tests/audit/test_judged_scorer.py (fake/counting judges + monkeypatched generator - zero API calls): scoring/flag-restore mechanism, empty-answer-skips-judge, retry-then-raise, arg-validation-before-side-effects, holdout split filter vs assign_one on the quickstart fixture, estimate math, all three validation verdicts, equal-flags skip, CLI dry-run gate, CLI bad-flags rejection. Full python -m pytest tests/ with PGVECTOR_TEST_DSN + strict no-skip = 596 passed, 0 skipped (586 prior + 10), exit 0; secondary roots (test_seam_all + history tools + streams) 103 passed exit 0. Live free smoke: `seam improve validate --locomo-dataset .../locomo10.json` dry-run on the REAL dataset = 5 scopes / 165 holdout cases / 660 max paid calls, zero API calls made.
+
+Unresolved next step: the first actual paid holdout validation RUN (operator-gated, needs explicit go + OPENAI_API_KEY): `seam improve validate --locomo-dataset benchmarks/external/locomo/data/locomo10.json --confirm-paid` after an improvement cycle has applied state worth validating (with no applied state it reports "no-candidate-state" after one baseline pass). Suggested first use: run `seam improve cycle --locomo-dataset ... --auto-approve` to apply the #297 w_lexical+0.1 dev win, then validate it on holdout.
+---END-ENTRY-#302---

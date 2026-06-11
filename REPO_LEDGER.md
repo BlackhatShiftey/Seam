@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-05-25
+Last updated: 2026-06-11
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -78,6 +78,15 @@ and `HISTORY_INDEX.md`.
   --check`, and a non-printing secret/session URL scan. Paid answerer, judge,
   decomposer, or full LoCoMo runs remain operator-gated and must not be added
   to default PR CI.
+- The self-improvement loop's paid judged validation tier
+  (`benchmarks/external/locomo/judged_scorer.py` + `tools/h2/paid_validation.py`)
+  is reachable ONLY via `seam improve validate --confirm-paid`. Without
+  `--confirm-paid` the command is a zero-cost dry run (case/call-count estimate;
+  no client constructed, no ingest). The judged scorer must never be added to
+  the always-on improvement loop's scorer list, never auto-run by any agent, and
+  every execution requires fresh explicit operator confirmation. It validates on
+  the HOLDOUT split by default; the loop itself tunes on dev only and must never
+  tune on holdout.
 - GitHub `main` is protected by repository ruleset `Protect main (PR +
   hygiene gates)`: no bypass actors, no deletion, no non-fast-forward update,
   pull request required, and `repo-hygiene`, `chroma-real-smoke`, and
