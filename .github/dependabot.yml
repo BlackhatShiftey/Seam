@@ -10,7 +10,10 @@ updates:
     directory: "/webui"      # webui/package.json is the only first-party npm manifest
     schedule:
       interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/"           # docker-compose.yaml lives at the repo root
+  - package-ecosystem: "docker-compose"
+    directory: "/"           # docker-compose.yaml lives at the repo root; the
+                             # "docker" ecosystem only scans Dockerfiles/K8s YAML
+                             # and fails with "No Dockerfiles nor Kubernetes YAML
+                             # found" on every weekly run.
     schedule:
       interval: "weekly"
