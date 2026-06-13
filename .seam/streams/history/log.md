@@ -6860,3 +6860,25 @@ Verified: the FULL CI command `python -m pytest test_seam_all/ tools/history/tes
 
 Unresolved next step: re-run automatic on PR merge (CodeQL should report 0 new alerts; test-and-benchmark green on all roots). KNOWN FOLLOW-UP surfaced: the §23 symbol/improvement loop cannot mine the floor's natural-language objects (only underscore slugs) - making it work on NL needs collision-safe symbol generation, folded into the Stage-3/4 unification + Track J. Then the #308 arc stands (unify compile_nl+compile_conversation_turn -> opt-in local Ollama rich extractor -> migrate degenerate records).
 ---END-ENTRY-#309---
+
+---BEGIN-ENTRY-#310---
+id: 310
+date: 2026-06-13T17:58:01Z
+agent: claude
+status: done
+topics: protocol, history, status, verify, continuity, docs
+commits: none
+refs: PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md
+supersedes: 309
+tokens: 397
+---
+Docs-only: completed the #309 status chain after CI's full continuity audit caught a gap the local preflight skips.
+
+ROOT: CI's `test-and-benchmark` job runs `python -m tools.history.verify_continuity` with the recorded-fact audit ON; #309 bumped the latest entry to 309 but PROJECT_STATUS.md's "Latest continuity handoff is HISTORY#NNN" resume bullet was left at #308, so the audit failed `recorded-fact: PROJECT_STATUS.md:39 claims HISTORY#308, but latest HISTORY#309` and turned both test-and-benchmark legs red on main (eee1fcf) — even though the TEST suite itself was green (1064 passed). The LOCAL commit preflight (`tools/claude/preflight_protocol.sh`) runs `verify_continuity --no-recorded-fact-audit`, which skips exactly this check, so it passed locally and the mismatch reached main.
+
+FIX: bumped the PROJECT_STATUS "Latest continuity handoff" bullet to the current latest entry; no code change. PROCESS: before pushing, run `python -m tools.history.verify_continuity` WITHOUT `--no-recorded-fact-audit` (the CI variant), or always bump the "Latest continuity handoff is HISTORY#NNN" bullet to the new entry id. Recorded in memory so it does not recur.
+
+Verified: full `verify_continuity` (recorded-fact audit on) = Continuity OK; integrity/routing/streams OK. The #308/#309 floor work + the all-roots test result (1064 passed/2 xfailed/0 skipped) are unchanged.
+
+Unresolved next step: the #308 Stage-3/4/5 arc stands (unify compile_nl+compile_conversation_turn -> opt-in local Ollama rich extractor -> migrate degenerate records); plus the §23 symbol-loop-over-natural-language gap (collision-safe symbol generation) folded into Track J.
+---END-ENTRY-#310---

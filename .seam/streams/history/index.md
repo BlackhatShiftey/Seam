@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 309
-total_tokens: ~116516
-latest_id: 309
+total_entries: 310
+total_tokens: ~116913
+latest_id: 310
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 310 | 2026-06-13 | done | 9c0ba7e31c62a461 | protocol,history,status,verify,+ | 309 |
 | 309 | 2026-06-13 | done | 0994fba1d6401398 | security,redos,codeql,mirl,+ | 308 |
 | 308 | 2026-06-13 | done | add5580674397e2f | mirl,compiler,nl,fidelity,+ | 307 |
 | 307 | 2026-06-13 | done | 627093bb2bcae2c6 | mirl,compiler,fidelity,spec,+ | 306 |
@@ -352,7 +353,7 @@ compact: true
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
 - consolidation: count=1 latest=#306
-- continuity: count=2 latest=#193, #192
+- continuity: count=3 latest=#310, #193, #192
 - contract: count=2 latest=#305, #303
 - correction: count=1 latest=#299
 - dashboard: count=71 latest=#299, #298, #288, #286, #285
@@ -362,7 +363,7 @@ compact: true
 - diff: count=4 latest=#153, #093, #092, #037
 - dns-rebinding: count=1 latest=#300
 - docker: count=3 latest=#149, #085, #084
-- docs: count=28 latest=#279, #278, #277, #269, #268
+- docs: count=29 latest=#310, #279, #278, #277, #269
 - doctor: count=9 latest=#287, #170, #169, #140, #139
 - dsl: count=1 latest=#298
 - enforcement: count=1 latest=#294
@@ -380,7 +381,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=232 latest=#309, #308, #307, #306, #305
+- history: count=233 latest=#310, #309, #308, #307, #306
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -421,7 +422,7 @@ compact: true
 - process: count=1 latest=#304
 - promotion: count=1 latest=#305
 - proposer: count=1 latest=#291
-- protocol: count=92 latest=#304, #294, #280, #268, #267
+- protocol: count=93 latest=#310, #304, #294, #280, #268
 - pyproject: count=5 latest=#267, #094, #051, #049, #022
 - qr: count=1 latest=#307
 - rank: count=6 latest=#243, #242, #240, #017, #005
@@ -453,7 +454,7 @@ compact: true
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - spec: count=3 latest=#307, #305, #304
 - ssrf: count=2 latest=#300, #288
-- status: count=134 latest=#309, #308, #307, #306, #305
+- status: count=135 latest=#310, #309, #308, #307, #306
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
@@ -465,7 +466,7 @@ compact: true
 - tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=238 latest=#309, #308, #307, #305, #303
+- verify: count=239 latest=#310, #309, #308, #307, #305
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
@@ -476,6 +477,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 287
+- done: 288
 - in-progress: 2
 - planned: 20
