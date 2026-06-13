@@ -6799,3 +6799,37 @@ Verified: tests/fidelity/test_spec_metrics.py 11 -> 17 (6 new qr tests, all CI-s
 
 Unresolved next step: Stage 2 - the deterministic FLOOR rewrite of compile_nl (segment input into propositions; verbatim RAW + per-proposition SPAN with real offsets; entities from high-confidence rules; NEVER fabricate a project:SEAM/goal claim), measured by this now-complete spec §22/§24 contract (target: sr->~1.0, rr->1.0 on real memories, keep pr=1.0, improve cr; the Stage-1 xfails flip to XPASS->hard-fail as properties pass, forcing each golden's baseline_failures to shrink). OPEN operator decision before Stage 2: the free-floor backend - recommended honest-minimal zero-new-dep floor + opt-in local Ollama for S-P-O triples; spaCy-as-default is on the table since deps are acceptable; a heavier hand-rolled extractor is ruled out. The fidelity contract is invariant across this choice.
 ---END-ENTRY-#307---
+
+---BEGIN-ENTRY-#308---
+id: 308
+date: 2026-06-13T10:11:44Z
+agent: claude
+status: done
+topics: mirl, compiler, nl, fidelity, floor, retrieval, test, verify, history, status
+commits: none
+refs: seam_runtime/nl.py,benchmarks/fidelity/golden.py,tests/fidelity/test_spec_metrics.py,tests/audit/test_conversation_turn_compile.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 307
+tokens: 1288
+---
+Stage 2: replaced the overfit compile_nl stub with a deterministic HONEST-MINIMAL FLOOR (operator-chosen backend: honest-minimal zero-new-dep floor + opt-in local Ollama for rich triples; spaCy held optional; heavier hand-rolled extractor ruled out). This is the genuine fix for the operator-found bug ("the same sentence over and over"): compile_nl no longer fabricates a (project:SEAM, goal, <slug-of-whole-input>) skeleton for every memory.
+
+THE FLOOR (`seam_runtime/nl.py:compile_nl`, measured by the spec §3.2/§8 + §22/§24 contract):
+- One verbatim RAW (exact input). No goal/scope/principle/constraint claims, no STA, no user/project entities, no SEAM default.
+- Sentence segmentation into propositions with REAL character offsets (`_segment_propositions`: splits on .!? followed by whitespace/end, so 4.2 / 9:30 / B12 don't split); one SPAN + one CLAIM per proposition, span localized to its fact.
+- Every claim is GROUNDED: subject = the proposition's leading noun phrase (`_leading_subject`: strip one determiner, take the next word + a following capitalized run), which is always drawn from the text, so a claim can never be "about" an entity absent from the input. predicate="content", object = the verbatim proposition (so the fact stays recoverable + queryable before a richer extractor assigns a structured relation).
+- High-confidence entities only (`_proper_noun_runs`: capitalized word runs minus capitalized function words). Lowercase common-noun phrases ("billing service", "west datacenter") are deliberately left to the opt-in extractor.
+- Document-unique ids (raw:<hash>/prov:compile:<hash>/span:<hash>:<n>/clm:<hash>:<n>) replacing the former fixed raw:1/clm:1. The fixed ids collided when several compiled batches were persisted directly into one store; production namespaces ids per document (ingest_text) so it was masked, but the un-namespaced path is now correct too. Deterministic in the input (byte-identical repeat compilation).
+
+SPEC-METRIC MOVEMENT (floor vs stub, measure_qr=True): sr 0.333->0.667 on real memories (the floor grounds the subject and carries the object tokens; the structured RELATION is still unassigned = the remaining 1/3, the opt-in extractor's job); rr up (e.g. single_fact 0.333->0.667, personal_event/schedule 0.5/0.75->1.0); cr UP on every case (0.018->0.027, 0.031->0.040/0.047 ...) because the floor is far leaner (no boilerplate); pr=tr=qr=1.0. self_description_overfit sr drops 1.0->0.333 BY DESIGN - the stub's 1.0 there was pure overfit; the general floor treats it like any sentence (subject "I", generic predicate) while still passing the full structural contract. The §24 gate STILL REJECTS the floor on every case (sr 0.667 < 0.98) - promotion is earned by the rich extractor, not the floor.
+
+FIDELITY RATCHET (benchmarks/fidelity/golden.py): the floor flipped 9 strict xfails to XPASS, so baseline_failures shrank accordingly: single_fact_ownership + two_independent_facts -> {entity_extraction} only (subject_grounding + segmentation/separable_coverage/fact_grounding now pass); personal_event_with_place_and_date + schedule_change -> {} (Maria/Lisbon proper nouns + "standup" leading subject recovered); self_description_overfit unchanged {}. The 2 REMAINING xfails (entity_extraction on the two lowercase-common-noun cases) are the documented opt-in-extractor target. tests/fidelity/test_compile_fidelity.py: 34 passed / 2 xfailed.
+
+TEST RECONCILIATION:
+- tests/fidelity/test_spec_metrics.py: the "stub" baseline tests rewritten to the floor reality (test_floor_recovers_subject_and_object_but_not_relation sr=2/3; test_floor_generalizes_no_overfit_to_self_description sr<1 but structural contract passes; test_floor_provenance_is_intact; test_floor_compression_ratio_is_below_one_for_a_single_sentence; test_promotion_gate_rejects_floor; the qr test renamed). 17 passed.
+- tests/audit/test_conversation_turn_compile.py::test_compile_nl_unchanged was an explicit pin of the stub's "single goal CLM" - rewritten as test_compile_nl_floor_is_faithful (verbatim RAW, grounded claims, no goal/SEAM fabrication).
+- test_self_probe_scorer + TestGraphAdapterIsolation were green only via the stub's accidental unique-id (STA/ENT-by-hash) accumulation; the document-unique-id change fixes both at the source with NO test edits (verified: the Alice/Carol graph isolation now actually exercises a surviving in-scope claim, not just an orphaned entity).
+
+Verified: full python -m pytest tests/ with PGVECTOR_TEST_DSN + strict no-skip = 647 passed, 2 xfailed, 0 skipped (no failures). Eyeballed a real two-fact memory: verbatim RAW, two localized spans with real offsets, two separable grounded claims, proper-noun entities, zero fabrication.
+
+Unresolved next step: Stage 3 (unify compile_nl + compile_conversation_turn behind one pipeline; delete the conversation-specific stub) and Stage 4 (the opt-in LOCAL OLLAMA rich extractor behind this same fidelity contract: real S-P-O triples -> raise sr->~1.0 and close the 2 remaining entity_extraction xfails; CI cannot run Ollama so it stays opt-in and the floor remains the default CI-measured behavior). Then Stage 5: migrate existing degenerate compile_nl records (keep RAW, replace derived ENT/CLM) + re-validate the self-probe loop on a real corpus now that own-corpus ingest is no longer poisoned.
+---END-ENTRY-#308---

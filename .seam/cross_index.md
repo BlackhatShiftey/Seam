@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 364
+total_events: 365
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-07T07:05:57Z | history:139:93d5d202 | session-event | done | mcp, multi-agent, command, doctor, verify, history, snaps... | seam_runtime/mcp.py,seam_runtime/doctor.py,seam_runtime/cli.py,test_seam_all/... |
 | 2026-05-07T09:29:44Z | history:140:7f73ff10 | session-event | done | mcp, multi-agent, command, doctor, verify, history, snaps... | seam_runtime/mcp.py,seam_runtime/doctor.py,seam_runtime/cli.py,test_seam_all/... |
 | 2026-05-08T00:00:00Z | roadmap:027:15ff1edf | status-change | bootstrap | readme, docs, command | ROADMAP.md:543 |
 | 2026-05-08T00:00:00Z | roadmap:028:c568fab8 | status-change | bootstrap | docs, readme, command | ROADMAP.md:1065 |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-13T04:54:03Z | history:305:852d5e86 | session-event | done | mirl, compiler, fidelity, spec, metrics, reconciliation, ... | benchmarks/fidelity/spec_metrics.py,benchmarks/fidelity/golden.py,benchmarks/... |
 | 2026-06-13T08:31:06Z | history:306:119fc10b | session-event | done | handoff, consolidation, branches, session-end, mirl, comp... | docs/handoffs/2026-06-13-mirl-compiler-fidelity-handoff.md,HISTORY.md,HISTORY... |
 | 2026-06-13T09:23:12Z | history:307:627093bb | session-event | done | mirl, compiler, fidelity, spec, metrics, qr, retrieval, t... | benchmarks/fidelity/spec_metrics.py,benchmarks/fidelity/golden.py,tests/fidel... |
+| 2026-06-13T10:11:44Z | history:308:add55806 | session-event | done | mirl, compiler, nl, fidelity, floor, retrieval, test, ver... | seam_runtime/nl.py,benchmarks/fidelity/golden.py,tests/fidelity/test_spec_met... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0164.cross.md | 2026-04-15T00:00:00Z..2026-05-07T06:42:19Z | 164 | (multi) | (multi) |
+| 0001-0165.cross.md | 2026-04-15T00:00:00Z..2026-05-07T07:05:57Z | 165 | (multi) | (multi) |

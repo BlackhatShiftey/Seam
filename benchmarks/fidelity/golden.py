@@ -2,16 +2,21 @@
 
 Each case carries the input text, the entities and facts a faithful compiler
 should surface, and ``baseline_failures`` - the set of contract properties the
-*current* ``compile_nl`` stub violates on this input. ``baseline_failures`` is
+*current* ``compile_nl`` floor violates on this input. ``baseline_failures`` is
 the failing baseline on record: the fidelity test xfails exactly these, so when
-the compiler rewrite makes one pass, the strict xfail flips to a failure and
-forces the set to be updated.
+the compiler is improved and a property starts passing, the strict xfail flips
+to a failure and forces the set to be updated.
 
-The cases are chosen so the contrast is unambiguous: every realistic memory
-(G1-G4) fails because the stub fabricates a ``project:SEAM`` subject and mashes
-facts into one slug, while the self-description input the stub was overfit to
-(G5) passes the full contract - proving the harness is fair and the contract is
-satisfiable, not just "the stub always loses".
+History: the original stub fabricated a ``project:SEAM`` subject and mashed
+every input into one slug, so every realistic memory (G1-G4) failed
+``subject_grounding`` (+ segmentation/coverage/grounding when multi-fact) and
+``entity_extraction``. The HISTORY#308 deterministic floor (verbatim RAW,
+per-proposition SPAN with real offsets, grounded subjects drawn from the text,
+high-confidence proper-noun + leading-subject entities, NEVER a fabricated
+claim) closed all of those EXCEPT ``entity_extraction`` for the cases whose
+salient entity is a lowercase common-noun phrase (``billing service``,
+``west datacenter``) - that needs the opt-in rich extractor (local Ollama), so
+those two remain on record as the only baseline failures.
 """
 
 from __future__ import annotations
@@ -83,9 +88,11 @@ GOLDENS: tuple[GoldenCase, ...] = (
         expected_entities=("Priya", "billing service"),
         facts=(Fact.of("Priya owns the billing service", "Priya owns billing service",
                        subject="Priya", relation="owns", obj="billing service"),),
-        # One fact, so segmentation/coverage/grounding already hold; the stub
-        # still fabricates a SEAM subject and extracts no real entities.
-        baseline_failures=frozenset({"entity_extraction", "subject_grounding"}),
+        # The floor grounds the subject ("Priya") and recovers it as an entity,
+        # but "billing service" is a lowercase common-noun phrase the floor's
+        # high-confidence rules don't surface -> entity_extraction stays failed
+        # until the opt-in extractor.
+        baseline_failures=frozenset({"entity_extraction"}),
         query="Who owns the billing service?",
     ),
     GoldenCase(
@@ -98,12 +105,11 @@ GOLDENS: tuple[GoldenCase, ...] = (
             Fact.of("Priya owns the billing service", "Priya owns billing service",
                     subject="Priya", relation="owns", obj="billing service"),
         ),
-        # The full failure surface: fabricated subject, no entities, two facts
-        # mashed into one slug claim spanning the whole document.
-        baseline_failures=frozenset({
-            "entity_extraction", "subject_grounding",
-            "segmentation", "separable_coverage", "fact_grounding",
-        }),
+        # The floor segments the two sentences into two grounded, separable
+        # claims with localized spans (segmentation/coverage/grounding/subject
+        # all pass); only entity_extraction stays failed because both salient
+        # entities are lowercase common-noun phrases.
+        baseline_failures=frozenset({"entity_extraction"}),
         query="Where do the nightly backups run?",
     ),
     GoldenCase(
@@ -113,7 +119,9 @@ GOLDENS: tuple[GoldenCase, ...] = (
         facts=(Fact.of("Maria got married in Lisbon", "Maria married Lisbon",
                        subject="Maria", relation="married", obj="Lisbon"),),
         temporal_facts=("last June",),
-        baseline_failures=frozenset({"entity_extraction", "subject_grounding"}),
+        # Maria + Lisbon are capitalized proper nouns, so the floor recovers both
+        # as entities and grounds the subject -> the full contract passes.
+        baseline_failures=frozenset(),
         query="Where did Maria get married?",
     ),
     GoldenCase(
@@ -123,7 +131,9 @@ GOLDENS: tuple[GoldenCase, ...] = (
         facts=(Fact.of("the standup moved to 9:30 am on Mondays", "standup moved 9 30 am mondays",
                        subject="standup", relation="moved", obj="9:30 am Mondays"),),
         temporal_facts=("9:30 am", "Mondays"),
-        baseline_failures=frozenset({"entity_extraction", "subject_grounding"}),
+        # "standup" is the leading subject phrase, so the floor recovers it as an
+        # entity and grounds the claim -> the full contract passes.
+        baseline_failures=frozenset(),
         query="When does the standup happen?",
     ),
     GoldenCase(
@@ -132,8 +142,10 @@ GOLDENS: tuple[GoldenCase, ...] = (
         expected_entities=("SEAM",),
         facts=(Fact.of("the goal is to build SEAM, a memory translator", "build SEAM memory translator",
                        subject="SEAM", relation="goal", obj="memory translator"),),
-        # The input the stub was written for: it names SEAM and states a goal,
-        # so the stub satisfies the whole contract here. Empty baseline_failures.
+        # SEAM is a capitalized proper noun the floor recovers; the single fact
+        # is grounded and localized. The full contract passes (note: the floor's
+        # generic predicate means sr here is the floor value, not the stub's
+        # overfit 1.0 - see test_spec_metrics).
         baseline_failures=frozenset(),
         query="What do you want to build?",
     ),

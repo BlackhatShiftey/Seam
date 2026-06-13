@@ -8,89 +8,182 @@ from .mirl import IRBatch, MIRLRecord, RecordKind, Status
 
 
 STOPWORDS = {"a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "into", "is", "it", "of", "on", "or", "that", "the", "this", "to", "we", "with", "without"}
-SCOPE_PATTERNS = {
-    "db": ["database", "databases", "db", "sql", "sqlite", "postgres"],
-    "rag": ["rag", "retrieval augmented generation", "retrieval-augmented generation"],
-    "ctx": ["context window", "context windows", "context", "prompt window"],
-    "cli": ["cli", "command line", "terminal", "shell"],
-}
-PRINCIPLE_PATTERNS = {
-    "simplest_recoverable_form": ["simplest state possible", "simplest form possible", "simplest recoverable state", "simplest recoverable form"],
-    "loss_minimization": ["without losing any information", "without losing meaning", "lossless"],
-    "durable_memory": ["permanently remember", "permanent memory", "durable memory", "long-term memory"],
-}
+
+# --- Deterministic honest-minimal floor (SEAM spec §3.2 + §8) ----------------
+#
+# This replaces the former template that fabricated a (project:SEAM, goal,
+# <slug-of-whole-input>) skeleton for every memory. The floor never invents a
+# subject or predicate: it preserves the input verbatim in one RAW, splits it
+# into propositions with REAL character offsets, and emits one grounded claim
+# per proposition whose subject is drawn from that proposition's own text and
+# whose object IS the verbatim proposition (so meaning is recoverable, §8).
+# Entities are extracted only by high-confidence rules (a sentence's leading
+# noun phrase + capitalized proper-noun runs). Rich S-P-O triples (real
+# predicates and object structure) are the job of the opt-in extractor (local
+# Ollama), added behind the same fidelity contract in a later slice; the floor
+# is the zero-new-dep base it sits on.
+
+# Determiners/possessives stripped from the front of a leading subject phrase.
+_LEADING_DETERMINERS = {"the", "a", "an", "my", "our", "your", "his", "her", "its", "their", "this", "that", "these", "those"}
+# Capitalized words that are NOT proper nouns even when capitalized (usually
+# sentence-initial); excluded from the proper-noun entity pass so we don't mint
+# entities like "The" or "I".
+_NON_ENTITY_CAPS = {"The", "A", "An", "My", "Our", "Your", "His", "Her", "Its", "Their", "This", "That", "These", "Those", "I", "It", "We", "They", "He", "She", "You", "If", "And", "But", "Or", "So", "Then"}
+
+_SENTENCE_BOUNDARY = re.compile(r"[.!?]+(?=\s|$)")
+_WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'-]*")
+_PROPER_NOUN_RUN = re.compile(r"[A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*")
 
 
 def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "local.default", scope: str = "thread") -> IRBatch:
-    raw_id = "raw:1"
-    span_id = "span:1"
-    prov_id = "prov:compile:1"
-    source_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
-    user_id = f"ent:user:{source_hash}"
-    project_id = f"ent:project:{_infer_project_name(raw_text).lower().replace(' ', '_')}_{source_hash}"
-    goal = _extract_goal(raw_text)
-    scope_values = _detect_scope(raw_text)
-    principles = _detect_principles(raw_text)
-    constraints = _detect_constraints(raw_text)
-    translator = any(token in raw_text.lower() for token in ("translate", "translator", "natural language"))
+    """Compile arbitrary natural language into faithful MIRL (deterministic floor).
 
-    records = [
-        MIRLRecord(id=raw_id, kind=RecordKind.RAW, ns=ns, scope=scope, status=Status.OBSERVED, attrs={"source_ref": source_ref, "content": raw_text, "media_type": "text/plain"}),
-        MIRLRecord(id=span_id, kind=RecordKind.SPAN, ns=ns, scope=scope, status=Status.OBSERVED, attrs={"raw_id": raw_id, "start": 0, "end": len(raw_text)}),
-        MIRLRecord(id=prov_id, kind=RecordKind.PROV, ns=ns, scope=scope, status=Status.OBSERVED, attrs={"entity": raw_id, "activity": "compile_nl", "agent": "system.nl"}),
-        MIRLRecord(id=user_id, kind=RecordKind.ENT, ns=ns, scope=scope, attrs={"entity_type": "user", "label": "local_user"}),
-        MIRLRecord(id=project_id, kind=RecordKind.ENT, ns=ns, scope=scope, attrs={"entity_type": "project", "label": _infer_project_name(raw_text)}),
+    Guarantees, measured by ``benchmarks/fidelity`` against the spec contract:
+    the input is preserved verbatim in exactly one RAW record; each proposition
+    (sentence) gets a SPAN with real ``(start, end)`` offsets and a CLAIM that is
+    grounded in a subject taken from that proposition's own words (NEVER a
+    fabricated ``project:SEAM``/``goal``); high-confidence entities (leading
+    subject phrases + capitalized proper-noun runs) become ENT records. A claim's
+    object is the verbatim proposition, so the fact is recoverable and queryable
+    even before a richer extractor assigns a structured relation/object.
+    """
+    source_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
+    # Document-stable, content-unique ids. Unlike the former fixed "raw:1"/"clm:1"
+    # ids, these don't collide when several compiled batches are persisted
+    # directly into one store (the production path namespaces ids per document;
+    # this keeps the un-namespaced path correct too). Deterministic in the input,
+    # so repeated compilation stays byte-identical.
+    raw_id = f"raw:{source_hash}"
+    prov_id = f"prov:compile:{source_hash}"
+
+    records: list[MIRLRecord] = [
+        MIRLRecord(id=raw_id, kind=RecordKind.RAW, ns=ns, scope=scope, status=Status.OBSERVED,
+                   attrs={"source_ref": source_ref, "content": raw_text, "media_type": "text/plain"}),
+        MIRLRecord(id=prov_id, kind=RecordKind.PROV, ns=ns, scope=scope, status=Status.OBSERVED,
+                   attrs={"entity": raw_id, "activity": "compile_nl", "agent": "system.nl"}),
     ]
 
-    claim_index = 1
-    state_fields: dict[str, object] = {}
+    entity_ids: dict[str, str] = {}
 
-    def add_claim(predicate: str, obj: object, confidence: float = 0.92) -> None:
-        nonlocal claim_index
+    def entity_id(label: str, entity_type: str = "entity") -> str:
+        """Resolve (and lazily create) an ENT for ``label``, deduped by its
+        lowercased form. Ids are document-stable and collision-free within the
+        batch."""
+        key = label.lower()
+        existing = entity_ids.get(key)
+        if existing is not None:
+            return existing
+        slug = re.sub(r"[^a-z0-9]+", "_", key).strip("_") or "entity"
+        base = f"ent:{slug}:{source_hash}"
+        ent_id = base
+        suffix = 2
+        used = {record.id for record in records}
+        while ent_id in used:
+            ent_id = f"{base}:{suffix}"
+            suffix += 1
+        entity_ids[key] = ent_id
         records.append(
-            MIRLRecord(
-                id=f"clm:{claim_index}",
-                kind=RecordKind.CLM,
-                ns=ns,
-                scope=scope,
-                conf=confidence,
-                prov=[prov_id],
-                evidence=[span_id],
-                attrs={"subject": project_id, "predicate": predicate, "object": obj},
-            )
+            MIRLRecord(id=ent_id, kind=RecordKind.ENT, ns=ns, scope=scope,
+                       attrs={"entity_type": entity_type, "label": label})
+        )
+        return ent_id
+
+    # High-confidence proper-noun entities anywhere in the text.
+    for run in _proper_noun_runs(raw_text):
+        entity_id(run, "entity")
+
+    span_index = 1
+    claim_index = 1
+    for proposition, start, end in _segment_propositions(raw_text):
+        subject_label = _leading_subject(proposition)
+        if not subject_label:
+            # A proposition with no word characters carries no fact; skip it
+            # rather than fabricate a subject.
+            continue
+        span_id = f"span:{source_hash}:{span_index}"
+        span_index += 1
+        records.append(
+            MIRLRecord(id=span_id, kind=RecordKind.SPAN, ns=ns, scope=scope, status=Status.OBSERVED,
+                       attrs={"raw_id": raw_id, "start": start, "end": end})
+        )
+        subject = entity_id(subject_label, "entity")
+        records.append(
+            MIRLRecord(id=f"clm:{source_hash}:{claim_index}", kind=RecordKind.CLM, ns=ns, scope=scope,
+                       conf=0.9, prov=[prov_id], evidence=[span_id],
+                       attrs={"subject": subject, "predicate": "content", "object": proposition})
         )
         claim_index += 1
 
-    add_claim("goal", goal)
-    state_fields["goal"] = goal
-    if scope_values:
-        add_claim("scope", scope_values)
-        state_fields["scope"] = scope_values
-    for principle in principles:
-        add_claim("principle", principle, 0.88)
-    if principles:
-        state_fields["principle"] = principles
-    for constraint in constraints:
-        add_claim("constraint", constraint, 0.9)
-    if constraints:
-        state_fields["constraint"] = constraints if len(constraints) > 1 else constraints[0]
-    if translator:
-        add_claim("translator", "nl_ir_pack_roundtrip", 0.95)
-        state_fields["translator"] = "nl_ir_pack_roundtrip"
-
-    records.append(
-        MIRLRecord(
-            id=f"sta:{project_id}",
-            kind=RecordKind.STA,
-            ns=ns,
-            scope=scope,
-            conf=0.9,
-            prov=[prov_id],
-            evidence=[span_id],
-            attrs={"target": project_id, "fields": state_fields},
-        )
-    )
     return IRBatch(records)
+
+
+def _segment_propositions(text: str) -> list[tuple[str, int, int]]:
+    """Split ``text`` into propositions (sentences) with REAL character offsets.
+
+    Splits on ``.``/``!``/``?`` runs that are followed by whitespace or end of
+    string, so intra-token punctuation (``4.2``, ``9:30``, ``B12``) does not
+    split. Each result is ``(proposition_text, start, end)`` with
+    ``text[start:end] == proposition_text`` (surrounding whitespace trimmed), and
+    only propositions containing at least one word are kept."""
+    result: list[tuple[str, int, int]] = []
+
+    def emit(start: int, end: int) -> None:
+        segment = text[start:end]
+        lead = len(segment) - len(segment.lstrip())
+        trimmed = segment.strip()
+        if trimmed and _WORD.search(trimmed):
+            real_start = start + lead
+            result.append((text[real_start:real_start + len(trimmed)], real_start, real_start + len(trimmed)))
+
+    cursor = 0
+    for match in _SENTENCE_BOUNDARY.finditer(text):
+        emit(cursor, match.end())
+        cursor = match.end()
+    if cursor < len(text):
+        emit(cursor, len(text))
+    if not result:
+        emit(0, len(text))
+    return result
+
+
+def _leading_subject(proposition: str) -> str:
+    """The proposition's leading noun phrase, used as a GROUNDED claim subject.
+
+    Strip one leading determiner/possessive, take the next word, and extend it
+    with any immediately-following capitalized words (a proper-noun tail like
+    ``sister Maria``). The result's tokens are always a subset of the input, so
+    a claim built on it can never be 'about' an entity absent from the text. This
+    is a deterministic approximation, not a parser; a richer extractor refines
+    the subject later."""
+    words = [match.group(0) for match in _WORD.finditer(proposition)]
+    if not words:
+        return ""
+    index = 1 if (words[0].lower() in _LEADING_DETERMINERS and len(words) > 1) else 0
+    parts = [words[index]]
+    follow = index + 1
+    while follow < len(words) and words[follow][:1].isupper():
+        parts.append(words[follow])
+        follow += 1
+    return " ".join(parts)
+
+
+def _proper_noun_runs(text: str) -> list[str]:
+    """High-confidence proper-noun entities: capitalized word runs, with leading
+    capitalized function words (``The``, ``My``, ``I`` ...) stripped. Deduped,
+    order-preserving. Deliberately conservative — lowercase common-noun phrases
+    (``billing service``) are left to the opt-in extractor."""
+    runs: list[str] = []
+    seen: set[str] = set()
+    for match in _PROPER_NOUN_RUN.finditer(text):
+        kept = [word for word in match.group(0).split() if word not in _NON_ENTITY_CAPS]
+        if not kept:
+            continue
+        run = " ".join(kept)
+        key = run.lower()
+        if key not in seen:
+            seen.add(key)
+            runs.append(run)
+    return runs
 
 
 def compile_conversation_turn(raw_text: str, source_ref: str = "local://input", ns: str = "local.default", scope: str = "thread") -> IRBatch:
@@ -225,54 +318,3 @@ def suggest_symbols(batch: IRBatch, min_frequency: int = 2) -> list[MIRLRecord]:
         short = "".join(part[0] for part in value.split("_"))[:6] or f"sym{index}"
         symbols.append(MIRLRecord(id=f"sym:auto:{index}", kind=RecordKind.SYM, status=Status.INFERRED, conf=0.7, attrs={"symbol": short, "expansion": value, "frequency": frequency}))
     return symbols
-
-
-def _extract_goal(text: str) -> str:
-    lowered = text.lower()
-    patterns = [
-        r"(?:want|wants|need|needs)\s+to\s+([^.!?]+)",
-        r"(?:want|wants|need|needs)\s+(?:a|an)?\s*([^.!?]+)",
-        r"(?:goal|goals)\s+(?:is|are)\s+to\s+([^.!?]+)",
-        r"(?:design|build|create)\s+([^.!?]+)",
-        r"(?:should)\s+([^.!?]+)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, lowered)
-        if match:
-            phrase = re.split(r"\b(?:for|across|with|that|which|and it should|it should)\b", match.group(1), maxsplit=1)[0]
-            return _normalize_phrase(phrase)
-    return _normalize_phrase(text)
-
-
-def _detect_scope(text: str) -> list[str]:
-    lowered = text.lower()
-    return [code for code, patterns in SCOPE_PATTERNS.items() if any(pattern in lowered for pattern in patterns)]
-
-
-def _detect_principles(text: str) -> list[str]:
-    lowered = text.lower()
-    return [code for code, patterns in PRINCIPLE_PATTERNS.items() if any(pattern in lowered for pattern in patterns)]
-
-
-def _detect_constraints(text: str) -> list[str]:
-    lowered = text.lower()
-    found: list[str] = []
-    if any(fragment in lowered for fragment in ("without losing", "preserve meaning", "lossless")):
-        found.append("preserve_meaning")
-    if "permanent" in lowered or "durable" in lowered:
-        found.append("persistent_memory")
-    return found
-
-
-def _normalize_phrase(text: str) -> str:
-    words = [word for word in re.findall(r"[A-Za-z0-9_:-]+", text.lower()) if word not in STOPWORDS]
-    return "_".join(words[:10]) if words else "unspecified"
-
-
-def _infer_project_name(text: str) -> str:
-    patterns = [r"(?:called|named)\s+([A-Z][A-Za-z0-9_-]{1,20})", r'"([A-Z][A-Za-z0-9_-]{1,20})"', r"'([A-Z][A-Za-z0-9_-]{1,20})'"]
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
-    return "SEAM"

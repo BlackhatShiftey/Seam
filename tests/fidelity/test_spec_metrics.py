@@ -78,36 +78,47 @@ def test_claim_content_tokens_includes_resolved_subject_label():
     assert {"priya", "owns", "billing", "service"} <= toks  # subject label resolved in
 
 
-# --- the stub baseline, in spec terms -----------------------------------------
+# --- the compile_nl floor baseline, in spec terms -----------------------------
 
-def test_stub_fails_semantic_retention_on_real_memory():
+def test_floor_recovers_subject_and_object_but_not_relation():
+    """The floor grounds the subject ('Priya') and carries the object tokens, but
+    leaves the structured relation ('owns') to the opt-in extractor -> sr = 2/3
+    (subject + object of 3 components), up from the stub's fabricated 1/3."""
     golden = _golden("single_fact_ownership")
     batch = compile_nl(golden.text)
-    # subject (project:SEAM) + predicate (goal) fabricated; only the slug object
-    # matches -> 1 of 3 components -> 0.333.
-    assert semantic_retention(batch, golden) == pytest.approx(1 / 3, abs=1e-3)
-    assert reconstruction_rate(batch, golden) < 1.0  # no real entities recovered
+    assert semantic_retention(batch, golden) == pytest.approx(2 / 3, abs=1e-3)
+    # Priya is recovered; "billing service" (lowercase phrase) is not yet -> rr<1.
+    assert 0.0 < reconstruction_rate(batch, golden) < 1.0
 
 
-def test_stub_passes_on_its_overfit_input():
+def test_floor_generalizes_no_overfit_to_self_description():
+    """The stub scored sr=1.0 here ONLY because it was overfit to this exact
+    self-description. The general floor treats it like any sentence: it still
+    recovers the entities/facts (rr=pr=1.0) and passes the structural contract,
+    but sr is the floor value (subject 'I' != golden subject 'SEAM', no structured
+    relation) -> the overfit 1.0 is gone, by design."""
     golden = _golden("self_description_overfit")
     batch = compile_nl(golden.text)
     m = measure_spec_metrics(golden.text, batch, golden)
-    assert m.sr == pytest.approx(1.0)
     assert m.rr == pytest.approx(1.0)
     assert m.pr == pytest.approx(1.0)
+    assert m.sr < 1.0
+    assert contract.check_entity_extraction(batch, golden.expected_entities).passed
+    assert contract.check_subject_grounding(batch, golden.text).passed
 
 
-def test_stub_provenance_is_intact_even_when_unfaithful():
-    """pr is NOT the metric that exposes the stub: it does bind every claim to a
-    span -> raw chain. sr and rr are the discriminators."""
+def test_floor_provenance_is_intact():
+    """pr is not a discriminator: the floor binds every claim to a span -> raw
+    chain (as the stub did). sr/cr/entity_extraction carry the signal."""
     golden = _golden("single_fact_ownership")
     assert provenance_retention(compile_nl(golden.text)) == pytest.approx(1.0)
 
 
-def test_stub_compression_ratio_is_below_one():
-    """cr exposes the token inflation the Stage-1 harness missed: the packed IR is
-    many times larger than the source."""
+def test_floor_compression_ratio_is_below_one_for_a_single_sentence():
+    """At single-sentence scale the packed IR (RAW+SPAN+PROV+ENT+CLM) is still
+    larger than the source, so cr<1 - but the leaner floor (no goal/scope/
+    principle/constraint/STA boilerplate) improves cr over the stub. The
+    density win is corpus-scale."""
     golden = _golden("single_fact_ownership")
     batch = compile_nl(golden.text)
     m = measure_spec_metrics(golden.text, batch, golden)
@@ -117,7 +128,10 @@ def test_stub_compression_ratio_is_below_one():
 
 # --- §24 promotion gate --------------------------------------------------------
 
-def test_promotion_gate_rejects_stub():
+def test_promotion_gate_rejects_floor():
+    """The floor fixes fabrication but does not yet assign structured relations,
+    so sr stays below the 0.98 threshold -> the gate still rejects it (the rich
+    extractor is what earns promotion)."""
     golden = _golden("single_fact_ownership")
     m = measure_spec_metrics(golden.text, compile_nl(golden.text), golden)
     ok, reasons = passes_promotion(m, m)
@@ -157,11 +171,10 @@ def test_every_golden_has_a_query():
         assert golden.query, f"{golden.name} has no qr query"
 
 
-def test_qr_succeeds_for_stub_on_a_real_memory():
-    """Even though the stub fabricates the subject, its slug claim still carries
-    the fact's tokens and survives the persist+search round-trip, so the fact is
-    queryable -> qr = 1.0. (qr is 'no worse than baseline', not the fabrication
-    discriminator; that is sr/cr.)"""
+def test_qr_succeeds_for_the_floor_on_a_real_memory():
+    """The floor's per-proposition claim carries the fact's tokens (object = the
+    verbatim proposition) and survives the persist+search round-trip, so the fact
+    is queryable -> qr = 1.0."""
     golden = _golden("single_fact_ownership")
     qr = retrieval_quality(compile_nl(golden.text), golden)
     assert qr == pytest.approx(1.0)

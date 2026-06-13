@@ -1,5 +1,7 @@
 """Tests for compile_conversation_turn — conversation text extraction and CLM generation."""
 
+import re
+
 import pytest
 
 from seam_runtime.mirl import RecordKind, Status
@@ -141,18 +143,28 @@ def test_clm_has_evidence_and_prov():
         assert len(claim.evidence) >= 1, f"CLM {claim.id} missing evidence"
 
 
-def test_compile_nl_unchanged():
-    """Sanity check: compile_nl still works and does not include conversation-specific behavior."""
+def test_compile_nl_floor_is_faithful():
+    """compile_nl is the deterministic floor (HISTORY#308): it preserves the input
+    verbatim, segments into grounded per-proposition claims, and - crucially -
+    NEVER fabricates the old (project:SEAM, goal, <slug>) skeleton."""
     from seam_runtime.nl import compile_nl
-    batch = compile_nl("I need to build a vector search engine for my database.")
+    text = "I need to build a vector search engine for my database."
+    batch = compile_nl(text)
+
+    raws = [r for r in batch.records if r.kind == RecordKind.RAW]
+    assert len(raws) == 1 and raws[0].attrs.get("content") == text  # verbatim RAW
+
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
-    # compile_nl creates one goal CLM and possibly scope/principle/constraint CLMs
-    goal_claims = [c for c in claims if c.attrs.get("predicate") == "goal"]
-    assert len(goal_claims) == 1, "compile_nl should still produce a single goal CLM"
-    # Should NOT produce conversation-specific predicates
-    conv_predicates = {"person", "date", "location", "mentioned", "went_to", "content", "met"}
+    assert claims, "the floor must emit at least one grounded claim"
+    # No fabricated goal/project skeleton, and every claim subject is grounded
+    # in the input (no project:SEAM).
+    ent_by_id = {r.id: r for r in batch.records if r.kind == RecordKind.ENT}
+    allowed = text.lower()
     for claim in claims:
-        pred = claim.attrs.get("predicate")
-        assert pred not in conv_predicates, (
-            f"compile_nl should not produce {pred!r} claims; got {claim.attrs}"
-        )
+        assert claim.attrs.get("predicate") != "goal", "floor must not fabricate a goal claim"
+        subject = claim.attrs.get("subject")
+        label = ent_by_id[subject].attrs["label"] if subject in ent_by_id else str(subject)
+        for token in re.findall(r"[a-z0-9]+", label.lower()):
+            assert token in allowed, f"claim subject {label!r} not grounded in the input"
+    assert not any(r.attrs.get("label") == "SEAM" for r in ent_by_id.values()), \
+        "floor must not invent a SEAM entity for unrelated input"
