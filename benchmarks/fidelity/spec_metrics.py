@@ -37,9 +37,11 @@ triple match against each golden's canonical (subject, relation, object) — a
 deterministic stand-in for ``semantic_match(original_ir, reconstructed_ir)``
 that catches fabrication (wrong subject/predicate) which a word-overlap score
 would miss, because the stub's slug preserves the source *words* while changing
-their *meaning*. ``qr`` needs a live ingest+retrieval harness and is deferred to
-the next slice (returns ``None`` here); the §24 gate treats an unmeasured metric
-as "cannot promote".
+their *meaning*. ``qr`` is measured for real (persist the batch into a hermetic
+temp runtime and ``search_ir`` for the golden's query) but is opt-in
+(``measure_spec_metrics(..., measure_qr=True)``) because it needs a live
+persist+search round-trip; left unmeasured (``None``) the §24 gate treats it as
+"cannot promote".
 """
 
 from __future__ import annotations
@@ -55,7 +57,7 @@ from benchmarks.fidelity.contract import (
     content_tokens,
 )
 from seam_runtime.lossless import count_prompt_tokens
-from seam_runtime.mirl import IRBatch, RecordKind
+from seam_runtime.mirl import IRBatch, RecordKind, iter_textual_fields
 from seam_runtime.pack import pack_records
 
 # §22 promotion thresholds.
@@ -63,11 +65,22 @@ SR_MIN = 0.98
 PR_EXACT = 1.00
 TR_MIN = 0.99
 
+# The record kinds the retrieval path treats as candidates (see
+# ``seam_runtime.retrieval.search_batch`` candidate_kinds). A fact is only
+# "directly queryable" if it survives in one of these — RAW/SPAN/PROV/ENT are
+# not returned by the default ``search_ir`` path.
+_RETRIEVABLE_KINDS = frozenset({RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL})
+
+# qr default cutoff: top-k retrieved candidates (matches ``search_ir`` default
+# budget). Spec §22 defines qr = retrieval_success_at_k.
+QR_K = 5
+
 
 @dataclass(frozen=True)
 class SpecMetrics:
     """The §22 metric vector for one (source, compiled batch). ``qr`` is None
-    until the retrieval harness lands (next slice)."""
+    when not measured (``measure_qr=False``); the §24 gate treats None as
+    'cannot promote'."""
 
     cr: float
     rr: float
@@ -194,22 +207,88 @@ def temporal_retention(batch: IRBatch, golden) -> float:
     return recovered / len(expected)
 
 
-def retrieval_quality(batch: IRBatch, golden) -> None:
-    """qr = retrieval_success_at_k. Deferred: needs a live ingest + search_ir
-    harness (embedder + store). Returns None until the next slice; the §24 gate
-    treats None as 'cannot promote'."""
-    return None
+def _record_search_tokens(batch: IRBatch, record) -> frozenset[str]:
+    """The content tokens a retrieval candidate carries. For a claim this is the
+    subject-aware view (resolved ENT label + predicate + object), matching how
+    coverage is scored elsewhere; for any other kind it is every textual attr
+    value flattened."""
+    if record.kind == RecordKind.CLM:
+        return claim_content_tokens(batch, record)
+    return content_tokens(" ".join(iter_textual_fields(record)))
 
 
-def measure_spec_metrics(source_text: str, batch: IRBatch, golden) -> SpecMetrics:
-    """Compute the §22 metric vector for one compiled batch (qr deferred)."""
+def retrieval_quality(batch: IRBatch, golden, *, k: int = QR_K) -> float | None:
+    """qr = retrieval_success_at_k for the golden's PRIMARY fact.
+
+    The honest, spec-literal measurement (§22 ``qr = retrieval_success_at_k``):
+    persist the compiled batch into a hermetic temp runtime (deterministic hash
+    embedder + SQLite vector adapter — no network, no ambient pgvector), issue
+    the golden's natural-language ``query`` against it, and report whether a
+    *gold record* (a retrievable-kind record whose tokens cover the primary
+    fact) lands in the top-k candidates: 1.0 if so, else 0.0.
+
+    Returns ``None`` when qr is unmeasurable (no query / no fact / a fact with no
+    content tokens); the §24 gate then treats it as 'cannot promote'. Returns
+    ``0.0`` (without persisting) when the compiler produced no retrievable record
+    carrying the fact at all — the strongest queryability failure.
+
+    At single-golden scale a tiny batch's gold record is almost always within
+    top-k, so the discriminating power of qr is "a record carrying the fact
+    exists and survives the real persist+search round-trip", which is exactly
+    the §24 concern (denser only when it can still recover what matters); the
+    fabrication discriminators remain ``sr`` and ``cr``."""
+    query = (getattr(golden, "query", "") or "").strip()
+    facts = [f for f in getattr(golden, "facts", ()) if f.key_tokens]
+    if not query or not facts:
+        return None
+    gold_tokens = facts[0].key_tokens
+
+    gold_ids = {
+        r.id
+        for r in batch.records
+        if r.kind in _RETRIEVABLE_KINDS and gold_tokens <= _record_search_tokens(batch, r)
+    }
+    if not gold_ids:
+        return 0.0
+
+    # Lazy, hermetic: importing SeamRuntime pulls the heavy runtime graph, and
+    # an explicit hash embedder + SQLite adapter keeps the measurement
+    # deterministic and independent of any SEAM_PGVECTOR_DSN in the environment.
+    import tempfile
+    from pathlib import Path
+
+    from seam_runtime.models import HashEmbeddingModel
+    from seam_runtime.runtime import SeamRuntime
+    from seam_runtime.vector_adapters import SQLiteVectorAdapter
+
+    with tempfile.TemporaryDirectory(prefix="seam-qr-") as tmp:
+        db = str(Path(tmp) / "qr.db")
+        model = HashEmbeddingModel()
+        runtime = SeamRuntime(store_path=db, embedding_model=model, vector_adapter=SQLiteVectorAdapter(db, model))
+        try:
+            runtime.persist_ir(batch)
+            result = runtime.search_ir(query, budget=k)
+        finally:
+            runtime.close()
+    hit = any(candidate.record.id in gold_ids for candidate in result.candidates[:k])
+    return 1.0 if hit else 0.0
+
+
+def measure_spec_metrics(source_text: str, batch: IRBatch, golden, *, measure_qr: bool = False, k: int = QR_K) -> SpecMetrics:
+    """Compute the §22 metric vector for one compiled batch.
+
+    ``cr/rr/sr/pr/tr`` are pure (no I/O, no embedder). ``qr`` requires a live
+    persist+search round-trip, so it is opt-in (``measure_qr=True``); the default
+    leaves ``qr=None`` (the §24 gate then conservatively blocks promotion). Pass
+    ``measure_qr=True`` to complete the gate (the Stage-2 rewrite is measured this
+    way)."""
     return SpecMetrics(
         cr=compression_ratio(source_text, batch),
         rr=reconstruction_rate(batch, golden),
         sr=semantic_retention(batch, golden),
         pr=provenance_retention(batch),
         tr=temporal_retention(batch, golden),
-        qr=retrieval_quality(batch, golden),
+        qr=retrieval_quality(batch, golden, k=k) if measure_qr else None,
     )
 
 

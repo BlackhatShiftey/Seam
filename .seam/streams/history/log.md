@@ -6769,3 +6769,33 @@ New operator preference recorded (memory): merge PRs promptly - arm --squash --a
 
 Unresolved next step: per the handoff, Slice 2 (qr metric) then Stage 2 (compile_nl floor rewrite), measured by the now-existing spec §22/§24 contract; operator to confirm the free-floor backend.
 ---END-ENTRY-#306---
+
+---BEGIN-ENTRY-#307---
+id: 307
+date: 2026-06-13T09:23:12Z
+agent: claude
+status: done
+topics: mirl, compiler, fidelity, spec, metrics, qr, retrieval, test, verify, history, status
+commits: none
+refs: benchmarks/fidelity/spec_metrics.py,benchmarks/fidelity/golden.py,tests/fidelity/test_spec_metrics.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 306
+tokens: 1075
+---
+Slice 2: implemented the SEAM-spec §22 `qr` (retrieval quality) metric, completing the §24 promotion gate. This is the deferred item from #305 and the first ordered step of the 2026-06-13 MIRL-compiler handoff resume point. No compiler behavior changed (Stage 2 is still next).
+
+`benchmarks/fidelity/spec_metrics.py`: `retrieval_quality(batch, golden, *, k=5)` is now a real measurement of `qr = retrieval_success_at_k` (spec §22), no longer a None stub:
+- Identifies the GOLD records in the batch = retrievable-kind records ({CLM,STA,EVT,REL}, matching seam_runtime.retrieval.search_batch candidate_kinds) whose tokens cover the golden's PRIMARY fact; claims are scored subject-aware via contract.claim_content_tokens (resolved ENT label + predicate + object).
+- If no retrievable record carries the fact -> qr=0.0 (the strongest queryability failure; no persist needed).
+- Otherwise persists the batch into a HERMETIC temp SeamRuntime (explicit HashEmbeddingModel + SQLiteVectorAdapter, so the measurement is deterministic, network-free, and independent of any ambient SEAM_PGVECTOR_DSN), runs search_ir(query, budget=k), and reports 1.0 iff a gold record id is in the top-k candidates else 0.0. Returns None when unmeasurable (no query / no fact).
+- measure_spec_metrics gained measure_qr=False (opt-in): the cr/rr/sr/pr/tr path stays pure + embedder-free by default (preserves #305's CI-safe metric tests; qr=None then, which the §24 gate already treats as cannot-promote); measure_qr=True turns on the persist+search round-trip and completes the gate (Stage 2 will measure this way).
+
+GOLDENS gained a `query` field per case (a NL question about facts[0]) for qr; cr/rr/sr/pr/tr are untouched.
+
+SPEC-METRIC BASELINE WITH qr (generated, measure_qr=True): every case qr=1.0 - the stub's all-in-one slug claim still carries the fact tokens and survives the persist+search round-trip, so the fact IS queryable. qr is "no worse than baseline" (§22), NOT a fabrication discriminator (pr/tr are also 1.0 and honest about this); sr (0.333 real vs 1.0 overfit) and cr (0.018-0.040, packed IR 25-55x source) remain the discriminators. cr/rr/sr/pr/tr are byte-identical to the #305 baseline. The §24 gate still REJECTS the stub on every case (sr<0.98 + cr not strictly>baseline) - now with EVERY axis measured. qr's real discriminating power lands later: it catches a future over-compressed rewrite that drops a fact's tokens from all retrievable records (gold_ids empty -> qr=0.0), which is exactly the §24 concern ("denser only when it proves it can still recover what matters").
+
+REPO_LEDGER unchanged: it already lists qr in the cr/rr/sr/pr/tr/qr contract and records that fidelity/metric harnesses align to §22/§24 - both remain true; this completes the implementation, not the policy.
+
+Verified: tests/fidelity/test_spec_metrics.py 11 -> 17 (6 new qr tests, all CI-safe + network-free via the deterministic hash embedder, ~0.6s): every golden has a query; qr=1.0 for the stub on a real memory AND for a hand-built faithful batch (proving qr is satisfiable, not rigged for the stub); qr=0.0 when no record carries the fact; qr=None without a query; measure_qr=True yields a real float so the gate has every axis and still rejects the stub on sr. Stage-1 fidelity harness unchanged (25 passed/11 xfailed; Slice 2 does not touch compile_nl so no ratchet flips). Full python -m pytest tests/ with PGVECTOR_TEST_DSN + strict no-skip = 638 passed, 11 xfailed, 0 skipped (632 + 6).
+
+Unresolved next step: Stage 2 - the deterministic FLOOR rewrite of compile_nl (segment input into propositions; verbatim RAW + per-proposition SPAN with real offsets; entities from high-confidence rules; NEVER fabricate a project:SEAM/goal claim), measured by this now-complete spec §22/§24 contract (target: sr->~1.0, rr->1.0 on real memories, keep pr=1.0, improve cr; the Stage-1 xfails flip to XPASS->hard-fail as properties pass, forcing each golden's baseline_failures to shrink). OPEN operator decision before Stage 2: the free-floor backend - recommended honest-minimal zero-new-dep floor + opt-in local Ollama for S-P-O triples; spaCy-as-default is on the table since deps are acceptable; a heavier hand-rolled extractor is ruled out. The fidelity contract is invariant across this choice.
+---END-ENTRY-#307---

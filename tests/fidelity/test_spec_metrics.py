@@ -1,9 +1,11 @@
 """SEAM-spec §22 metrics: mechanism, the compile_nl baseline, and proof the
 contract is satisfiable by a *faithful* compiler.
 
-CI-safe and embedder-free: uses `compile_nl` (pure regex) + `pack_records`
-(token counting) + hand-built batches. No persistence, no retrieval, no model.
-qr (retrieval_quality) is deferred to the next slice and is None here.
+CI-safe: the cr/rr/sr/pr/tr tests are embedder-free (uses `compile_nl` pure
+regex + `pack_records` token counting + hand-built batches; no persistence, no
+retrieval, no model). The qr tests run a real persist+search round-trip through
+a hermetic temp runtime (deterministic hash embedder + SQLite vector adapter),
+which is still in-process and network-free, so they stay CI-safe.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from benchmarks.fidelity.spec_metrics import (
     passes_promotion,
     provenance_retention,
     reconstruction_rate,
+    retrieval_quality,
     semantic_retention,
 )
 from seam_runtime.mirl import IRBatch, MIRLRecord, RecordKind
@@ -109,7 +112,7 @@ def test_stub_compression_ratio_is_below_one():
     batch = compile_nl(golden.text)
     m = measure_spec_metrics(golden.text, batch, golden)
     assert m.cr < 1.0
-    assert m.qr is None  # deferred
+    assert m.qr is None  # qr is opt-in (measure_qr=False here)
 
 
 # --- §24 promotion gate --------------------------------------------------------
@@ -144,3 +147,57 @@ def test_promotion_gate_blocks_unmeasured_qr():
     ok, reasons = passes_promotion(candidate, baseline)
     assert not ok
     assert any("qr" in r for r in reasons)
+
+
+# --- qr (retrieval_success_at_k): the directly-queryable axis -------------------
+
+def test_every_golden_has_a_query():
+    """qr is unmeasurable without a query; the slice requires one per case."""
+    for golden in GOLDENS:
+        assert golden.query, f"{golden.name} has no qr query"
+
+
+def test_qr_succeeds_for_stub_on_a_real_memory():
+    """Even though the stub fabricates the subject, its slug claim still carries
+    the fact's tokens and survives the persist+search round-trip, so the fact is
+    queryable -> qr = 1.0. (qr is 'no worse than baseline', not the fabrication
+    discriminator; that is sr/cr.)"""
+    golden = _golden("single_fact_ownership")
+    qr = retrieval_quality(compile_nl(golden.text), golden)
+    assert qr == pytest.approx(1.0)
+
+
+def test_qr_succeeds_for_a_faithful_batch():
+    """A correct compiler's grounded claim is also retrievable -> qr satisfiable,
+    not rigged so only the stub can score it."""
+    golden = _golden("single_fact_ownership")
+    qr = retrieval_quality(_faithful_batch_priya(), golden)
+    assert qr == pytest.approx(1.0)
+
+
+def test_qr_is_zero_when_no_record_carries_the_fact():
+    """If the compiled batch holds no retrievable record covering the fact, the
+    fact is not queryable at all -> qr = 0.0 (no persist needed)."""
+    golden = _golden("single_fact_ownership")  # fact tokens: priya/owns/billing/service
+    unrelated = compile_nl("The weather is nice today.")
+    assert retrieval_quality(unrelated, golden) == pytest.approx(0.0)
+
+
+def test_qr_is_none_without_a_query():
+    from dataclasses import replace
+
+    golden = replace(_golden("single_fact_ownership"), query="")
+    assert retrieval_quality(compile_nl(golden.text), golden) is None
+
+
+def test_measure_qr_opt_in_completes_the_metric_vector():
+    """measure_qr=True turns qr from None into a real float so the §24 gate has
+    every axis; the gate still rejects the stub (on sr), now with qr measured."""
+    golden = _golden("single_fact_ownership")
+    batch = compile_nl(golden.text)
+    m = measure_spec_metrics(golden.text, batch, golden, measure_qr=True)
+    assert m.qr == pytest.approx(1.0)
+    ok, reasons = passes_promotion(m, m)
+    assert not ok
+    assert any("sr" in r for r in reasons)
+    assert not any("qr not measured" in r for r in reasons)

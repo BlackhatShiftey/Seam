@@ -66,6 +66,10 @@ class GoldenCase:
     # Temporal facts a faithful compiler should retain, for the spec §22 `tr`
     # metric. Optional; empty means tr is vacuously 1.0 for this case.
     temporal_facts: tuple[str, ...] = ()
+    # A natural-language retrieval query about this case's PRIMARY fact
+    # (``facts[0]``), for the spec §22 `qr` (retrieval_success_at_k) metric
+    # (`spec_metrics.retrieval_quality`). Empty means qr is unmeasurable here.
+    query: str = ""
 
     @property
     def expected_fact_count(self) -> int:
@@ -82,6 +86,7 @@ GOLDENS: tuple[GoldenCase, ...] = (
         # One fact, so segmentation/coverage/grounding already hold; the stub
         # still fabricates a SEAM subject and extracts no real entities.
         baseline_failures=frozenset({"entity_extraction", "subject_grounding"}),
+        query="Who owns the billing service?",
     ),
     GoldenCase(
         name="two_independent_facts",
@@ -99,6 +104,7 @@ GOLDENS: tuple[GoldenCase, ...] = (
             "entity_extraction", "subject_grounding",
             "segmentation", "separable_coverage", "fact_grounding",
         }),
+        query="Where do the nightly backups run?",
     ),
     GoldenCase(
         name="personal_event_with_place_and_date",
@@ -108,6 +114,7 @@ GOLDENS: tuple[GoldenCase, ...] = (
                        subject="Maria", relation="married", obj="Lisbon"),),
         temporal_facts=("last June",),
         baseline_failures=frozenset({"entity_extraction", "subject_grounding"}),
+        query="Where did Maria get married?",
     ),
     GoldenCase(
         name="schedule_change",
@@ -117,6 +124,7 @@ GOLDENS: tuple[GoldenCase, ...] = (
                        subject="standup", relation="moved", obj="9:30 am Mondays"),),
         temporal_facts=("9:30 am", "Mondays"),
         baseline_failures=frozenset({"entity_extraction", "subject_grounding"}),
+        query="When does the standup happen?",
     ),
     GoldenCase(
         name="self_description_overfit",
@@ -127,5 +135,6 @@ GOLDENS: tuple[GoldenCase, ...] = (
         # The input the stub was written for: it names SEAM and states a goal,
         # so the stub satisfies the whole contract here. Empty baseline_failures.
         baseline_failures=frozenset(),
+        query="What do you want to build?",
     ),
 )
