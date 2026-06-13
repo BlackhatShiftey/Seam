@@ -6745,3 +6745,27 @@ Verified: tests/fidelity/test_spec_metrics.py (11 new, CI-safe + embedder-free):
 
 Unresolved next step: Slice 2 - add the qr (retrieval_success@k) metric via an ingest+search_ir harness so the §24 gate is complete (qr is the "directly queryable" axis the spec + operator require), THEN the Stage-2 deterministic floor rewrite of compile_nl measured by this spec contract (target: raise sr->~1.0 and rr->1.0 on real memories, keep pr=1.0, improve cr).
 ---END-ENTRY-#305---
+
+---BEGIN-ENTRY-#306---
+id: 306
+date: 2026-06-13T08:31:06Z
+agent: claude
+status: done
+topics: handoff, consolidation, branches, session-end, mirl, compiler, fidelity, history, status
+commits: none
+refs: docs/handoffs/2026-06-13-mirl-compiler-fidelity-handoff.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 305
+tokens: 566
+---
+Session consolidation + handoff. No runtime code changed; docs/branch hygiene only.
+
+State at consolidation: HEAD == origin/main, working tree clean, ZERO open PRs, 0 open CodeQL + 0 open Dependabot security alerts. Full suite 632 passed/11 xfailed/0 skipped.
+
+Wrote `docs/handoffs/2026-06-13-mirl-compiler-fidelity-handoff.md` capturing: (1) the session arc (#301 maintenance closeout; #302 paid judged holdout scorer; #303 fidelity harness + failing baseline; #304 SEAM-spec-is-governing-contract protocol rule; #305 spec-metric §22/§24 reconciliation); (2) an HONEST progress assessment - the compile_nl bug is NOT yet fixed (sr still 0.333, cr still ~0.03 on real memories); this session built the measurement apparatus + the governing rule, not the fix; the number moves in Stage 2; (3) the precise bug location + the spec-metric baseline a fix must beat; (4) the ordered resume point: Slice 2 = qr (retrieval_success@k via ingest+search_ir, completes the §24 gate), THEN Stage 2 = the deterministic floor rewrite of compile_nl; (5) the open free-floor backend decision (recommended honest-minimal+Ollama, spaCy optional, deps now acceptable per operator); (6) hard constraints carried forward (read spec first; component "broken" only vs ITS contract - don't repeat the RC/1 misjudgment; never auto-run paid; no Claude attribution; branch+PR only; backup/local-pgvector-bootstrap = KEEP).
+
+Branch hygiene: deleted the merged branches from this session (local feat/dashboard-functional + fix/chat-ssrf-allowlist; the chore/* remote branches had already auto-deleted on merge); `git fetch --prune` cleared stale tracking refs. Remaining non-main remote branches left for the operator (not this session's, or KEEP): claude/confident-albattani-awIbm, feat/dashboard-functional (PR #54 merged, deletable), handoff/archive (infra), backup/local-pgvector-bootstrap (KEEP per policy).
+
+New operator preference recorded (memory): merge PRs promptly - arm --squash --auto on every PR, confirm merge, pull, prune the branch; never let PRs accumulate; target zero open PRs (this session held the queue at zero; #71-#78 all merged).
+
+Unresolved next step: per the handoff, Slice 2 (qr metric) then Stage 2 (compile_nl floor rewrite), measured by the now-existing spec §22/§24 contract; operator to confirm the free-floor backend.
+---END-ENTRY-#306---
