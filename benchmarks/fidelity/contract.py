@@ -89,6 +89,20 @@ def _claim_text(claim) -> str:
     return " ".join(parts)
 
 
+def claim_content_tokens(batch: IRBatch, claim) -> frozenset[str]:
+    """Content tokens carried by a claim = resolved subject-entity label +
+    predicate + object. A claim's subject is an entity *reference*, so a faithful
+    claim like ``(ent:priya, owns, billing_service)`` carries 'priya' only via
+    its resolved ENT label, not its attrs text. Coverage/reconstruction must see
+    that, or a correct compiler (subject as a separate entity) would wrongly look
+    like it dropped the subject. The stub's all-in-one slug already contains
+    every token, so this does not change the stub baseline."""
+    ents = _ents_by_id(batch)
+    ent = ents.get(claim.attrs.get("subject"))
+    subject_label = str(ent.attrs.get("label", "")) if ent is not None else str(claim.attrs.get("subject") or "")
+    return content_tokens(subject_label + " " + _claim_text(claim))
+
+
 def check_raw_verbatim(batch: IRBatch, text: str) -> CheckResult:
     raws = [r for r in batch.records if r.kind == RecordKind.RAW]
     if len(raws) != 1:
@@ -159,7 +173,7 @@ def check_separable_coverage(batch: IRBatch, facts) -> CheckResult:
     distinct facts. A fact is 'in' a claim when the fact's key tokens are a
     subset of the claim's text tokens. The stub's one mashed slug contains every
     fact's tokens, so it carries multiple facts in one claim and fails (b)."""
-    claim_token_sets = [(c, content_tokens(_claim_text(c))) for c in _claims(batch)]
+    claim_token_sets = [(c, claim_content_tokens(batch, c)) for c in _claims(batch)]
     # (a) coverage
     uncovered = []
     for fact in facts:

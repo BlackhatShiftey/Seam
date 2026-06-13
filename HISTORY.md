@@ -6710,3 +6710,38 @@ No runtime code changed; docs/protocol only. Verification: protocol gates (integ
 
 Unresolved next step: re-ground the compiler/fidelity work (project_mirl_compiler_rewrite Stage 2) in the spec - reconcile benchmarks/fidelity to §22 metrics (cr/rr/sr/pr/tr/qr) + §8 recoverability + §24 promotion rule before rewriting compile_nl, so the "genuine fix" is measured by the spec's own contract. Operator gated whether to proceed to that next.
 ---END-ENTRY-#304---
+
+---BEGIN-ENTRY-#305---
+id: 305
+date: 2026-06-13T04:54:03Z
+agent: claude
+status: done
+topics: mirl, compiler, fidelity, spec, metrics, reconciliation, contract, promotion, test, verify, history, status
+commits: none
+refs: benchmarks/fidelity/spec_metrics.py,benchmarks/fidelity/golden.py,benchmarks/fidelity/contract.py,tests/fidelity/test_spec_metrics.py,docs/audits/2026-06-12-mirl-compile-fidelity.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 304
+tokens: 1058
+---
+Reconciled the Stage-1 MIRL compile fidelity harness to the SEAM spec's OWN metrics (SEAM_SPEC_V0.1 §22/§24), per the governing-contract rule (#304). The compiler is now measured by the spec's contract, not by my ad-hoc Stage-1 properties.
+
+NEW `benchmarks/fidelity/spec_metrics.py`: implements §22 cr/rr/sr/pr/tr + the §24 promotion gate (qr deferred):
+- cr (compression ratio) = original NL tokens / context-PACK tokens (NL->PACK, the north-star density; distinct from score_pack's existing IR->PACK compression_ratio). Uses count_prompt_tokens + pack_records (embedder-free).
+- rr (reconstruction rate) = recovered (entities+facts+temporal) / required.
+- sr (semantic retention) = mean structured (subject,relation,object) triple match per golden - a deterministic stand-in for §22 semantic_match(original_ir, reconstructed_ir) that catches FABRICATION (wrong subject/predicate) a word-overlap score misses because the stub's slug preserves the source WORDS while changing their MEANING.
+- pr (provenance retention) = claims with a complete claim->SPAN->RAW chain.
+- tr (temporal retention) = golden temporal tokens present in a claim / a t0/t1 field.
+- qr (retrieval quality) = DEFERRED to next slice (needs ingest+search_ir harness); returns None; the §24 gate treats None as cannot-promote.
+- passes_promotion (§24): promote only if sr>=0.98, pr==1.00, tr>=0.99, qr no worse than baseline, cr strictly > baseline = "denser only when it proves it can still recover what matters".
+
+The 7 Stage-1 checks are now DOCUMENTED as diagnostic COMPONENTS of the §22 metrics (raw_verbatim=lossless backing for rr; entity_extraction/segmentation/separable_coverage->rr; subject_grounding->sr; fact_grounding->pr; determinism=translator guarantee §29.1), not a parallel contract.
+
+GOLDENS gained canonical (subject,relation,object) triples (for sr) + temporal_facts (for tr); backward-compatible optional fields, Stage-1 baseline unchanged.
+
+compile_nl SPEC-METRIC BASELINE (generated): sr=0.333 on every real memory (subject project:SEAM + predicate goal fabricated, only the slug object matches = 1/3) vs sr=1.0 on the overfit self-description; cr=0.018-0.040 (packed IR is 25-55x the source = the token inflation the Stage-1 harness MISSED, the spec's north-star axis); rr=0.333-0.75 real vs 1.0 overfit (entity-recovery component discriminates); pr=tr=1.0 EVERYWHERE and do NOT expose the stub (it binds provenance; its slug accidentally contains temporal tokens) - honest: the stub's sin is faithfulness+density (sr/rr/cr), not provenance/temporal-token-presence. The §24 gate REJECTS the stub on every case.
+
+CONTRACT FIX (latent Stage-1 bug): coverage/rr read only predicate+object, so a FAITHFUL compiler (subject as a separate entity) would wrongly look like it dropped the subject. Added `contract.claim_content_tokens(batch, claim)` = resolved subject-entity LABEL + predicate + object; check_separable_coverage + reconstruction_rate now use it. A hand-built faithful (ent:priya, owns, billing_service) batch now scores sr=rr=pr=1.0 and passes every Stage-1 check; the STUB baseline is byte-unchanged (its slug already contained every token, incl. the subject). This makes the contract satisfiable by a correct compiler - a prerequisite for the Stage-2 rewrite to be measurable.
+
+Verified: tests/fidelity/test_spec_metrics.py (11 new, CI-safe + embedder-free): faithful-batch satisfies sr/rr/pr + all Stage-1 checks; claim_content_tokens resolves subject; stub fails sr on real memory + passes its overfit input; stub pr intact; stub cr<1; §24 gate rejects stub, accepts a recovering+denser candidate, blocks a density win that loses recovery, blocks unmeasured qr. Stage-1 harness still 25 passed/11 xfailed (baseline preserved). Full python -m pytest tests/ with PGVECTOR_TEST_DSN + strict no-skip = 632 passed, 11 xfailed, 0 skipped (621 + 11 new).
+
+Unresolved next step: Slice 2 - add the qr (retrieval_success@k) metric via an ingest+search_ir harness so the §24 gate is complete (qr is the "directly queryable" axis the spec + operator require), THEN the Stage-2 deterministic floor rewrite of compile_nl measured by this spec contract (target: raise sr->~1.0 and rr->1.0 on real memories, keep pr=1.0, improve cr).
+---END-ENTRY-#305---
