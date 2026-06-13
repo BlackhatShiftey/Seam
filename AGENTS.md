@@ -10,6 +10,7 @@ Read in order:
 3. `HISTORY_INDEX.md`
 4. `docs/CODE_LAYOUT.md`
 5. `docs/DATA_ROUTING.md` when the task touches history, ledgers, maintenance records, routing, context budget, or auditability.
+6. `SEAM_SPEC_V0.1.md` **and** `docs/MIRL_V1.md` when the task touches SEAM product behavior — compilation/`compile_nl`, MIRL/IR records, compression, PACK, retrieval, surfaces (HS/1), codecs (RC/1, LX/1), the symbol/improvement loop, benchmarks, or any design decision or measurement claim about how SEAM should behave. The spec is the **governing contract**: do not redesign, "improve", or declare a component broken without first checking the contract it is actually supposed to satisfy (see REPO_LEDGER "SEAM spec is the governing contract"). The process docs above tell you the repo's *state*; the spec tells you what SEAM *is*.
 
 Then:
 - Prefer latest valid snapshot in `.seam/snapshots/`.
@@ -88,7 +89,7 @@ Bounded reading protocol that keeps session-start cost flat as the repo grows. T
 
 ### Phase 1 — Session Start (do NOT read full HISTORY.md or full ROADMAP.md)
 
-1. `PROJECT_STATUS.md` + `REPO_LEDGER.md` + `HISTORY_INDEX.md` + `docs/CODE_LAYOUT.md` (and `docs/DATA_ROUTING.md` when the task touches history/ledgers/routing/audit).
+1. `PROJECT_STATUS.md` + `REPO_LEDGER.md` + `HISTORY_INDEX.md` + `docs/CODE_LAYOUT.md` (and `docs/DATA_ROUTING.md` when the task touches history/ledgers/routing/audit; and `SEAM_SPEC_V0.1.md` + `docs/MIRL_V1.md` — the **governing contract** — when the task touches SEAM product behavior: compilation, MIRL/IR, compression, PACK, retrieval, surfaces, codecs, the symbol/improvement loop, benchmarks, or any design/measurement claim).
 2. `.seam/streams/roadmap/state.md` — derived view of the roadmap stream, grouped by status (`now`, `later`, `done`, etc.). Read this **instead of** `ROADMAP.md`. Only fall through to the prose in `ROADMAP.md` when the task is to edit the roadmap or to read a specific track's narrative.
 3. `.seam/cross_index.md` hot zone — the temporal join across `history`, `roadmap`, `experience`, and any opted-in library streams. Use it for "what happened recently across the whole repo" without reading per-stream logs.
 4. `tools.history.build_context_pack --topics <tags> --latest <n> --token-budget <budget>` for history entries the task actually needs. Never `cat HISTORY.md`.

@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 303
-total_tokens: ~110678
-latest_id: 303
+total_entries: 304
+total_tokens: ~111452
+latest_id: 304
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 304 | 2026-06-13 | done | 6a29f16d0c7118a6 | protocol,agents,repo-ledger,spec,+ | 303 |
 | 303 | 2026-06-13 | done | 89226734f2a6645d | mirl,compiler,nl,fidelity,+ | 302 |
 | 302 | 2026-06-11 | done | 9ceec2f6f0966d15 | self-improvement,benchmark,locomo,judge,+ | 301 |
 | 301 | 2026-06-11 | done | f168a4a1ecf4108d | maintenance,security,codeql,dependabot,+ | 300 |
@@ -317,6 +318,7 @@ compact: true
 
 ## topic index (latest ids, max 5)
 
+- agents: count=1 latest=#304
 - alias: count=2 latest=#033, #002
 - allowlist: count=1 latest=#300
 - animation: count=4 latest=#068, #052, #032, #028
@@ -363,13 +365,14 @@ compact: true
 - fixture: count=6 latest=#265, #187, #145, #092, #039
 - generalization: count=1 latest=#297
 - gold-standard: count=1 latest=#038
+- governing-contract: count=1 latest=#304
 - graph: count=2 latest=#099, #030
 - h2: count=6 latest=#297, #293, #292, #291, #290
 - handoff: count=10 latest=#229, #228, #224, #190, #186
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=226 latest=#303, #302, #301, #300, #299
+- history: count=227 latest=#304, #303, #302, #301, #300
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -392,7 +395,7 @@ compact: true
 - mcp: count=15 latest=#222, #218, #213, #212, #211
 - memory: count=5 latest=#286, #275, #274, #182, #178
 - merge: count=1 latest=#301
-- mirl: count=22 latest=#303, #145, #132, #131, #130
+- mirl: count=23 latest=#304, #303, #145, #132, #131
 - models: count=1 latest=#182
 - multi-agent: count=19 latest=#268, #231, #230, #229, #224
 - naming: count=4 latest=#033, #024, #009, #002
@@ -406,21 +409,25 @@ compact: true
 - plan: count=14 latest=#243, #214, #180, #176, #171
 - planner: count=1 latest=#288
 - pr: count=1 latest=#301
+- process: count=1 latest=#304
 - proposer: count=1 latest=#291
-- protocol: count=91 latest=#294, #280, #268, #267, #266
+- protocol: count=92 latest=#304, #294, #280, #268, #267
 - pyproject: count=5 latest=#267, #094, #051, #049, #022
 - rank: count=6 latest=#243, #242, #240, #017, #005
 - ratchet: count=1 latest=#291
+- read-order: count=1 latest=#304
 - readme: count=17 latest=#147, #121, #117, #116, #100
 - reconcile: count=1 latest=#182
 - recovery: count=1 latest=#271
 - redos: count=1 latest=#298
 - refactor: count=1 latest=#284
 - registry: count=1 latest=#178
+- repo-ledger: count=1 latest=#304
 - retrieval: count=49 latest=#297, #292, #291, #290, #289
 - retry: count=1 latest=#182
 - roadmap: count=50 latest=#284, #276, #243, #196, #193
 - roundtrip: count=2 latest=#007, #006
+- rule: count=1 latest=#304
 - salvage: count=1 latest=#179
 - sbert: count=3 latest=#023, #022, #011
 - scorer: count=1 latest=#292
@@ -431,8 +438,9 @@ compact: true
 - session: count=3 latest=#027, #025, #019
 - skip: count=1 latest=#294
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
+- spec: count=1 latest=#304
 - ssrf: count=2 latest=#300, #288
-- status: count=128 latest=#303, #302, #301, #285, #284
+- status: count=129 latest=#304, #303, #302, #301, #285
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
@@ -454,6 +462,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 281
+- done: 282
 - in-progress: 2
 - planned: 20

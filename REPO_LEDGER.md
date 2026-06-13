@@ -1,6 +1,6 @@
 # SEAM Repo Ledger
 
-Last updated: 2026-06-11
+Last updated: 2026-06-12
 
 This ledger is the stable engineering memory for repo-level decisions only.
 Detailed session history, milestones, and plan transitions now live in `HISTORY.md`
@@ -23,6 +23,25 @@ and `HISTORY_INDEX.md`.
 
 ## Stable Decisions
 
+- **The SEAM spec is the governing contract.** `SEAM_SPEC_V0.1.md` (the four-layer
+  RAW/IR/PACK/LENS model, the north star "maximum durable intelligence per token",
+  the loss model RAW=phrasing/IR=meaning/PACK=utility, the NL<->IR<->PACK<->NL
+  translation directions, the symbol-table improvement loop, and the compression
+  metrics `cr/rr/sr/pr/tr/qr` with the §24 "denser only when recovery is proven"
+  promotion rule) together with `docs/MIRL_V1.md` (the Readable Lossless
+  Compression Contract, MIRL record kinds/fields, RC/1, HS/1, the PACK
+  Exact/Context/Narrative contracts) define what SEAM IS. Every change to SEAM
+  product behavior is measured against them. Agents MUST read the spec before
+  redesigning, "improving", or declaring a component broken (AGENTS.md Session
+  Start item 6). A component is only "broken" if it fails the contract it is
+  actually supposed to satisfy — e.g. RC/1's contract is lossless + directly
+  queryable + exact rebuild (NOT token reduction; token reduction lives in PACK,
+  the symbol loop, and the Track J codec); `compile_nl` genuinely violates the
+  §3.2 compiler responsibilities + §8 recoverable-meaning contract. New fidelity
+  or metric harnesses align to the spec's own metrics (§22/§24), not invented
+  ad-hoc properties. This decision exists because the spec was historically
+  absent from the mandatory read order, which let implementations drift from the
+  design (the overfit `compile_nl` stub being the clearest case).
 - This GitHub repo is the private source-of-truth home for SEAM runtime,
   tooling, docs, tests, and repo-owned fixtures. A separate repo will hold
   user-file surfaces or user-facing file sets when that workflow is created.

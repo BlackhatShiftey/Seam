@@ -6684,3 +6684,29 @@ Verified: `tests/fidelity` = 25 passed, 11 xfailed (the 11 = G1/G3/G4 x{entity,s
 
 Unresolved next step: Stage 2 - the deterministic FLOOR rewrite of compile_nl (segment into propositions, verbatim RAW/SPAN per proposition, entities from high-confidence rules, NEVER fabricate a claim) to turn the entity_extraction/subject_grounding/segmentation/separable_coverage/fact_grounding xfails green. Backend recommendation (operator not yet final): honest-minimal zero-new-dep floor + opt-in LOCAL OLLAMA for rich S-P-O triples; hold spaCy as a pluggable OFFLINE-triples option, not default/core; heavier hand-rolled extractor RULED OUT. Then Stage 3 unify with compile_conversation_turn (delete the stub), Stage 4 opt-in LLM extractor, Stage 5 migrate existing degenerate records + re-validate the self-probe loop on a real corpus.
 ---END-ENTRY-#303---
+
+---BEGIN-ENTRY-#304---
+id: 304
+date: 2026-06-13T04:32:49Z
+agent: claude
+status: done
+topics: protocol, agents, repo-ledger, spec, governing-contract, mirl, read-order, rule, process, history, status
+commits: none
+refs: AGENTS.md,REPO_LEDGER.md,SEAM_SPEC_V0.1.md,docs/MIRL_V1.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 303
+tokens: 774
+---
+PROTOCOL: made the SEAM spec a mandatory session-start read and the governing contract, closing the drift gap that produced the overfit compile_nl stub (and that had me, this session, re-deriving design the spec already defines).
+
+ROOT GAP (operator-flagged, "this is supposed to be a rule" / "read the whole architecture and not assuming"): AGENTS.md Session-Start read order mandated only the PROCESS/continuity docs (PROJECT_STATUS, REPO_LEDGER, HISTORY_INDEX, CODE_LAYOUT, DATA_ROUTING) and OMITTED the product spec (SEAM_SPEC_V0.1.md, docs/MIRL_V1.md) that defines what SEAM IS. So agents start grounded in repo state but never required to read the design contract -> implementations drift (compile_nl became a template overfit to SEAM's own self-description; this session I wrongly called RC/1 "broken" by measuring it against a token-reduction contract it was never meant to satisfy).
+
+CHANGE:
+1. AGENTS.md Session Start: added item 6 - read SEAM_SPEC_V0.1.md AND docs/MIRL_V1.md when the task touches SEAM product behavior (compilation/compile_nl, MIRL/IR, compression, PACK, retrieval, surfaces/HS-1, codecs RC-1/LX-1, the symbol/improvement loop, benchmarks, or any design/measurement claim). Framed as the GOVERNING CONTRACT: do not redesign/"improve"/declare-broken without checking the contract the component is actually supposed to satisfy. Mirrored into the Context Loop Phase 1 list.
+2. REPO_LEDGER Stable Decisions: new lead decision "The SEAM spec is the governing contract" - captures the four-layer RAW/IR/PACK/LENS model, north star (max durable intelligence per token), loss model (RAW=phrasing/IR=meaning/PACK=utility), NL<->IR<->PACK<->NL translation, the symbol-table improvement loop, and the compression metrics cr/rr/sr/pr/tr/qr + the §24 "denser only when recovery proven" promotion rule; records that a component is only "broken" if it fails ITS contract (RC/1 = lossless+queryable+exact-rebuild, NOT token reduction, which lives in PACK + symbol loop + Track J; compile_nl genuinely violates §3.2 + §8); new fidelity/metric harnesses align to §22/§24 not invented properties.
+
+RECALIBRATION of this session's earlier claims against the now-read spec: (a) compile_nl bug = REAL (violates §3.2 compiler responsibilities + §8 recoverable meaning) - the Stage-1 fidelity harness #303 stands but should be reconciled to the spec's §22/§24 metrics rather than ad-hoc properties; (b) RC/1 "token inflation" finding = MISJUDGED - RC/1 meets its MIRL_V1 contract (lossless, directly queryable, 100% exact rebuild); the 15x token count is expected because token reduction is not RC/1's layer.
+
+No runtime code changed; docs/protocol only. Verification: protocol gates (integrity/routing/continuity/streams) re-run after the chain; no test impact (no code change). 
+
+Unresolved next step: re-ground the compiler/fidelity work (project_mirl_compiler_rewrite Stage 2) in the spec - reconcile benchmarks/fidelity to §22 metrics (cr/rr/sr/pr/tr/qr) + §8 recoverability + §24 promotion rule before rewriting compile_nl, so the "genuine fix" is measured by the spec's own contract. Operator gated whether to proceed to that next.
+---END-ENTRY-#304---
