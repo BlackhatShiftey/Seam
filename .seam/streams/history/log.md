@@ -6833,3 +6833,30 @@ Verified: full python -m pytest tests/ with PGVECTOR_TEST_DSN + strict no-skip =
 
 Unresolved next step: Stage 3 (unify compile_nl + compile_conversation_turn behind one pipeline; delete the conversation-specific stub) and Stage 4 (the opt-in LOCAL OLLAMA rich extractor behind this same fidelity contract: real S-P-O triples -> raise sr->~1.0 and close the 2 remaining entity_extraction xfails; CI cannot run Ollama so it stays opt-in and the floor remains the default CI-measured behavior). Then Stage 5: migrate existing degenerate compile_nl records (keep RAW, replace derived ENT/CLM) + re-validate the self-probe loop on a real corpus now that own-corpus ingest is no longer poisoned.
 ---END-ENTRY-#308---
+
+---BEGIN-ENTRY-#309---
+id: 309
+date: 2026-06-13T17:45:05Z
+agent: claude
+status: done
+topics: security, redos, codeql, mirl, compiler, nl, test, symbols, verify, history, status
+commits: none
+refs: seam_runtime/nl.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 308
+tokens: 1077
+---
+Follow-up to #308 (the compile_nl floor): fixed a CodeQL high-severity ReDoS AND reconciled the secondary-root tests that #308 broke. HONEST MISS: #308 was merged (PR #81) with only `python -m pytest tests/` run locally; CI's `test-and-benchmark` also runs `test_seam_all/` (a large legacy unittest root that pins compiler/CLI output), where the floor broke 15 tests. The PR auto-merged on the REQUIRED ruleset checks (a subset) while the advisory CodeQL + test-and-benchmark checks were RED, so #308 landed on main degraded. This entry makes main green on every root. (Memory updated: the full local check is ALL roots, not just tests/.)
+
+(1) SECURITY - py/polynomial-redos (CodeQL high, seam_runtime/nl.py): the floor's sentence-boundary regex `[.!?]+(?=\s|$)` backtracks O(n^2) on adversarial "!!!...!x" (the `[.!?]+` matches the whole run, the lookahead fails, the engine backtracks one char at a time), and compile_nl runs on user-provided text (REST /ingest, MCP, dashboard, CLI). Replaced it with a linear, backtracking-free single-pass scan in `_segment_propositions` (consume each `.!?` run, treat as a boundary only when followed by whitespace/end), matching the repo's #298 ReDoS approach; `_SENTENCE_PUNCT = frozenset(".!?")`. Behavior byte-identical (two-fact memory still segments [0:43]/[44:75]; 4.2/9:30/B12 still don't split); a 60000-'!' input now compiles in ~0.004s (was polynomial). The other two new regexes (`_WORD`, `_PROPER_NOUN_RUN`) are linear and were not flagged.
+
+(2) test_seam_all reconciliation (15 tests) - the legacy unittest root pinned the OLD stub's output:
+- Hardcoded record ids: the stub used fixed raw:1/clm:1..N; the floor uses content-derived ids (clm:<hash>:<n>). Added test helpers `_claim_ids(text)` / `_claim_refs(text)` and replaced every literal clm:2/clm:5/prov:compile:1/span:1 with the actual compiled id (vector reindex, retrieval-orchestrator merge/sync, context pipeline, chroma adapter, CLI retrieve/context prompt+records views, textual dashboard, the two trace tests).
+- test_compile_generates_core_records: rewritten to assert the floor's core records (verbatim RAW + PROV + per-proposition SPAN/CLAIM + entities; NO ent:project/ent:user; 3 grounded "content" claims) instead of the stub's project/goal skeleton.
+- test_cli_surface_compile: expects ent:seam (the floor's grounded entity) not ent:project:seam_/ent:user.
+- test_runtime_persist_reports_ids_when_sqlite_rollback_fails: the floor's content-unique ids mean two DIFFERENT texts no longer share ids, so re-persisting a different doc no longer overwrites (previous.records empty -> single-failure path). Made `replacement` recompile the SAME text as `original` so it overwrites and the rollback restore path (the double-failure -> "manual recovery may be required") is actually exercised.
+- test_symbol_promotion_and_pack_compaction: the symbol loop (§23) mines repeated UNDERSCORE tokens from structured IR; the floor's natural-language claim objects (spaces, not slugs) don't feed it, and a quick attempt to make the miner whitespace-aware flooded the promoter with arbitrary NL words that consonant-compact into COLLIDING symbols (verify_ir symbol_collision on "ths"). Reverted that (mining frequent words from arbitrary NL needs collision-safe symbol generation = Track J / §23 follow-up, out of Stage-2 scope) and retargeted the test to structured DSL input the loop is built for (object "memory" x2, min_frequency=2 -> the core symbol "mem"; no collision).
+
+Verified: the FULL CI command `python -m pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` with PGVECTOR_TEST_DSN + strict no-skip = 1064 passed, 2 xfailed, 3 subtests passed, 0 skipped, 0 failed. The #308 fidelity ratchet + spec baseline stand (the 2 xfailed = the deferred entity_extraction cases).
+
+Unresolved next step: re-run automatic on PR merge (CodeQL should report 0 new alerts; test-and-benchmark green on all roots). KNOWN FOLLOW-UP surfaced: the §23 symbol/improvement loop cannot mine the floor's natural-language objects (only underscore slugs) - making it work on NL needs collision-safe symbol generation, folded into the Stage-3/4 unification + Track J. Then the #308 arc stands (unify compile_nl+compile_conversation_turn -> opt-in local Ollama rich extractor -> migrate degenerate records).
+---END-ENTRY-#309---

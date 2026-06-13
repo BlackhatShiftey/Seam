@@ -30,7 +30,11 @@ _LEADING_DETERMINERS = {"the", "a", "an", "my", "our", "your", "his", "her", "it
 # entities like "The" or "I".
 _NON_ENTITY_CAPS = {"The", "A", "An", "My", "Our", "Your", "His", "Her", "Its", "Their", "This", "That", "These", "Those", "I", "It", "We", "They", "He", "She", "You", "If", "And", "But", "Or", "So", "Then"}
 
-_SENTENCE_BOUNDARY = re.compile(r"[.!?]+(?=\s|$)")
+# Sentence-ending punctuation. A run of these is a boundary only when followed
+# by whitespace or end-of-string (so 4.2 / 9:30 / B12 don't split). Detected by
+# a linear scan, NOT a regex: `[.!?]+(?=\s|$)` is polynomial on uncontrolled
+# input (catastrophic backtracking on long "!!!!" runs that fail the lookahead).
+_SENTENCE_PUNCT = frozenset(".!?")
 _WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'-]*")
 _PROPER_NOUN_RUN = re.compile(r"[A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*")
 
@@ -124,7 +128,8 @@ def _segment_propositions(text: str) -> list[tuple[str, int, int]]:
     string, so intra-token punctuation (``4.2``, ``9:30``, ``B12``) does not
     split. Each result is ``(proposition_text, start, end)`` with
     ``text[start:end] == proposition_text`` (surrounding whitespace trimmed), and
-    only propositions containing at least one word are kept."""
+    only propositions containing at least one word are kept. The boundary scan is
+    O(n) and backtracking-free (no regex), so it is safe on uncontrolled input."""
     result: list[tuple[str, int, int]] = []
 
     def emit(start: int, end: int) -> None:
@@ -135,14 +140,24 @@ def _segment_propositions(text: str) -> list[tuple[str, int, int]]:
             real_start = start + lead
             result.append((text[real_start:real_start + len(trimmed)], real_start, real_start + len(trimmed)))
 
+    length = len(text)
     cursor = 0
-    for match in _SENTENCE_BOUNDARY.finditer(text):
-        emit(cursor, match.end())
-        cursor = match.end()
-    if cursor < len(text):
-        emit(cursor, len(text))
+    index = 0
+    while index < length:
+        if text[index] in _SENTENCE_PUNCT:
+            run_end = index
+            while run_end < length and text[run_end] in _SENTENCE_PUNCT:
+                run_end += 1
+            if run_end >= length or text[run_end].isspace():
+                emit(cursor, run_end)
+                cursor = run_end
+            index = run_end
+        else:
+            index += 1
+    if cursor < length:
+        emit(cursor, length)
     if not result:
-        emit(0, len(text))
+        emit(0, length)
     return result
 
 

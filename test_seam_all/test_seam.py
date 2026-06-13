@@ -79,6 +79,20 @@ except ImportError:  # pragma: no cover - optional server extra
 TEST_ARTIFACT_DIR = Path("test_seam")
 
 
+def _claim_ids(text: str) -> list[str]:
+    """The CLM ids the compiler emits for ``text``. Compiler record ids are
+    content-derived (``clm:<hash>:<n>``), so this matches what persist/search
+    will surface — use it instead of hardcoding ids that change with the input."""
+    return [record.id for record in compile_nl(text).records if record.kind == RecordKind.CLM]
+
+
+def _claim_refs(text: str) -> tuple[str, str, str]:
+    """``(claim_id, prov_id, span_id)`` for the first claim ``text`` compiles to."""
+    batch = compile_nl(text)
+    claim = next(record for record in batch.records if record.kind == RecordKind.CLM)
+    return claim.id, claim.prov[0], claim.evidence[0]
+
+
 class SeamTests(unittest.TestCase):
     def setUp(self) -> None:
         TEST_ARTIFACT_DIR.mkdir(exist_ok=True)
@@ -105,11 +119,19 @@ class SeamTests(unittest.TestCase):
         )
         records = compile_nl(text)
         ir = render_ir(records)
-        self.assertIn("ENT|ent:project:", ir)
-        self.assertIn("ENT|ent:user:", ir)
-        self.assertIn("CLM|clm:1|", ir)
-        self.assertIn('"object":["db","rag","ctx"]', ir)
-        self.assertIn('"simplest_recoverable_form"', ir)
+        # The floor's core records: one verbatim RAW, a PROV, per-proposition
+        # SPAN+CLAIM, and high-confidence entities. NO fabricated project/user.
+        self.assertIn("RAW|raw:", ir)
+        self.assertIn("PROV|prov:compile:", ir)
+        self.assertIn("CLM|clm:", ir)
+        self.assertIn("ENT|ent:", ir)
+        self.assertNotIn("ent:project:", ir)
+        self.assertNotIn("ent:user:", ir)
+        # Three sentences -> three grounded claims carrying the verbatim text.
+        claims = [r for r in records.records if r.kind == RecordKind.CLM]
+        self.assertEqual(len(claims), 3)
+        self.assertEqual(claims[0].attrs["predicate"], "content")
+        self.assertIn("permanently remembers things", claims[0].attrs["object"])
 
     def test_exact_pack_round_trips(self) -> None:
         text = "Build durable AI memory for databases and context windows without losing meaning."
@@ -148,31 +170,33 @@ claim c1:
 
 
     def test_runtime_persist_search_trace(self) -> None:
-        runtime = SeamRuntime(self.db_path)
-        batch = runtime.compile_nl(
+        text = (
             "We want a universal AI memory language for databases, RAG pipelines, and context windows. "
             "It should translate back into natural language without losing meaning."
         )
-        runtime.persist_ir(batch)
+        claim_id, prov_id, span_id = _claim_refs(text)
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl(text))
         result = runtime.search_ir("translator natural language", budget=3)
         self.assertTrue(result.candidates)
-        trace = runtime.trace("clm:5")
+        trace = runtime.trace(claim_id)
         node_ids = {node.id for node in trace.nodes}
-        self.assertIn("prov:compile:1", node_ids)
-        self.assertIn("span:1", node_ids)
+        self.assertIn(prov_id, node_ids)
+        self.assertIn(span_id, node_ids)
 
     def test_trace_loads_only_reachable_records(self) -> None:
-        runtime = SeamRuntime(self.db_path)
-        batch = runtime.compile_nl(
+        text = (
             "We want a universal AI memory language for databases, RAG pipelines, and context windows. "
             "It should translate back into natural language without losing meaning."
         )
-        runtime.persist_ir(batch)
+        claim_id, prov_id, span_id = _claim_refs(text)
+        runtime = SeamRuntime(self.db_path)
+        runtime.persist_ir(runtime.compile_nl(text))
         with patch.object(runtime.store, "load_ir", side_effect=AssertionError("trace must not load the full DB")):
-            trace = runtime.trace("clm:5")
+            trace = runtime.trace(claim_id)
         node_ids = {node.id for node in trace.nodes}
-        self.assertIn("prov:compile:1", node_ids)
-        self.assertIn("span:1", node_ids)
+        self.assertIn(prov_id, node_ids)
+        self.assertIn(span_id, node_ids)
 
     def test_store_load_ir_supports_stable_pagination(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -253,9 +277,13 @@ claim c1:
                 return {}
 
         runtime = SeamRuntime(self.db_path)
-        original = runtime.compile_nl("SEAM keeps enough context for manual rollback recovery.")
+        text = "SEAM keeps enough context for manual rollback recovery."
+        original = runtime.compile_nl(text)
         runtime.persist_ir(original)
-        replacement = runtime.compile_nl("Replacement should name touched ids if restore fails.")
+        # Re-persisting the SAME document overwrites its records (compiler ids are
+        # content-derived), so the rollback path must restore the PREVIOUS records
+        # — and it is that restore we make fail, to reach "manual recovery".
+        replacement = runtime.compile_nl(text)
         original_persist_ir = runtime.store.persist_ir
         calls = 0
 
@@ -456,15 +484,16 @@ claim c1:
     def test_vector_index_reindex_and_search(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
+        claim_id = next(r.id for r in batch.records if r.kind == RecordKind.CLM)
         runtime.store.persist_ir(batch)
         reindex_report = runtime.reindex_vectors()
-        self.assertIn("clm:2", reindex_report["indexed_ids"])
+        self.assertIn(claim_id, reindex_report["indexed_ids"])
         self.assertTrue(reindex_report["stale_before"])
         second_reindex = runtime.reindex_vectors()
         self.assertEqual(second_reindex["stale_before"], [])
         result = runtime.search_ir("translator natural language", budget=3)
         top_ids = [candidate.record.id for candidate in result.candidates]
-        self.assertIn("clm:2", top_ids)
+        self.assertIn(claim_id, top_ids)
 
     def test_ingest_persists_document_status_and_memory_search_get(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -991,12 +1020,26 @@ print("ok")
 
     def test_symbol_promotion_and_pack_compaction(self) -> None:
         runtime = SeamRuntime(self.db_path)
-        batch = runtime.compile_nl(
-            "We need durable memory. This memory runtime should preserve memory context. "
-            "The memory system should improve memory retrieval."
+        # The symbol loop (SEAM spec §23) mines repeated tokens from structured IR.
+        # ("memory" recurs across the claim objects -> the core symbol "mem".)
+        # The compile_nl FLOOR emits natural-language objects, not the structured
+        # tokens this loop is designed for; mining frequent words from arbitrary NL
+        # (collision-safe symbol generation) is Track J / §23 follow-up work.
+        batch = runtime.compile_dsl(
+            """
+entity project "SEAM" as p1
+claim c1:
+  subject p1
+  predicate stores
+  object memory
+claim c2:
+  subject p1
+  predicate recalls
+  object memory
+"""
         )
         runtime.persist_ir(batch)
-        promote = runtime.promote_symbols(min_frequency=1)
+        promote = runtime.promote_symbols(min_frequency=2)
         self.assertTrue(promote.stored_ids)
         compact_batch = runtime.store.load_ir()
         expansion_to_symbol, _ = build_symbol_maps(compact_batch.records, namespace="local.default")
@@ -1286,10 +1329,11 @@ claim c1:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
         runtime.persist_ir(batch)
+        claim_id = next(r.id for r in batch.records if r.kind == RecordKind.CLM)
         orchestrator = RetrievalOrchestrator(runtime)
         result = orchestrator.search("kind:CLM translator natural language", budget=3, include_trace=True)
         self.assertTrue(result.candidates)
-        translator = next((candidate for candidate in result.candidates if candidate.record.id == "clm:2"), None)
+        translator = next((candidate for candidate in result.candidates if candidate.record.id == claim_id), None)
         self.assertIsNotNone(translator)
         self.assertIn("sql", translator.sources)
         self.assertIsNotNone(result.trace)
@@ -1363,25 +1407,29 @@ claim c2:
         self.assertIn('"retrieve"', payload)
 
     def test_cli_retrieve_pretty_output(self) -> None:
+        seed = "We need a translator back into natural language for memory workflows."
+        claim_id = _claim_ids(seed)[0]
         runtime = SeamRuntime(self.db_path)
-        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        runtime.persist_ir(runtime.compile_nl(seed))
         stream = StringIO()
         with redirect_stdout(stream):
             run_cli(["--db", str(self.db_path), "retrieve", "kind:CLM translator natural language", "--budget", "3"])
         payload = stream.getvalue()
         self.assertIn("Intent: hybrid", payload)
         self.assertIn("Candidates:", payload)
-        self.assertIn("clm:2", payload)
+        self.assertIn(claim_id, payload)
 
     def test_chroma_semantic_adapter_searches_via_fake_client(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
         runtime.persist_ir(batch)
+        claim_id = next(r.id for r in batch.records if r.kind == RecordKind.CLM)
+        raw_id = next(r.id for r in batch.records if r.kind == RecordKind.RAW)
         adapter = ChromaSemanticAdapter(runtime.store, runtime.embedding_model, client=FakeChromaClient(), sync_on_search=True)
         plan = build_plan("translator natural language", budget=3)
         hits = adapter.search(plan, limit=3)
         self.assertTrue(hits)
-        self.assertIn(hits[0].record.id, {"clm:2", "raw:1"})  # RAW is indexable; chroma indexes all INDEXABLE_KINDS
+        self.assertIn(hits[0].record.id, {claim_id, raw_id})  # RAW is indexable; chroma indexes all INDEXABLE_KINDS
         self.assertEqual(hits[0].leg, "chroma")
 
     def test_retrieval_orchestrator_syncs_persistent_indexes(self) -> None:
@@ -1393,18 +1441,20 @@ claim c2:
             semantic_adapter=ChromaSemanticAdapter(runtime.store, runtime.embedding_model, client=FakeChromaClient()),
             semantic_backend="chroma",
         )
+        claim_id = next(r.id for r in batch.records if r.kind == RecordKind.CLM)
         report = orchestrator.sync_persistent_indexes()
         self.assertEqual(report["backend"], "chroma")
         self.assertGreaterEqual(report["chroma_indexed"], 1)
-        self.assertIn("clm:2", report["sqlite_indexed"])
+        self.assertIn(claim_id, report["sqlite_indexed"])
 
     def test_context_pipeline_returns_context_pack(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("We need a translator back into natural language for memory workflows.")
         runtime.persist_ir(batch)
+        claim_id = next(r.id for r in batch.records if r.kind == RecordKind.CLM)
         orchestrator = RetrievalOrchestrator(runtime)
         rag = orchestrator.rag("translator natural language", budget=3, pack_budget=2000, include_trace=True)
-        self.assertIn("clm:2", rag.candidate_ids)
+        self.assertIn(claim_id, rag.candidate_ids)
         self.assertTrue(rag.records)
         self.assertTrue(rag.candidates)
         self.assertEqual(rag.pack["mode"], "context")
@@ -1423,14 +1473,16 @@ claim c2:
         self.assertIn('"records"', payload)
 
     def test_cli_context_prompt_view_outputs_prompt_ready_text(self) -> None:
+        seed = "We need a translator back into natural language for memory workflows."
+        claim_id = _claim_ids(seed)[0]
         runtime = SeamRuntime(self.db_path)
-        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        runtime.persist_ir(runtime.compile_nl(seed))
         stream = StringIO()
         with redirect_stdout(stream):
             run_cli(["--db", str(self.db_path), "context", "translator natural language", "--budget", "3", "--view", "prompt"])
         payload = stream.getvalue()
         self.assertIn("SEAM retrieved context", payload)
-        self.assertIn("[1] clm:2 [CLM]", payload)
+        self.assertIn(f"[1] {claim_id} [CLM]", payload)
 
     def test_cli_context_evidence_view_json_contains_citations(self) -> None:
         runtime = SeamRuntime(self.db_path)
@@ -1445,13 +1497,15 @@ claim c2:
         self.assertIn('"citation"', payload)
 
     def test_cli_context_records_view_outputs_exact_record_payloads(self) -> None:
+        seed = "We need a translator back into natural language for memory workflows."
+        claim_id = _claim_ids(seed)[0]
         runtime = SeamRuntime(self.db_path)
-        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        runtime.persist_ir(runtime.compile_nl(seed))
         stream = StringIO()
         with redirect_stdout(stream):
             run_cli(["--db", str(self.db_path), "context", "translator natural language", "--budget", "3", "--view", "records"])
         payload = stream.getvalue()
-        self.assertIn('"id": "clm:2"', payload)
+        self.assertIn(f'"id": "{claim_id}"', payload)
         self.assertIn('"kind": "CLM"', payload)
 
     def test_cli_context_summary_view_reports_highlights(self) -> None:
@@ -1872,8 +1926,9 @@ claim c1:
             decoded = decode_surface(surface_path)
             self.assertEqual(decoded.payload_format, "MIRL")
             self.assertEqual(decoded.mode, "rgb24")
-            self.assertIn("ENT|ent:project:seam_", decoded.text)
-            self.assertIn("ENT|ent:user:", decoded.text)
+            # The floor extracts "SEAM" as a grounded entity (no fabricated project/user).
+            self.assertIn("ENT|ent:seam", decoded.text)
+            self.assertIn("CLM|clm:", decoded.text)
 
             result = query_surface(surface_path, "holographic memory")
             self.assertTrue(result.hits)
@@ -2884,8 +2939,10 @@ claim c1:
     def test_textual_dashboard_routes_retrieval_output(self) -> None:
         if find_spec("textual") is None:
             self.skipTest("textual is not installed")
+        seed = "We need a translator back into natural language for memory workflows."
+        claim_id = _claim_ids(seed)[0]
         runtime = SeamRuntime(self.db_path)
-        runtime.persist_ir(runtime.compile_nl("We need a translator back into natural language for memory workflows."))
+        runtime.persist_ir(runtime.compile_nl(seed))
         app = TextualDashboardApp(runtime)
 
         async def _check() -> None:
@@ -2895,7 +2952,7 @@ claim c1:
                 await pilot.pause()
                 joined = "\n".join(app.retrieval_lines)
                 self.assertIn("retrieve translator natural language", joined)
-                self.assertIn("clm:2", joined)
+                self.assertIn(claim_id, joined)
 
         asyncio.run(_check())
 
