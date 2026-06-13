@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 359
+total_events: 360
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-07T03:06:28Z | history:134:1c04cffa | session-event | done | history, roadmap, verify, snapshot, protocol | docs/roadmap/AGENT_COMPILER.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-05-07T05:08:26Z | history:135:05371c73 | session-event | done | status, roadmap, linux, history, snapshot, verify, protoc... | PROJECT_STATUS.md,ROADMAP.md,docs/setup.md,README.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-05-07T05:09:41Z | history:136:76b5adf0 | session-event | done | status, roadmap, linux, history, snapshot, verify, protoc... | PROJECT_STATUS.md,docs/setup.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-05-07T05:44:52Z | history:137:063c290a | session-event | done | dashboard, tui, command, chat, roadmap, status, history, ... | seam_runtime/cli.py,test_seam_all/test_seam.py,experimental/webui,PROJECT_STA... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-10T05:12:03Z | history:300:071ef6f0 | session-event | done | security, ssrf, dns-rebinding, chat-endpoint, server, all... | seam_runtime/server.py,tests/audit/test_audit_2026_06_05.py,HISTORY.md,HISTOR... |
 | 2026-06-11T09:14:32Z | history:301:f168a4a1 | session-event | done | maintenance, security, codeql, dependabot, dependencies, ... | .github/dependabot.yml,webui/package.json,HISTORY.md,HISTORY_INDEX.md,PROJECT... |
 | 2026-06-11T10:00:24Z | history:302:9ceec2f6 | session-event | done | self-improvement, benchmark, locomo, judge, paid-validati... | benchmarks/external/locomo/judged_scorer.py,tools/h2/paid_validation.py,seam_... |
+| 2026-06-13T03:32:40Z | history:303:89226734 | session-event | done | mirl, compiler, nl, fidelity, contract, ingest, bug, harn... | benchmarks/fidelity/__init__.py,benchmarks/fidelity/contract.py,benchmarks/fi... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0159.cross.md | 2026-04-15T00:00:00Z..2026-05-07T00:00:00Z | 159 | (multi) | (multi) |
+| 0001-0160.cross.md | 2026-04-15T00:00:00Z..2026-05-07T03:06:28Z | 160 | (multi) | (multi) |

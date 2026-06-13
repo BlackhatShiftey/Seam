@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 302
-total_tokens: ~109619
-latest_id: 302
+total_entries: 303
+total_tokens: ~110678
+latest_id: 303
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 303 | 2026-06-13 | done | 89226734f2a6645d | mirl,compiler,nl,fidelity,+ | 302 |
 | 302 | 2026-06-11 | done | 9ceec2f6f0966d15 | self-improvement,benchmark,locomo,judge,+ | 301 |
 | 301 | 2026-06-11 | done | f168a4a1ecf4108d | maintenance,security,codeql,dependabot,+ | 300 |
 | 300 | 2026-06-10 | done | 071ef6f0185a8c6f | security,ssrf,dns-rebinding,chat-endpoint,+ | 299 |
@@ -320,10 +321,12 @@ compact: true
 - allowlist: count=1 latest=#300
 - animation: count=4 latest=#068, #052, #032, #028
 - atomicity: count=1 latest=#182
-- audit: count=73 latest=#290, #288, #280, #279, #278
+- audit: count=74 latest=#303, #290, #288, #280, #279
+- baseline: count=1 latest=#303
 - beam: count=1 latest=#223
 - benchmark: count=97 latest=#302, #292, #290, #289, #282
 - branch: count=1 latest=#280
+- bug: count=1 latest=#303
 - bugfix: count=14 latest=#295, #287, #286, #283, #282
 - bundle: count=5 latest=#262, #245, #238, #015, #008
 - chat: count=15 latest=#286, #137, #074, #073, #072
@@ -337,9 +340,11 @@ compact: true
 - codeql: count=4 latest=#301, #300, #299, #298
 - command: count=67 latest=#251, #241, #232, #221, #220
 - compile: count=13 latest=#154, #047, #046, #043, #042
+- compiler: count=1 latest=#303
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
 - continuity: count=2 latest=#193, #192
+- contract: count=1 latest=#303
 - correction: count=1 latest=#299
 - dashboard: count=71 latest=#299, #298, #288, #286, #285
 - dependabot: count=1 latest=#301
@@ -354,6 +359,7 @@ compact: true
 - enforcement: count=1 latest=#294
 - experiment: count=1 latest=#273
 - extras: count=1 latest=#022
+- fidelity: count=1 latest=#303
 - fixture: count=6 latest=#265, #187, #145, #092, #039
 - generalization: count=1 latest=#297
 - gold-standard: count=1 latest=#038
@@ -362,11 +368,13 @@ compact: true
 - handoff: count=10 latest=#229, #228, #224, #190, #186
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
-- history: count=225 latest=#302, #301, #300, #299, #298
+- harness: count=1 latest=#303
+- history: count=226 latest=#303, #302, #301, #300, #299
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
 - infra: count=1 latest=#271
+- ingest: count=1 latest=#303
 - installer: count=13 latest=#204, #177, #173, #169, #100
 - integrity: count=9 latest=#281, #276, #218, #209, #133
 - isolation: count=2 latest=#275, #274
@@ -384,11 +392,11 @@ compact: true
 - mcp: count=15 latest=#222, #218, #213, #212, #211
 - memory: count=5 latest=#286, #275, #274, #182, #178
 - merge: count=1 latest=#301
-- mirl: count=21 latest=#145, #132, #131, #130, #129
+- mirl: count=22 latest=#303, #145, #132, #131, #130
 - models: count=1 latest=#182
 - multi-agent: count=19 latest=#268, #231, #230, #229, #224
 - naming: count=4 latest=#033, #024, #009, #002
-- nl: count=1 latest=#223
+- nl: count=2 latest=#303, #223
 - operator: count=1 latest=#179
 - pack: count=2 latest=#218, #183
 - packaging: count=4 latest=#296, #293, #287, #284
@@ -424,27 +432,28 @@ compact: true
 - skip: count=1 latest=#294
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - ssrf: count=2 latest=#300, #288
-- status: count=127 latest=#302, #301, #285, #284, #283
+- status: count=128 latest=#303, #302, #301, #285, #284
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
 - surface: count=5 latest=#276, #225, #218, #208, #145
-- test: count=21 latest=#302, #301, #300, #299, #298
+- test: count=22 latest=#303, #302, #301, #300, #299
 - tests: count=3 latest=#192, #191, #182
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=233 latest=#302, #301, #300, #299, #298
+- verify: count=234 latest=#303, #302, #301, #300, #299
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
 - workflow-permissions: count=1 latest=#298
 - wsl2: count=1 latest=#021
+- xfail: count=1 latest=#303
 
 ## status rollup
 
 - roots: 66
-- done: 280
+- done: 281
 - in-progress: 2
 - planned: 20

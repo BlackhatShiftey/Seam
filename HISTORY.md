@@ -6658,3 +6658,29 @@ Verified: 10 new CI-safe tests in tests/audit/test_judged_scorer.py (fake/counti
 
 Unresolved next step: the first actual paid holdout validation RUN (operator-gated, needs explicit go + OPENAI_API_KEY): `seam improve validate --locomo-dataset benchmarks/external/locomo/data/locomo10.json --confirm-paid` after an improvement cycle has applied state worth validating (with no applied state it reports "no-candidate-state" after one baseline pass). Suggested first use: run `seam improve cycle --locomo-dataset ... --auto-approve` to apply the #297 w_lexical+0.1 dev win, then validate it on holdout.
 ---END-ENTRY-#302---
+
+---BEGIN-ENTRY-#303---
+id: 303
+date: 2026-06-13T03:32:40Z
+agent: claude
+status: done
+topics: mirl, compiler, nl, fidelity, contract, ingest, bug, harness, xfail, baseline, test, verify, history, status, audit
+commits: none
+refs: benchmarks/fidelity/__init__.py,benchmarks/fidelity/contract.py,benchmarks/fidelity/golden.py,tests/fidelity/test_compile_fidelity.py,docs/audits/2026-06-12-mirl-compile-fidelity.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 302
+tokens: 1059
+---
+Stage 1 of the genuine MIRL compiler rewrite: an executable fidelity CONTRACT + the current stub's failing baseline on record. No compiler behavior changed; this is the spec + measurement the rewrite will turn green.
+
+BUG (operator-found): `seam_runtime/nl.py:compile_nl` - the generic "remember arbitrary text" compiler behind `seam remember`, the shell remember, the dashboard remember box, the MCP `ingest` tool, and REST `/ingest` - is not a compiler; it is a template overfit to SEAM's own self-description. It pattern-matches "want to / goal is to / called X"; when those don't fire (every real memory) it slugifies the WHOLE input and asserts it as `project:SEAM`'s `goal`, attributed to hardcoded `user:local_user` + `project:SEAM`. So every ingest emits the same skeleton regardless of content ("the same sentence over and over"). Root lines: `_extract_goal` falls back to `_normalize_phrase(text)` (nl.py:244); `_infer_project_name` returns "SEAM" (nl.py:278); `add_claim` hardcodes subject=project_id + default predicate "goal" (nl.py:48,59,64). The LoCoMo benchmark path DODGES it (conversational ingest uses the richer `compile_conversation_turn`, nl.py:96), but the self-improvement loop's "tune on the user's OWN corpus" mode is poisoned by it, and per the format-displaces-RAW finding these boilerplate ENT/CLM/STA records crowd the verbatim RAW that token-overlap retrieval reads.
+
+CONTRACT (`benchmarks/fidelity/contract.py`, backend-agnostic - same checks will measure the deterministic floor, the opt-in LLM tier, any backend): 7 deterministic structural-proxy checks - raw_verbatim, determinism, entity_extraction, subject_grounding (the core faithfulness prop: no claim about an entity absent from the input), segmentation (N facts -> >=N claims), separable_coverage (each fact in its own claim, no claim mashes two), fact_grounding (multi-fact input: no claim spans the whole document). Proxy limits documented at each check; not a semantic oracle.
+
+GOLDENS (`benchmarks/fidelity/golden.py`): 5 cases, each annotated with `baseline_failures` = the props the current stub violates. BASELINE MATRIX (generated from the checks): every realistic memory (single-fact ownership, two independent facts, personal event w/ place+date, schedule change) FAILS entity_extraction + subject_grounding; the two-fact case additionally FAILS segmentation + separable_coverage + fact_grounding (two facts collapse into one whole-document slug). The self-description input the stub was overfit to PASSES the full contract - proving the harness is fair and the contract is satisfiable, not rigged. raw_verbatim + determinism pass everywhere (the rewrite must preserve both).
+
+RATCHET (`tests/fidelity/test_compile_fidelity.py`): every (case x property) pair is one parametrized check; a violated property is `xfail(strict=True)`, so the failing baseline is GREEN in CI (xfailed, not failed; the strict-no-skip conftest exempts wasxfail) AND when the rewrite makes a prop pass, the strict xfail becomes an XPASS -> hard failure -> forces removing it from `baseline_failures`. Nothing flips silently. Plus a guard test that every name in any `baseline_failures` is a real contract property. Audit doc `docs/audits/2026-06-12-mirl-compile-fidelity.md` captures contract + matrix + the staged plan.
+
+Verified: `tests/fidelity` = 25 passed, 11 xfailed (the 11 = G1/G3/G4 x{entity,subject} + G2 x5 + G5 x0); full `python -m pytest tests/` with PGVECTOR_TEST_DSN + strict no-skip = 621 passed, 11 xfailed, 0 skipped (prior 596 + 25 new passing; the 11 xfailed are the documented baseline, exempt from strict-no-skip). Zero unexpected XPASS, which validates that `baseline_failures` is exactly correct.
+
+Unresolved next step: Stage 2 - the deterministic FLOOR rewrite of compile_nl (segment into propositions, verbatim RAW/SPAN per proposition, entities from high-confidence rules, NEVER fabricate a claim) to turn the entity_extraction/subject_grounding/segmentation/separable_coverage/fact_grounding xfails green. Backend recommendation (operator not yet final): honest-minimal zero-new-dep floor + opt-in LOCAL OLLAMA for rich S-P-O triples; hold spaCy as a pluggable OFFLINE-triples option, not default/core; heavier hand-rolled extractor RULED OUT. Then Stage 3 unify with compile_conversation_turn (delete the stub), Stage 4 opt-in LLM extractor, Stage 5 migrate existing degenerate records + re-validate the self-probe loop on a real corpus.
+---END-ENTRY-#303---
