@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 369
+total_events: 370
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-08T09:50:28Z | history:144:d5565a39 | session-event | done | status, roadmap, ledger, benchmark, compress, verify, his... | PROJECT_STATUS.md,README.md,ROADMAP.md,docs/setup.md,docs/ledgers/runtime/com... |
 | 2026-05-08T10:11:20Z | history:141:22531976 | session-event | done | protocol, multi-agent, history, snapshot, verify | .opencode/skills/seam-session-closeout/SKILL.md,HISTORY.md,HISTORY_INDEX.md,.... |
 | 2026-05-08T10:20:42Z | history:142:beb06018 | session-event | done | protocol, multi-agent, history, snapshot, verify, audit | .opencode/skills/seam-repo-navigator/SKILL.md,.opencode/skills/seam-implement... |
 | 2026-05-08T10:24:01Z | history:143:ca60d4ac | session-event | done | protocol, multi-agent, history, snapshot, verify, audit | .opencode/skills/seam-github-publisher/SKILL.md,.opencode/skills/seam-repo-na... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-13T17:58:01Z | history:310:9c0ba7e3 | session-event | done | protocol, history, status, verify, continuity, docs | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md |
 | 2026-06-14T05:06:38Z | history:311:cbcce34e | session-event | done | mirl, compiler, nl, unify, conversation, locomo, benchmar... | seam_runtime/nl.py,seam_runtime/runtime.py,tests/audit/test_conversation_turn... |
 | 2026-06-14T06:56:46Z | history:312:d81f92ae | session-event | done | self-improvement, loop, self-probe, retrieval, locomo, be... | seam_runtime/self_improve.py,tests/audit/test_self_probe_scorer.py,HISTORY.md... |
+| 2026-06-14T08:03:31Z | history:313:105bd107 | session-event | done | mirl, compiler, nl, ollama, extractor, fidelity, llm, tes... | seam_runtime/nl_extract.py,seam_runtime/nl.py,tests/fidelity/test_nl_extract.... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0169.cross.md | 2026-04-15T00:00:00Z..2026-05-08T00:00:00Z | 169 | (multi) | (multi) |
+| 0001-0170.cross.md | 2026-04-15T00:00:00Z..2026-05-08T09:50:28Z | 170 | (multi) | (multi) |
