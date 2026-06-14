@@ -7,6 +7,11 @@ from typing import Iterable
 from .mirl import IRBatch, MIRLRecord, Pack, RecordKind, token_count
 from .symbols import build_symbol_maps
 
+# The meaning-bearing kinds a CONTEXT pack carries (what an LLM reasons over).
+# RAW/PROV/SPAN/ENT/SYM are structural and dropped from the prompt - the verbatim
+# lives in a content claim's object, entity labels are inlined into claim subjects.
+_CONTEXT_CONTENT_KINDS = frozenset({RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL})
+
 
 def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: int = 512, mode: str = "context", profile: str = "default", namespace: str | None = None) -> Pack:
     ordered = sorted(records, key=lambda record: record.id)
@@ -40,7 +45,14 @@ def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: i
                 signal = {**signal, "subject": label}
         return signal
 
-    entries = [{"kind": record.kind.value, "signal": _dense_signal(record), "prov": record.prov, "evidence": record.evidence} for record in ordered]
+    # Content-only: a context pack is the meaning an LLM reasons over, so it carries
+    # only the claim/state/event/relation records. The structural records (RAW is
+    # the verbatim already carried in a content claim's object; PROV/SPAN are
+    # provenance metadata; ENT labels are inlined into claim subjects above) are
+    # dropped from the entries - they live in the store for traceability, not in
+    # the prompt. This is the bulk of the NL->PACK density win.
+    content_records = [record for record in ordered if record.kind in _CONTEXT_CONTENT_KINDS]
+    entries = [{"kind": record.kind.value, "signal": _dense_signal(record), "prov": record.prov, "evidence": record.evidence} for record in content_records]
 
     # Build payload skeleton to measure overhead tokens
     skeleton = {"lens": lens, "entries": [], "refs": [], "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
@@ -51,7 +63,7 @@ def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: i
     overflow_ids: list[str] = []
     current_tokens = overhead_tokens
 
-    for record, entry in zip(ordered, entries):
+    for record, entry in zip(content_records, entries):
         entry_json = json.dumps(entry, sort_keys=True, separators=(",", ":"))
         entry_tokens = token_count(entry_json)
         if current_tokens + entry_tokens <= budget:

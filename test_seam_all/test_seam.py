@@ -174,6 +174,16 @@ class SeamTests(unittest.TestCase):
         self.assertNotIn("ent:", subject)
         self.assertNotIn("id", clm)  # dense: no repeated per-entry id
 
+    def test_context_pack_is_content_only(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl("Priya owns the billing service.")
+        pack = pack_ir(batch, budget=1_000_000)
+        kinds = {entry["kind"] for entry in pack.payload["entries"]}
+        # A context pack carries only meaning-bearing records (the LLM reasons over
+        # these); RAW/PROV/SPAN/ENT are structural and live in the store, not the prompt.
+        self.assertTrue(kinds <= {"CLM", "STA", "EVT", "REL"}, kinds)
+        self.assertTrue(any(entry["kind"] == "CLM" for entry in pack.payload["entries"]))
+
     def test_verifier_rejects_missing_claim_fields(self) -> None:
         batch = compile_dsl(
             """

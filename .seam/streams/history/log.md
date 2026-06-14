@@ -6997,3 +6997,25 @@ HONEST: this is the FIRST, low-risk slice (~1.4x + the readability fix); the bul
 
 Unresolved next step: density slice 2 - prov/evidence index-dedup + content-only context packs (the bulk of the remaining 4.3x), then the §23 symbol loop on NL (Track J). Then Stage 5 (migrate degenerate compile_nl records) remains open on the compiler side.
 ---END-ENTRY-#314---
+
+---BEGIN-ENTRY-#315---
+id: 315
+date: 2026-06-14T12:27:24Z
+agent: claude
+status: done
+topics: pack, density, compression, context, retrieval, cr, verify, history, status
+commits: none
+refs: seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 314
+tokens: 612
+---
+Density axis, SLICE 2 (content-only context packs) - the bulk of the NL->PACK density win the #314 slice deferred. A CONTEXT pack is the meaning an LLM reasons over; it should carry only the meaning-bearing records, not the structural scaffolding that exists for traceability in the store.
+
+THE CHANGE (`seam_runtime/pack.py`): a new module-level `_CONTEXT_CONTENT_KINDS = {CLM, STA, EVT, REL}`. Context mode now filters `content_records = [r for r in ordered if r.kind in _CONTEXT_CONTENT_KINDS]` and the entries + budget loop iterate that, so RAW/PROV/SPAN/ENT no longer become pack ENTRIES. This is safe because the dropped kinds are already fully represented in what remains: RAW's verbatim lives in a content claim's `object` (the #311 floor guarantees one grounded content claim per proposition), ENT labels are inlined into claim subjects (the #314 slice), and PROV/SPAN are provenance metadata the model never reasons over. The full `ordered` set still drives `ent_label` (so subjects still resolve to labels) and the symbol map - only the ENTRIES list is content-only. The records all remain in the store for traceability/exact-mode reversibility; this is purely what the context PROMPT carries.
+
+MEASURED (fixed 8-memory corpus, 64 NL tokens, store = 8 RAW/8 PROV/11 ENT/8 SPAN/13 CLM): context pack ALL-kinds 2375 tokens / 48 entries (cr 0.027) -> content-only 862 tokens / 13 CLM entries (cr 0.074) = 2.76x fewer pack tokens and cr 0.027->0.074. Combined with #314 (slice 1) this is the ~3.8x cumulative density gain over the slice-0 baseline that #314 scoped, with the context now both dense AND readable.
+
+Tests: new `test_context_pack_is_content_only` (entry kinds subset {CLM,STA,EVT,REL}, at least one CLM) next to the slice-1 `test_context_pack_resolves_subject_to_label`. score_pack's traceability (ref/prov/evidence retention) is unaffected - prov/evidence live ON the kept content entries, and `_context_entries_by_id` keys by refs[position] over exactly the included content entries. Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures (1073 passed/2 xfailed/3 subtests, +2 over #313's 1071).
+
+Unresolved next step: density slice 3 - the §23 symbol loop on natural-language objects (collision-safe symbol generation, the "3" in the operator's "1+3"; deferred to Track J after the #309 whitespace-tokenization collision). The prov/evidence index-dedup idea from #314 is now moot for the content path (the structural-id bloat left with the dropped entries). Then Stage 5 (migrate degenerate compile_nl records) remains open on the compiler side.
+---END-ENTRY-#315---

@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 314
-total_tokens: ~120730
-latest_id: 314
+total_entries: 315
+total_tokens: ~121342
+latest_id: 315
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 315 | 2026-06-14 | done | 1824fb062a082afc | pack,density,compression,context,+ | 314 |
 | 314 | 2026-06-14 | done | bcd1c824a713d226 | pack,density,compression,context,+ | 313 |
 | 313 | 2026-06-14 | done | 105bd107e9676668 | mirl,compiler,nl,ollama,+ | 312 |
 | 312 | 2026-06-14 | done | d81f92aec55a66cb | self-improvement,loop,self-probe,retrieval,+ | 311 |
@@ -355,17 +356,17 @@ compact: true
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compiler: count=8 latest=#313, #311, #309, #308, #307
 - compress: count=26 latest=#145, #144, #132, #131, #130
-- compression: count=1 latest=#314
+- compression: count=2 latest=#315, #314
 - concepts: count=1 latest=#180
 - consolidation: count=1 latest=#306
-- context: count=1 latest=#314
+- context: count=2 latest=#315, #314
 - continuity: count=3 latest=#310, #193, #192
 - contract: count=2 latest=#305, #303
 - conversation: count=1 latest=#311
 - correction: count=1 latest=#299
-- cr: count=1 latest=#314
+- cr: count=2 latest=#315, #314
 - dashboard: count=71 latest=#299, #298, #288, #286, #285
-- density: count=1 latest=#314
+- density: count=2 latest=#315, #314
 - dependabot: count=1 latest=#301
 - dependencies: count=4 latest=#301, #296, #295, #293
 - dev-gate: count=1 latest=#297
@@ -391,7 +392,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=237 latest=#314, #313, #312, #311, #310
+- history: count=238 latest=#315, #314, #313, #312, #311
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -423,7 +424,7 @@ compact: true
 - nl: count=6 latest=#313, #311, #309, #308, #303
 - ollama: count=1 latest=#313
 - operator: count=1 latest=#179
-- pack: count=3 latest=#314, #218, #183
+- pack: count=4 latest=#315, #314, #218, #183
 - packaging: count=4 latest=#296, #293, #287, #284
 - paid-validation: count=1 latest=#302
 - persist: count=25 latest=#251, #244, #218, #213, #212
@@ -448,7 +449,7 @@ compact: true
 - refactor: count=1 latest=#284
 - registry: count=1 latest=#178
 - repo-ledger: count=1 latest=#304
-- retrieval: count=53 latest=#314, #312, #308, #307, #297
+- retrieval: count=54 latest=#315, #314, #312, #308, #307
 - retry: count=1 latest=#182
 - roadmap: count=50 latest=#284, #276, #243, #196, #193
 - roundtrip: count=2 latest=#007, #006
@@ -467,7 +468,7 @@ compact: true
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - spec: count=3 latest=#307, #305, #304
 - ssrf: count=2 latest=#300, #288
-- status: count=139 latest=#314, #313, #312, #311, #310
+- status: count=140 latest=#315, #314, #313, #312, #311
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
@@ -480,7 +481,7 @@ compact: true
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - unify: count=1 latest=#311
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=243 latest=#314, #313, #312, #311, #310
+- verify: count=244 latest=#315, #314, #313, #312, #311
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
@@ -491,6 +492,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 292
+- done: 293
 - in-progress: 2
 - planned: 20
