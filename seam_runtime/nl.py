@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from collections import Counter
 
@@ -63,7 +64,7 @@ _LOCATION_REJECT = {"the", "a", "an", "i", "me", "my"}
 _ENTITY_REJECT = {"the", "a", "an", "i", "me", "my", "this", "that"}
 
 
-def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "local.default", scope: str = "thread") -> IRBatch:
+def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "local.default", scope: str = "thread", extractor=None) -> IRBatch:
     """Compile arbitrary natural language (memory or conversation turn) into
     faithful MIRL.
 
@@ -74,7 +75,20 @@ def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "loca
     capitalized proper nouns) become ENT records. When the text carries
     conversational signal (a ``Name:`` speaker, dates, locations, named entities,
     action verbs), grounded enrichment claims are added, localized to the
-    proposition that produced them."""
+    proposition that produced them.
+
+    ``extractor`` (opt-in; ``nl_extract.Extractor``, default the deterministic
+    floor) adds REAL (subject, relation, object) triples + entities from a local
+    model behind a grounding gate, replacing the regex enrichment when it returns
+    grounded claims. The floor's verbatim content claim is always kept, so
+    coverage/temporal retention are preserved; the LLM path is best-effort
+    deterministic only (the floor is the determinism guarantee). Resolved from
+    ``SEAM_NL_EXTRACTOR`` when not passed; CI never sets it, so the floor stays
+    the default + only CI-measured behavior."""
+    if extractor is None and os.environ.get("SEAM_NL_EXTRACTOR"):
+        from .nl_extract import extractor_from_env
+
+        extractor = extractor_from_env()
     source_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
     raw_id = f"raw:{source_hash}"
     prov_id = f"prov:compile:{source_hash}"
@@ -147,10 +161,22 @@ def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "loca
         # leading noun phrase (both are drawn from the input text).
         subject = speaker_subject or entity_id(subject_label, "entity")
         # Floor: the verbatim content claim carries the full proposition (this is
-        # what satisfies the contract's coverage check).
+        # what satisfies the contract's coverage check + temporal retention).
         add_claim("content", proposition, subject, span_id)
-        # High-confidence conversational enrichment, localized to this span.
-        _extract_conversational(proposition, subject, span_id, add_claim, speaker_match)
+        # Opt-in rich extractor: REAL (subject, relation, object) triples + entities
+        # (already grounded against this proposition), replacing the regex
+        # enrichment. Falls back to the regex enrichment when it returns nothing.
+        extraction = extractor.extract(proposition) if extractor is not None else None
+        if extraction is not None and extraction.claims:
+            for entity in extraction.entities:
+                entity_id(entity.name, entity.entity_type)
+            for claim in extraction.claims:
+                claim_subject = entity_id(claim.subject, "entity")
+                entity_id(claim.obj, "entity")  # the object phrase is a grounded entity too
+                add_claim(claim.relation, claim.obj, claim_subject, span_id, 0.85)
+        else:
+            # High-confidence conversational enrichment, localized to this span.
+            _extract_conversational(proposition, subject, span_id, add_claim, speaker_match)
 
     return IRBatch(records)
 

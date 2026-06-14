@@ -6938,3 +6938,34 @@ Verified: tests/audit/test_self_probe_scorer.py 7->9 (default probe kinds = cont
 
 Unresolved next step: Stage 4 (the operator's "added goal") - the opt-in LOCAL OLLAMA rich extractor behind the §22/§24 fidelity contract (real S-P-O triples -> sr->~1.0, close the 2 entity_extraction xfails, replace the regex enrichment). Then Stage 5 record migration. The §23 symbol-loop-on-NL gap (Track J) also stands.
 ---END-ENTRY-#312---
+
+---BEGIN-ENTRY-#313---
+id: 313
+date: 2026-06-14T08:03:31Z
+agent: claude
+status: done
+topics: mirl, compiler, nl, ollama, extractor, fidelity, llm, test, verify, history, status
+commits: none
+refs: seam_runtime/nl_extract.py,seam_runtime/nl.py,tests/fidelity/test_nl_extract.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 312
+tokens: 1038
+---
+Stage 4 (MIRL compiler, the operator's "added goal"): the OPT-IN local-Ollama rich extractor. The deterministic floor is faithful but shallow (no structured relation; misses lowercase common-noun entities); this adds real (subject, relation, object) triples + entities from a LOCAL model behind a GROUNDING GATE, raising compile fidelity sr 0.667->1.0 on real memories and closing both entity_extraction xfails - WITHOUT sacrificing faithfulness.
+
+NEW `seam_runtime/nl_extract.py`:
+- `OllamaExtractor` calls a local Ollama HTTP endpoint (urllib, NO new dep; loopback only) with a few-shot, strict-verbatim prompt + a JSON schema (entities + (subject,relation,object) claims). The few-shot example is essential: bare qwen2.5:3b returned empty/hallucinated; with it, every golden extracts grounded triples.
+- `ground_extraction(raw, text)` = the FABRICATION FIREWALL (spec §3.2 + §8): an entity survives only if its content tokens are a subset of the text's; a claim survives only if its subject, relation, AND object are each grounded. Anything ungrounded is dropped; any failure (model down, bad JSON, timeout) returns empty -> the caller falls back to the floor. So the "never fabricate" guarantee holds even when the model hallucinates.
+- `extractor_from_env()` resolves the opt-in switch `SEAM_NL_EXTRACTOR=ollama` (+ `SEAM_OLLAMA_HOST`/`SEAM_OLLAMA_MODEL`).
+
+`seam_runtime/nl.py` `compile_nl(text, ..., extractor=None)`: when an extractor is supplied (or the env switch is set), each proposition KEEPS the floor's verbatim content claim (so coverage + temporal retention are preserved) and ADDS the extractor's grounded triples + entities, replacing the regex enrichment; an empty extraction falls back to the regex enrichment. The floor stays the DEFAULT (CI never sets the env), so determinism (§29.1) remains the floor's guarantee - an LLM path is best-effort deterministic only (temp=0).
+
+VALIDATION (real model: qwen2.5:3b on the T7 via a user ollama on :11435; see [[reference-ollama-qwen-on-t7]]) against the 5 fidelity goldens:
+- single_fact_ownership / two_independent_facts / personal_event / schedule_change: sr 0.667 -> 1.000 (REAL relations: (Priya, owns, billing service) matches the canonical triple); entity_extraction = True on ALL (it now extracts "billing service" / "west datacenter" - the lowercase common-noun phrases that are the floor's 2 remaining xfails); rr/pr/tr = 1.0 (the kept content claim preserves temporal/coverage); subject_grounding/segmentation/separable_coverage/fact_grounding all pass (the grounding gate works).
+- self_description_overfit: sr stays 0.333 - CORRECTLY, the model returns the real grammatical triple (I, want to build, SEAM), not the stub's overfit (SEAM, goal, memory translator); that golden's canonical relation "goal" is itself a stub artifact.
+
+HONEST SCOPE: the floor's `test_compile_fidelity` still shows 2 entity_extraction xfails because it runs the FLOOR (no extractor) - the floor genuinely doesn't extract common-noun phrases; the EXTRACTOR closes them, validated here + by the CI-safe integration test (a stub extractor proves "billing service" becomes a grounded entity). CI cannot run a local model and the strict-no-skip policy forbids a skipping test, so the real-model sr->1.0 numbers above are MY measurement, recorded here, not a CI test.
+
+Verified: NEW tests/fidelity/test_nl_extract.py (5, CI-safe + model-free): the grounding firewall keeps grounded / drops hallucinated + empty-on-garbage; compile_nl(extractor=stub) adds the real "owns" relation + the "billing service" entity while keeping the content claim and grounding every subject; floor fallback on empty extraction; env resolution. Fidelity floor UNCHANGED (2 xfailed). Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures (1071 passed/2 xfailed/3 subtests, +5).
+
+Unresolved next step: Stage 5 - migrate existing degenerate compile_nl records (keep RAW, replace derived ENT/CLM). Optional: a content-addressed extraction cache to make the opt-in path deterministic-after-first; promote the §24 gate on the extractor path (sr>=0.98 now reachable for real memories). Still open: the §23 symbol-loop-on-NL gap (Track J).
+---END-ENTRY-#313---
