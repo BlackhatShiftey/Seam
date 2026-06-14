@@ -1,8 +1,14 @@
 """Conversation-turn extraction via the unified compiler (HISTORY#311).
 
 `compile_conversation_turn` was folded into `compile_nl`; these tests pin the
-conversational extraction (speaker/date/location/action) the unified compiler
-must still produce, now with GROUNDED claim subjects (no synthetic turn entity).
+conversational extraction (speaker/date/location/action) with GROUNDED claim
+subjects (no synthetic turn entity).
+
+As of HISTORY#317 the regex enrichment is OFF by default (it mislabels ~25% of
+real prose for zero LoCoMo recall benefit), gated behind `SEAM_NL_REGEX_ENRICH`.
+This file pins the OPT-IN legacy path, so the autouse fixture enables the flag
+for every test here. The default-off behavior is pinned separately
+(test_seam.py::test_compile_nl_no_regex_enrichment_by_default).
 """
 
 import re
@@ -11,6 +17,11 @@ import pytest
 
 from seam_runtime.mirl import RecordKind, Status
 from seam_runtime.nl import compile_nl
+
+
+@pytest.fixture(autouse=True)
+def _enable_regex_enrichment(monkeypatch):
+    monkeypatch.setenv("SEAM_NL_REGEX_ENRICH", "1")
 
 
 def test_creates_raw_span_prov_records():

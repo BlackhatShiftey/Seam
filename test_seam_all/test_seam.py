@@ -174,6 +174,25 @@ class SeamTests(unittest.TestCase):
         self.assertNotIn("ent:", subject)
         self.assertNotIn("id", clm)  # dense: no repeated per-entry id
 
+    def test_compile_nl_no_regex_enrichment_by_default(self) -> None:
+        # HISTORY#317: the regex enrichment (location/date/went_to/felt) is OFF by
+        # default - it mislabeled ~25% of real prose for zero LoCoMo recall benefit.
+        # The floor emits ONLY the faithful content claim (+ proper-noun entities);
+        # structured triples come from the opt-in grounded extractor.
+        import os
+        os.environ.pop("SEAM_NL_REGEX_ENRICH", None)
+        batch = compile_nl("Bob is allergic to peanuts and shellfish on Monday in Denver.")
+        preds = {r.attrs.get("predicate") for r in batch.records if r.kind.value == "CLM"}
+        self.assertEqual(preds, {"content"}, f"floor must emit only content claims, got {preds}")
+        # ...and the legacy path is recoverable via the flag.
+        os.environ["SEAM_NL_REGEX_ENRICH"] = "1"
+        try:
+            enriched = compile_nl("Bob is allergic to peanuts and shellfish on Monday in Denver.")
+            enriched_preds = {r.attrs.get("predicate") for r in enriched.records if r.kind.value == "CLM"}
+            self.assertTrue(enriched_preds - {"content"}, "flag should re-enable enrichment claims")
+        finally:
+            os.environ.pop("SEAM_NL_REGEX_ENRICH", None)
+
     def test_context_pack_is_content_only(self) -> None:
         runtime = SeamRuntime(self.db_path)
         batch = runtime.compile_nl("Priya owns the billing service.")
