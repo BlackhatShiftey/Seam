@@ -6908,3 +6908,33 @@ KNOWN (transitional): the ported IGNORECASE location/action regexes over-fire on
 
 Unresolved next step: Stage 4 - the opt-in LOCAL OLLAMA rich extractor behind this same fidelity contract (real predicates/objects -> sr->~1.0, close the 2 entity_extraction xfails, and replace the regex enrichment); then Stage 5 - migrate existing degenerate compile_nl records (keep RAW, replace derived ENT/CLM) + re-validate the self-probe own-corpus loop. Also still open: the §23 symbol/improvement loop can't mine natural-language objects (collision-safe symbol generation, Track J).
 ---END-ENTRY-#311---
+
+---BEGIN-ENTRY-#312---
+id: 312
+date: 2026-06-14T06:56:46Z
+agent: claude
+status: done
+topics: self-improvement, loop, self-probe, retrieval, locomo, benchmark, verify, history, status
+commits: none
+refs: seam_runtime/self_improve.py,tests/audit/test_self_probe_scorer.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 311
+tokens: 1042
+---
+LOOP VALIDATION (operator: "loop validation with stage 4 compiler completion as an added goal" - this is the primary goal): demonstrated that the closed self-improvement loop is FUNCTIONAL on faithful ingest now that the compiler is fixed (#308-#311), and fixed two self-probe signal-quality bugs the now-faithful corpus exposed. This is the operator's Track-K gate ("benchmarks 100% functional" = a closed automatable self-improvement loop with auto-proposer + apply step).
+
+CONTEXT: the own-corpus self-probe (seam_runtime/self_improve.py) was POISONED by the old slug compiler (every memory -> project:SEAM/goal/<slug>, so cloze-of-own-record was slug-cloze). With the unified faithful compiler the content claims carry the VERBATIM proposition, so the cloze is now genuine natural language (e.g. "The museum's deep-sea bioluminescence exhibit opens in [October]").
+
+TWO FIXES (exposed by running the self-probe on a faithful corpus):
+1. generate_probes default kinds: was kinds=None=ALL kinds, which probed RAW (not a default search_ir candidate -> always misses), PROV/SPAN (only text is an id-string -> degenerate cloze), ENT (label-only). New `_DEFAULT_PROBE_KINDS = (CLM,STA,EVT,REL)` = exactly the kinds search_ir returns as candidates; an explicit `kinds=` still overrides (e.g. kinds=(RAW,)). On the demo corpus this lifted the self-probe from a contaminated 0.298 to a clean 0.609.
+2. _record_text excludes id-reference fields: a claim's `subject` is an `ent:...` id (a REFERENCE, not content), and `max(textual_fields, key=len)` could pick that long id over a short object (e.g. a `mentioned` claim's "Vendor Lumora"), producing a degenerate cloze over the subject id ("ent contract 86b39217a627"). Added `_REF_RE`/`_looks_like_ref` to skip ent|raw|clm|span|prov|sta|evt|rel|sym: id strings; the cloze source is now always natural-language content.
+
+VALIDATION (FREE, no paid):
+- Self-probe on a clean ~8-12-fact faithful corpus: every probe is genuine NL cloze; recall = 1.0. This is the #290 STRUCTURAL property (cloze-of-own-record on a distinct corpus is lexically trivial), so the self-probe is a perfect REGRESSION WATCHDOG with no headroom - NOT a score-mover. The score-mover is the free-LoCoMo scorer (#292).
+- FULL CLOSED LOOP (run_improvement_cycle with [self_probe + free-LoCoMo dev scorer], auto_approve=True, 2 LoCoMo scopes): baseline self_probe=1.0 / locomo_recall=0.5795; evaluated 11 candidate levers; PROPOSED `bm25_all_kinds=True` (locomo_recall +0.0266, self_probe +0.0 = no regression); APPLIED via the #289 reversible reconcile; re-measured; KEPT (reverted=false). The observe->propose->apply->re-measure loop fired end-to-end, with the self-probe (1.0) acting as the no-regression guard the LoCoMo gain had to hold.
+
+TRACK-K GATE ASSESSMENT: MET. The loop is closed + automatable (auto-proposer + reversible apply + revert-on-regression ratchet), runs entirely on FREE signals (self-probe watchdog + free-LoCoMo recall; no judge/answerer/API), and produces real non-regressing applied improvements on faithful own-corpus ingest. HONEST SCOPE: the +0.0266 is a free-metric DEV-split gain (proves the loop WORKS), NOT a paid-validated production claim - big claims still require the operator-gated paid judged validation (`seam improve validate --confirm-paid`, never auto-run).
+
+Verified: tests/audit/test_self_probe_scorer.py 7->9 (default probe kinds = content-only; _record_text excludes id refs). Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures (1066 passed/2 xfailed/3 subtests, +2 over #311).
+
+Unresolved next step: Stage 4 (the operator's "added goal") - the opt-in LOCAL OLLAMA rich extractor behind the §22/§24 fidelity contract (real S-P-O triples -> sr->~1.0, close the 2 entity_extraction xfails, replace the regex enrichment). Then Stage 5 record migration. The §23 symbol-loop-on-NL gap (Track J) also stands.
+---END-ENTRY-#312---

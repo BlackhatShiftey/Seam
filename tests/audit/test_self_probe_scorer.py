@@ -17,8 +17,10 @@ from seam_runtime.self_improve import (
     Probe,
     ScoreReport,
     SelfProbeScorer,
+    _record_text,
     generate_probes,
 )
+from seam_runtime.mirl import MIRLRecord
 
 _FACTS = [
     "Maria adopted a rescue greyhound named Pixel in March 2021.",
@@ -134,3 +136,30 @@ def test_generate_probes_raw_default_filters_kind(tmp_path):
     _seed(runtime)
     raw_probes = generate_probes(runtime, kinds=(RecordKind.RAW,))
     assert all(p.category == "RAW" for p in raw_probes)
+
+
+def test_generate_probes_default_targets_only_retrievable_content_kinds(tmp_path):
+    """The default probe set excludes RAW (not a default search candidate) and
+    PROV/SPAN/ENT (id/label-only text), which would always miss and dilute the
+    signal — it targets only what `search_ir` can return."""
+    runtime = SeamRuntime(tmp_path / "p.db")
+    _seed(runtime)
+    probes = generate_probes(runtime)
+    assert probes, "faithful corpus should yield content probes"
+    allowed = {"CLM", "STA", "EVT", "REL"}
+    assert {p.category for p in probes} <= allowed, {p.category for p in probes}
+
+
+def test_record_text_excludes_id_reference_fields():
+    """A claim's subject is an `ent:...` id reference, not content; the cloze
+    source is the natural-language object, even when the id string is longer."""
+    claim = MIRLRecord(
+        id="clm:x",
+        kind=RecordKind.CLM,
+        attrs={"subject": "ent:a_very_long_reference_id:0123456789abcdef", "predicate": "mentioned", "object": "Vendor Lumora"},
+    )
+    assert _record_text(claim) == "Vendor Lumora"
+    # A record whose only textual fields are references has no cloze source.
+    prov = MIRLRecord(id="prov:x", kind=RecordKind.PROV, attrs={"entity": "raw:abc123", "activity": "compile_nl", "agent": "system.nl"})
+    text = _record_text(prov)
+    assert text is None or "raw:" not in text
