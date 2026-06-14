@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 310
-total_tokens: ~116913
-latest_id: 310
+total_entries: 311
+total_tokens: ~117905
+latest_id: 311
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 311 | 2026-06-14 | done | cbcce34e8d96e8f6 | mirl,compiler,nl,unify,+ | 310 |
 | 310 | 2026-06-13 | done | 9c0ba7e31c62a461 | protocol,history,status,verify,+ | 309 |
 | 309 | 2026-06-13 | done | 0994fba1d6401398 | security,redos,codeql,mirl,+ | 308 |
 | 308 | 2026-06-13 | done | add5580674397e2f | mirl,compiler,nl,fidelity,+ | 307 |
@@ -332,7 +333,7 @@ compact: true
 - audit: count=74 latest=#303, #290, #288, #280, #279
 - baseline: count=1 latest=#303
 - beam: count=1 latest=#223
-- benchmark: count=97 latest=#302, #292, #290, #289, #282
+- benchmark: count=98 latest=#311, #302, #292, #290, #289
 - branch: count=1 latest=#280
 - branches: count=1 latest=#306
 - bug: count=1 latest=#303
@@ -349,12 +350,13 @@ compact: true
 - codeql: count=5 latest=#309, #301, #300, #299, #298
 - command: count=67 latest=#251, #241, #232, #221, #220
 - compile: count=13 latest=#154, #047, #046, #043, #042
-- compiler: count=6 latest=#309, #308, #307, #306, #305
+- compiler: count=7 latest=#311, #309, #308, #307, #306
 - compress: count=26 latest=#145, #144, #132, #131, #130
 - concepts: count=1 latest=#180
 - consolidation: count=1 latest=#306
 - continuity: count=3 latest=#310, #193, #192
 - contract: count=2 latest=#305, #303
+- conversation: count=1 latest=#311
 - correction: count=1 latest=#299
 - dashboard: count=71 latest=#299, #298, #288, #286, #285
 - dependabot: count=1 latest=#301
@@ -369,7 +371,7 @@ compact: true
 - enforcement: count=1 latest=#294
 - experiment: count=1 latest=#273
 - extras: count=1 latest=#022
-- fidelity: count=5 latest=#308, #307, #306, #305, #303
+- fidelity: count=6 latest=#311, #308, #307, #306, #305
 - fixture: count=6 latest=#265, #187, #145, #092, #039
 - floor: count=1 latest=#308
 - generalization: count=1 latest=#297
@@ -381,7 +383,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=233 latest=#310, #309, #308, #307, #306
+- history: count=234 latest=#311, #310, #309, #308, #307
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -395,7 +397,7 @@ compact: true
 - lexical: count=1 latest=#004
 - linux: count=6 latest=#177, #173, #136, #135, #021
 - locking: count=2 latest=#283, #182
-- locomo: count=15 latest=#302, #297, #292, #290, #282
+- locomo: count=16 latest=#311, #302, #297, #292, #290
 - longmemeval: count=1 latest=#223
 - loop: count=6 latest=#297, #293, #292, #291, #290
 - lossless: count=1 latest=#288
@@ -405,11 +407,11 @@ compact: true
 - memory: count=5 latest=#286, #275, #274, #182, #178
 - merge: count=1 latest=#301
 - metrics: count=2 latest=#307, #305
-- mirl: count=28 latest=#309, #308, #307, #306, #305
+- mirl: count=29 latest=#311, #309, #308, #307, #306
 - models: count=1 latest=#182
 - multi-agent: count=19 latest=#268, #231, #230, #229, #224
 - naming: count=4 latest=#033, #024, #009, #002
-- nl: count=4 latest=#309, #308, #303, #223
+- nl: count=5 latest=#311, #309, #308, #303, #223
 - operator: count=1 latest=#179
 - pack: count=2 latest=#218, #183
 - packaging: count=4 latest=#296, #293, #287, #284
@@ -454,19 +456,20 @@ compact: true
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - spec: count=3 latest=#307, #305, #304
 - ssrf: count=2 latest=#300, #288
-- status: count=135 latest=#310, #309, #308, #307, #306
+- status: count=136 latest=#311, #310, #309, #308, #307
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
 - surface: count=5 latest=#276, #225, #218, #208, #145
 - symbols: count=1 latest=#309
-- test: count=26 latest=#309, #308, #307, #305, #303
+- test: count=27 latest=#311, #309, #308, #307, #305
 - tests: count=3 latest=#192, #191, #182
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tokenizer: count=1 latest=#216
 - tui: count=25 latest=#137, #121, #120, #119, #118
+- unify: count=1 latest=#311
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=239 latest=#310, #309, #308, #307, #305
+- verify: count=240 latest=#311, #310, #309, #308, #307
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
@@ -477,6 +480,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 288
+- done: 289
 - in-progress: 2
 - planned: 20

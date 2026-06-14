@@ -127,11 +127,17 @@ class SeamTests(unittest.TestCase):
         self.assertIn("ENT|ent:", ir)
         self.assertNotIn("ent:project:", ir)
         self.assertNotIn("ent:user:", ir)
-        # Three sentences -> three grounded claims carrying the verbatim text.
+        # Three sentences -> one verbatim "content" claim each (the floor base);
+        # the unified compiler may add grounded conversational enrichment claims
+        # on top, so count the content claims specifically.
         claims = [r for r in records.records if r.kind == RecordKind.CLM]
-        self.assertEqual(len(claims), 3)
-        self.assertEqual(claims[0].attrs["predicate"], "content")
-        self.assertIn("permanently remembers things", claims[0].attrs["object"])
+        content_claims = [c for c in claims if c.attrs.get("predicate") == "content"]
+        self.assertEqual(len(content_claims), 3)
+        self.assertIn("permanently remembers things", content_claims[0].attrs["object"])
+        # Every claim subject is a grounded ENT (no fabricated project:SEAM).
+        ent_ids = {r.id for r in records.records if r.kind == RecordKind.ENT}
+        for c in claims:
+            self.assertIn(c.attrs.get("subject"), ent_ids)
 
     def test_exact_pack_round_trips(self) -> None:
         text = "Build durable AI memory for databases and context windows without losing meaning."

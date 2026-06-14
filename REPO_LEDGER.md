@@ -36,8 +36,10 @@ and `HISTORY_INDEX.md`.
   Start item 6). A component is only "broken" if it fails the contract it is
   actually supposed to satisfy — e.g. RC/1's contract is lossless + directly
   queryable + exact rebuild (NOT token reduction; token reduction lives in PACK,
-  the symbol loop, and the Track J codec); `compile_nl` genuinely violates the
-  §3.2 compiler responsibilities + §8 recoverable-meaning contract. New fidelity
+  the symbol loop, and the Track J codec); the former overfit `compile_nl` stub
+  genuinely violated the §3.2 compiler responsibilities + §8 recoverable-meaning
+  contract (fixed by the HISTORY#308 deterministic floor and unified into one
+  faithful pipeline at #311; the rich S-P-O extractor is Stage 4). New fidelity
   or metric harnesses align to the spec's own metrics (§22/§24), not invented
   ad-hoc properties. This decision exists because the spec was historically
   absent from the mandatory read order, which let implementations drift from the
