@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 367
+total_events: 368
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-08T00:00:00Z | roadmap:028:c568fab8 | status-change | bootstrap | docs, readme, command | ROADMAP.md:1065 |
 | 2026-05-08T00:00:00Z | roadmap:029:b70d7e92 | status-change | bootstrap | compile, mirl, surface | ROADMAP.md:1097 |
 | 2026-05-08T09:50:28Z | history:144:d5565a39 | session-event | done | status, roadmap, ledger, benchmark, compress, verify, his... | PROJECT_STATUS.md,README.md,ROADMAP.md,docs/setup.md,docs/ledgers/runtime/com... |
 | 2026-05-08T10:11:20Z | history:141:22531976 | session-event | done | protocol, multi-agent, history, snapshot, verify | .opencode/skills/seam-session-closeout/SKILL.md,HISTORY.md,HISTORY_INDEX.md,.... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-13T10:11:44Z | history:308:add55806 | session-event | done | mirl, compiler, nl, fidelity, floor, retrieval, test, ver... | seam_runtime/nl.py,benchmarks/fidelity/golden.py,tests/fidelity/test_spec_met... |
 | 2026-06-13T17:45:05Z | history:309:0994fba1 | session-event | done | security, redos, codeql, mirl, compiler, nl, test, symbol... | seam_runtime/nl.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PRO... |
 | 2026-06-13T17:58:01Z | history:310:9c0ba7e3 | session-event | done | protocol, history, status, verify, continuity, docs | PROJECT_STATUS.md,HISTORY.md,HISTORY_INDEX.md |
+| 2026-06-14T05:06:38Z | history:311:cbcce34e | session-event | done | mirl, compiler, nl, unify, conversation, locomo, benchmar... | seam_runtime/nl.py,seam_runtime/runtime.py,tests/audit/test_conversation_turn... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0167.cross.md | 2026-04-15T00:00:00Z..2026-05-08T00:00:00Z | 167 | (multi) | (multi) |
+| 0001-0168.cross.md | 2026-04-15T00:00:00Z..2026-05-08T00:00:00Z | 168 | (multi) | (multi) |

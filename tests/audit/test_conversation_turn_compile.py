@@ -1,16 +1,21 @@
-"""Tests for compile_conversation_turn — conversation text extraction and CLM generation."""
+"""Conversation-turn extraction via the unified compiler (HISTORY#311).
+
+`compile_conversation_turn` was folded into `compile_nl`; these tests pin the
+conversational extraction (speaker/date/location/action) the unified compiler
+must still produce, now with GROUNDED claim subjects (no synthetic turn entity).
+"""
 
 import re
 
 import pytest
 
 from seam_runtime.mirl import RecordKind, Status
-from seam_runtime.nl import compile_conversation_turn
+from seam_runtime.nl import compile_nl
 
 
 def test_creates_raw_span_prov_records():
     """compile_conversation_turn always creates RAW, SPAN, and PROV records."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023.")
     by_kind = {}
     for record in batch.records:
         by_kind.setdefault(record.kind, []).append(record)
@@ -23,12 +28,12 @@ def test_creates_raw_span_prov_records():
     assert raw.attrs.get("content") == "Caroline: I went to the LGBTQ support group on 7 May 2023."
 
     prov = by_kind[RecordKind.PROV][0]
-    assert prov.attrs.get("activity") == "compile_conversation_turn"
+    assert prov.attrs.get("activity") == "compile_nl"
 
 
 def test_extracts_speaker_and_creates_person_ent():
     """Speaker is extracted from Name: prefix and a person ENT record is created."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023.")
     ents = [r for r in batch.records if r.kind == RecordKind.ENT]
 
     person_ents = [e for e in ents if e.attrs.get("entity_type") == "person"]
@@ -38,7 +43,7 @@ def test_extracts_speaker_and_creates_person_ent():
 
 def test_extracts_date():
     """Date strings are extracted and stored as CLM records with predicate='date'."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023.")
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
 
     date_claims = [c for c in claims if c.attrs.get("predicate") == "date"]
@@ -50,7 +55,7 @@ def test_extracts_date():
 
 def test_extracts_location():
     """Locations after 'in', 'at', 'to' are extracted with predicate='location'."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023.")
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
 
     location_claims = [c for c in claims if c.attrs.get("predicate") == "location"]
@@ -61,7 +66,7 @@ def test_extracts_location():
 
 def test_extracts_action_fact():
     """Action verbs produce CLM records with specific predicates like 'went_to'."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023.")
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
 
     action_claims = [c for c in claims if c.attrs.get("predicate") == "went_to"]
@@ -71,21 +76,22 @@ def test_extracts_action_fact():
 
 
 def test_person_claim_has_speaker_subject():
-    """Person CLM has the speaker ENT as the subject."""
-    batch = compile_conversation_turn("Alice: I met Bob at the park yesterday.")
+    """Person CLM has the speaker ENT as the subject (a person entity, grounded)."""
+    batch = compile_nl("Alice: I met Bob at the park yesterday.")
+    by_id = batch.by_id()
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
 
     person_claims = [c for c in claims if c.attrs.get("predicate") == "person"]
     assert len(person_claims) >= 1, f"Expected 'person' claim, got: {[c.attrs.get('predicate') for c in claims]}"
-    # Subject should reference the speaker entity, not the turn entity
-    subject = str(person_claims[0].attrs.get("subject"))
-    assert "person" in subject, f"Expected 'person' in subject reference, got {subject!r}"
-    assert "alice" in subject.lower(), f"Expected 'alice' in subject reference, got {subject!r}"
+    subject_ent = by_id.get(person_claims[0].attrs.get("subject"))
+    assert subject_ent is not None and subject_ent.kind == RecordKind.ENT
+    assert subject_ent.attrs.get("entity_type") == "person"
+    assert subject_ent.attrs.get("label") == "Alice"
 
 
 def test_fallback_content_claim_when_no_facts_extracted():
     """When no facts can be extracted, a single content CLM with the full text is created."""
-    batch = compile_conversation_turn("ok")
+    batch = compile_nl("ok")
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
     assert len(claims) >= 1, f"Expected at least one fallback claim, got {len(claims)}"
     content_claims = [c for c in claims if c.attrs.get("predicate") == "content"]
@@ -94,8 +100,11 @@ def test_fallback_content_claim_when_no_facts_extracted():
 
 
 def test_no_speaker_still_works():
-    """Conversation turn without a Name: prefix still produces records with turn entity as subject."""
-    batch = compile_conversation_turn("I went to the store on 2025-01-15 to buy groceries.")
+    """Conversation turn without a Name: prefix still extracts facts, and every
+    claim subject is GROUNDED in the input (no synthetic turn entity)."""
+    text = "I went to the store on 2025-01-15 to buy groceries."
+    batch = compile_nl(text)
+    by_id = batch.by_id()
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
 
     # Should extract date '2025-01-15'
@@ -106,15 +115,20 @@ def test_no_speaker_still_works():
     action_claims = [c for c in claims if c.attrs.get("predicate") == "went_to"]
     assert len(action_claims) >= 1, f"Expected went_to claim, got: {[c.attrs.get('predicate') for c in claims]}"
 
-    # Subject should be the turn entity, not a person entity
+    # Every subject resolves to an ENT whose label tokens are all present in the
+    # input — i.e. grounded, never a fabricated ent:turn:* subject.
+    allowed = set(re.findall(r"[a-z0-9]+", text.lower()))
     for c in claims:
-        subj = str(c.attrs.get("subject"))
-        assert "turn" in subj.lower() or "person" in subj.lower(), f"Subject {subj!r} does not reference turn or person entity"
+        subject_ent = by_id.get(c.attrs.get("subject"))
+        assert subject_ent is not None and subject_ent.kind == RecordKind.ENT, c.attrs
+        label = str(subject_ent.attrs.get("label", ""))
+        assert all(tok in allowed for tok in re.findall(r"[a-z0-9]+", label.lower())), f"ungrounded subject {label!r}"
+        assert "turn" not in subject_ent.id.lower(), f"synthetic turn entity: {subject_ent.id}"
 
 
 def test_all_clm_records_have_meaningful_predicates():
     """Every CLM record uses a predicate from the expected set."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023. I met Dr. Smith there.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023. I met Dr. Smith there.")
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
 
     valid_predicates = {
@@ -131,7 +145,7 @@ def test_all_clm_records_have_meaningful_predicates():
 
 def test_clm_has_evidence_and_prov():
     """Each CLM record has prov linking to the PROV record and evidence linking to the SPAN."""
-    batch = compile_conversation_turn("Caroline: I went to the LGBTQ support group on 7 May 2023.")
+    batch = compile_nl("Caroline: I went to the LGBTQ support group on 7 May 2023.")
     claims = [r for r in batch.records if r.kind == RecordKind.CLM]
     prov_records = [r for r in batch.records if r.kind == RecordKind.PROV]
 

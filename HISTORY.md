@@ -6882,3 +6882,29 @@ Verified: full `verify_continuity` (recorded-fact audit on) = Continuity OK; int
 
 Unresolved next step: the #308 Stage-3/4/5 arc stands (unify compile_nl+compile_conversation_turn -> opt-in local Ollama rich extractor -> migrate degenerate records); plus the §23 symbol-loop-over-natural-language gap (collision-safe symbol generation) folded into Track J.
 ---END-ENTRY-#310---
+
+---BEGIN-ENTRY-#311---
+id: 311
+date: 2026-06-14T05:06:38Z
+agent: claude
+status: done
+topics: mirl, compiler, nl, unify, conversation, locomo, benchmark, fidelity, test, verify, history, status
+commits: none
+refs: seam_runtime/nl.py,seam_runtime/runtime.py,tests/audit/test_conversation_turn_compile.py,test_seam_all/test_seam.py,REPO_LEDGER.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 310
+tokens: 992
+---
+Stage 3 (MIRL compiler): UNIFIED compile_nl + compile_conversation_turn into ONE fidelity-clean pipeline; deleted compile_conversation_turn. Operator chose the "preserve behavior" option (keep ALL conversational extractors, gate on free LoCoMo recall) and accepted shipping on aggregate-recall improvement.
+
+THE UNIFIED COMPILER (`seam_runtime/nl.py:compile_nl`): the honest floor BASE (verbatim RAW; segment into propositions with REAL offsets; one GROUNDED content claim per proposition carrying the full proposition; high-confidence proper-noun entities) + the conversational high-confidence rules folded in from the deleted compile_conversation_turn (speaker `Name:` -> person ENT; dates; locations; named entities; action verbs went_to/attended/met/learned/felt), now run PER-PROPOSITION with the claim localized to its SPAN and the subject GROUNDED (the turn speaker if present, else the proposition's leading noun phrase - NEVER the old synthetic `ent:turn:<hash>` that failed subject_grounding). `seam_runtime/runtime.py:ingest_conversation_turn` now delegates to compile_nl (kept as the benchmark/agent entry point). One compilation path for memories AND conversation turns.
+
+LOCOMO NO-REGRESSION GATE (free recall scorer, answerer=None, no paid): measured 3 scopes / 298 dev questions / top_k=20 BEFORE and AFTER on locomo10.json. Aggregate 0.614757 -> 0.623128 (+0.0084, IMPROVED). Per-category: cat1 0.3712->0.3863 (+0.015), cat4 0.6940->0.7097 (+0.016), cat2 0.7520->0.7439 (-0.008), cat3 0.2662->0.2503 (-0.016), cat5 0.0->0.0. The single-hop cats GAIN from the extra grounded entry points; the multi-hop/temporal cats dip slightly as the per-turn content claims compete at fixed top_k - small and within plausible noise on a 3-scope sample. Operator accepted on aggregate (a compiler refactor's bar is "don't regress the benchmark"; aggregate satisfies it).
+
+FIDELITY UNCHANGED: the conversational rules barely fire on the plain-memory goldens, and the IGNORECASE location regex (kept so "the LGBTQ support group" matches) that DOES fire on some goldens (e.g. golden 3 "married in Lisbon" -> a grounded `location` claim) only ADDS grounded, span-localized, PARTIAL claims - the mandatory content claim still carries the full fact, so coverage/segmentation/fact_grounding all still pass. Traced every golden: tests/fidelity/ green (2 xfailed = the deferred entity_extraction cases, unchanged); the §22 sr/cr/rr baselines unchanged.
+
+TESTS RECONCILED: tests/audit/test_conversation_turn_compile.py - import compile_nl (was compile_conversation_turn); prov activity now "compile_nl"; test_person_claim_has_speaker_subject + test_no_speaker_still_works rewritten to assert the subject resolves to a GROUNDED ENT (entity_type/label) instead of the old id-string "person"/"turn" checks. test_seam_all test_compile_generates_core_records counts CONTENT claims (the unified compiler adds conversational enrichment on top). Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` with PGVECTOR_TEST_DSN + strict no-skip = 1064 passed, 2 xfailed, 3 subtests, 0 skipped, 0 failed.
+
+KNOWN (transitional): the ported IGNORECASE location/action regexes over-fire on plain English ("back into natural language" -> a `location` claim "natural language") - grounded and harmless (and a net LoCoMo entry-point win) but noisy. These hand-rolled extractors are explicitly slated for REPLACEMENT by Stage 4's opt-in local Ollama rich extractor (real S-P-O triples), so the noise is temporary; pruning them now was the rejected Option 2 (would risk recall with nothing better in their place).
+
+Unresolved next step: Stage 4 - the opt-in LOCAL OLLAMA rich extractor behind this same fidelity contract (real predicates/objects -> sr->~1.0, close the 2 entity_extraction xfails, and replace the regex enrichment); then Stage 5 - migrate existing degenerate compile_nl records (keep RAW, replace derived ENT/CLM) + re-validate the self-probe own-corpus loop. Also still open: the §23 symbol/improvement loop can't mine natural-language objects (collision-safe symbol generation, Track J).
+---END-ENTRY-#311---

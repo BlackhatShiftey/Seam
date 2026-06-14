@@ -198,11 +198,12 @@ class SeamRuntime:
         scope: str = "thread",
         persist: bool = True,
     ) -> IngestReport:
-        from .nl import compile_conversation_turn
-
+        # Unified compiler (HISTORY#311): conversation turns and plain memories
+        # share one faithful pipeline. `ingest_conversation_turn` is kept as the
+        # benchmark/agent entry point but delegates to compile_nl.
         document_id = stable_document_id(source_ref, text)
         batch = namespace_ingest_batch(
-            compile_conversation_turn(text, source_ref=source_ref, ns=ns, scope=scope),
+            compile_nl(text, source_ref=source_ref, ns=ns, scope=scope),
             document_id,
         )
         stored_ids: list[str] = []
