@@ -6969,3 +6969,31 @@ Verified: NEW tests/fidelity/test_nl_extract.py (5, CI-safe + model-free): the g
 
 Unresolved next step: Stage 5 - migrate existing degenerate compile_nl records (keep RAW, replace derived ENT/CLM). Optional: a content-addressed extraction cache to make the opt-in path deterministic-after-first; promote the §24 gate on the extractor path (sr>=0.98 now reachable for real memories). Still open: the §23 symbol-loop-on-NL gap (Track J).
 ---END-ENTRY-#313---
+
+---BEGIN-ENTRY-#314---
+id: 314
+date: 2026-06-14T11:04:31Z
+agent: claude
+status: done
+topics: pack, density, compression, context, retrieval, cr, verify, history, status
+commits: none
+refs: seam_runtime/pack.py,seam_runtime/context_views.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 313
+tokens: 745
+---
+Density axis, SLICE 1 (operator picked "1+3" = dense pack + the §23 symbol loop; this is the first, safe slice of the dense-pack part). The north star is "max durable intelligence per token"; density was the weakest leg.
+
+DIAGNOSTIC (measured): for an 8-memory corpus (114 NL tokens, 60 records) the context PACK was 5896 tokens - cr(NL/PACK) = 0.019, i.e. the pack was 52x LARGER than the source. The breakdown: 77% of the pack tokens were HASH-ID BLOAT (the long `clm:<hash>:<hash>:n` / `ent:<hash>:slug:<hash>` ids, repeated 4x per entry: id, subject, prov, evidence), and the subject was an opaque `ent:...` id - so the context an LLM consumes was unreadable hashes, not facts. Only 23% was content.
+
+THIS SLICE (dense context pack, `seam_runtime/pack.py` + `context_views.py`):
+- A context entry no longer repeats its own id - it is carried ONCE in `refs` (refs[i] is the id of entries[i]); the per-entry "id" field is dropped.
+- A claim's subject resolves to the entity LABEL (from the ENT records in the set) instead of the `ent:...` id. The rendered context (prompt/evidence/summary views) now reads "Priya owns billing service", not "ent:...:hash content ...".
+- Consumers updated: `_context_entries_by_id` keys by refs[position]; the "pack" view + the prompt/evidence/summary signal renderers resolve ids/labels. prov/evidence kept as full ids (still scored by score_pack).
+Result: 5896 -> 4117 tokens (cr 0.019 -> 0.028, ~1.4x) AND the context is human/LLM-readable - a correctness/usability fix as much as a density one (the agent context was opaque hashes).
+
+Tests: `test_context_pack_refs_match_budgeted_entries` rewritten to the dense invariant (no per-entry id; refs == included entries); new `test_context_pack_resolves_subject_to_label`. Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures.
+
+HONEST: this is the FIRST, low-risk slice (~1.4x + the readability fix); the bulk of the 4.3x available is in the NEXT slices, which I scoped: (a) dedup the prov/evidence ids by index into refs (the remaining ~50% bloat -> ~4.3x); (b) content-only context packs - drop the structural PROV/SPAN/ENT entries (37 of 60 records in the cr-metric pack) that the LLM never reasons over; (c) the §23 symbol loop on natural-language objects (collision-safe symbol generation, the "3" in the operator's "1+3"). I sliced deliberately to keep the agent-context path changes safe and tested rather than landing a large refactor in one step.
+
+Unresolved next step: density slice 2 - prov/evidence index-dedup + content-only context packs (the bulk of the remaining 4.3x), then the §23 symbol loop on NL (Track J). Then Stage 5 (migrate degenerate compile_nl records) remains open on the compiler side.
+---END-ENTRY-#314---

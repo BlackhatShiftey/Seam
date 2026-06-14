@@ -76,11 +76,15 @@ def render_context_pretty(payload: dict[str, Any]) -> str:
         f"Pack id: {pack.get('pack_id')}",
         "Context entries:",
     ]
-    entries = pack.get("payload", {}).get("entries", [])
+    pack_payload = pack.get("payload", {})
+    entries = pack_payload.get("entries", [])
+    refs = pack_payload.get("refs", [])
     if not entries:
         lines.append("(none)")
     for index, entry in enumerate(entries, start=1):
-        lines.append(f"{index}. {entry.get('id')} [{entry.get('kind')}]")
+        # an entry's id is refs[position] (the dense pack carries it once, in refs)
+        record_id = refs[index - 1] if index - 1 < len(refs) else entry.get("id", "?")
+        lines.append(f"{index}. {record_id} [{entry.get('kind')}]")
     if payload.get("trace"):
         lines.append("Trace: included")
     return "\n".join(lines)
@@ -116,6 +120,13 @@ def _build_prompt_text(payload: dict[str, Any]) -> str:
 def _build_evidence_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     records = payload.get("records", [])
     candidates = payload.get("candidates", [])
+    # Resolve claim subjects to entity labels so the rendered context reads
+    # "Priya owns billing service", not an opaque "ent:...:hash content ...".
+    ent_label = {
+        record.get("id"): str(record.get("attrs", {}).get("label", ""))
+        for record in records
+        if record.get("kind") == "ENT" and record.get("attrs", {}).get("label")
+    }
     rows: list[dict[str, Any]] = []
     for index, record in enumerate(records, start=1):
         candidate = candidates[index - 1] if index - 1 < len(candidates) else {}
@@ -124,7 +135,7 @@ def _build_evidence_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "citation": f"[{index}] {record.get('id')} [{record.get('kind')}]",
                 "record_id": record.get("id"),
                 "kind": record.get("kind"),
-                "signal": _record_signal(record),
+                "signal": _record_signal(record, ent_label),
                 "score": float(candidate.get("score", 0.0) or 0.0),
                 "sources": dict(candidate.get("sources", {})),
                 "reasons": list(candidate.get("reasons", [])),
@@ -138,20 +149,27 @@ def _build_evidence_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
 def _build_summary(payload: dict[str, Any]) -> dict[str, Any]:
     records = payload.get("records", [])
     kind_counts = Counter(record.get("kind", "UNK") for record in records)
+    ent_label = {
+        record.get("id"): str(record.get("attrs", {}).get("label", ""))
+        for record in records
+        if record.get("kind") == "ENT" and record.get("attrs", {}).get("label")
+    }
     return {
         "query": payload.get("query"),
         "record_count": len(records),
         "kind_counts": dict(sorted(kind_counts.items())),
-        "highlights": [_record_signal(record) for record in records[:5]],
+        "highlights": [_record_signal(record, ent_label) for record in records[:5]],
         "pack_id": payload.get("pack", {}).get("pack_id"),
     }
 
 
-def _record_signal(record: dict[str, Any]) -> str:
+def _record_signal(record: dict[str, Any], ent_label: dict[str, str] | None = None) -> str:
     attrs = record.get("attrs", {})
     kind = record.get("kind")
     if kind == "CLM":
-        return f"{attrs.get('subject', '?')} {attrs.get('predicate', '?')} {attrs.get('object', '?')}"
+        subject = attrs.get("subject", "?")
+        subject = (ent_label or {}).get(subject, subject)  # resolve ent-id -> label
+        return f"{subject} {attrs.get('predicate', '?')} {attrs.get('object', '?')}"
     if kind == "STA":
         fields = attrs.get("fields", {})
         if isinstance(fields, dict) and fields:

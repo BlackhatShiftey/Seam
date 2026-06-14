@@ -156,10 +156,23 @@ class SeamTests(unittest.TestCase):
             for index in range(3)
         ]
         pack = pack_ir(IRBatch(records), budget=60)
-        entry_ids = [entry["id"] for entry in pack.payload["entries"]]
-        self.assertEqual(entry_ids, ["clm:0"])
-        self.assertEqual(pack.refs, entry_ids)
-        self.assertEqual(pack.payload["refs"], entry_ids)
+        # Dense context entries no longer repeat their own id - it is carried once
+        # in refs (refs[i] is the id of entries[i]). refs lists exactly the entries
+        # that fit the budget.
+        self.assertEqual(pack.refs, pack.payload["refs"])
+        self.assertEqual(len(pack.refs), len(pack.payload["entries"]))
+        self.assertTrue(pack.refs and set(pack.refs) <= {f"clm:{i}" for i in range(3)})
+        self.assertNotIn("id", pack.payload["entries"][0])
+
+    def test_context_pack_resolves_subject_to_label(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        batch = runtime.compile_nl("Priya owns the billing service.")
+        pack = pack_ir(batch, budget=1_000_000)
+        clm = next(e for e in pack.payload["entries"] if e.get("kind") == "CLM")
+        subject = str(clm["signal"].get("subject", ""))
+        # The claim subject is the entity LABEL (readable), not an opaque ent:... id.
+        self.assertNotIn("ent:", subject)
+        self.assertNotIn("id", clm)  # dense: no repeated per-entry id
 
     def test_verifier_rejects_missing_claim_fields(self) -> None:
         batch = compile_dsl(

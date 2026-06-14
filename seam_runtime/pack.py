@@ -25,31 +25,48 @@ def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: i
         summary = _narrative_summary(ordered, lens=lens)
         return Pack(pack_id=pack_id, mode=mode, lens=lens, refs=refs, payload={"summary": summary}, budget=budget, reversible=False, token_cost=token_count(summary), profile=profile)
 
-    # Context mode: truncate by token budget, not record count.
-    entries = [{"id": record.id, "kind": record.kind.value, "signal": _compact_signal(_signal_for_record(record), expansion_to_symbol), "prov": record.prov, "evidence": record.evidence} for record in ordered]
+    # Context mode: truncate by token budget, not record count. DENSE form - the
+    # hash-laden record ids dominated the packed tokens, so an entry no longer
+    # repeats its own id (it is `refs[position]`), and a claim's subject resolves
+    # to the entity LABEL instead of an opaque `ent:...` id. Net: far fewer tokens
+    # AND a context an LLM can actually read ("Priya owns billing service").
+    ent_label = {record.id: str(record.attrs.get("label", "")) for record in ordered if record.kind == RecordKind.ENT and record.attrs.get("label")}
+
+    def _dense_signal(record: MIRLRecord) -> object:
+        signal = _compact_signal(_signal_for_record(record), expansion_to_symbol)
+        if record.kind == RecordKind.CLM and isinstance(signal, dict):
+            label = ent_label.get(signal.get("subject"))
+            if label:
+                signal = {**signal, "subject": label}
+        return signal
+
+    entries = [{"kind": record.kind.value, "signal": _dense_signal(record), "prov": record.prov, "evidence": record.evidence} for record in ordered]
 
     # Build payload skeleton to measure overhead tokens
     skeleton = {"lens": lens, "entries": [], "refs": [], "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
     overhead_tokens = token_count(json.dumps(skeleton, sort_keys=True, separators=(",", ":")))
 
     included_entries: list[dict[str, object]] = []
-    overflow_entries: list[dict[str, object]] = []
+    included_ids: list[str] = []
+    overflow_ids: list[str] = []
     current_tokens = overhead_tokens
 
-    for entry in entries:
+    for record, entry in zip(ordered, entries):
         entry_json = json.dumps(entry, sort_keys=True, separators=(",", ":"))
         entry_tokens = token_count(entry_json)
         if current_tokens + entry_tokens <= budget:
             included_entries.append(entry)
+            included_ids.append(record.id)
             current_tokens += entry_tokens
         else:
-            overflow_entries.append(entry)
+            overflow_ids.append(record.id)
 
-    refs = [str(entry["id"]) for entry in included_entries]
+    # refs[i] is the id of entries[i] - so each entry's id is carried once, in refs.
+    refs = included_ids
     pack_id = _pack_id("context", lens, budget, refs)
     payload: dict[str, object] = {"lens": lens, "entries": included_entries, "refs": refs, "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
-    if overflow_entries:
-        payload["overflow"] = {"count": len(overflow_entries), "omitted_ids": [str(e["id"]) for e in overflow_entries]}
+    if overflow_ids:
+        payload["overflow"] = {"count": len(overflow_ids), "omitted_ids": overflow_ids}
     body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return Pack(pack_id=pack_id, mode="context", lens=lens, refs=refs, payload=payload, budget=budget, reversible=False, token_cost=token_count(body), profile=profile)
 
@@ -158,7 +175,9 @@ def _context_entries_by_id(pack: Pack) -> dict[str, dict[str, object]]:
     if pack.mode != "context":
         return {}
     entries = pack.payload.get("entries", [])
-    return {str(entry.get("id")): entry for entry in entries if isinstance(entry, dict) and entry.get("id")}
+    refs = pack.payload.get("refs", [])
+    # An entry's id is refs[position] (carried once in refs, not repeated per entry).
+    return {refs[i]: entry for i, entry in enumerate(entries) if isinstance(entry, dict) and i < len(refs)}
 
 
 def _list_field_retention(records: list[MIRLRecord], entries: dict[str, dict[str, object]], field: str) -> float:
