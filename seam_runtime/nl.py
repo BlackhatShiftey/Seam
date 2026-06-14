@@ -89,6 +89,12 @@ def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "loca
         from .nl_extract import extractor_from_env
 
         extractor = extractor_from_env()
+    # Legacy regex enrichment is OFF by default (SEAM_NL_REGEX_ENRICH to re-enable):
+    # the hand-rolled location/action regexes mislabel ~25% of real prose
+    # (location=<allergen>, felt=<shipped>) for ZERO measured LoCoMo recall benefit
+    # (the content claim already carries every token), so they are pure liability and
+    # superseded by the grounded opt-in extractor. See HISTORY#317.
+    regex_enrich = bool(os.environ.get("SEAM_NL_REGEX_ENRICH"))
     source_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()[:12]
     raw_id = f"raw:{source_hash}"
     prov_id = f"prov:compile:{source_hash}"
@@ -174,8 +180,8 @@ def compile_nl(raw_text: str, source_ref: str = "local://input", ns: str = "loca
                 claim_subject = entity_id(claim.subject, "entity")
                 entity_id(claim.obj, "entity")  # the object phrase is a grounded entity too
                 add_claim(claim.relation, claim.obj, claim_subject, span_id, 0.85)
-        else:
-            # High-confidence conversational enrichment, localized to this span.
+        elif regex_enrich:
+            # Legacy regex enrichment (default OFF; see SEAM_NL_REGEX_ENRICH above).
             _extract_conversational(proposition, subject, span_id, add_claim, speaker_match)
 
     return IRBatch(records)

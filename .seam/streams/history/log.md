@@ -7045,3 +7045,29 @@ Verified: new test_context_pack_factors_prov_evidence_ids_reversibly (id-alias t
 
 Unresolved next step: the bigger remaining structural lever is the SAME hash inside `refs` (163 tokens) - encoding it would amortize the one table entry over refs+prov+evidence (the biggest %), but it widens blast radius (ref_coverage, _context_entries_by_id keying, and the readable context_views pack-view display all read refs as full ids), so it was kept out of this prov/evidence-scoped slice = candidate slice 4. The §23 symbol loop on NL objects is confirmed LOW-value under this tokenizer (marginal multi-token-phrase wins, high #309 substring risk) - effectively closed unless the tokenizer changes. Stage 5 (migrate degenerate compile_nl records) remains open on the compiler side.
 ---END-ENTRY-#316---
+
+---BEGIN-ENTRY-#317---
+id: 317
+date: 2026-06-14T23:53:15Z
+agent: claude
+status: done
+topics: nl, compiler, ingest, enrichment, regex, locomo, benchmark, recall, test, verify, history, status
+commits: none
+refs: seam_runtime/nl.py,tests/audit/test_conversation_turn_compile.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 316
+tokens: 760
+---
+INGEST QUALITY: turned the floor's regex enrichment OFF by default (operator: "fix the noisy regex" before a paid benchmark). This is the #311 "transitional" hand-rolled location/date/mentioned/action(felt/went_to) extractor, now proven to be pure liability by a live smoke + a benchmark A/B.
+
+EVIDENCE (measured, not assumed):
+- INGEST SMOKE (16 varied real sentences, default floor): 16/16 produced the faithful content claim, but 6/16 emitted EXTRA enrichment claims and ~25% of ingests got a CLEARLY-WRONG secondary label - `location=gluten` ("allergic to gluten"), `felt=shipped version 2`, `location=cardiology` ("specializes in cardiology"), `felt=delivered`. Grounded (drawn from text, never fabricated) but semantically wrong, and it is the DEFAULT/CI path, not an edge case.
+- BENCHMARK A/B (free LoCoMo recall, 5 dev scopes / 599 questions, enrichment ON vs OFF over the SAME questions): enriched 0.627396 vs content-only 0.626730 = delta -0.000667 (noise); per-category cat1/2/3/5 BYTE-IDENTICAL, cat4 -0.0012. So the enrichment delivers ZERO recall benefit (a hair negative) - mechanically, the faithful content claim already carries every verbatim token, so the enrichment claims are token-SUBSETS that add wrong structure + records but no new retrievable signal. 25% wrong for 0 upside = cut it.
+
+THE FIX (`seam_runtime/nl.py`): `compile_nl` reads `SEAM_NL_REGEX_ENRICH` (default OFF); the `_extract_conversational` call is now `elif regex_enrich:` so the floor emits ONLY the verbatim content claim + proper-noun entities + grounded subject. The regex enrichment is RECOVERABLE via the flag (not deleted) and the opt-in grounded Ollama extractor (#313) remains the real structured-triple path. Determinism + faithfulness unchanged; this only removes the wrong secondary labels.
+
+WHAT THE BENCHMARK ALSO EXPOSED (the real recall headroom, NOT addressed here): baseline 0.627 with the 11 retrieval-flag levers TAPPED OUT (improve cycle proposed nothing) - because those levers are all retrieval-side and cannot touch ingest. Per-category the weakness is cat1 multi-hop 0.398 and cat3 open-domain 0.223 (cat2 0.679 / cat4 0.737 strong; cat5 0.0 = unanswerable). Improving cat1/cat3 needs a genuinely NEW lever (multi-hop retrieval / query decomposition), not an existing knob = next research item.
+
+Verified: tests/audit/test_conversation_turn_compile.py now sets SEAM_NL_REGEX_ENRICH=1 via an autouse fixture (pins the OPT-IN legacy path); new test_seam.py::test_compile_nl_no_regex_enrichment_by_default pins the default-off floor (only `content` predicate) + flag-recoverability. Post-fix ingest smoke = 0/16 noisy (was 6/16); LoCoMo non-content claims at scale = 0. Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures (1075 passed/2 xfailed/3 subtests, +1 over #316).
+
+Unresolved next step: operator-authorized PAID 100-question judged LoCoMo run (after this free verification) - gated, cost surfaced first. Then the real recall work: cat1 multi-hop + cat3 open-domain need a new retrieval/ingest lever (the 11 flag levers are exhausted at 0.627). Stage 5 (migrate the degenerate records still in `./seam.db`) and the server graceful-shutdown wiring gap remain open.
+---END-ENTRY-#317---
