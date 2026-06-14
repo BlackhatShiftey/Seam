@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 315
-total_tokens: ~121342
-latest_id: 315
+total_entries: 316
+total_tokens: ~122102
+latest_id: 316
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 316 | 2026-06-14 | done | a45c14d009f6399b | pack,density,compression,context,+ | 315 |
 | 315 | 2026-06-14 | done | 1824fb062a082afc | pack,density,compression,context,+ | 314 |
 | 314 | 2026-06-14 | done | bcd1c824a713d226 | pack,density,compression,context,+ | 313 |
 | 313 | 2026-06-14 | done | 105bd107e9676668 | mirl,compiler,nl,ollama,+ | 312 |
@@ -356,17 +357,17 @@ compact: true
 - compile: count=13 latest=#154, #047, #046, #043, #042
 - compiler: count=8 latest=#313, #311, #309, #308, #307
 - compress: count=26 latest=#145, #144, #132, #131, #130
-- compression: count=2 latest=#315, #314
+- compression: count=3 latest=#316, #315, #314
 - concepts: count=1 latest=#180
 - consolidation: count=1 latest=#306
-- context: count=2 latest=#315, #314
+- context: count=3 latest=#316, #315, #314
 - continuity: count=3 latest=#310, #193, #192
 - contract: count=2 latest=#305, #303
 - conversation: count=1 latest=#311
 - correction: count=1 latest=#299
-- cr: count=2 latest=#315, #314
+- cr: count=3 latest=#316, #315, #314
 - dashboard: count=71 latest=#299, #298, #288, #286, #285
-- density: count=2 latest=#315, #314
+- density: count=3 latest=#316, #315, #314
 - dependabot: count=1 latest=#301
 - dependencies: count=4 latest=#301, #296, #295, #293
 - dev-gate: count=1 latest=#297
@@ -377,6 +378,7 @@ compact: true
 - doctor: count=9 latest=#287, #170, #169, #140, #139
 - dsl: count=1 latest=#298
 - enforcement: count=1 latest=#294
+- evidence: count=1 latest=#316
 - experiment: count=1 latest=#273
 - extractor: count=1 latest=#313
 - extras: count=1 latest=#022
@@ -392,7 +394,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=238 latest=#315, #314, #313, #312, #311
+- history: count=239 latest=#316, #315, #314, #313, #312
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -424,7 +426,7 @@ compact: true
 - nl: count=6 latest=#313, #311, #309, #308, #303
 - ollama: count=1 latest=#313
 - operator: count=1 latest=#179
-- pack: count=4 latest=#315, #314, #218, #183
+- pack: count=5 latest=#316, #315, #314, #218, #183
 - packaging: count=4 latest=#296, #293, #287, #284
 - paid-validation: count=1 latest=#302
 - persist: count=25 latest=#251, #244, #218, #213, #212
@@ -436,6 +438,7 @@ compact: true
 - promotion: count=1 latest=#305
 - proposer: count=1 latest=#291
 - protocol: count=93 latest=#310, #304, #294, #280, #268
+- prov: count=1 latest=#316
 - pyproject: count=5 latest=#267, #094, #051, #049, #022
 - qr: count=1 latest=#307
 - rank: count=6 latest=#243, #242, #240, #017, #005
@@ -468,20 +471,21 @@ compact: true
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - spec: count=3 latest=#307, #305, #304
 - ssrf: count=2 latest=#300, #288
-- status: count=140 latest=#315, #314, #313, #312, #311
+- status: count=141 latest=#316, #315, #314, #313, #312
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
 - surface: count=5 latest=#276, #225, #218, #208, #145
-- symbols: count=1 latest=#309
+- symbols: count=2 latest=#316, #309
 - test: count=28 latest=#313, #311, #309, #308, #307
 - tests: count=3 latest=#192, #191, #182
 - textual: count=17 latest=#108, #106, #063, #062, #061
 - tokenizer: count=1 latest=#216
+- traceability: count=1 latest=#316
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - unify: count=1 latest=#311
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=244 latest=#315, #314, #313, #312, #311
+- verify: count=245 latest=#316, #315, #314, #313, #312
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
@@ -492,6 +496,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 293
+- done: 294
 - in-progress: 2
 - planned: 20

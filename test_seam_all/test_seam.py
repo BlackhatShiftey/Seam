@@ -184,6 +184,28 @@ class SeamTests(unittest.TestCase):
         self.assertTrue(kinds <= {"CLM", "STA", "EVT", "REL"}, kinds)
         self.assertTrue(any(entry["kind"] == "CLM" for entry in pack.payload["entries"]))
 
+    def test_context_pack_factors_prov_evidence_ids_reversibly(self) -> None:
+        runtime = SeamRuntime(self.db_path)
+        # One document -> all claims share one prov/span hash, so the long hash
+        # segment repeats across prov+evidence and the id-alias table fires.
+        batch = runtime.compile_nl(
+            "Priya owns the billing service. The billing service depends on the payments gateway. "
+            "Marcus leads the platform team. Priya reports to Marcus."
+        )
+        pack = pack_ir(batch, budget=1_000_000)
+        idsym = pack.payload.get("idsym", {})
+        self.assertTrue(idsym, "expected an id-alias table when prov/evidence hashes repeat")
+        # Every alias symbol lives in the reserved `$` namespace (collision-safe: no
+        # real id segment starts with `$`).
+        self.assertTrue(all(symbol.startswith("$") for symbol in idsym))
+        encoded_prov = [value for entry in pack.payload["entries"] for value in entry["prov"]]
+        self.assertTrue(any("$" in value for value in encoded_prov), encoded_prov)
+        # Reversible: score_pack decodes the aliases back to the full ids, so a
+        # faithful pack still earns full prov/evidence retention (traceability holds).
+        score = score_pack(pack, batch.records)
+        self.assertEqual(score["provenance_retention"], 1.0)
+        self.assertEqual(score["evidence_retention"], 1.0)
+
     def test_verifier_rejects_missing_claim_fields(self) -> None:
         batch = compile_dsl(
             """
