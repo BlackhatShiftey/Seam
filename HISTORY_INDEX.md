@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 311
-total_tokens: ~117905
-latest_id: 311
+total_entries: 312
+total_tokens: ~118947
+latest_id: 312
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 312 | 2026-06-14 | done | d81f92aec55a66cb | self-improvement,loop,self-probe,retrieval,+ | 311 |
 | 311 | 2026-06-14 | done | cbcce34e8d96e8f6 | mirl,compiler,nl,unify,+ | 310 |
 | 310 | 2026-06-13 | done | 9c0ba7e31c62a461 | protocol,history,status,verify,+ | 309 |
 | 309 | 2026-06-13 | done | 0994fba1d6401398 | security,redos,codeql,mirl,+ | 308 |
@@ -333,7 +334,7 @@ compact: true
 - audit: count=74 latest=#303, #290, #288, #280, #279
 - baseline: count=1 latest=#303
 - beam: count=1 latest=#223
-- benchmark: count=98 latest=#311, #302, #292, #290, #289
+- benchmark: count=99 latest=#312, #311, #302, #292, #290
 - branch: count=1 latest=#280
 - branches: count=1 latest=#306
 - bug: count=1 latest=#303
@@ -383,7 +384,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=234 latest=#311, #310, #309, #308, #307
+- history: count=235 latest=#312, #311, #310, #309, #308
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -397,9 +398,9 @@ compact: true
 - lexical: count=1 latest=#004
 - linux: count=6 latest=#177, #173, #136, #135, #021
 - locking: count=2 latest=#283, #182
-- locomo: count=16 latest=#311, #302, #297, #292, #290
+- locomo: count=17 latest=#312, #311, #302, #297, #292
 - longmemeval: count=1 latest=#223
-- loop: count=6 latest=#297, #293, #292, #291, #290
+- loop: count=7 latest=#312, #297, #293, #292, #291
 - lossless: count=1 latest=#288
 - lx1: count=6 latest=#206, #197, #088, #018, #011
 - maintenance: count=1 latest=#301
@@ -438,7 +439,7 @@ compact: true
 - refactor: count=1 latest=#284
 - registry: count=1 latest=#178
 - repo-ledger: count=1 latest=#304
-- retrieval: count=51 latest=#308, #307, #297, #292, #291
+- retrieval: count=52 latest=#312, #308, #307, #297, #292
 - retry: count=1 latest=#182
 - roadmap: count=50 latest=#284, #276, #243, #196, #193
 - roundtrip: count=2 latest=#007, #006
@@ -448,7 +449,8 @@ compact: true
 - scorer: count=1 latest=#292
 - search: count=16 latest=#276, #242, #240, #181, #154
 - security: count=43 latest=#309, #301, #300, #299, #298
-- self-improvement: count=7 latest=#302, #297, #293, #292, #291
+- self-improvement: count=8 latest=#312, #302, #297, #293, #292
+- self-probe: count=1 latest=#312
 - server: count=4 latest=#300, #288, #286, #285
 - session: count=3 latest=#027, #025, #019
 - session-end: count=1 latest=#306
@@ -456,7 +458,7 @@ compact: true
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - spec: count=3 latest=#307, #305, #304
 - ssrf: count=2 latest=#300, #288
-- status: count=136 latest=#311, #310, #309, #308, #307
+- status: count=137 latest=#312, #311, #310, #309, #308
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
@@ -469,7 +471,7 @@ compact: true
 - tui: count=25 latest=#137, #121, #120, #119, #118
 - unify: count=1 latest=#311
 - vector: count=25 latest=#228, #223, #220, #218, #199
-- verify: count=240 latest=#311, #310, #309, #308, #307
+- verify: count=241 latest=#312, #311, #310, #309, #308
 - vulnerability: count=1 latest=#296
 - webui: count=3 latest=#286, #285, #267
 - windows: count=21 latest=#283, #282, #261, #260, #259
@@ -480,6 +482,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 289
+- done: 290
 - in-progress: 2
 - planned: 20

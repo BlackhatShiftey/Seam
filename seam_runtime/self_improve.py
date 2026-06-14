@@ -37,6 +37,14 @@ from .retrieval import RetrievalFlags
 if TYPE_CHECKING:  # avoid import cycle / heavy import at module load
     from .runtime import SeamRuntime
 
+# The kinds a probe may target by default = exactly the kinds `search_ir` can
+# return as candidates (see `retrieval.search_batch` candidate_kinds). Probing
+# RAW (not a default search candidate) or PROV/SPAN/ENT (whose only text is an
+# id/label, not content) yields structurally-unhittable or degenerate cloze
+# queries that always miss, diluting the signal; the content claim carries the
+# verbatim proposition, so restricting to these loses no content.
+_DEFAULT_PROBE_KINDS = (RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL)
+
 
 @dataclass(frozen=True)
 class Probe:
@@ -94,10 +102,22 @@ def _category_of(record: MIRLRecord) -> str:
     return getattr(kind, "value", None) or str(kind)
 
 
+_REF_RE = re.compile(r"^(?:ent|raw|clm|span|prov|sta|evt|rel|sym):\S*$")
+
+
+def _looks_like_ref(value: str) -> bool:
+    """True if ``value`` is a SEAM record-id reference (e.g. a claim's subject
+    ``ent:contract:<hash>``) rather than natural-language content."""
+    return bool(_REF_RE.match(value))
+
+
 def _record_text(record: MIRLRecord) -> str | None:
     """The most content-bearing textual field of a record (the cloze source).
-    None when the record has no usable text."""
-    texts = [t.strip() for t in iter_textual_fields(record) if t and t.strip()]
+
+    Excludes id-reference fields (a claim's ``subject`` is an ``ent:...`` id, not
+    content), so a short-object enrichment claim does not produce a degenerate
+    cloze over its subject id. None when the record has no usable text."""
+    texts = [t.strip() for t in iter_textual_fields(record) if t and t.strip() and not _looks_like_ref(t.strip())]
     if not texts:
         return None
     return max(texts, key=len)
@@ -155,8 +175,13 @@ def generate_probes(
     Each probe masks the salient span of a record's text (see :func:`_cloze`),
     so the query is a near-paraphrase missing the answer token and a hit means
     retrieval found the record from context, not lexical echo. Records whose
-    text has no maskable salient span (labels, too-short fields) are skipped, so
-    ``kinds=None`` (all kinds) self-selects the answer-bearing records.
+    text has no maskable salient span (labels, too-short fields) are skipped.
+
+    ``kinds=None`` (the default) targets only the kinds retrieval can actually
+    return (``_DEFAULT_PROBE_KINDS`` = CLM/STA/EVT/REL); this excludes RAW (not a
+    default search candidate) and PROV/SPAN/ENT (id/label-only text), whose probes
+    would always miss and silently dilute the signal. Pass an explicit ``kinds``
+    tuple to override (e.g. ``kinds=(RAW,)`` to probe RAW specifically).
 
     Determinism (fixed ``seed``) is required so the SAME probe set scores a
     config before and after an ``improvement apply`` - that identity is what
@@ -165,7 +190,7 @@ def generate_probes(
     failing.
     """
     batch = runtime.store.load_ir(ns=ns, scope=scope, limit=load_limit)
-    kind_set = set(kinds) if kinds else None
+    kind_set = set(kinds) if kinds is not None else set(_DEFAULT_PROBE_KINDS)
     candidates: list[Probe] = []
     for record in batch.records:
         if kind_set is not None and record.kind not in kind_set:
