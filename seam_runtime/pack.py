@@ -12,6 +12,20 @@ from .symbols import build_symbol_maps
 # lives in a content claim's object, entity labels are inlined into claim subjects.
 _CONTEXT_CONTENT_KINDS = frozenset({RecordKind.CLM, RecordKind.STA, RecordKind.EVT, RecordKind.REL})
 
+# Sentinel namespace for id-segment aliases (slice 3). The surviving content
+# entries still carry full prov/evidence pointers (`prov:compile:<hash>`,
+# `span:<hash>:n`) whose document <hash> is the token-expensive part (~7 tokens)
+# and repeats across an entry's prov + evidence. A pack-level alias table maps
+# each recurring long `:`-segment to a short `$N` symbol; ids are rewritten by
+# segment substitution and the table is stored once in the pack, so the encoding
+# is exactly reversible (real id segments never start with `$`). This is a §23.1
+# alias rule applied to the structured id surface forms.
+_ID_ALIAS_PREFIX = "$"
+# Only segments worth a `$N` symbol (~2 tokens) get aliased - a short segment
+# (`prov`, `compile`, `span`, a numeric index) costs <= the symbol, so aliasing it
+# would not reduce tokens. The document hashes are the segments that clear this bar.
+_MIN_ID_SEGMENT_TOKENS = 3
+
 
 def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: int = 512, mode: str = "context", profile: str = "default", namespace: str | None = None) -> Pack:
     ordered = sorted(records, key=lambda record: record.id)
@@ -52,7 +66,22 @@ def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: i
     # dropped from the entries - they live in the store for traceability, not in
     # the prompt. This is the bulk of the NL->PACK density win.
     content_records = [record for record in ordered if record.kind in _CONTEXT_CONTENT_KINDS]
-    entries = [{"kind": record.kind.value, "signal": _dense_signal(record), "prov": record.prov, "evidence": record.evidence} for record in content_records]
+
+    # Factor the repeated long id segments (document hashes) out of the surviving
+    # entries' prov/evidence pointers. Net-win gated: if the alias table does not
+    # reduce total tokens, it is dropped and the entries keep full ids - so this is
+    # a strict no-regression ratchet on the packed token count (spec §24 spirit:
+    # denser only when it proves it stays recoverable, which the stored table does).
+    id_alias, id_unalias = _mine_id_aliases(content_records)
+    entries = [
+        {
+            "kind": record.kind.value,
+            "signal": _dense_signal(record),
+            "prov": [_encode_id(value, id_alias) for value in record.prov],
+            "evidence": [_encode_id(value, id_alias) for value in record.evidence],
+        }
+        for record in content_records
+    ]
 
     # Build payload skeleton to measure overhead tokens
     skeleton = {"lens": lens, "entries": [], "refs": [], "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
@@ -77,6 +106,8 @@ def pack_records(records: Iterable[MIRLRecord], lens: str = "general", budget: i
     refs = included_ids
     pack_id = _pack_id("context", lens, budget, refs)
     payload: dict[str, object] = {"lens": lens, "entries": included_entries, "refs": refs, "symbols": {symbol: expansion for expansion, symbol in expansion_to_symbol.items()}}
+    if id_unalias:
+        payload["idsym"] = id_unalias
     if overflow_ids:
         payload["overflow"] = {"count": len(overflow_ids), "omitted_ids": overflow_ids}
     body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -115,8 +146,9 @@ def score_pack(pack: Pack, records: Iterable[MIRLRecord]) -> dict[str, float | i
         overall = (0.50 * reversibility) + (0.20 * ref_coverage) + (0.15 * provenance_retention) + (0.15 * evidence_retention)
     elif pack.mode == "context":
         entries = _context_entries_by_id(pack)
-        provenance_retention = _list_field_retention(ordered, entries, "prov")
-        evidence_retention = _list_field_retention(ordered, entries, "evidence")
+        id_unalias = pack.payload.get("idsym", {})
+        provenance_retention = _list_field_retention(ordered, entries, "prov", id_unalias)
+        evidence_retention = _list_field_retention(ordered, entries, "evidence", id_unalias)
         reversibility = 0.0
         traceability = (ref_coverage + provenance_retention + evidence_retention) / 3
         overall = (0.40 * traceability) + (0.25 * budget_fit) + (0.20 * compression_score) + (0.15 * ref_coverage)
@@ -192,7 +224,7 @@ def _context_entries_by_id(pack: Pack) -> dict[str, dict[str, object]]:
     return {refs[i]: entry for i, entry in enumerate(entries) if isinstance(entry, dict) and i < len(refs)}
 
 
-def _list_field_retention(records: list[MIRLRecord], entries: dict[str, dict[str, object]], field: str) -> float:
+def _list_field_retention(records: list[MIRLRecord], entries: dict[str, dict[str, object]], field: str, id_unalias: dict[str, str] | None = None) -> float:
     if not records:
         return 1.0
     scores: list[float] = []
@@ -205,8 +237,63 @@ def _list_field_retention(records: list[MIRLRecord], entries: dict[str, dict[str
         if entry is None:
             scores.append(0.0)
             continue
-        scores.append(1.0 if list(entry.get(field, [])) == expected else 0.0)
+        # Decode the id aliases so retention is measured against the FULL ids: the
+        # alias table round-trips exactly, so a faithful pack still scores 1.0.
+        stored = [_decode_id(value, id_unalias) for value in entry.get(field, [])] if id_unalias else list(entry.get(field, []))
+        scores.append(1.0 if stored == expected else 0.0)
     return sum(scores) / len(scores)
+
+
+def _mine_id_aliases(records: list[MIRLRecord]) -> tuple[dict[str, str], dict[str, str]]:
+    """Mine recurring long id `:`-segments from the records' prov/evidence.
+
+    Returns (alias, unalias) = (segment->`$N`, `$N`->segment). Only segments that
+    recur (frequency >= 2) and cost at least `_MIN_ID_SEGMENT_TOKENS` are aliased,
+    and the whole table is kept only if it is a NET token win over the raw ids
+    (table cost included) - otherwise empty maps are returned and ids stay full.
+    Symbol assignment is deterministic within scope (sorted by -frequency then
+    segment), satisfying the §13 determinism/collision/reversibility rules.
+    """
+    ids = [str(value) for record in records for value in (*record.prov, *record.evidence)]
+    if not ids:
+        return {}, {}
+    segment_counts: dict[str, int] = {}
+    for id_value in ids:
+        for segment in id_value.split(":"):
+            segment_counts[segment] = segment_counts.get(segment, 0) + 1
+
+    alias: dict[str, str] = {}
+    unalias: dict[str, str] = {}
+    index = 0
+    for segment, frequency in sorted(segment_counts.items(), key=lambda item: (-item[1], item[0])):
+        if frequency < 2 or segment.startswith(_ID_ALIAS_PREFIX) or token_count(segment) < _MIN_ID_SEGMENT_TOKENS:
+            continue
+        symbol = f"{_ID_ALIAS_PREFIX}{index}"
+        alias[segment] = symbol
+        unalias[symbol] = segment
+        index += 1
+
+    if not alias:
+        return {}, {}
+
+    raw_cost = sum(token_count(id_value) for id_value in ids)
+    encoded_cost = sum(token_count(_encode_id(id_value, alias)) for id_value in ids)
+    table_cost = token_count(json.dumps(unalias, sort_keys=True, separators=(",", ":")))
+    if encoded_cost + table_cost >= raw_cost:
+        return {}, {}  # no net win - keep full ids (strict no-regression)
+    return alias, unalias
+
+
+def _encode_id(id_value: str, alias: dict[str, str]) -> str:
+    if not alias:
+        return id_value
+    return ":".join(alias.get(segment, segment) for segment in str(id_value).split(":"))
+
+
+def _decode_id(id_value: str, unalias: dict[str, str]) -> str:
+    if not unalias:
+        return id_value
+    return ":".join(unalias.get(segment, segment) for segment in str(id_value).split(":"))
 
 
 def _records_token_cost(records: list[MIRLRecord]) -> int:

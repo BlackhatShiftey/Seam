@@ -7019,3 +7019,29 @@ Tests: new `test_context_pack_is_content_only` (entry kinds subset {CLM,STA,EVT,
 
 Unresolved next step: density slice 3 - the §23 symbol loop on natural-language objects (collision-safe symbol generation, the "3" in the operator's "1+3"; deferred to Track J after the #309 whitespace-tokenization collision). The prov/evidence index-dedup idea from #314 is now moot for the content path (the structural-id bloat left with the dropped entries). Then Stage 5 (migrate degenerate compile_nl records) remains open on the compiler side.
 ---END-ENTRY-#315---
+
+---BEGIN-ENTRY-#316---
+id: 316
+date: 2026-06-14T13:26:00Z
+agent: claude
+status: done
+topics: pack, density, compression, context, symbols, prov, evidence, traceability, cr, verify, history, status
+commits: none
+refs: seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 315
+tokens: 760
+---
+Density axis, SLICE 3 (collision-safe id factoring on prov/evidence) + a CORRECTION to #315. Operator asked "is it possible to do a and b? do a at least" where a = factor the prov/evidence ids, b = the §23 predicate/symbol compaction.
+
+CORRECTION TO #315: that entry claimed "the prov/evidence index-dedup idea is now moot (the structural-id bloat left with the dropped entries)" - WRONG. The bloat left the DROPPED RAW/PROV/SPAN entries, but the SURVIVING content (CLM) entries still carry full `prov:compile:<hash>` + `span:<hash>:n` id strings. MEASURED breakdown of the 862-token content-only pack (8-memory corpus): refs 163, prov 162, evidence 162, signal.object 95, kind 52, signal.subject 42, signal.predicate 39. So prov+evidence = 324 tokens (38%) were still full hash-ids, NOT moot. (Per protocol I do not edit #315 in place; this supersede records the correction.)
+
+KEY TOKENIZER FINDING (why b was dropped): under the repo tokenizer `content`=1 token and a 2-char symbol `ct`=1 token, so §23 predicate compaction saves ZERO tokens - aliasing already-1-token words is pure table overhead. The §23 symbol loop only wins on MULTI-token strings. The token-expensive part of an id is the document `<hash>` (`1bfcc2c02379`=7 tokens), which repeats across an entry's prov + evidence (+ refs). So a is the only real lever; b is token-neutral and was correctly skipped (doing it would regress).
+
+THE CHANGE (`seam_runtime/pack.py`, a only): `_mine_id_aliases` mines recurring long `:`-segments (frequency>=2, token_count>=`_MIN_ID_SEGMENT_TOKENS`=3 -> the doc hashes) from the content records' prov/evidence, assigns each a `$N` symbol in a reserved sentinel namespace (real id segments never start with `$` -> collision-safe by construction; deterministic order = -freq then segment per §13), and rewrites prov/evidence by exact segment substitution. The `$N`->segment table is stored ONCE as `payload["idsym"]`. NET-WIN GATED: if encoded ids + table >= raw ids the table is dropped and ids stay full -> a STRICT no-regression ratchet on packed tokens (spec §24 spirit). REVERSIBLE: `_decode_id` is the exact inverse; `score_pack`/`_list_field_retention` decode before comparing to the full record ids, so prov/evidence retention stays 1.0 and context traceability holds (>=0.66 evals gate). Context packs are already reversible=false, so the only reader of entry prov/evidence is score_pack (verified: cli/server/mcp/context_views read payload["records"], not the pack entries).
+
+MEASURED: multi-doc 8-memory corpus (8 distinct hashes, each ~3x across prov/evidence so the 7-token table entry barely amortizes) 862->808 tokens (-6.3%); single-DOCUMENT corpus (13 claims sharing ONE hash = the realistic ingest pattern, where the one table entry amortizes over 26 prov/evidence occurrences) 961->769 (-20.0%), traceability 0.802, prov/evidence retention 1.0. The % grows with claims-per-document, and the gate guarantees it never regresses.
+
+Verified: new test_context_pack_factors_prov_evidence_ids_reversibly (id-alias table fires, all symbols in the `$` namespace, encoded prov references symbols, score_pack retention 1.0 = reversible). Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures (1074 passed/2 xfailed/3 subtests, +1 over #315).
+
+Unresolved next step: the bigger remaining structural lever is the SAME hash inside `refs` (163 tokens) - encoding it would amortize the one table entry over refs+prov+evidence (the biggest %), but it widens blast radius (ref_coverage, _context_entries_by_id keying, and the readable context_views pack-view display all read refs as full ids), so it was kept out of this prov/evidence-scoped slice = candidate slice 4. The §23 symbol loop on NL objects is confirmed LOW-value under this tokenizer (marginal multi-token-phrase wins, high #309 substring risk) - effectively closed unless the tokenizer changes. Stage 5 (migrate degenerate compile_nl records) remains open on the compiler side.
+---END-ENTRY-#316---
