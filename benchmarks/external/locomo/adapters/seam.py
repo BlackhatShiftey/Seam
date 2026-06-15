@@ -650,8 +650,17 @@ def _openai_short_answer(model: str, prompt: str, max_tokens: int = 64, diag_out
         # hidden reasoning tokens against the completion budget. Mirror the
         # judge's handling at judge.py:148-150: floor the budget so the
         # actual answer text has room to emit, and minimize reasoning.
-        request["max_completion_tokens"] = max(max_tokens, 256)
-        request["reasoning_effort"] = "minimal"
+        # Reasoning tokens count against max_completion_tokens, so a small floor
+        # (256) is exhausted by medium/high effort before the answer emits. Floor
+        # generously (env-configurable) so the short answer has room after reasoning.
+        _floor = int(os.environ.get("SEAM_BENCH_MAX_COMPLETION_TOKENS", "2048"))
+        request["max_completion_tokens"] = max(max_tokens, _floor)
+        # reasoning_effort is env-configurable (SEAM_BENCH_REASONING_EFFORT).
+        # Default "low": the former hardcoded "minimal" is rejected by some
+        # reasoning models (o4-mini supports low/medium/high/xhigh, not minimal),
+        # and "low" is the broadly-supported minimum. Raise it (medium/high) to
+        # actually engage reasoning for hard-category measurement.
+        request["reasoning_effort"] = os.environ.get("SEAM_BENCH_REASONING_EFFORT", "low")
     else:
         request["max_tokens"] = max_tokens
         request["temperature"] = 0

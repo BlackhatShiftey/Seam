@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 320
-total_tokens: ~124962
-latest_id: 320
+total_entries: 321
+total_tokens: ~125682
+latest_id: 321
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 321 | 2026-06-15 | done | 8f340dc06137a30a | retrieval,answerer,reasoning,locomo,+ | 320 |
 | 320 | 2026-06-15 | done | 25494450ae5a4f8e | retrieval,budget,topk,locomo,+ | 319 |
 | 319 | 2026-06-15 | done | 4081a094aa3d9227 | roadmap,query,sql,bird,+ | 318 |
 | 318 | 2026-06-15 | done | 986aa84648caf209 | retrieval,multihop,locomo,benchmark,+ | 317 |
@@ -338,11 +339,12 @@ compact: true
 - alias: count=2 latest=#033, #002
 - allowlist: count=1 latest=#300
 - animation: count=4 latest=#068, #052, #032, #028
+- answerer: count=1 latest=#321
 - atomicity: count=1 latest=#182
 - audit: count=74 latest=#303, #290, #288, #280, #279
 - baseline: count=1 latest=#303
 - beam: count=1 latest=#223
-- benchmark: count=103 latest=#320, #319, #318, #317, #312
+- benchmark: count=104 latest=#321, #320, #319, #318, #317
 - bird: count=1 latest=#319
 - branch: count=1 latest=#280
 - branches: count=1 latest=#306
@@ -350,6 +352,7 @@ compact: true
 - bug: count=1 latest=#303
 - bugfix: count=14 latest=#295, #287, #286, #283, #282
 - bundle: count=5 latest=#262, #245, #238, #015, #008
+- cat1: count=1 latest=#321
 - chat: count=15 latest=#286, #137, #074, #073, #072
 - chat-endpoint: count=1 latest=#300
 - chroma: count=5 latest=#296, #295, #293, #017, #001
@@ -370,6 +373,7 @@ compact: true
 - continuity: count=3 latest=#310, #193, #192
 - contract: count=2 latest=#305, #303
 - conversation: count=1 latest=#311
+- coreference: count=1 latest=#321
 - correction: count=1 latest=#299
 - cr: count=3 latest=#316, #315, #314
 - dashboard: count=71 latest=#299, #298, #288, #286, #285
@@ -403,7 +407,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=243 latest=#320, #319, #318, #317, #316
+- history: count=244 latest=#321, #320, #319, #318, #317
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -412,13 +416,13 @@ compact: true
 - installer: count=13 latest=#204, #177, #173, #169, #100
 - integrity: count=9 latest=#281, #276, #218, #209, #133
 - isolation: count=2 latest=#275, #274
-- judge: count=2 latest=#320, #302
+- judge: count=3 latest=#321, #320, #302
 - ledger: count=38 latest=#302, #230, #181, #177, #176
 - lexical: count=1 latest=#004
 - linux: count=6 latest=#177, #173, #136, #135, #021
 - llm: count=1 latest=#313
 - locking: count=2 latest=#283, #182
-- locomo: count=21 latest=#320, #319, #318, #317, #312
+- locomo: count=22 latest=#321, #320, #319, #318, #317
 - longmemeval: count=1 latest=#223
 - loop: count=7 latest=#312, #297, #293, #292, #291
 - lossless: count=1 latest=#288
@@ -431,7 +435,7 @@ compact: true
 - mirl: count=30 latest=#313, #311, #309, #308, #307
 - models: count=1 latest=#182
 - multi-agent: count=19 latest=#268, #231, #230, #229, #224
-- multihop: count=2 latest=#319, #318
+- multihop: count=3 latest=#321, #319, #318
 - naming: count=4 latest=#033, #024, #009, #002
 - nl: count=7 latest=#317, #313, #311, #309, #308
 - ollama: count=1 latest=#313
@@ -457,6 +461,7 @@ compact: true
 - ratchet: count=1 latest=#291
 - read-order: count=1 latest=#304
 - readme: count=17 latest=#147, #121, #117, #116, #100
+- reasoning: count=1 latest=#321
 - recall: count=2 latest=#320, #317
 - reconcile: count=1 latest=#182
 - reconciliation: count=1 latest=#305
@@ -466,7 +471,7 @@ compact: true
 - regex: count=1 latest=#317
 - registry: count=1 latest=#178
 - repo-ledger: count=1 latest=#304
-- retrieval: count=57 latest=#320, #319, #318, #315, #314
+- retrieval: count=58 latest=#321, #320, #319, #318, #315
 - retry: count=1 latest=#182
 - roadmap: count=52 latest=#319, #318, #284, #276, #243
 - roundtrip: count=2 latest=#007, #006
@@ -488,7 +493,7 @@ compact: true
 - sql: count=1 latest=#319
 - sql2: count=1 latest=#318
 - ssrf: count=2 latest=#300, #288
-- status: count=145 latest=#320, #319, #318, #317, #316
+- status: count=146 latest=#321, #320, #319, #318, #317
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
@@ -514,6 +519,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 298
+- done: 299
 - in-progress: 2
 - planned: 20

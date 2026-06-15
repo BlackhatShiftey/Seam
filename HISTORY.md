@@ -7143,3 +7143,30 @@ Verified: new tests/audit/test_retrieval_flags.py (search_top_k default None + e
 
 Unresolved next step: optional - bump the CORE search_ir production default (budget=5 is starved) behind its OWN measurement on the CLI/REST surface; expose context-char-budget similarly if wanted. Track O (BIRD/query engine) banked for after. Stage 5 (degenerate ./seam.db) + the server graceful-shutdown wiring gap still open. The cat1/cat3 retrieval-quality arc is CLOSED (0.40->0.52 validated).
 ---END-ENTRY-#320---
+
+---BEGIN-ENTRY-#321---
+id: 321
+date: 2026-06-15T04:42:47Z
+agent: claude
+status: done
+topics: retrieval, answerer, reasoning, locomo, benchmark, judge, cat1, multihop, coreference, history, status
+commits: none
+refs: benchmarks/external/locomo/adapters/seam.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 320
+tokens: 720
+---
+PUSH TOWARD 80% (operator goal, a multi-task campaign not one knob): climbed the ANSWERER ladder past the #320 budget knee (0.52), found it TAPS OUT at ~0.60, and proved cat1 is a retrieval-ARCHITECTURE problem the answerer cannot fix. All paid judged, 100 cases, knee retrieval (top_k=100/budget=8000), judge gpt-4o-mini:
+- gpt-4o-mini answerer: 0.52
+- gpt-4o answerer: 0.595 (+0.075) - but the win is ENTIRELY cat2 temporal (0.50->0.70); cat1 FLAT 0.45->0.44.
+- o4-mini reasoning (effort=medium): 0.595 (SAME) - cat1 still stuck 0.48; reasoning traded cat2 down (0.61) for cat3 up (0.58).
+- cross-encoder rerank: FREE recall A/B = 0.0 delta on every category (reorders candidates, adds no new evidence at the knee).
+VERDICT: cat1 (32% of cases, ~0.46) does not move for ANY answerer (mini/gpt-4o/reasoning all ~0.45-0.48 at recall 0.69) => it is NOT answerer-capability, NOT budget, NOT rerank. Inspecting the actual cat1 failures (loaded the dataset QA): they are ATTRIBUTE/AGGREGATION questions ("what activities does Melanie do?" gold="pottery, camping, painting, swimming" = every mention across the convo) + NEEDLE single-facts ("where did Caroline move from?"="Sweden" stated once). recall=0.69 OVERCOUNTS (short gold tokens appear somewhere in 100 turns, but the specific fact/full list is not derivable). No knob assembles a cross-turn aggregation.
+
+ROOT BLOCKER (the path to 80%): SEAM lacks CROSS-TURN ENTITY COREFERENCE + entity-aggregation retrieval. LoCoMo ingests PER-TURN so each turn's "Melanie" is a DIFFERENT ent id (per the #320/#319 flat-ingest finding: ZERO ir_edges) - there is nothing to gather "all of Melanie's activities" against. So cat1 needs an INGEST+RETRIEVAL rebuild (resolve an entity across turns; retrieve all claims about a subject), a real project - NOT a paid run. The cheap-lever ceiling is ~0.60-0.68; 0.80 requires the rebuild (which also unblocks the empty-graph multi-hop). HONEST: 0.80 on LoCoMo cat1 is near-SOTA.
+
+ADAPTER BUG-FIXES (found while testing reasoning, real): `_openai_short_answer` hardcoded `reasoning_effort="minimal"` (rejected by o4-mini: supports low/medium/high/xhigh) and `max_completion_tokens=max(mt,256)` (exhausted by reasoning tokens before the answer emits). Both now env-configurable: SEAM_BENCH_REASONING_EFFORT (default "low") + SEAM_BENCH_MAX_COMPLETION_TOKENS (default 2048). The reasoning-answerer path was previously BROKEN for o4-mini; now works (3-case smoke + full-100 confirmed).
+
+Verified: benchmark-adapter only; no core/runtime change; suite unchanged (1077). The gpt-4o answerer (0.595) is the measured best but NOT made the default (production cost decision for the operator). integrity/routing/continuity/streams green.
+
+Unresolved next step: the cat1 retrieval rebuild = cross-turn entity coreference (resolve same-entity ids across per-turn ingests) + entity-aggregation retrieval (gather all claims about a subject). Scope+test cheaply (free cat1 recall) BEFORE building, per [[feedback_always_test_before_building]]. That is the campaign work toward 80%. Stage 5 + server graceful-shutdown gap still open.
+---END-ENTRY-#321---
