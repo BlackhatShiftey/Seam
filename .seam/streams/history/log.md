@@ -7115,3 +7115,31 @@ Verified: docs/roadmap only (Track O is a planning entry); no runtime/test chang
 
 Unresolved next step: cat1/cat3 - re-aim away from decomposition: test (free) whether a LARGER context budget or original-query-first merge avoids the displacement, OR diagnose whether the gold evidence is retrievable at ALL at higher top-k (embedding/lexical mismatch). If the evidence isn't retrievable, the lever is better RANKING/expansion, not more queries. Track O (BIRD/query engine) banked for after the recall work. Stage 5 + the server graceful-shutdown gap still open.
 ---END-ENTRY-#319---
+
+---BEGIN-ENTRY-#320---
+id: 320
+date: 2026-06-15T03:39:08Z
+agent: claude
+status: done
+topics: retrieval, budget, topk, locomo, benchmark, judge, recall, flags, productize, test, verify, history, status
+commits: none
+refs: seam_runtime/retrieval.py,seam_runtime/runtime.py,benchmarks/external/locomo/adapters/seam.py,benchmarks/external/locomo/run.py,tests/audit/test_retrieval_flags.py,tests/audit/test_locomo_adapter_evidence_text.py,tests/audit/test_locomo_adapter_retrieval_event_writer.py,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 319
+tokens: 760
+---
+ROOT-CAUSE FIX (validated): the cat1/cat3 weakness was RETRIEVAL BUDGET STARVATION, not multi-hop, not embeddings. The whole diagnostic chain: paid baseline 0.40 -> bucket failures (cat1/cat3 = retrieval-miss, answerer honest) -> a FREE Phase-0 test KILLED the decomposition hypothesis (#319: it HURT -0.169) -> a FREE top_k/budget sweep found recall climbs hard with depth (cat1 0.385->0.842) -> a PAID judged run confirmed it converts to ANSWER quality -> tested the next point to find the KNEE -> productize -> reproduce. Operator principle this session: "we always test / test first, before build / find a way to test the theory" [[feedback_always_test_before_building]].
+
+THE CURVE (paid judged, 100 cases, gpt-4o-mini answerer+judge, same fixture):
+- 20/2000 (former default): judge 0.40 (orig) + 0.385 (validation) = ~0.39
+- 100/8000 (KNEE): judge 0.52, 0.525, 0.52, 0.54 (4 runs) = ~0.53
+- 200/20000: 0.525 - FLATTENS past the knee (recall kept climbing 0.69->0.77 but judge +0.005, and cat1 recall 0.69->0.83 with judge FLAT = answerer saturation), for ~2x answerer cost. So 100/8000 is the quality-per-token knee, NOT "max it".
+4 knee runs cluster 0.52-0.54 vs 2 baseline 0.385-0.40 = clean separation, ~+0.14, REPRODUCED (not a lucky jump). cat1 0.22->0.44, cat3 0.23->0.42 both double.
+
+THE BUILD:
+- `RetrievalFlags.search_top_k: int | None = None` (env `SEAM_RETRIEVAL_TOP_K`); `search_ir` uses it as the candidate budget when set (None = call-site budget unchanged). DELIBERATELY NOT a self-improvement `candidate_lever`: search_top_k directly controls candidate-set size, so it would trivially GAME the #290 self-probe ("is the gold record in the candidate set"). It is a config knob + a measured default, tuned by free-LoCoMo/paid judge, never the self-probe watchdog.
+- Measured benchmark defaults bumped to the knee: SeamLocomoAdapter + run.py `search_top_k 20->100`, context `budget 2000->8000`. The CORE search_ir default (budget=5) is LEFT UNCHANGED - CLI/REST aren't benchmarked, so bumping their production default is a measured follow-up (test-before-change-production).
+
+Verified: new tests/audit/test_retrieval_flags.py (search_top_k default None + env parse + search_ir honors the override widening candidates); 2 tests that pinned the old 20/2000 defaults updated to pass explicit values (default-independent). Full CI command `pytest test_seam_all/ tools/history/test_history_tools.py tools/streams/ tests/` + PGVECTOR_TEST_DSN + strict no-skip = green, 0 failures (1077 passed/2 xfailed/3 subtests, +2). Total paid spend for the whole cat1/cat3 arc ~7 judged runs ~ a few dollars.
+
+Unresolved next step: optional - bump the CORE search_ir production default (budget=5 is starved) behind its OWN measurement on the CLI/REST surface; expose context-char-budget similarly if wanted. Track O (BIRD/query engine) banked for after. Stage 5 (degenerate ./seam.db) + the server graceful-shutdown wiring gap still open. The cat1/cat3 retrieval-quality arc is CLOSED (0.40->0.52 validated).
+---END-ENTRY-#320---

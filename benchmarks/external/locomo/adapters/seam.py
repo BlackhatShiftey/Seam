@@ -53,7 +53,11 @@ class SeamLocomoAdapter:
     def __init__(
         self,
         db_path: str | None = None,
-        budget: int = 2000,
+        # Measured knee (HISTORY#320): top_k=100 / context budget=8000 lifts paid
+        # judge_score 0.40->0.52 vs the former starved 20/2000; the curve flattens
+        # past here (200/20000 = +0.005 for ~2x answerer cost), so this is the
+        # quality-per-token default, not "max it".
+        budget: int = 8000,
         include_evidence_closure: bool = True,
         answerer: str | None = None,
         answerer_model: str | None = None,
@@ -62,7 +66,7 @@ class SeamLocomoAdapter:
         decomposer_max_subq: int = 3,
         abstain_threshold: float = 0.0,
         rerank: str | None = None,
-        search_top_k: int = 20,
+        search_top_k: int = 100,
         rerank_top_k: int = 20,
         semantic_recovery_mode: str = "baseline",
         rerank_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2",

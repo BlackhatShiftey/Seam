@@ -175,6 +175,7 @@ def test_empty_candidates_still_writes_event(monkeypatch, tmp_path):
     adapter = SeamLocomoAdapter(
         db_path=str(tmp_path),
         budget=2000,
+        search_top_k=20,  # pin explicitly so the diagnostics assert is default-independent
         record_retrieval_events=True,
         run_id="run-empty",
     )

@@ -168,6 +168,12 @@ class SeamRuntime:
         # proposer passes a candidate RetrievalFlags to ablate one lever deterministically
         # without mutating env or the cached runtime state.
         flags = flags if flags is not None else self._retrieval_flags_cached()
+        # Retrieval-depth override (HISTORY#320): flags.search_top_k (env
+        # SEAM_RETRIEVAL_TOP_K) raises the candidate count past the call-site
+        # `budget` when set. The benchmark default of 20 was starving recall;
+        # deeper retrieval is a measured paid-judge win (0.40->0.52). None = use
+        # the caller's `budget` unchanged.
+        budget = flags.search_top_k if getattr(flags, "search_top_k", None) else budget
         # Substream isolation: when ``ns`` is given, confine BOTH the candidate
         # load and the vector top-K to that namespace so a shared store/vector
         # pool cannot leak another namespace's records. ns=None reproduces the

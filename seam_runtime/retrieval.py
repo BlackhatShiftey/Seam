@@ -41,6 +41,15 @@ class RetrievalFlags:
     # cross-ns crowding). ~0 measured LoCoMo recall impact; the value is
     # multi-tenant isolation. End-state ON for any multi-namespace store.
     scoped_vectors: bool = False
+    # Retrieval DEPTH override (candidate count requested from search). None =
+    # use the call-site `budget`. A measured win (HISTORY#320): the benchmark
+    # default of 20 was STARVING recall - deeper retrieval lifts paid judge_score
+    # 0.40->0.52 (knee at ~100). This is a CONFIG knob (env SEAM_RETRIEVAL_TOP_K),
+    # deliberately NOT a self-improvement `candidate_lever`: search_top_k directly
+    # controls candidate-set size, so it would trivially GAME the #290 self-probe
+    # ("is the gold record in the candidate set"). Tuned by free-LoCoMo / paid
+    # judge + a measured default, never by the self-probe watchdog.
+    search_top_k: int | None = None
     # Weighted-fusion channel weights. These default to the locked pre-audit
     # tuple (lexical .40 / semantic .35 / graph .15 / temporal .10), so an
     # un-tuned store reproduces the baseline exactly. Unlike the boolean levers
@@ -134,6 +143,10 @@ def _retrieval_env_overrides(env: Mapping[str, str]) -> dict[str, object]:
             out["rrf_k"] = int(raw)
     if _present("SEAM_RETRIEVAL_SCOPED_VECTORS"):
         out["scoped_vectors"] = _truthy("SEAM_RETRIEVAL_SCOPED_VECTORS")
+    if _present("SEAM_RETRIEVAL_TOP_K"):
+        raw = env["SEAM_RETRIEVAL_TOP_K"].strip()
+        if raw.isdigit() and int(raw) > 0:
+            out["search_top_k"] = int(raw)
     return out
 
 
@@ -143,11 +156,16 @@ def retrieval_flags_from_env(env: Mapping[str, str] | None = None) -> RetrievalF
     def _on(name: str) -> bool:
         return env.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
+    def _pos_int(name: str) -> int | None:
+        raw = env.get(name, "").strip()
+        return int(raw) if raw.isdigit() and int(raw) > 0 else None
+
     return RetrievalFlags(
         semantic_zero_no_vector=_on("SEAM_RETRIEVAL_SEMANTIC_ZERO"),
         bm25_all_kinds=_on("SEAM_RETRIEVAL_BM25_ALL"),
         fusion="rrf" if _on("SEAM_RETRIEVAL_RRF") else "weighted",
         scoped_vectors=_on("SEAM_RETRIEVAL_SCOPED_VECTORS"),
+        search_top_k=_pos_int("SEAM_RETRIEVAL_TOP_K"),
     )
 
 
