@@ -7071,3 +7071,25 @@ Verified: tests/audit/test_conversation_turn_compile.py now sets SEAM_NL_REGEX_E
 
 Unresolved next step: operator-authorized PAID 100-question judged LoCoMo run (after this free verification) - gated, cost surfaced first. Then the real recall work: cat1 multi-hop + cat3 open-domain need a new retrieval/ingest lever (the 11 flag levers are exhausted at 0.627). Stage 5 (migrate the degenerate records still in `./seam.db`) and the server graceful-shutdown wiring gap remain open.
 ---END-ENTRY-#317---
+
+---BEGIN-ENTRY-#318---
+id: 318
+date: 2026-06-15T01:01:25Z
+agent: claude
+status: done
+topics: retrieval, multihop, locomo, benchmark, scope, query, sql2, roadmap, docs, history, status
+commits: none
+refs: docs/audits/2026-06-15-cat1-cat3-multihop-scope.md,docs/roadmap/SEAM_QUERY_ENGINE_SQL2_LEARNINGS.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 317
+tokens: 720
+---
+SCOPING (docs only, no runtime change): two design artifacts the operator asked for - (1) scope the cat1/cat3 multi-hop retrieval lever, (2) capture SQL2 learnings for SEAM OVERALL (operator clarified: not scoped to the current problem, a SEAM-wide future direction).
+
+(1) `docs/audits/2026-06-15-cat1-cat3-multihop-scope.md`. DIAGNOSIS from the #317 paid run (100 cases), bucketing each wrong case by WHY: cat1 multi-hop = 12 retrieval-miss (low recall) vs 6 answerer-miss; cat3 open-domain = 8 retrieval-miss vs 1 answerer-miss. CONCLUSION: cat1/cat3 are RETRIEVAL-bound - the answerer is HONEST (returns "unknown", does not hallucinate when context is insufficient), so the lever is getting evidence INTO context, not the answerer. (cat2 is the opposite: high-recall answerer-misses = temporal reasoning, separate.) KEY FINDING - the multi-hop machinery already EXISTS but is dormant + benchmark-only: `adapters/seam.py:_decompose` (LLM splits question -> sub-queries -> union) was OFF in the 0.40 baseline; `_collect_closure_ids` follows only evidence/prov ids, NOT `ir_edges` (the graph is SCORED via `_graph_score` but never TRAVERSED for retrieval); the CORE runtime (`search_ir`) is single-shot with no decomposition or edge-traversal. LEVERS: L1 query decomposition (multi-query; model-independent - local Ollama default per #313, deterministic split fallback), L2 graph-edge closure expansion (FREE, no LLM - traverse ir_edges bounded-depth from candidates), L3 cat3 query expansion. PLAN: Phase 0 validate cheaply in the adapter (Ollama decomposer free + prototype edge-traversal) measuring free recall vs 0.372/0.261 BEFORE building; Phase 1 productize the winner into core search_ir as a retrieval mode/flag + add to RetrievalFlags so the self-improvement loop can tune it (it currently can't - the 11 levers are all single-shot knobs, tapped out at 0.627); Phase 2 cat3 expansion. Guards: opt-in/flagged (latency+cost), bound hop-depth/budget (dilution), free-recall no-regression watchdog.
+
+(2) `docs/roadmap/SEAM_QUERY_ENGINE_SQL2_LEARNINGS.md`. SEAM-wide future direction (NOT scheduled). The kernel worth taking: "a generated query is not trusted until execution + semantic verification" = already SEAM's DNA (extractor grounding firewall, §24 gate, glass-box). Highest-value model-independent idea: NL -> TYPED QUERY PLAN -> deterministic compilation -> verified execution -> provenance-backed result (model emits plans, not raw SQL authority; preserves model independence). SEAM-overall case: today the store is queryable only via search_ir + CLI flags - no declarative structured querying (status/time/kind/scope/confidence/relationships). TAKE: typed query plan (keystone), read-only AST sandbox with trusted-code scope injection, execution-verified eval, semantic schema registry, provenance-backed query traces. LEAVE (over-built for a tiny known-schema local store): the SQL2 candidate-consensus ensemble (a deterministic plan compiler removes the variance it tames), heavy schema-linking, fine-tuned specialist, any Gemini dependency. Phased build (deterministic foundation -> model-assisted planning -> verification scaling -> specialization); belongs as its own roadmap track (sandbox+traces overlap Track K), AFTER the cat1/cat3 recall work (different, additive axis).
+
+Verified: docs-only; integrity/routing/continuity/streams green; no code/tests touched (suite unchanged at 1075).
+
+Unresolved next step: cat1/cat3 Phase 0 validation (free: Ollama decomposer + edge-traversal prototype in the adapter, measure recall lift vs 0.372/0.261) -> if it moves, Phase 1 productize into core search_ir + RetrievalFlags. The SEAM Query Engine is banked as a future track. Stage 5 (degenerate ./seam.db records) + the server graceful-shutdown wiring gap still open.
+---END-ENTRY-#318---

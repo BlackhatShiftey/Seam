@@ -1,8 +1,8 @@
 # History Index
 
-total_entries: 317
-total_tokens: ~122862
-latest_id: 317
+total_entries: 318
+total_tokens: ~123582
+latest_id: 318
 source: HISTORY.md
 schema: v1
 compact: true
@@ -11,6 +11,7 @@ compact: true
 
 | id | date | status | hash | topics | supersedes |
 |---|---|---|---|---|---|
+| 318 | 2026-06-15 | done | 986aa84648caf209 | retrieval,multihop,locomo,benchmark,+ | 317 |
 | 317 | 2026-06-14 | done | 8008e5f4352f41f0 | nl,compiler,ingest,enrichment,+ | 316 |
 | 316 | 2026-06-14 | done | a45c14d009f6399b | pack,density,compression,context,+ | 315 |
 | 315 | 2026-06-14 | done | 1824fb062a082afc | pack,density,compression,context,+ | 314 |
@@ -339,7 +340,7 @@ compact: true
 - audit: count=74 latest=#303, #290, #288, #280, #279
 - baseline: count=1 latest=#303
 - beam: count=1 latest=#223
-- benchmark: count=100 latest=#317, #312, #311, #302, #292
+- benchmark: count=101 latest=#318, #317, #312, #311, #302
 - branch: count=1 latest=#280
 - branches: count=1 latest=#306
 - bug: count=1 latest=#303
@@ -375,7 +376,7 @@ compact: true
 - diff: count=4 latest=#153, #093, #092, #037
 - dns-rebinding: count=1 latest=#300
 - docker: count=3 latest=#149, #085, #084
-- docs: count=29 latest=#310, #279, #278, #277, #269
+- docs: count=30 latest=#318, #310, #279, #278, #277
 - doctor: count=9 latest=#287, #170, #169, #140, #139
 - dsl: count=1 latest=#298
 - enforcement: count=1 latest=#294
@@ -396,7 +397,7 @@ compact: true
 - harden: count=1 latest=#182
 - hardening: count=1 latest=#268
 - harness: count=1 latest=#303
-- history: count=240 latest=#317, #316, #315, #314, #313
+- history: count=241 latest=#318, #317, #316, #315, #314
 - holdout: count=5 latest=#302, #152, #093, #092, #036
 - holographic: count=1 latest=#288
 - improve: count=1 latest=#302
@@ -411,7 +412,7 @@ compact: true
 - linux: count=6 latest=#177, #173, #136, #135, #021
 - llm: count=1 latest=#313
 - locking: count=2 latest=#283, #182
-- locomo: count=18 latest=#317, #312, #311, #302, #297
+- locomo: count=19 latest=#318, #317, #312, #311, #302
 - longmemeval: count=1 latest=#223
 - loop: count=7 latest=#312, #297, #293, #292, #291
 - lossless: count=1 latest=#288
@@ -424,6 +425,7 @@ compact: true
 - mirl: count=30 latest=#313, #311, #309, #308, #307
 - models: count=1 latest=#182
 - multi-agent: count=19 latest=#268, #231, #230, #229, #224
+- multihop: count=1 latest=#318
 - naming: count=4 latest=#033, #024, #009, #002
 - nl: count=7 latest=#317, #313, #311, #309, #308
 - ollama: count=1 latest=#313
@@ -443,6 +445,7 @@ compact: true
 - prov: count=1 latest=#316
 - pyproject: count=5 latest=#267, #094, #051, #049, #022
 - qr: count=1 latest=#307
+- query: count=1 latest=#318
 - rank: count=6 latest=#243, #242, #240, #017, #005
 - ratchet: count=1 latest=#291
 - read-order: count=1 latest=#304
@@ -456,13 +459,14 @@ compact: true
 - regex: count=1 latest=#317
 - registry: count=1 latest=#178
 - repo-ledger: count=1 latest=#304
-- retrieval: count=54 latest=#315, #314, #312, #308, #307
+- retrieval: count=55 latest=#318, #315, #314, #312, #308
 - retry: count=1 latest=#182
-- roadmap: count=50 latest=#284, #276, #243, #196, #193
+- roadmap: count=51 latest=#318, #284, #276, #243, #196
 - roundtrip: count=2 latest=#007, #006
 - rule: count=1 latest=#304
 - salvage: count=1 latest=#179
 - sbert: count=3 latest=#023, #022, #011
+- scope: count=1 latest=#318
 - scorer: count=1 latest=#292
 - search: count=16 latest=#276, #242, #240, #181, #154
 - security: count=43 latest=#309, #301, #300, #299, #298
@@ -474,8 +478,9 @@ compact: true
 - skip: count=1 latest=#294
 - snapshot: count=110 latest=#239, #229, #227, #226, #225
 - spec: count=3 latest=#307, #305, #304
+- sql2: count=1 latest=#318
 - ssrf: count=2 latest=#300, #288
-- status: count=142 latest=#317, #316, #315, #314, #313
+- status: count=143 latest=#318, #317, #316, #315, #314
 - storage: count=7 latest=#283, #282, #270, #269, #268
 - streams: count=9 latest=#287, #276, #216, #210, #209
 - structure: count=2 latest=#285, #284
@@ -500,6 +505,6 @@ compact: true
 ## status rollup
 
 - roots: 66
-- done: 295
+- done: 296
 - in-progress: 2
 - planned: 20

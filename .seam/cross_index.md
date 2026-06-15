@@ -2,14 +2,13 @@
 
 schema: seam-cross-index/v1
 source: streams/*/log.md (derived; do not hand-edit)
-total_events: 374
+total_events: 375
 hot_zone_max: 200
 archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 
 ## Hot Zone (latest 200 events, oldest first)
 | utc | stream:id:hash | kind | event | topics | refs |
 |---|---|---|---|---|---|
-| 2026-05-08T11:25:00Z | history:146:908d7f11 | session-event | done | docs, history, snapshot, verify, audit, command, dashboar... | docs/howto/README.md,docs/errors.md,docs/setup.md,ROADMAP.md,HISTORY.md,HISTO... |
 | 2026-05-08T11:55:00Z | history:147:e9815937 | session-event | done | docs, readme, command, benchmark, history, snapshot, veri... | README.md,HISTORY.md,HISTORY_INDEX.md,.seam/snapshots |
 | 2026-05-08T13:25:11Z | history:148:e5a81511 | session-event | done | mcp, multi-agent, command, protocol, verify, history, sna... | seam_runtime/mcp_protocol.py,seam_runtime/cli.py,pyproject.toml,test_seam_all... |
 | 2026-05-08T13:45:50Z | history:149:498e3e01 | session-event | done | mcp, multi-agent, pgvector, docker, command, verify, hist... | seam_runtime/pgvector_bootstrap.py,seam_runtime/mcp_protocol.py,.gemini/setti... |
@@ -209,10 +208,11 @@ archive_pattern: cross_index_archive/<lo>-<hi>.cross.md
 | 2026-06-14T12:27:24Z | history:315:1824fb06 | session-event | done | pack, density, compression, context, retrieval, cr, verif... | seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,P... |
 | 2026-06-14T13:26:00Z | history:316:a45c14d0 | session-event | done | pack, density, compression, context, symbols, prov, evide... | seam_runtime/pack.py,test_seam_all/test_seam.py,HISTORY.md,HISTORY_INDEX.md,P... |
 | 2026-06-14T23:53:15Z | history:317:8008e5f4 | session-event | done | nl, compiler, ingest, enrichment, regex, locomo, benchmar... | seam_runtime/nl.py,tests/audit/test_conversation_turn_compile.py,test_seam_al... |
+| 2026-06-15T01:01:25Z | history:318:986aa846 | session-event | done | retrieval, multihop, locomo, benchmark, scope, query, sql... | docs/audits/2026-06-15-cat1-cat3-multihop-scope.md,docs/roadmap/SEAM_QUERY_EN... |
 
 
 ## Archive Pointers
 
 | chunk | utc_range | event_count | streams | top_topics |
 |---|---|---|---|---|
-| 0001-0174.cross.md | 2026-04-15T00:00:00Z..2026-05-08T10:35:00Z | 174 | (multi) | (multi) |
+| 0001-0175.cross.md | 2026-04-15T00:00:00Z..2026-05-08T11:25:00Z | 175 | (multi) | (multi) |
