@@ -40,6 +40,8 @@ def test_flag_defaults_all_off():
     assert flags.bm25_all_kinds is False
     assert flags.fusion == "weighted"
     assert flags.rrf_k == 60
+    # search_top_k defaults to None = no override of the call-site budget.
+    assert flags.search_top_k is None
 
 
 def test_flag_env_parsing_truthy_variants():
@@ -51,6 +53,33 @@ def test_flag_env_parsing_truthy_variants():
     # falsy / unset stays off
     assert retrieval_flags_from_env({"SEAM_RETRIEVAL_RRF": "0"}).fusion == "weighted"
     assert retrieval_flags_from_env({"SEAM_RETRIEVAL_BM25_ALL": "false"}).bm25_all_kinds is False
+
+
+def test_search_top_k_env_parsing():
+    # HISTORY#320: the retrieval-depth knob. Positive int parses; unset/invalid -> None.
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_TOP_K": "100"}).search_top_k == 100
+    assert retrieval_flags_from_env({}).search_top_k is None
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_TOP_K": "0"}).search_top_k is None
+    assert retrieval_flags_from_env({"SEAM_RETRIEVAL_TOP_K": "abc"}).search_top_k is None
+
+
+def test_search_top_k_overrides_call_site_budget():
+    # search_ir uses flags.search_top_k as the candidate budget when set, so a
+    # deeper top_k surfaces records a small budget would miss. Build a store with
+    # more records than the call-site budget and confirm the override widens it.
+    import tempfile, os
+    from seam_runtime.runtime import SeamRuntime
+    db = tempfile.mktemp(suffix=".db")
+    try:
+        rt = SeamRuntime(db)
+        for i in range(12):
+            rt.ingest_conversation_turn(f"Fact number {i}: the widget {i} ships on day {i}.")
+        narrow = rt.search_ir("widget ships", budget=3, include_raw=True)
+        deep = rt.search_ir("widget ships", budget=3, include_raw=True, flags=RetrievalFlags(search_top_k=20))
+        assert len(deep.candidates) > len(narrow.candidates)
+    finally:
+        if os.path.exists(db):
+            os.remove(db)
 
 
 # --- P0-1: semantic -> 0 when a real vector backend is active -------------

@@ -62,7 +62,7 @@ def test_locomo_adapter_uses_separate_search_top_k(monkeypatch, tmp_path):
         "benchmarks.external.locomo.adapters.seam._open_runtime",
         lambda _db_path: FakeRuntime(),
     )
-    adapter = SeamLocomoAdapter(db_path=str(tmp_path), budget=2000)
+    adapter = SeamLocomoAdapter(db_path=str(tmp_path), budget=2000, search_top_k=20)
 
     adapter.answer("scope", "What happened?")
 

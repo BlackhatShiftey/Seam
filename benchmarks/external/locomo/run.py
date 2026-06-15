@@ -42,8 +42,8 @@ def build_adapter(
     rerank: str | None = None,
     keep_db: bool = False,
     db_path: str | None = None,
-    context_budget: int = 2000,
-    search_top_k: int = 20,
+    context_budget: int = 8000,  # HISTORY#320 measured knee (was 2000, starved)
+    search_top_k: int = 100,     # HISTORY#320 measured knee (was 20, starved)
     rerank_top_k: int = 20,
     semantic_recovery_mode: str = "baseline",
     record_retrieval_events: bool | None = None,
@@ -283,14 +283,14 @@ def main() -> None:
     parser.add_argument(
         "--context-budget",
         type=int,
-        default=2000,
-        help="(seam adapter) Character budget for retrieved evidence context (default: 2000).",
+        default=8000,
+        help="(seam adapter) Character budget for retrieved evidence context (default: 8000, the HISTORY#320 measured knee; was 2000).",
     )
     parser.add_argument(
         "--search-top-k",
         type=int,
-        default=20,
-        help="(seam adapter) Candidate count requested from search_ir before evidence closure (default: 20).",
+        default=100,
+        help="(seam adapter) Candidate count requested from search_ir before evidence closure (default: 100, the HISTORY#320 measured knee; was 20).",
     )
     parser.add_argument(
         "--rerank-top-k",
