@@ -7093,3 +7093,25 @@ Verified: docs-only; integrity/routing/continuity/streams green; no code/tests t
 
 Unresolved next step: cat1/cat3 Phase 0 validation (free: Ollama decomposer + edge-traversal prototype in the adapter, measure recall lift vs 0.372/0.261) -> if it moves, Phase 1 productize into core search_ir + RetrievalFlags. The SEAM Query Engine is banked as a future track. Stage 5 (degenerate ./seam.db records) + the server graceful-shutdown wiring gap still open.
 ---END-ENTRY-#318---
+
+---BEGIN-ENTRY-#319---
+id: 319
+date: 2026-06-15T01:17:23Z
+agent: claude
+status: done
+topics: roadmap, query, sql, bird, benchmark, retrieval, multihop, locomo, decomposition, history, status
+commits: none
+refs: ROADMAP.md,HISTORY.md,HISTORY_INDEX.md,PROJECT_STATUS.md
+supersedes: 318
+tokens: 620
+---
+TWO things this session: (A) added ROADMAP Track O for the SEAM Query Engine (operator: "add BIRD to the benchmarks" -> "add it to the roadmap in an appropriate place to start or consider it"); (B) ran + recorded the cat1/cat3 Phase 0 multi-hop validation, a decisive NEGATIVE result.
+
+(A) ROADMAP Track O - SEAM Query Engine (execution-verified NL querying). Planned/consider, priority 3, AFTER the retrieval-quality work. Canonical design = docs/roadmap/SEAM_QUERY_ENGINE_SQL2_LEARNINGS.md (#318). Kernel: NL -> typed query plan -> deterministic compile -> verified execution -> provenance result. KEY PLACEMENT of BIRD (operator asked when the BIRD harness becomes useful): it is useless until SEAM can EMIT SQL, so it is the FIRST/measurement-first deliverable OF this track (not a standalone add) - a query-benchmark slot SEPARATE from the conversational memory_benchmarks.json registry (BIRD is text-to-SQL, not memory), the execution-accuracy scorer (run gold + predicted SQL, compare result sets) + fixture testable before any generator, generator NOT_CONFIGURED until the engine exists. Phases 1 deterministic foundation (+ BIRD harness) / 2 model-assisted planning (now BIRD scores SEAM) / 3 verification scaling (NOT the SQL2 consensus ensemble - a deterministic compiler removes the variance) / 4 specialization. Overlaps Track K. Added to the major-workstreams summary list.
+
+(B) cat1/cat3 Phase 0 (FREE: qwen2.5:3b on local Ollama :11435 as the decomposer; recall scorer, 3 dev scopes / 259 questions, decomposition OFF vs ON, SAME questions). RESULT: decomposition HURTS recall - baseline 0.6119 -> decomposed 0.4429, delta -0.169; per-category cat1 -0.226 (the multi-hop TARGET), cat2 -0.064, cat3 -0.016, cat4 -0.223. MECHANISM: the sub-queries retrieve off-topic records that DISPLACE the correct evidence at the fixed context budget (the #273/[[feedback_format_change_displaces_raw]] displacement dynamic). HYPOTHESIS FALSIFIED for naive decomposition; Phase 0 (validate-before-building) saved a regression from being productized. ALSO confirmed structurally: compile_nl creates ZERO ir_edges (flat ingest), so L2 graph-edge closure has no graph to walk (would need entity-coref/REL extraction first); LoCoMo ingests PER-TURN so entities don't co-refer across turns. So both naive multi-hop levers (L1 decomposition, L2 edge-closure) are OUT as-is - the cat1/cat3 miss is a ranking/budget/displacement problem (or the evidence is simply not retrievable at top-k), NOT a too-few-queries problem.
+
+Verified: docs/roadmap only (Track O is a planning entry); no runtime/test change (suite unchanged at 1075); integrity/routing/continuity/streams green.
+
+Unresolved next step: cat1/cat3 - re-aim away from decomposition: test (free) whether a LARGER context budget or original-query-first merge avoids the displacement, OR diagnose whether the gold evidence is retrievable at ALL at higher top-k (embedding/lexical mismatch). If the evidence isn't retrievable, the lever is better RANKING/expansion, not more queries. Track O (BIRD/query engine) banked for after the recall work. Stage 5 + the server graceful-shutdown gap still open.
+---END-ENTRY-#319---

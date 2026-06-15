@@ -1595,6 +1595,70 @@ Phase work:
 
 ---
 
+## Track O — SEAM Query Engine (execution-verified NL querying)
+
+<!-- seam:item
+id: roadmap:track:O
+status: planned
+status-since: 2026-06-15
+status-by: history:319
+supersedes: none
+topics: query, sql, retrieval, benchmark, bird
+priority: 3
+phase: 1
+-->
+
+**Status:** Planned / consider — a future major workstream, AFTER the cat1/cat3
+retrieval-quality work (the measured current bottleneck; a query engine is a
+different, additive axis). Operator interest: text-to-SQL (Google Gemini-SQL2,
+80.04% on BIRD) is a strong product direction for SEAM.
+**Canonical design:** `docs/roadmap/SEAM_QUERY_ENGINE_SQL2_LEARNINGS.md` (the
+SQL2 learnings + what to take vs leave).
+
+A model-independent, provenance-preserving, **execution-verified** natural-language
+query interface over SEAM's store (MIRL records, relational metadata, semantic
+indexes, trace graphs). The kernel — already SEAM's DNA (extractor grounding
+firewall, §24 gate, glass-box): **a generated query is not trusted until execution
++ semantic verification succeed.** Pipeline: NL → **typed query plan** →
+deterministic compilation → verified execution → provenance-backed result (the model
+emits *plans*, never raw executable authority).
+
+**Start here (measurement-first, the forcing function): the BIRD harness.**
+BIRD evaluates *executable results, not query strings* — the standard yardstick for
+text-to-SQL. Build it as the FIRST deliverable of this track (the way the `compile_nl`
+fidelity contract preceded the compiler fix): a new query-benchmark slot (separate
+from the conversational `memory_benchmarks.json` registry), the **execution-accuracy
+scorer** (run gold + predicted SQL on a BIRD SQLite db, compare result sets), a `bird`
+CLI target with `--dry-run`/plan, dataset registration (not bundled — `--dataset-path`
+to a local BIRD release, like `beam`), and a tiny fixture so the scorer is tested
+before any generator exists. The SEAM SQL **generator** stays `NOT_CONFIGURED` until
+the engine can emit SQL — the harness measures nothing until then, so it is built
+*with* this track, not before it (it becomes useful at Phase 1, fully at Phase 2).
+
+Phase work:
+
+1. **Deterministic foundation (no LLM):** `seam_runtime/query/` — typed `SEAMQueryPlan`,
+   semantic schema registry, deterministic plan→operation compiler (over the existing
+   hybrid retrieval + structured SQLite filters), read-only AST-validated sandbox
+   (scope/namespace predicates injected by trusted code; SQLite authorizer + timeout +
+   row limits; deny ATTACH/PRAGMA/extension-load), query-trace persistence. **+ the BIRD
+   execution-accuracy benchmark.** `seam query --plan-only`.
+2. **Model-assisted planning:** NL→plan adapters (Ollama default; openai/claude/gemini
+   opt-in), schema linking, ambiguity detection, single-candidate verification. Now the
+   BIRD harness can score SEAM end-to-end.
+3. **Verification scaling (only if a measured variance problem appears):** failure-aware
+   repair, confidence-gated abstention, cost/latency budgets. NOT the SQL2 candidate-
+   consensus ensemble by default — a deterministic plan compiler removes the variance it
+   tames (see the learnings doc).
+4. **Specialization:** mine successful traces into a gold-query dataset + hard negatives
+   + optional local-model distillation, reusing the existing self-improvement + benchmark
+   loop.
+
+Overlaps Track K (the read-only sandbox + provenance query traces share K's audit
+ledger). Do not start before the retrieval-quality work lands.
+
+---
+
 ## Recommended Course — Priority Order
 
 Use this section for current priority. Older planned entries `HISTORY#028`-
@@ -1652,6 +1716,7 @@ Major workstreams scheduled after the plug-and-play target lands
 - Track L: Agent / Skills Compiler (reconcile from `claude/seam-trust-security-manual-8mhEL`)
 - Track J: Prompt codec optimization (TOON / SEAM-RC / SEAM-LX evaluation)
 - Track K: Trust, security, lineage, auditability (capabilities, audit ledger, BIL benchmark bundles)
+- Track O: SEAM Query Engine (execution-verified NL→typed-plan→SQL; starts with the BIRD execution-accuracy harness; after the retrieval-quality work)
 ```
 
 Snapshot archival policy: do not delete or compress `.seam/snapshots/` ad hoc.
